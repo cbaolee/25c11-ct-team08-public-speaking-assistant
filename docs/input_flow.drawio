@@ -1,0 +1,294 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="UI-flow" id="8_ju9bwB_Etv3yS0M0JM">
+    <mxGraphModel grid="0" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="" mermaidData="{&#xa;  &quot;data&quot;: &quot;%%{init: {&#39;themeVariables&#39;: {&#39;edgeLabelBackground&#39;: &#39;transparent&#39;}}}%%\nflowchart TD\n    %% Define UI Node Styles\n    classDef screen fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#ffffff\n    classDef state fill:#334155,stroke:#f59e0b,stroke-width:2px,stroke-dasharray: 5 5,color:#ffffff\n    classDef error fill:#450a0a,stroke:#ef4444,stroke-width:2px,color:#fca5a5\n    classDef success fill:#064e3b,stroke:#10b981,stroke-width:2px,color:#a7f3d0\n    classDef decision fill:#0f172a,stroke:#94a3b8,stroke-width:2px,color:#ffffff\n\n    %% ================= DASHBOARD &amp; NAVIGATION =================\n    Dash[\&quot;Main Dashboard Screen&lt;br/&gt;Options: Generate Script | Practice Voice | History\&quot;]:::screen\n    Dash --&gt;|Click Profile| Profile[\&quot;Profile Screen&lt;br/&gt;(Update user info &amp; Record 30s Baseline Voice)\&quot;]:::screen\n    Dash --&gt;|Click History| History[\&quot;Practice History Screen&lt;br/&gt;(List of saved Audio Records &amp; Score charts)\&quot;]:::screen\n\n    %% ================= MODULE 1: SCRIPT GENERATING (UI) =================\n    Dash --&gt;|Click Generate Script| U1\n\n    subgraph FUNC1 [\&quot;MODULE 1: SCRIPT GENERATION UI FLOW\&quot;]\n        direction TB\n        U1[\&quot;Script Input Screen&lt;br/&gt;- Select Topic Dropdown&lt;br/&gt;- Drag &amp; Drop PDF File or Enter Text\&quot;]:::screen\n        \n        U1 --&gt;|Click Generate Button| ING1{\&quot;File Validation&lt;br/&gt;(UI Sanity Gate)\&quot;}:::decision\n        \n        ING1 --&gt;|Invalid Format / Oversized / Password Protected| ERR1[\&quot;UI Error State: Red Border &amp; Inline Message&lt;br/&gt;&#39;Invalid file format, size exceeded, or password-protected!&#39;\&quot;]:::error\n        ERR1 --&gt;|User selects another file| U1\n        \n        ING1 --&gt;|Valid File| LOAD_EXTRACT[\&quot;UI Loading State: Skeleton Loader&lt;br/&gt;&#39;Extracting text &amp; verifying content safety...&#39;\&quot;]:::state\n        \n        LOAD_EXTRACT --&gt; VAL_CHECK{\&quot;Content Moderation&lt;br/&gt;(Profanity / Harmful?)\&quot;}:::decision\n        \n        VAL_CHECK --&gt;|Policy Violation| ERR2[\&quot;UI Safety Alert Modal:&lt;br/&gt;&#39;Content contains inappropriate or restricted language.&lt;br/&gt;Please revise your input material!&#39;\&quot;]:::error\n        ERR2 --&gt;|Click Acknowledge &amp; Edit| U1\n        \n        VAL_CHECK --&gt;|Safe Content| LOAD_GEN[\&quot;UI Loading State: Progress Bar&lt;br/&gt;&#39;Generating English MC script...&#39;\&quot;]:::state\n        \n        LOAD_GEN --&gt; OUT1[\&quot;Reference Script Screen&lt;br/&gt;- Text Editor displaying generated English script&lt;br/&gt;- Highlighted keywords&lt;br/&gt;- Buttons: Copy Text | Download | Regenerate\&quot;]:::success\n    end\n\n    OUT1 --&gt;|Click Back to Dashboard| Dash\n\n    %% ================= MODULE 2: EVALUATE VOICE PRACTICE (UI) =================\n    Dash --&gt;|Click Evaluate Voice| U2\n    OUT1 -.-&gt;|Click Practice with this Script| U2\n\n    subgraph FUNC2 [\&quot;MODULE 2: VOICE PRACTICE &amp; EVALUATION UI FLOW\&quot;]\n        direction TB\n        U2[\&quot;Voice Studio Screen (Record / Upload)&lt;br/&gt;- Left Panel: Reference Script Display&lt;br/&gt;- Right Panel: Direct Mic Recording OR Upload Audio File\&quot;]:::screen\n        \n        U2 --&gt;|Finish Recording / Upload Audio &amp; Click Evaluate| LOAD_PRE[\&quot;UI Loading State (Step 1/2)&lt;br/&gt;&#39;Compressing &amp; normalizing audio...&#39;\&quot;]:::state\n        \n        LOAD_PRE --&gt; LOAD_ANA[\&quot;UI Analyzing State (Step 2/2)&lt;br/&gt;&#39;Transcribing speech, measuring pacing (WPM) &amp; prosody...&#39;\&quot;]:::state\n        \n        LOAD_ANA --&gt; OUT2[\&quot;Evaluation Report Screen&lt;br/&gt;1. Overall Score (Compared against 30s Baseline)&lt;br/&gt;2. Transcript View: Mispronounced / missing words highlighted in red&lt;br/&gt;3. Visual Charts: Pacing (WPM), Pauses, Pitch (F0) &amp; Volume (dB)&lt;br/&gt;4. Audio Player (Playback recorded voice)\&quot;]:::screen\n        \n        OUT2 --&gt; SAVE_TOAST[\&quot;UI Toast Notification:&lt;br/&gt;&#39;Audio Record &amp; Evaluation Report automatically saved to History&#39;\&quot;]:::success\n    end\n\n    SAVE_TOAST --&gt;|Click Re-record / Upload Another| U2\n    SAVE_TOAST --&gt;|Click View History| History\n    SAVE_TOAST --&gt;|Click Back to Dashboard| Dash&quot;,&#xa;  &quot;config&quot;: null,&#xa;  &quot;version&quot;: &quot;12&quot;&#xa;}" id="6U0zkVIXLJNiaiAlb-0J-100">
+          <mxCell connectable="0" parent="1" style="group;transparentBounds=1;editIcon=1;lockedGroup=0;groupPadding=10;" vertex="1">
+            <mxGeometry as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="n:FUNC1" mermaidBaseStyle="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#FDF4FF;strokeColor=#E879F9;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MODULE 1: SCRIPT GENERATION UI FLOW" id="6U0zkVIXLJNiaiAlb-0J-112">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F8FAFC;strokeColor=none;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;container=0;" vertex="1">
+            <mxGeometry height="1639" width="827" x="665" y="150" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;Main Dashboard Screen&lt;/b&gt;&lt;br&gt;Options: Generate Script | Practice Voice | History" mermaidId="n:Dash" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#1e293b;strokeColor=#3b82f6;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Main Dashboard Screen&#xa;Options: Generate Script | Practice Voice | History" id="6U0zkVIXLJNiaiAlb-0J-130">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="150" width="152" x="1155" y="-160" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;Profile Screen&lt;/b&gt;" mermaidId="n:Profile" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#1e293b;strokeColor=#3b82f6;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Profile Screen&#xa;(Update user info &amp; Record 30s Baseline Voice)" id="6U0zkVIXLJNiaiAlb-0J-131">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="69" width="152" x="435" y="171" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Practice History Screen" mermaidId="n:History" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#1e293b;strokeColor=#3b82f6;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Practice History Screen&#xa;(List of saved Audio Records &amp; Score charts)" id="6U0zkVIXLJNiaiAlb-0J-132">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="79.65" width="152" x="1340" y="1980" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Profile&lt;/span&gt;" mermaidId="e:Dash-&gt;Profile#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Profile" id="6U0zkVIXLJNiaiAlb-0J-133">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-130" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-131">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1172" y="40" />
+                <mxPoint x="511" y="40" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click History&lt;/span&gt;" mermaidId="e:Dash-&gt;History#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=1;entryX=0.35;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click History" id="6U0zkVIXLJNiaiAlb-0J-134">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-130" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=1;entryX=0.35;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-132">
+            <mxGeometry relative="1" x="-0.0004" as="geometry">
+              <Array as="points">
+                <mxPoint x="1202.1" y="60" />
+                <mxPoint x="605" y="60" />
+                <mxPoint x="605" y="1920" />
+                <mxPoint x="1393.2" y="1920" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Generate Script&lt;/span&gt;" mermaidId="e:Dash-&gt;U1#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Generate Script" id="6U0zkVIXLJNiaiAlb-0J-135">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-130" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-113">
+            <mxGeometry relative="1" x="0.3943" y="-4" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="1209.9" y="80" />
+                <mxPoint x="1057.5" y="80" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Back to Dashboard&lt;/span&gt;" mermaidId="e:OUT1-&gt;Dash#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.56;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Back to Dashboard" id="6U0zkVIXLJNiaiAlb-0J-136">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-120" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.673;exitY=0.004;entryX=0.56;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;exitDx=0;exitDy=0;exitPerimeter=0;" target="6U0zkVIXLJNiaiAlb-0J-130">
+            <mxGeometry relative="1" x="-0.1303" as="geometry">
+              <Array as="points">
+                <mxPoint x="1275.2" y="1490" />
+                <mxPoint x="1395" y="1490" />
+                <mxPoint x="1395" y="280" />
+                <mxPoint x="1240.1" y="280" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;&lt;b&gt;Script Input Screen&lt;/b&gt;&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;- Select Topic Dropdown&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;- Drag &amp;amp; Drop PDF File or Enter Text&lt;/span&gt;&lt;/div&gt;" mermaidId="n:U1" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#1e293b;strokeColor=#3b82f6;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Script Input Screen&#xa;- Select Topic Dropdown&#xa;- Drag &amp; Drop PDF File or Enter Text" id="6U0zkVIXLJNiaiAlb-0J-113">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;align=center;" vertex="1">
+            <mxGeometry height="167.06129210381005" width="148.9383886255924" x="983.0509478672986" y="217.621755935947" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;File Validation&lt;/b&gt;&lt;br&gt;(UI Sanity Gate)" mermaidId="n:ING1" mermaidBaseStyle="rhombus;html=1;strokeWidth=2;whiteSpace=wrap;fillColor=#0f172a;strokeColor=#94a3b8;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="File Validation&#xa;(UI Sanity Gate)" id="6U0zkVIXLJNiaiAlb-0J-114">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="rhombus;html=1;strokeWidth=2;whiteSpace=wrap;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="202.02760905577028" width="203.81042654028437" x="955.6149289099526" y="486.6681391496411" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;UI Error State&lt;/b&gt;" mermaidId="n:ERR1" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#450a0a;strokeColor=#ef4444;fontColor=#fca5a5;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="UI Error State: Red Border &amp; Inline Message&#xa;&#39;Invalid file format, size exceeded, or password-protected!&#39;" id="6U0zkVIXLJNiaiAlb-0J-115">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#450a0a;strokeColor=#ef4444;fontColor=#FCD8D1;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="79.65" width="148.94" x="770.42" y="750" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;UI Loading State&lt;/b&gt;" mermaidId="n:LOAD_EXTRACT" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#334155;strokeColor=#f59e0b;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;dashed=1;dashPattern=5 5;fixDash=1;" mermaidBaseValue="UI Loading State: Skeleton Loader&#xa;&#39;Extracting text &amp; verifying content safety...&#39;" id="6U0zkVIXLJNiaiAlb-0J-116">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;dashed=1;dashPattern=5 5;fixDash=1;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="105.69" width="148.94" x="1084.96" y="790" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;Content Moderation&lt;/b&gt;&lt;br&gt;(Profanity / Harmful?)" mermaidId="n:VAL_CHECK" mermaidBaseStyle="rhombus;html=1;strokeWidth=2;whiteSpace=wrap;fillColor=#0f172a;strokeColor=#94a3b8;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Content Moderation&#xa;(Profanity / Harmful?)" id="6U0zkVIXLJNiaiAlb-0J-117">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="rhombus;html=1;strokeWidth=2;whiteSpace=wrap;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="202.02760905577028" width="203.81042654028437" x="1057.5290047393366" y="957.9737713970183" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span&gt;UI Safety Alert Modal&lt;/span&gt;" mermaidId="n:ERR2" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#450a0a;strokeColor=#ef4444;fontColor=#fca5a5;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="UI Safety Alert Modal:&#xa;&#39;Content contains inappropriate or restricted language.&#xa;Please revise your input material!&#39;" id="6U0zkVIXLJNiaiAlb-0J-118">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#450a0a;strokeColor=#ef4444;fontColor=#FCD8D1;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;fontStyle=0;align=center;verticalAlign=middle;" vertex="1">
+            <mxGeometry height="79.64549972390944" width="148.94" x="1233.8999999999999" y="1300.0027885146328" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;UI Loading State&lt;/b&gt;" mermaidId="n:LOAD_GEN" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#334155;strokeColor=#f59e0b;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;dashed=1;dashPattern=5 5;fixDash=1;" mermaidBaseValue="UI Loading State: Progress Bar&#xa;&#39;Generating English MC script...&#39;" id="6U0zkVIXLJNiaiAlb-0J-119">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;dashed=1;dashPattern=5 5;fixDash=1;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="79.64549972390944" width="148.94" x="1034" y="1300.0027885146328" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span&gt;Reference Script Screen&lt;/span&gt;&lt;br&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;- Text Editor displaying generated English script&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;- Highlighted keywords&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;- Buttons: Copy Text | Download | Regenerate&lt;/span&gt;&lt;/div&gt;" mermaidId="n:OUT1" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#064e3b;strokeColor=#10b981;fontColor=#a7f3d0;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Reference Script Screen&#xa;- Text Editor displaying generated English script&#xa;- Highlighted keywords&#xa;- Buttons: Copy Text | Download | Regenerate" id="6U0zkVIXLJNiaiAlb-0J-120">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#064e3b;strokeColor=#10b981;fontColor=#D1FFE3;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;fontStyle=0;align=center;verticalAlign=middle;" vertex="1">
+            <mxGeometry height="247.67807840971838" width="148.9383886255924" x="1175.0003791469194" y="1520.117062396466" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Generate Button&lt;/span&gt;" mermaidId="e:U1-&gt;ING1#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Generate Button" id="6U0zkVIXLJNiaiAlb-0J-121">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-113" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-114">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Invalid&amp;nbsp;&lt;/span&gt;&lt;div&gt;&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;&lt;br&gt;&lt;/span&gt;&lt;/div&gt;" mermaidId="e:ING1-&gt;ERR1#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Invalid Format / Oversized / Password Protected" id="6U0zkVIXLJNiaiAlb-0J-122">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-114" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-115">
+            <mxGeometry relative="1" x="0.6046" y="-1" as="geometry">
+              <mxPoint as="offset" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;User selects another file&lt;/span&gt;" mermaidId="e:ERR1-&gt;U1#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=0;entryX=0.28;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="User selects another file" id="6U0zkVIXLJNiaiAlb-0J-123">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-115" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=0;entryX=0.28;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-113">
+            <mxGeometry relative="1" x="-0.1321" as="geometry">
+              <Array as="points">
+                <mxPoint x="822.6" y="660" />
+                <mxPoint x="753.8" y="660" />
+                <mxPoint x="753.8" y="413.8" />
+                <mxPoint x="1024.8" y="413.8" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Valid&amp;nbsp;&lt;/span&gt;" mermaidId="e:ING1-&gt;LOAD_EXTRACT#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.65;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Valid File" id="6U0zkVIXLJNiaiAlb-0J-124">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-114" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.65;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-116">
+            <mxGeometry relative="1" x="0.3524" y="8" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="1159.4" y="665.4" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:LOAD_EXTRACT-&gt;VAL_CHECK#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="6U0zkVIXLJNiaiAlb-0J-125">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-116" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="6U0zkVIXLJNiaiAlb-0J-117">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Policy Violation&lt;/span&gt;" mermaidId="e:VAL_CHECK-&gt;ERR2#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.65;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Policy Violation" id="6U0zkVIXLJNiaiAlb-0J-126">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-117" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.65;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-118">
+            <mxGeometry relative="1" x="0.5519" y="-28" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="1287.5" y="1136.7" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Acknowledge &amp;amp; Edit&lt;/span&gt;" mermaidId="e:ERR2-&gt;U1#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.71;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Acknowledge &amp; Edit" id="6U0zkVIXLJNiaiAlb-0J-127">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-118" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.71;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-113">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1329.920616113744" y="413.8216454997239" />
+                <mxPoint x="1088.8755924170616" y="413.8216454997239" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Safe Content&lt;/span&gt;" mermaidId="e:VAL_CHECK-&gt;LOAD_GEN#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Safe Content" id="6U0zkVIXLJNiaiAlb-0J-128">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-117" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-119">
+            <mxGeometry relative="1" x="0.3738" y="2" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="1108.5" y="1136.7" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:LOAD_GEN-&gt;OUT1#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.35;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="6U0zkVIXLJNiaiAlb-0J-129">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-119" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.35;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="6U0zkVIXLJNiaiAlb-0J-120">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1108.5" y="1490.9784649364992" />
+                <mxPoint x="1227.1" y="1490.9784649364992" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="n:FUNC2" mermaidBaseStyle="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F0FDFA;strokeColor=#2DD4BF;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MODULE 2: VOICE PRACTICE &amp; EVALUATION UI FLOW" id="6U0zkVIXLJNiaiAlb-0J-101">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F5FDFB;strokeColor=none;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;container=0;" vertex="1">
+            <mxGeometry height="1129" width="500" x="1640" y="171" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Evaluate Voice&lt;/span&gt;" mermaidId="e:Dash-&gt;U2#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.69;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Evaluate Voice" id="6U0zkVIXLJNiaiAlb-0J-137">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-130" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.69;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-102">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1259.9" y="60" />
+                <mxPoint x="1904.3" y="60" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click History&lt;/span&gt;" mermaidId="e:SAVE_TOAST-&gt;History#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=0.99;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click View History" id="6U0zkVIXLJNiaiAlb-0J-139">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-106" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=0.99;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-132">
+            <mxGeometry relative="1" x="-0.2461" y="-18" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="2018" y="1920" />
+                <mxPoint x="1437.3" y="1920" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Back to Dashboard&lt;/span&gt;" mermaidId="e:SAVE_TOAST-&gt;Dash#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.72;exitY=0;entryX=0.81;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Back to Dashboard" id="6U0zkVIXLJNiaiAlb-0J-140">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-106" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.72;exitY=0;entryX=0.81;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-130">
+            <mxGeometry relative="1" x="0.0003" as="geometry">
+              <Array as="points">
+                <mxPoint x="2051.4" y="30" />
+                <mxPoint x="1278.1" y="30" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;Voice Studio Screen&amp;nbsp;&lt;/b&gt;&lt;br&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;- Direct Mic Recording OR Upload Audio File&lt;/span&gt;&lt;/div&gt;" mermaidId="n:U2" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#1e293b;strokeColor=#3b82f6;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Voice Studio Screen (Record / Upload)&#xa;- Left Panel: Reference Script Display&#xa;- Right Panel: Direct Mic Recording OR Upload Audio File" id="6U0zkVIXLJNiaiAlb-0J-102">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="144" width="152" x="1807" y="217.62" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <mxCell id="6U0zkVIXLJNiaiAlb-0J-146" edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-103" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;fontFamily=Recursive;fontSize=14;fontColor=#28253D;labelBackgroundColor=transparent;strokeColor=#000000;strokeWidth=2;align=center;verticalAlign=middle;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;jumpStyle=arc;jumpSize=12;startArrow=none;endArrow=block;endSize=8;targetPerimeterSpacing=4;curved=0;" target="6U0zkVIXLJNiaiAlb-0J-105">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <UserObject label="&lt;b&gt;UI Loading State&lt;/b&gt;" mermaidId="n:LOAD_PRE" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#334155;strokeColor=#f59e0b;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;dashed=1;dashPattern=5 5;fixDash=1;" mermaidBaseValue="UI Loading State (Step 1/2)&#xa;&#39;Compressing &amp; normalizing audio...&#39;" id="6U0zkVIXLJNiaiAlb-0J-103">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;dashed=1;dashPattern=5 5;fixDash=1;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="62" width="152" x="1702" y="579" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;b&gt;Evaluation Report Screen&lt;/b&gt;&lt;br&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;1. Overall Score (Compared against 30s Baseline)&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;2. Transcript View: Mispronounced / missing words highlighted in red&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;3. Visual Charts: Pacing (WPM), Pauses, Pitch (F0) &amp;amp; Volume (dB)&lt;/span&gt;&lt;/div&gt;&lt;div style=&quot;text-align: left;&quot;&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(18, 18, 18));&quot;&gt;4. Audio Player (Playback recorded voice)&lt;/span&gt;&lt;/div&gt;" mermaidId="n:OUT2" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#1e293b;strokeColor=#3b82f6;fontColor=#ffffff;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Evaluation Report Screen&#xa;1. Overall Score (Compared against 30s Baseline)&#xa;2. Transcript View: Mispronounced / missing words highlighted in red&#xa;3. Visual Charts: Pacing (WPM), Pauses, Pitch (F0) &amp; Volume (dB)&#xa;4. Audio Player (Playback recorded voice)" id="6U0zkVIXLJNiaiAlb-0J-105">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="380" width="159" x="1698.5" y="710" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span&gt;UI Toast Notification&lt;/span&gt;" mermaidId="n:SAVE_TOAST" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#064e3b;strokeColor=#10b981;fontColor=#a7f3d0;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="UI Toast Notification:&#xa;&#39;Audio Record &amp; Evaluation Report automatically saved to History&#39;" id="6U0zkVIXLJNiaiAlb-0J-106">
+          <mxCell parent="6U0zkVIXLJNiaiAlb-0J-100" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#064e3b;strokeColor=#10b981;fontColor=#D1FFE3;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;fontStyle=0;align=center;verticalAlign=middle;" vertex="1">
+            <mxGeometry height="93.5" width="152" x="1942" y="1160" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:OUT2-&gt;SAVE_TOAST#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.29;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="6U0zkVIXLJNiaiAlb-0J-110">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-105" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.29;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="6U0zkVIXLJNiaiAlb-0J-106">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1778" y="1120" />
+                <mxPoint x="1986.1" y="1120" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Click Re-record / Upload Another&lt;/span&gt;" mermaidId="e:SAVE_TOAST-&gt;U2#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=0;entryX=0.64;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Click Re-record / Upload Another" id="6U0zkVIXLJNiaiAlb-0J-111">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-106" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=0;entryX=0.64;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-102">
+            <mxGeometry relative="1" x="-0.2501" y="8" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="2018" y="504" />
+                <mxPoint x="1904.3" y="504" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="&lt;span style=&quot;background-color: light-dark(#ffffff, var(--ge-dark-color, #121212));&quot;&gt;Upload Audio&amp;nbsp;&lt;/span&gt;" mermaidId="e:U2-&gt;LOAD_PRE#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="Finish Recording / Upload Audio &amp; Click Evaluate" id="6U0zkVIXLJNiaiAlb-0J-107">
+          <mxCell edge="1" parent="6U0zkVIXLJNiaiAlb-0J-100" source="6U0zkVIXLJNiaiAlb-0J-102" style="edgeStyle=orthogonalEdgeStyle;rounded=0;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=transparent;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="6U0zkVIXLJNiaiAlb-0J-103">
+            <mxGeometry relative="1" x="0.3484" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="1860.2" y="504" />
+                <mxPoint x="1778" y="504" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

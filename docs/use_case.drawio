@@ -1,0 +1,97 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="AmTVAXEkn7gUk8JjcYXG">
+    <mxGraphModel dx="1323" dy="708" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#0B2585;fontFamily=Helvetica;" value="Public speaking coach — AI assistant for English learners" vertex="1">
+          <mxGeometry height="40" width="700" x="60" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="boundary" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#0B2585;strokeWidth=2.5;verticalAlign=top;fontSize=20;fontStyle=1;fontColor=#0B2585;spacingTop=8;fontFamily=Helvetica;" value="Public Speaking Coach" vertex="1">
+          <mxGeometry height="630" width="680" x="220" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_learner" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#222F3D;strokeWidth=2;fillColor=none;fontSize=18;fontStyle=1;fontColor=#222F3D;fontFamily=Helvetica;spacingTop=6;" value="Learner" vertex="1">
+          <mxGeometry height="90" width="45" x="90" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="actor_email" parent="1" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;strokeColor=#4A5568;strokeWidth=2;fillColor=none;fontSize=18;fontStyle=1;fontColor=#4A5568;fontFamily=Helvetica;spacingTop=6;" value="Email / Calendar" vertex="1">
+          <mxGeometry height="90" width="45" x="980" y="605" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_profile" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Modify profile" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_history" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="View practice &amp;&#xa;analysis" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="220" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_gen_script" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF0E5;strokeColor=#D97706;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Generate script" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_eval_script" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF0E5;strokeColor=#D97706;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Evaluate script" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_practice" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Practice speech&#xa;(audio)" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_recommend" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF0E5;strokeColor=#D97706;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Recommend next&#xa;exercise" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_schedule" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Schedule practice" vertex="1">
+          <mxGeometry height="65" width="230" x="250" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_extract" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Extract context&#xa;(PDF/text)" vertex="1">
+          <mxGeometry height="65" width="230" x="640" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_score" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#FFF0E5;strokeColor=#D97706;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Score &amp; analyze&#xa;voice" vertex="1">
+          <mxGeometry height="65" width="230" x="640" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_save" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Save to history" vertex="1">
+          <mxGeometry height="65" width="230" x="640" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_rerecord" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Request&#xa;re-recording" vertex="1">
+          <mxGeometry height="65" width="230" x="640" y="540" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_reminders" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EEF2FF;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=16;fontColor=#222F3D;fontFamily=Helvetica;" value="Send reminders" vertex="1">
+          <mxGeometry height="65" width="230" x="640" y="620" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l1" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_profile">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l2" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_history">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l3" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_gen_script">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l4" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_eval_script">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l5" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_practice">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l6" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_recommend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_l7" edge="1" parent="1" source="actor_learner" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="uc_schedule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_inc1" edge="1" parent="1" source="uc_gen_script" style="endArrow=open;endSize=8;dashed=1;dashPattern=6 6;html=1;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=15;fontColor=#1D4ED8;labelBackgroundColor=#ffffff;fontFamily=Helvetica;" target="uc_extract" value="«include»">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_inc2" edge="1" parent="1" source="uc_practice" style="endArrow=open;endSize=8;dashed=1;dashPattern=6 6;html=1;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=15;fontColor=#1D4ED8;labelBackgroundColor=#ffffff;fontFamily=Helvetica;" target="uc_score" value="«include»">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_inc3" edge="1" parent="1" source="uc_practice" style="endArrow=open;endSize=8;dashed=1;dashPattern=6 6;html=1;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=15;fontColor=#1D4ED8;labelBackgroundColor=#ffffff;fontFamily=Helvetica;" target="uc_save" value="«include»">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_ext1" edge="1" parent="1" source="uc_rerecord" style="endArrow=open;endSize=8;dashed=1;dashPattern=6 6;html=1;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=15;fontColor=#1D4ED8;labelBackgroundColor=#ffffff;fontFamily=Helvetica;" target="uc_practice" value="«extend»">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="rel_inc4" edge="1" parent="1" source="uc_schedule" style="endArrow=open;endSize=8;dashed=1;dashPattern=6 6;html=1;strokeColor=#1D4ED8;strokeWidth=1.5;fontSize=15;fontColor=#1D4ED8;labelBackgroundColor=#ffffff;fontFamily=Helvetica;" target="uc_reminders" value="«include»">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="edge_r1" edge="1" parent="1" source="uc_reminders" style="endArrow=none;html=1;strokeColor=#222F3D;strokeWidth=1.5;" target="actor_email">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
