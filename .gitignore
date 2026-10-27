@@ -218,3 +218,48 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ==============================================================
+# Project specific (public-speaking-assistant)
+# ==============================================================
+
+# Secrets: only .env.example is tracked
+.env.*
+!.env.example
+
+# Audio: never commit recordings (privacy + size)
+*.wav
+*.mp3
+*.m4a
+*.flac
+*.ogg
+*.opus
+*.webm
+*.aac
+
+# Real PDFs: never commit source documents
+*.pdf
+
+# Local data and evaluation outputs (keep the folder, ignore the content)
+data/*
+!data/.gitkeep
+!data/README.md
+eval/output/
+
+# Local model files and caches
+*.gguf
+*.onnx
+*.pt
+*.safetensors
+.cache/
+.ruff_cache/
+
+# Editor and tool local settings
+.vscode/
+.idea/
+.claude/settings.local.json
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini

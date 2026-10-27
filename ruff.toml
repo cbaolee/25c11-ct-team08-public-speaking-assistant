@@ -1,0 +1,16 @@
+# Ruff configuration shared by the whole team.
+required-version = ">=0.17.0"
+target-version = "py312"
+line-length = 100
+extend-exclude = [".venv", "data"]
+
+[lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # import sorting
+    "N",   # pep8-naming (enforces the naming conventions)
+    "UP",  # pyupgrade
+    "B",   # bugbear
+]

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+# Cancel an older run of the same branch when a new commit arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: lint-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      # The Python project does not exist yet (it is created in task 02).
+      # Until pyproject.toml is in the repo, the steps below are skipped.
+      # Task 02 must add ruff and pytest as dev dependencies and commit uv.lock.
+      - name: Detect Python project
+        id: project
+        run: |
+          if [ -f pyproject.toml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No pyproject.toml yet: lint and test are skipped."
+          fi
+
+      - name: Install dependencies
+        if: steps.project.outputs.exists == 'true'
+        run: uv sync --locked
+
+      - name: Lint with ruff
+        if: steps.project.outputs.exists == 'true'
+        run: uv run ruff check .
+
+      - name: Run tests with pytest
+        if: steps.project.outputs.exists == 'true'
+        run: uv run pytest

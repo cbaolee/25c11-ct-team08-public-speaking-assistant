@@ -1,0 +1,26 @@
+# Python dependencies for Public Speaking Coach (target: Python 3.12).
+# System tools are not installed by pip: install FFmpeg separately.
+# Versions are pinned so every member gets the same environment.
+
+# --- Web API ---
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32      # file upload (PDF, audio)
+pydantic-settings==2.16.1     # read config from environment variables
+python-dotenv==1.2.4          # load the local .env file
+httpx==0.28.1
+
+# --- Flow 1: PDF -> Script ---
+pymupdf4llm==2.0              # PDF to Markdown with headings and page numbers
+groq==1.7.0                   # Groq API client (LLM and Whisper STT)
+
+# --- Flow 2: Audio -> Transcript + WPM + Pauses ---
+silero-vad==6.2.3             # voice activity detection (pulls in PyTorch, large download)
+
+# --- Scoring ---
+jiwer==4.0.0                  # word error rate (WER)
+num2words==0.5.14             # numbers to words before comparing text
+
+# --- Development ---
+pytest==9.1.1
+ruff==0.17.3
