@@ -1,0 +1,40 @@
+[project]
+name = "public-speaking-assistant"
+version = "0.1.0"
+description = "An AI powered assistant that helps users with developing their public speaking capabilities"
+readme = "README.md"
+authors = [
+    { name = "cbaolee" },
+    { name = "hgdat2534" },
+    { name = "hmai" },
+    { name = "paikabluu" },
+    { name = "SilvQT" },
+    { name = "tuongvii2327" }
+
+
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.16.2",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+    "uvicorn>=0.54.0",
+]
+
+[project.scripts]
+25c11-ct-team08-public-speaking-assistant = "25c11_ct_team08_public_speaking_assistant:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.2.0",
+]
+
+[tool.uv]
+package = false
