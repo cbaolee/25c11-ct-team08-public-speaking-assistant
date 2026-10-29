@@ -1,0 +1,17 @@
+[project]
+name = "public-speaking-assistant"
+version = "0.1.0"
+description = "Assistant that helps users practice and improve their public speaking"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.16.2",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+    "uvicorn>=0.54.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
