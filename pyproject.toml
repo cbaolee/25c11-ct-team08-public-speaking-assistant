@@ -1,7 +1,7 @@
 [project]
 name = "public-speaking-assistant"
 version = "0.1.0"
-description = "FastAPI backend service for public speaking assistant"
+description = "Assistant that helps users practice and improve their public speaking"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
