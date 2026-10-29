@@ -9,9 +9,7 @@ class Settings(BaseSettings):
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()
