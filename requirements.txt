@@ -24,3 +24,4 @@ num2words==0.5.14             # numbers to words before comparing text
 # --- Development ---
 pytest==9.1.1
 ruff==0.17.3
+reportlab>=4.0.0
