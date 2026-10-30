@@ -5,12 +5,21 @@ description = "Assistant that helps users practice and improve their public spea
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    # Web API
     "fastapi>=0.162.0",
     "httpx>=0.28.1",
     "pydantic-settings>=2.16.2",
-    "pytest>=9.2.0",
-    "ruff>=0.17.3",
+    "python-dotenv>=1.2.4",
     "uvicorn>=0.54.0",
+    # Flow 1: PDF -> Script
+    "pymupdf>=1.24.0",
+    "pymupdf4llm>=0.0.17",
+    "pypdf>=4.2.0",
+    "groq>=1.7.0",
+    # Development / testing
+    "pytest>=9.2.0",
+    "reportlab>=4.0.0",
+    "ruff>=0.17.3",
 ]
 
 [tool.pytest.ini_options]
