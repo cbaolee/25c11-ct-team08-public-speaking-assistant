@@ -18,4 +18,4 @@ async def health_check():
 
 @app.get("/")
 async def index(request: Request):
-    return templates.TemplateResponse(request, "demo_ui_v2_static.html")
+    return templates.TemplateResponse(request, "demo_ui.html")
