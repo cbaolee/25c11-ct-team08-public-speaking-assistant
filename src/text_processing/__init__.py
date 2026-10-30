@@ -9,7 +9,7 @@ __all__ = [
     "DocumentParserError",
     "ScriptGenerator",
     "ScriptResult",
-    "parse_input_to_chunks",    
+    "parse_input_to_chunks",
     "sanitize_chunks",
     "sanitize_text",
     "validate_pdf_file",
