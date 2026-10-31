@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+from pathlib import Path
+
+MASTER_SAMPLE_RATE = 16000
 
 
 @dataclass(frozen=True)
@@ -8,7 +11,7 @@ class AudioProbe:
     sample_rate: str
     channels: int
     duration_s: float | None
-    size_bytes: str
+    size_bytes: int
 
 
 class AudioRejected(Exception):
@@ -18,3 +21,10 @@ class AudioRejected(Exception):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+@dataclass(frozen=True)
+class MasterAudio:
+    path: Path
+    duration_s: float
+    warnings: list[str]
