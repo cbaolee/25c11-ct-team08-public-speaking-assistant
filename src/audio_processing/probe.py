@@ -5,7 +5,7 @@ from pathlib import Path
 from .contracts import AudioProbe, AudioRejected
 
 
-def _run_ffprobe(path: Path) -> dict:
+def _run_ffprobe(path: Path, timeout_s: float = 10) -> dict:
     command = [
         "ffprobe",
         "-v", "error",
@@ -21,7 +21,7 @@ def _run_ffprobe(path: Path) -> dict:
             capture_output=True,
             text=True,
             check=True,
-            timeout=10
+            timeout=timeout_s
         )
 
         return json.loads(result.stdout)
