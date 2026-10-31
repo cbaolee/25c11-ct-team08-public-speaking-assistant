@@ -1,5 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+max_audio_seconds = 1320
+max_upload_bytes = 100 * 1024 * 1024
+allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
+
 
 class Settings(BaseSettings):
     groq_api_key: str = ""
