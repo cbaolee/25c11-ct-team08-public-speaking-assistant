@@ -91,6 +91,8 @@ def empty_file(tmp_path: Path) -> Path:
     return out
 
 
+# ---------- trường hợp hợp lệ ----------
+
 def test_valid_wav_returns_probe(ok_wav):
     result = probe(ok_wav, **LIMITS)
     assert result.sample_rate == 16000
@@ -162,3 +164,46 @@ def test_ffprobe_timeout_is_corrupt(ok_wav, monkeypatch):
     with pytest.raises(AudioRejected) as info:
         probe(ok_wav, **LIMITS)
     assert _code(info) == "corrupt"
+
+
+@pytest.fixture
+def mp4_with_video(tmp_path: Path) -> Path:
+    out = tmp_path / "av.mp4"
+    _ffmpeg(
+        "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2",
+        "-f", "lavfi", "-i", _sine(220, 2, 44100),
+        "-c:v", "mpeg4", "-c:a", "aac", str(out),
+    )
+    return out
+
+
+@pytest.fixture
+def mkv_with_video(tmp_path: Path) -> Path:
+    out = tmp_path / "av.mkv"
+    _ffmpeg(
+        "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2",
+        "-f", "lavfi", "-i", _sine(220, 2, 16000),
+        "-c:v", "mpeg4", "-c:a", "pcm_s16le", str(out),
+    )
+    return out
+
+
+@pytest.fixture
+def mp3_with_cover_art(tmp_path: Path) -> Path:
+    mp3 = tmp_path / "plain.mp3"
+    png = tmp_path / "cover.png"
+    out = tmp_path / "art.mp3"
+    _ffmpeg("-f", "lavfi", "-i", _sine(220, 1, 44100), "-c:a", "libmp3lame", str(mp3))
+    _ffmpeg("-f", "lavfi", "-i", "color=c=red:s=64x64:d=1", "-frames:v", "1", str(png))
+    _ffmpeg("-i", str(mp3), "-i", str(png), "-map", "0", "-map", "1",
+            "-c", "copy", "-id3v2_version", "3", str(out))
+    return out
+
+
+@pytest.mark.parametrize("fixture_name", ["mp4_with_video", "mkv_with_video", "mp3_with_cover_art"])
+def test_file_with_video_or_image_is_rejected(fixture_name, request):
+    path = request.getfixturevalue(fixture_name)
+    allowed = ALLOWED | {"mp3"}
+    with pytest.raises(AudioRejected) as info:
+        probe(path, **{**LIMITS, "allowed_formats": allowed})
+    assert _code(info) == "unsupported_format"
