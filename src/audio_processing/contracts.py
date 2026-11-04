@@ -28,3 +28,23 @@ class MasterAudio:
     path: Path
     duration_s: float
     warnings: list[str]
+
+
+@dataclass(frozen=True)
+class SpeechSegment:
+    start_s: float
+    end_s: float
+
+    @property
+    def duration_s(self) -> float:
+        return self.end_s - self.start_s
+
+
+@dataclass(frozen=True)
+class Pause:
+    start_s: float
+    end_s: float
+
+    @property
+    def duration_s(self) -> float:
+        return self.end_s - self.start_s
