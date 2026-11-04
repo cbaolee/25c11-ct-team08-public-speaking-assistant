@@ -17,8 +17,11 @@ class Settings(BaseSettings):
     groq_llm_fallback_model_1: str = ""
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
+    
+    # THÊM 2 DÒNG NÀY CHO MODULE STT MỚI:
+    deepgram_api_key: str = ""
+    gladia_api_key: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-
 
 settings = Settings()

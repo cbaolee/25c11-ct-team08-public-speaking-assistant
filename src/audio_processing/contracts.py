@@ -106,3 +106,13 @@ class EvaluationResult:
     stt: dict                       # {"provider": str, "model": str}
     flags: list[str]
     display_only: dict              # {"loudness_db_timeline": list, ...}
+
+
+@dataclass(frozen=True)
+class VadParams:
+    """Các tham số cấu hình cho Silero VAD."""
+    threshold: float = 0.5
+    min_speech_duration_ms: int = 250
+    min_silence_duration_ms: int = 100
+    window_size_samples: int = 512
+    speech_pad_ms: int = 30

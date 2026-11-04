@@ -121,7 +121,7 @@ def score_pitch(master: MasterAudio, baseline: BaselineProfile | None) -> float:
     Đo độ rộng cao độ (st) từ F0 contour bằng parselmouth[cite: 1, 2].
     """
     try:
-        snd = parselmouth.Sound(master.samples, master.sample_rate)
+        snd = parselmouth.Sound(str(master.path))
         pitch = snd.to_pitch()
         f0_values = pitch.selected_array['frequency']
         
