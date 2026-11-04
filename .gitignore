@@ -263,3 +263,6 @@ eval/output/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Benchmark local
+scripts/
