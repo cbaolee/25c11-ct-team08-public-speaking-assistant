@@ -241,7 +241,6 @@ __marimo__/
 *.pdf
 
 # Local data and evaluation outputs (keep the folder, ignore the content)
-data/*
 !data/.gitkeep
 !data/README.md
 eval/output/
