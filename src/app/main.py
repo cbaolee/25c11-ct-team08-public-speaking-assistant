@@ -4,6 +4,8 @@ import tempfile
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from src.audio_processing.contracts import (
     AudioRejected, 
@@ -13,12 +15,21 @@ from src.audio_processing.contracts import (
 )
 from src.audio_processing.pipeline import evaluate_session, analyze_baseline
 
+WEB_DIR = Path(__file__).resolve().parents[1] / "web" 
+
 app = FastAPI()
+app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=WEB_DIR / "templates")
 
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/")
+async def index(request: Request):
+    return templates.TemplateResponse(request, "demo_ui.html")
 
 
 @app.exception_handler(AudioRejected)
