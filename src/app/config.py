@@ -7,6 +7,8 @@ allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
 decode_timeout_s = 60
 duration_cap_margin_s = 10
 
+MIN_PAUSE_S = 0.35
+
 
 class Settings(BaseSettings):
     groq_api_key: str = ""

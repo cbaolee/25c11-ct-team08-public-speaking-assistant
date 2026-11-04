@@ -1,7 +1,7 @@
 from src.audio_processing.contracts import Pause, SpeechSegment
 from src.audio_processing.vad import find_pauses
 
-MIN_PAUSE = 0.25
+MIN_PAUSE = 0.35
 
 
 def seg(start: float, end: float) -> SpeechSegment:
@@ -17,12 +17,12 @@ def test_single_segment_has_no_pauses():
 
 
 def test_gap_exactly_at_threshold_is_kept():
-    segments = [seg(0.0, 1.0), seg(1.25, 2.0)]          
-    assert find_pauses(segments, min_pause_s=MIN_PAUSE) == [Pause(1.0, 1.25)]
+    segments = [seg(0.0, 1.0), seg(1.35, 2.0)]          
+    assert find_pauses(segments, min_pause_s=MIN_PAUSE) == [Pause(1.0, 1.35)]
 
 
 def test_gap_just_below_threshold_is_dropped():
-    segments = [seg(0.0, 1.0), seg(1.24, 2.0)]         
+    segments = [seg(0.0, 1.0), seg(1.34, 2.0)]         
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == []
 
 
