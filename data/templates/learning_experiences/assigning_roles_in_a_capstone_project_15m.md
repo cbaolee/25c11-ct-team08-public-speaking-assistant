@@ -1,6 +1,6 @@
 ---
-topic: Assigning Roles in a Capstone Project
-category: Learning Experiences
+topic: "Assigning Roles in a Capstone Project"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When launching a semester-long capstone project, how do you decide who manages each component of the assignment? Many student teams debate whether to assign specialized roles or work across all responsibilities. Today we will explore assigning roles in a capstone project, and examine how you might analyze role delegation.

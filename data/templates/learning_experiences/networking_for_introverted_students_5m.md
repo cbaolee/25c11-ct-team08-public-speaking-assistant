@@ -1,6 +1,6 @@
 ---
-topic: Networking for Introverted Students
-category: Learning Experiences
+topic: "Networking for Introverted Students"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you attend a career mixer or student conference, how do you approach conversations with unfamiliar people? Today we will explore networking for introverted students, and consider how you might evaluate different approaches to building connections.

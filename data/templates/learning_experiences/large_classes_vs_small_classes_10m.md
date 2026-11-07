@@ -1,6 +1,6 @@
 ---
-topic: Large Classes vs Small Classes
-category: Learning Experiences
+topic: "Large Classes vs Small Classes"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you register for courses, do you thrive in expansive lecture halls or around small discussion tables? Cohort size can shape how students interact with faculty and peers. Today we will explore large classes versus small classes, and examine how you might evaluate both environments.

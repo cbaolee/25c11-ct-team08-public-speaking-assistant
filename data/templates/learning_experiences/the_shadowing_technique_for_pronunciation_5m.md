@@ -1,6 +1,6 @@
 ---
-topic: The Shadowing Technique for Pronunciation
-category: Learning Experiences
+topic: "The Shadowing Technique for Pronunciation"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever tried repeating audio tracks in a new language the instant you hear them? Today we will look at the shadowing technique for pronunciation, and consider how you might evaluate this training method.

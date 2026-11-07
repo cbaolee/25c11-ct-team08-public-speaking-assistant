@@ -1,6 +1,6 @@
 ---
-topic: Learning English Through Movies and Series
-category: Learning Experiences
+topic: "Learning English Through Movies and Series"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you relax with a film or television show, do you consider how subtitles and dialogue shape your English? Today we will explore learning English through movies and series, and consider how you might evaluate this medium.

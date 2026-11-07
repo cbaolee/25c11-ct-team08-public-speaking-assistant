@@ -1,6 +1,6 @@
 ---
-topic: Grades vs Real Learning
-category: Learning Experiences
+topic: "Grades vs Real Learning"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you receive a final mark at the end of a semester, what does that score represent to you? Students often wonder how closely letter marks reflect genuine comprehension. Today we will explore grades versus real learning, and examine how you might evaluate both measures.

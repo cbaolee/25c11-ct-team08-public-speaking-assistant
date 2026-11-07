@@ -1,6 +1,6 @@
 ---
-topic: Gamification in Learning Apps
-category: Learning Experiences
+topic: "Gamification in Learning Apps"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you complete an exercise on your phone, do points and streak counters influence how often you open the app? Gamified software has become a familiar presence in modern education. Today we will explore gamification in learning apps, and examine how you might analyze its educational role.

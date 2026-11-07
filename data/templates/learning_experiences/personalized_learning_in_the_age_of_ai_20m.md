@@ -1,6 +1,6 @@
 ---
-topic: Personalized Learning in the Age of AI
-category: Learning Experiences
+topic: "Personalized Learning in the Age of AI"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. Have you ever wondered how educational software adapts to your individual pacing and comprehension? The rise of automated systems has sparked discussion about how tailored instruction should be delivered. Today we will explore personalized learning in the age of AI, and examine how you might analyze this educational model.

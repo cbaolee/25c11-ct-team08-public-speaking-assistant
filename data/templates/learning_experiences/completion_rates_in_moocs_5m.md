@@ -1,6 +1,6 @@
 ---
-topic: Completion Rates in MOOCs
-category: Learning Experiences
+topic: "Completion Rates in MOOCs"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever registered for a massive open online course and wondered how many participants reach the final lecture? Today we will explore completion rates in MOOCs, and consider how you might analyze this educational pattern.

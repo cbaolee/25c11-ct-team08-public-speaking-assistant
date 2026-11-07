@@ -1,6 +1,6 @@
 ---
-topic: Reading Academic Papers as a Student
-category: Learning Experiences
+topic: "Reading Academic Papers as a Student"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you need to understand an advanced topic, do you rely on textbooks or engage with primary journal articles? Navigating scholarly literature is a skill many undergraduates work to develop. Today we will explore reading academic papers as a student, and examine how you might evaluate this practice.

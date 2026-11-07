@@ -1,6 +1,6 @@
 ---
-topic: The Role of Curiosity in Learning
-category: Learning Experiences
+topic: "The Role of Curiosity in Learning"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you dive into a topic outside your syllabus, what prompts you to keep reading? Today we will explore the role of curiosity in learning, and consider how you might evaluate its place in academic life.

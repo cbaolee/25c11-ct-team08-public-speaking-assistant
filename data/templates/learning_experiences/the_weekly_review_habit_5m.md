@@ -1,6 +1,6 @@
 ---
-topic: The Weekly Review Habit
-category: Learning Experiences
+topic: "The Weekly Review Habit"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever taken time at the end of a week to look back over your notes and assignments? Today we will explore the weekly review habit, and examine how you might evaluate this routine.

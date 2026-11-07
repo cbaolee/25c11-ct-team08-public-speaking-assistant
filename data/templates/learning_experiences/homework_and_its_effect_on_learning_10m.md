@@ -1,6 +1,6 @@
 ---
-topic: Homework and Its Effect on Learning
-category: Learning Experiences
+topic: "Homework and Its Effect on Learning"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When your professors assign weekly exercises to complete after class, how does that independent practice influence your understanding? Today we will explore homework and its effect on learning, and examine how you might analyze this academic tradition.

@@ -1,6 +1,6 @@
 ---
-topic: Open Book vs Closed Book Exams
-category: Learning Experiences
+topic: "Open Book vs Closed Book Exams"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you prepare for an assessment, does having access to reference materials change how you prepare? Today we will explore open book versus closed book exams, and examine how you might evaluate both formats.

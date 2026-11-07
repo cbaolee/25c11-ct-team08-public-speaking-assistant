@@ -1,6 +1,6 @@
 ---
-topic: Remote Collaboration Tools for Student Teams
-category: Learning Experiences
+topic: "Remote Collaboration Tools for Student Teams"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When your project team cannot meet in person, how do digital workspaces influence your coordination? Today we will explore remote collaboration tools for student teams, and examine how you might assess their place in your work.

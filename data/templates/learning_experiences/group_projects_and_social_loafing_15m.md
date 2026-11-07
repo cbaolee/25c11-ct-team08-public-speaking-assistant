@@ -1,6 +1,6 @@
 ---
-topic: Group Projects and Social Loafing
-category: Learning Experiences
+topic: "Group Projects and Social Loafing"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When an instructor assigns a team deliverable, how do you feel about sharing a mark with your classmates? Many students worry about uneven contributions from their peers. Today we will explore group projects and social loafing, and examine how you might evaluate this collaborative dynamic.

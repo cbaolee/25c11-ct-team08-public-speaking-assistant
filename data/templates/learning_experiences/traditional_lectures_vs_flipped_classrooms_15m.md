@@ -1,6 +1,6 @@
 ---
-topic: Traditional Lectures vs Flipped Classrooms
-category: Learning Experiences
+topic: "Traditional Lectures vs Flipped Classrooms"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you enter a course, do you prefer listening to a live presentation or discussing pre-recorded materials with peers? University teaching formats continue to evolve across campuses. Today we will explore traditional lectures versus flipped classrooms, and examine how you might evaluate both models.

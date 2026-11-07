@@ -1,6 +1,6 @@
 ---
-topic: Learning by Teaching Others
-category: Learning Experiences
+topic: "Learning by Teaching Others"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever attempted to explain an intricate academic concept to a classmate and discovered where your own understanding was incomplete? Today we will explore learning by teaching others, and consider how you might assess this pedagogical strategy.

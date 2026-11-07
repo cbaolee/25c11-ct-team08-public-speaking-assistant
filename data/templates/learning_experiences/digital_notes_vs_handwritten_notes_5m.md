@@ -1,6 +1,6 @@
 ---
-topic: Digital Notes vs Handwritten Notes
-category: Learning Experiences
+topic: "Digital Notes vs Handwritten Notes"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you attend a university lecture, do you record ideas on a keyboard or with pen and paper? Today we will explore digital notes versus handwritten notes, and consider how you might evaluate both mediums.

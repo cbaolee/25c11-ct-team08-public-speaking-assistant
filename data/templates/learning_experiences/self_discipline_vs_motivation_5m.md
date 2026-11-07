@@ -1,6 +1,6 @@
 ---
-topic: Self Discipline vs Motivation
-category: Learning Experiences
+topic: "Self Discipline vs Motivation"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you face an unappealing assignment, do you wait until you feel inspired or sit down regardless of your mood? Today we will explore self-discipline versus motivation, and consider how you might evaluate both drives.

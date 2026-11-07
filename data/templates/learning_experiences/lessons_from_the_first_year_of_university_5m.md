@@ -1,6 +1,6 @@
 ---
-topic: Lessons From the First Year of University
-category: Learning Experiences
+topic: "Lessons From the First Year of University"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever looked back at your first months on campus and asked what changed in your perspective? Today we will explore lessons from the first year of university, and consider how you might evaluate this period of adjustment.

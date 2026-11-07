@@ -1,6 +1,6 @@
 ---
-topic: Project Retrospectives for Continuous Improvement
-category: Learning Experiences
+topic: "Project Retrospectives for Continuous Improvement"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When your team submits a final deliverable, do you review how your group functioned throughout the project? Today we will explore project retrospectives for continuous improvement, and look at how to assess this practice.

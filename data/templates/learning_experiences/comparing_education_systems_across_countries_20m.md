@@ -1,6 +1,6 @@
 ---
-topic: Comparing Education Systems Across Countries
-category: Learning Experiences
+topic: "Comparing Education Systems Across Countries"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you observe how schools operate across different parts of the world, what explains their differing priorities? National traditions and policies produce widely varied schooling frameworks. Today we will explore comparing education systems across countries, and examine how you might analyze their distinct designs.

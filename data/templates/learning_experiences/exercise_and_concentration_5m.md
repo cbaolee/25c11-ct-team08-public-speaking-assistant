@@ -1,6 +1,6 @@
 ---
-topic: Exercise and Concentration
-category: Learning Experiences
+topic: "Exercise and Concentration"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you feel your attention slipping during long study sessions, do you take a walk or continue sitting at your desk? Today we will explore exercise and concentration, and consider how you might evaluate this physical intervention.

@@ -1,6 +1,6 @@
 ---
-topic: Volunteering as a Learning Experience
-category: Learning Experiences
+topic: "Volunteering as a Learning Experience"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you look for opportunities to develop your skills, do you consider unpaid service within local communities? Many students engage in civic outreach alongside their academic schedules. Today we will explore volunteering as a learning experience, and examine how you might analyze its educational value.

@@ -1,6 +1,6 @@
 ---
-topic: Breaking Through the Language Learning Plateau
-category: Learning Experiences
+topic: "Breaking Through the Language Learning Plateau"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. Have you ever felt your language progress stall after reaching intermediate fluency? Many learners find that moving beyond comfortable everyday speech presents an unexpected hurdle. Today we will explore breaking through the language learning plateau, and look at how to evaluate different strategies.

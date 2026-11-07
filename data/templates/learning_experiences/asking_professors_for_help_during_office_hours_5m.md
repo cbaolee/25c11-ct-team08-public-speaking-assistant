@@ -1,6 +1,6 @@
 ---
-topic: Asking Professors for Help During Office Hours
-category: Learning Experiences
+topic: "Asking Professors for Help During Office Hours"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever hesitated before knocking on an instructor's door during their office hours? Today we will look at asking professors for help during office hours, and consider how you might evaluate this interaction.

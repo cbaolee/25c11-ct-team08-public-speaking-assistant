@@ -1,6 +1,6 @@
 ---
-topic: Theory vs Practice in Engineering Education
-category: Learning Experiences
+topic: "Theory vs Practice in Engineering Education"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you pursue a technical degree, should you spend more time deriving equations or working in fabrication laboratories? How engineering curricula balance theoretical fundamentals with practical execution is an ongoing question. Today we will explore theory versus practice in engineering education, and examine how you might analyze both domains.

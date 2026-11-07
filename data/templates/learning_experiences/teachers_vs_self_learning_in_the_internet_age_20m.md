@@ -1,6 +1,6 @@
 ---
-topic: Teachers vs Self Learning in the Internet Age
-category: Learning Experiences
+topic: "Teachers vs Self Learning in the Internet Age"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. With an endless library of tutorials and courses available online, what is the role of an in-person instructor today? Access to digital information has reshaped how we think about acquiring expertise. Today we will explore teachers versus self-learning in the internet age, and examine how you might analyze both educational paths.

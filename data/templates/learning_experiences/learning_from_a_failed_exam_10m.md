@@ -1,6 +1,6 @@
 ---
-topic: Learning From a Failed Exam
-category: Learning Experiences
+topic: "Learning From a Failed Exam"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When an exam result falls far below your expectations, how do you respond to the score? Many university students encounter academic setbacks during their degree. Today we will explore learning from a failed exam, and consider how to analyze this experience.

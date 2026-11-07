@@ -1,6 +1,6 @@
 ---
-topic: Perfectionism in Academic Work
-category: Learning Experiences
+topic: "Perfectionism in Academic Work"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you work on an essay or presentation, do you polish every sentence indefinitely or submit the piece once it satisfies the brief? Today we will explore perfectionism in academic work, and examine how you might analyze this tendency.

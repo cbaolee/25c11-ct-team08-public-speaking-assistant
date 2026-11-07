@@ -1,6 +1,6 @@
 ---
-topic: Responsible Use of AI in Assignments
-category: Learning Experiences
+topic: "Responsible Use of AI in Assignments"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you sit down to draft an essay or write code, how do you decide where to draw the line with software assistance? The presence of generative platforms has opened ongoing debates across university campuses. Today we will explore responsible use of AI in assignments, and examine how you might analyze policy and practice.

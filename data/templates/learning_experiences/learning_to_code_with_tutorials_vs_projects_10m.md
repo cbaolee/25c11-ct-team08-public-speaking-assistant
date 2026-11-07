@@ -1,6 +1,6 @@
 ---
-topic: Learning to Code With Tutorials vs Projects
-category: Learning Experiences
+topic: "Learning to Code With Tutorials vs Projects"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you decide to learn a new programming language, do you follow guided walkthroughs or build your own software from scratch? Many students wonder how each path shapes technical skill. Today we will explore learning to code with tutorials versus projects, and examine how you might evaluate both methods.

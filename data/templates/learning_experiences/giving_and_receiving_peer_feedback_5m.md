@@ -1,6 +1,6 @@
 ---
-topic: Giving and Receiving Peer Feedback
-category: Learning Experiences
+topic: "Giving and Receiving Peer Feedback"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When a classmate comments on your draft, how do you interpret their observations? Today we will look at giving and receiving peer feedback, and consider how you might evaluate this exchange.

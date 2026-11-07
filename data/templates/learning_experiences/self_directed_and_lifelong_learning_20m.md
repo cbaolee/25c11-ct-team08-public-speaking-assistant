@@ -1,6 +1,6 @@
 ---
-topic: Self Directed and Lifelong Learning
-category: Learning Experiences
+topic: "Self Directed and Lifelong Learning"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you look beyond graduation day, how do you expect to acquire new knowledge once professors and course syllabi are gone? Many students reflect on how independent curiosity sustains long-term growth. Today we will explore self-directed and lifelong learning, and examine how you might analyze this lifelong pursuit.

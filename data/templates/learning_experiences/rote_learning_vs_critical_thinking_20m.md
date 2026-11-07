@@ -1,6 +1,6 @@
 ---
-topic: Rote Learning vs Critical Thinking
-category: Learning Experiences
+topic: "Rote Learning vs Critical Thinking"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you prepare for an examination, do you memorize facts verbatim or evaluate the underlying concepts? How we acquire and interpret knowledge shapes our academic journey. Today we will explore rote learning versus critical thinking, and examine how you might evaluate both cognitive approaches.

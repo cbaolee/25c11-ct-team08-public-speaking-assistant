@@ -1,6 +1,6 @@
 ---
-topic: Online Courses vs Classroom Learning
-category: Learning Experiences
+topic: "Online Courses vs Classroom Learning"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you look at course offerings for the upcoming semester, do you prefer virtual lectures or sitting in a seminar room? The availability of digital coursework has reshaped how undergraduates plan their academic degrees. Today we will explore online courses versus classroom learning, and examine how you might evaluate both environments.

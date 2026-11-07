@@ -1,6 +1,6 @@
 ---
-topic: Bilingualism and Cognitive Benefits
-category: Learning Experiences
+topic: "Bilingualism and Cognitive Benefits"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When someone switches effortlessly between two languages, how does that mental flexibility influence other areas of thought? Many students wonder how bilingualism shapes broader cognitive function. Today we will explore bilingualism and cognitive benefits, and examine how you might analyze these mental claims.

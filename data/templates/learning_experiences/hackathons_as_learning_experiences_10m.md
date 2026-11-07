@@ -1,6 +1,6 @@
 ---
-topic: Hackathons as Learning Experiences
-category: Learning Experiences
+topic: "Hackathons as Learning Experiences"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. Have you ever spent an entire weekend building a prototype from scratch alongside teammates? Many students attend intensive development events to test their practical skills. Today we will explore hackathons as learning experiences, and examine how you might analyze their educational role.

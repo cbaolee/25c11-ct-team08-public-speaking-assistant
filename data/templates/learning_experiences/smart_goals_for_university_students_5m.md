@@ -1,6 +1,6 @@
 ---
-topic: SMART Goals for University Students
-category: Learning Experiences
+topic: "SMART Goals for University Students"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. How do you set targets when you plan your academic goals for the semester? Today we will look at SMART goals for university students, and consider how you might assess this framework.

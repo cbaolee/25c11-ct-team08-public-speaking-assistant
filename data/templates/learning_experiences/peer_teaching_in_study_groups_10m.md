@@ -1,6 +1,6 @@
 ---
-topic: Peer Teaching in Study Groups
-category: Learning Experiences
+topic: "Peer Teaching in Study Groups"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you gather with classmates to prepare for an exam, do you explain concepts to one another or review notes independently? Many students organize study groups to talk through difficult course material. Today we will explore peer teaching in study groups, and consider how you might evaluate this collaborative practice.

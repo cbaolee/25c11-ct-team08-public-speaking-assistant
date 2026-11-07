@@ -1,6 +1,6 @@
 ---
-topic: Standardized Entrance Exams and Their Fairness
-category: Learning Experiences
+topic: "Standardized Entrance Exams and Their Fairness"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you applied for admission to higher education, how did your performance on standardized tests reflect your readiness? Entrance examinations remain a central mechanism for university admissions worldwide. Today we will explore standardized entrance exams and their fairness, and examine how you might analyze their role.

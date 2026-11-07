@@ -1,6 +1,6 @@
 ---
-topic: Speaking Anxiety in a Second Language
-category: Learning Experiences
+topic: "Speaking Anxiety in a Second Language"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. Have you ever felt your mind freeze when asked to speak in a foreign language in front of your peers? Many students experience apprehension when expressing their thoughts in an unfamiliar tongue. Today we will explore speaking anxiety in a second language, and examine how you might analyze this communication hurdle.

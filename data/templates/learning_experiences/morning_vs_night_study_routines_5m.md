@@ -1,6 +1,6 @@
 ---
-topic: Morning vs Night Study Routines
-category: Learning Experiences
+topic: "Morning vs Night Study Routines"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever wondered whether you do your best thinking at dawn or late in the evening? Today we will look at morning versus night study routines, and consider how you might evaluate both schedules.

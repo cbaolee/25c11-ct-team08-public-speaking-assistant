@@ -1,6 +1,6 @@
 ---
-topic: Smartphone Distraction in the Classroom
-category: Learning Experiences
+topic: "Smartphone Distraction in the Classroom"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you walk into a lecture hall, how do you manage the presence of your phone? Many students keep their devices nearby while taking notes or listening to presentations. Today we will explore smartphone distraction in the classroom, and examine how you might analyze its role in academic life.

@@ -1,6 +1,6 @@
 ---
-topic: Project Based Assessment vs Written Exams
-category: Learning Experiences
+topic: "Project Based Assessment vs Written Exams"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. How do you prefer to demonstrate what you have learned during a semester? Some courses ask for extended term projects, while others rely on traditional written tests. Today we will explore project-based assessment versus written exams, and look at how to evaluate both evaluation formats.

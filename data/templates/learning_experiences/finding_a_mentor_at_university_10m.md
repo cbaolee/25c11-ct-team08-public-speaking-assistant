@@ -1,6 +1,6 @@
 ---
-topic: Finding a Mentor at University
-category: Learning Experiences
+topic: "Finding a Mentor at University"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. Have you ever sought advice from an experienced faculty member or senior student about your future? Many undergraduates consider whether to seek mentorship during their studies. Today we will explore finding a mentor at university, and examine how you might evaluate this relationship.

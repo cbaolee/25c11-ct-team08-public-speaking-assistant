@@ -1,6 +1,6 @@
 ---
-topic: Internships as Real World Learning
-category: Learning Experiences
+topic: "Internships as Real World Learning"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you prepare for your future career, do you learn more from lecture halls or from working inside a professional organization? Many undergraduates complete internships to bridge the gap between theory and employment. Today we will explore internships as real-world learning, and examine how you might analyze their educational value.

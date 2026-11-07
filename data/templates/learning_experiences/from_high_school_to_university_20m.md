@@ -1,6 +1,6 @@
 ---
-topic: From High School to University
-category: Learning Experiences
+topic: "From High School to University"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you transitioned from secondary school into higher education, what changed in how you managed your studies? Many students find that university life alters their expectations and routines. Today we will explore the transition from high school to university, and examine how you might analyze this shift.
