@@ -1,6 +1,6 @@
 ---
-topic: Generative AI as a Study Partner
-category: Learning Experiences
+topic: "Generative AI as a Study Partner"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you encounter confusing concepts in your readings, have you ever turned to conversational software for an explanation? Many university students now consult generative models as interactive learning partners. Today we will explore generative AI as a study partner, and examine how you might analyze its educational impact.

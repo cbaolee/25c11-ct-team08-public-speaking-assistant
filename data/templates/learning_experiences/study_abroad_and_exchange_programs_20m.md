@@ -1,6 +1,6 @@
 ---
-topic: Study Abroad and Exchange Programs
-category: Learning Experiences
+topic: "Study Abroad and Exchange Programs"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you consider your degree trajectory, have you ever thought about completing a semester in another country? Many university students weigh the opportunity to enroll in an international exchange program. Today we will explore study abroad and exchange programs, and examine how you might analyze their educational impact.

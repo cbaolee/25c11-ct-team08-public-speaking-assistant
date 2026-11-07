@@ -1,6 +1,6 @@
 ---
-topic: Living Away From Home as a Student
-category: Learning Experiences
+topic: "Living Away From Home as a Student"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you move away from your family to attend university, how does that shift alter your everyday routine? Living independently introduces students to new responsibilities and unfamiliar environments. Today we will explore living away from home as a student, and examine how you might analyze this experience.

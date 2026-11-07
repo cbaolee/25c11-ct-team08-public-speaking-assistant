@@ -1,6 +1,6 @@
 ---
-topic: Student Clubs as Learning Spaces
-category: Learning Experiences
+topic: "Student Clubs as Learning Spaces"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you look beyond lecture halls, where do you gain practical experience on campus? Many undergraduates spend hours participating in extracurricular student organizations. Today we will explore student clubs as learning spaces, and look at how you might evaluate their educational value.

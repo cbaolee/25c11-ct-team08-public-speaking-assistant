@@ -1,6 +1,6 @@
 ---
-topic: Language Exchange Partners
-category: Learning Experiences
+topic: "Language Exchange Partners"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you want to practice conversational fluency, do you schedule informal conversations with native speakers? Today we will explore language exchange partners, and consider how you might assess this mutual arrangement.

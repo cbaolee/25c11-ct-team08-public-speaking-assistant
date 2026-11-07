@@ -1,6 +1,6 @@
 ---
-topic: Growth Mindset vs Fixed Mindset
-category: Learning Experiences
+topic: "Growth Mindset vs Fixed Mindset"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you receive a difficult problem set, do you believe your ability is set in stone or something you can develop? Today we will explore growth mindset versus fixed mindset, and examine how you might analyze both perspectives on ability.

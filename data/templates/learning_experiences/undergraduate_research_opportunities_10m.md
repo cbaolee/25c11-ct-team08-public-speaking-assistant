@@ -1,6 +1,6 @@
 ---
-topic: Undergraduate Research Opportunities
-category: Learning Experiences
+topic: "Undergraduate Research Opportunities"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. Have you ever considered joining a faculty investigation to explore unanswered questions in your field? Many undergraduates weigh whether to participate in faculty-led scholarly inquiry. Today we will explore undergraduate research opportunities, and examine how you might assess this academic involvement.

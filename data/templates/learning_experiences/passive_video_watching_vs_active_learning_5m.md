@@ -1,6 +1,6 @@
 ---
-topic: Passive Video Watching vs Active Learning
-category: Learning Experiences
+topic: "Passive Video Watching vs Active Learning"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you watch a recorded lecture online, do you simply let the video play or do you pause to take notes and test yourself? Today we will explore passive video watching versus active learning, and consider how you might evaluate both approaches.

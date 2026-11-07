@@ -1,6 +1,6 @@
 ---
-topic: Learning Vocabulary in Context
-category: Learning Experiences
+topic: "Learning Vocabulary in Context"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you encounter unfamiliar words in a new language, do you memorize isolated lists or infer meaning from the surrounding text? Today we will explore learning vocabulary in context, and consider how you might evaluate this practice.

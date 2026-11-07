@@ -1,6 +1,6 @@
 ---
-topic: Intrinsic vs Extrinsic Motivation in Study
-category: Learning Experiences
+topic: "Intrinsic vs Extrinsic Motivation in Study"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you open your textbooks in the evening, is your goal personal curiosity or the grade printed on your transcript? Today we will explore intrinsic versus extrinsic motivation in study, and examine how you might evaluate both incentives.

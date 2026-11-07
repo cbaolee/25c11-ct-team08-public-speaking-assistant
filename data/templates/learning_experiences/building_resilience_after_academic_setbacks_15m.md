@@ -1,6 +1,6 @@
 ---
-topic: Building Resilience After Academic Setbacks
-category: Learning Experiences
+topic: "Building Resilience After Academic Setbacks"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you receive an unexpectedly poor mark on an exam, how do you regroup for your next assessment? Many university students encounter academic hurdles that test their confidence. Today we will explore building resilience after academic setbacks, and examine how you might analyze recovery and growth.

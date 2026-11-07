@@ -1,6 +1,6 @@
 ---
-topic: Grammar First vs Communication First
-category: Learning Experiences
+topic: "Grammar First vs Communication First"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When starting a new language, should you master sentence structures before speaking or begin conversing right away? Today we will explore grammar first versus communication first, and examine how you might analyze both paths.

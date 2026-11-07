@@ -1,6 +1,6 @@
 ---
-topic: Sleep and Academic Performance
-category: Learning Experiences
+topic: "Sleep and Academic Performance"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When deadlines approach, do you sacrifice hours of sleep to gain more revision time or prioritize rest? Many students weigh sleep against study hours throughout the semester. Today we will explore sleep and academic performance, and examine how you might analyze this trade-off.

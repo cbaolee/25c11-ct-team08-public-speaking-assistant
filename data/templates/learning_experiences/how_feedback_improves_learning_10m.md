@@ -1,6 +1,6 @@
 ---
-topic: How Feedback Improves Learning
-category: Learning Experiences
+topic: "How Feedback Improves Learning"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you receive comments on an essay or test, how do you engage with that information? Many students wonder how critiques shape their academic performance. Today we will explore how feedback influences learning, and consider how you might evaluate its role.

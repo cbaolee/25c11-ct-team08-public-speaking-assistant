@@ -1,6 +1,6 @@
 ---
-topic: Shared Accountability in Team Work
-category: Learning Experiences
+topic: "Shared Accountability in Team Work"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When a group assignment is submitted, who owns the final quality of the work? Today we will explore shared accountability in teamwork, and consider how you might evaluate this principle.

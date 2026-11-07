@@ -1,6 +1,6 @@
 ---
-topic: Social Media Comparison Among Students
-category: Learning Experiences
+topic: "Social Media Comparison Among Students"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you scroll through feeds of your peers sharing accomplishments, how does that stream of updates influence your own perspective? Many students encounter digital showcases of academic and social achievement. Today we will explore social media comparison among students, and examine how you might analyze its effects.

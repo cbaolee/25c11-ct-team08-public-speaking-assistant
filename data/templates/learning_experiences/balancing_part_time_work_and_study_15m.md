@@ -1,6 +1,6 @@
 ---
-topic: Balancing Part Time Work and Study
-category: Learning Experiences
+topic: "Balancing Part Time Work and Study"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. Have you ever tried to balance a weekly work shift with a full course load? Many university students manage paid employment alongside their academic deadlines. Today we will explore balancing part-time work and study, and examine how you might analyze this dual commitment.

@@ -1,6 +1,6 @@
 ---
-topic: Managing Test Anxiety Before Exams
-category: Learning Experiences
+topic: "Managing Test Anxiety Before Exams"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. Have you ever felt your heart race or your thoughts scatter right before an important test? Many university students encounter physiological stress when walking into an exam hall. Today we will explore managing test anxiety before exams, and examine how you might analyze different ways to address it.

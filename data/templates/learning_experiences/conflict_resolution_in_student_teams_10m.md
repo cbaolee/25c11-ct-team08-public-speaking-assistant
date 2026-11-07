@@ -1,6 +1,6 @@
 ---
-topic: Conflict Resolution in Student Teams
-category: Learning Experiences
+topic: "Conflict Resolution in Student Teams"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When differing viewpoints arise during a team meeting, how do you and your peers resolve disagreements? Teamwork often brings competing priorities to the surface. Today we will explore conflict resolution in student teams, and consider how you might evaluate different approaches to mediation.

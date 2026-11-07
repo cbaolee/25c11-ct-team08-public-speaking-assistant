@@ -1,6 +1,6 @@
 ---
-topic: Lecture Attendance vs Self Study
-category: Learning Experiences
+topic: "Lecture Attendance vs Self Study"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you plan your weekly schedule, do you prioritize attending every lecture in person or working through course materials on your own? Many students weigh these two paths as they organize their time. Today we will explore lecture attendance versus self-study, and examine how you might evaluate both options.

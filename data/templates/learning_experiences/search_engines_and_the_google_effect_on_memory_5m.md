@@ -1,6 +1,6 @@
 ---
-topic: Search Engines and the Google Effect on Memory
-category: Learning Experiences
+topic: "Search Engines and the Google Effect on Memory"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you need a factual detail for class, do you search online immediately or try to retrieve it from memory? Today we will explore search engines and the Google effect on memory, and examine how you might evaluate this cognitive shift.

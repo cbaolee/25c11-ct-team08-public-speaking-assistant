@@ -1,6 +1,6 @@
 ---
-topic: Building a Portfolio During University
-category: Learning Experiences
+topic: "Building a Portfolio During University"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you prepare to show prospective employers what you can do, do you point to your transcript grades or present concrete artifacts of your work? Today we will explore building a portfolio during university, and consider how you might evaluate this practice.

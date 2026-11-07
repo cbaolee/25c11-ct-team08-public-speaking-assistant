@@ -1,6 +1,6 @@
 ---
-topic: Academic Integrity and the Temptation to Cheat
-category: Learning Experiences
+topic: "Academic Integrity and the Temptation to Cheat"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When academic pressure peaks before deadlines, how do students navigate expectations surrounding honest work? Many of us recognize the strain that surrounds high-stakes assessments. Today we will explore academic integrity and the temptation to cheat, and examine how you might analyze both pressures and principles.

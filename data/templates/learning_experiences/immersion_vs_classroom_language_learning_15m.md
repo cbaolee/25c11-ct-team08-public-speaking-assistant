@@ -1,6 +1,6 @@
 ---
-topic: Immersion vs Classroom Language Learning
-category: Learning Experiences
+topic: "Immersion vs Classroom Language Learning"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you set out to learn a foreign language, do you prefer moving into an environment where it is spoken or studying its grammar in a classroom? Many students weigh these two environments when pursuing fluency. Today we will explore immersion versus classroom language learning, and examine how you might analyze both approaches.

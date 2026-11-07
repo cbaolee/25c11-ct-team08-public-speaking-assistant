@@ -1,6 +1,6 @@
 ---
-topic: Rubrics and Transparent Grading
-category: Learning Experiences
+topic: "Rubrics and Transparent Grading"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you receive an assignment prompt, do you consult the grading criteria before you start writing? Today we will explore rubrics and transparent grading, and look at how to evaluate their role in university courses.

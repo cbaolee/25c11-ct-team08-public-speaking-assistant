@@ -1,6 +1,6 @@
 ---
-topic: Choosing a Major
-category: Learning Experiences
+topic: "Choosing a Major"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you reflect on your academic trajectory, how do you decide which field of study to pursue? Many university students weigh various considerations when declaring their major. Today we will explore choosing a major, and examine how you might analyze the factors that guide this decision.

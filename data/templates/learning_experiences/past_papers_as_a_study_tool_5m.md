@@ -1,6 +1,6 @@
 ---
-topic: Past Papers as a Study Tool
-category: Learning Experiences
+topic: "Past Papers as a Study Tool"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. Have you ever worked through previous exam papers to prepare for an upcoming test? Today we will look at past papers as a study tool, and consider how you might assess their place in your preparation.

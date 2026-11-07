@@ -1,6 +1,6 @@
 ---
-topic: Side Projects as a Way to Learn
-category: Learning Experiences
+topic: "Side Projects as a Way to Learn"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you want to explore a new tool or subject, do you wait for course assignments or build something on your own time? Today we will explore side projects as a way to learn, and examine how you might analyze their educational role.

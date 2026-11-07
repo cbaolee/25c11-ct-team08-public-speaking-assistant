@@ -1,6 +1,6 @@
 ---
-topic: Peer Assessment in Group Work
-category: Learning Experiences
+topic: "Peer Assessment in Group Work"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When you collaborate with classmates on a team project, how should individual contributions be evaluated? Many university courses incorporate evaluations from teammates to determine final grades. Today we will explore peer assessment in group work, and consider how you might analyze this approach.

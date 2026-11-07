@@ -1,6 +1,6 @@
 ---
-topic: Burnout Among University Students
-category: Learning Experiences
+topic: "Burnout Among University Students"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When relentless deadlines accumulate near the end of a semester, how do students recognize when stress turns into exhaustion? Many undergraduates encounter overwhelming pressure during their degree programs. Today we will explore burnout among university students, and examine how you might analyze both causes and responses.

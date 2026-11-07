@@ -1,6 +1,6 @@
 ---
-topic: Learning From Failure
-category: Learning Experiences
+topic: "Learning From Failure"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When an academic project collapses or an idea falls flat, how do you interpret that setback? Today we will look at learning from failure, and consider how you might evaluate its role in student development.

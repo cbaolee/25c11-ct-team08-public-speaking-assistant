@@ -1,6 +1,6 @@
 ---
-topic: Imposter Syndrome Among University Students
-category: Learning Experiences
+topic: "Imposter Syndrome Among University Students"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. Have you ever entered a seminar room and wondered whether you truly belong among your peers? Many university students experience moments of self-doubt despite meeting every admissions standard. Today we will explore imposter syndrome among university students, and examine how you might analyze this phenomenon.

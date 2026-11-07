@@ -1,6 +1,6 @@
 ---
-topic: Public Speaking as a Core Learning Skill
-category: Learning Experiences
+topic: "Public Speaking as a Core Learning Skill"
+category: "Learning Experiences"
 duration_min: 10
 ---
 Good morning. When an instructor assigns an oral presentation, do you treat it as an assessment test or as a way to understand the subject itself? Today we will explore public speaking as a core learning skill, and examine how you might assess this practice.

@@ -1,6 +1,6 @@
 ---
-topic: Reflective Journaling for Learning
-category: Learning Experiences
+topic: "Reflective Journaling for Learning"
+category: "Learning Experiences"
 duration_min: 5
 ---
 Good morning. When you complete an assignment or lecture, do you write down what worked and what proved difficult? Today we will explore reflective journaling for learning, and consider how you might evaluate this contemplative practice.

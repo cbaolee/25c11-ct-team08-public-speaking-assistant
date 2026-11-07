@@ -1,6 +1,6 @@
 ---
-topic: Soft Skills vs Technical Skills
-category: Learning Experiences
+topic: "Soft Skills vs Technical Skills"
+category: "Learning Experiences"
 duration_min: 20
 ---
 Good morning. When you look at job descriptions in your field, do you focus on mastering software tools or developing your interpersonal communication? University students often debate how to distribute their preparation across these two domains. Today we will explore soft skills versus technical skills, and examine how you might analyze their relative weight.

@@ -1,6 +1,6 @@
 ---
-topic: Leadership Lessons From Student Projects
-category: Learning Experiences
+topic: "Leadership Lessons From Student Projects"
+category: "Learning Experiences"
 duration_min: 15
 ---
 Good morning. When you work with peers on an academic assignment, who coordinates the collective effort? Many undergraduates find themselves stepping forward to guide group responsibilities. Today we will explore leadership lessons from student projects, and examine how you might evaluate different approaches to leading.
