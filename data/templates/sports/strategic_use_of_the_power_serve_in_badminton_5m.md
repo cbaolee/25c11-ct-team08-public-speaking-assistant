@@ -1,6 +1,6 @@
 ---
 topic: "Strategic use of the power serve in badminton"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon. Whether you are on the touchline or in the analytics room, today's topic changes how we view competition.

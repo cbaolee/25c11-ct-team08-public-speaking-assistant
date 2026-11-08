@@ -1,6 +1,6 @@
 ---
 topic: "Statistical impact of home advantage in football"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good afternoon, sports fans and fellow tacticians. Our focus today is the quantifiable edge that home venues provide in modern football.

@@ -1,6 +1,6 @@
 ---
 topic: "Resolving a Technical Disagreement in the Team"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Okay, everyone, can I jump in for a moment? I think we've had a really good discussion so far, and I can feel that we're starting to go around in circles a little. So I'd like to take a step back, summarize where we are, and suggest a way for us to reach a decision together.

@@ -1,6 +1,6 @@
 ---
 topic: "Load distribution in multi‑day cycling tours"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. Today we examine how to allocate effort across grueling stage races.

@@ -1,6 +1,6 @@
 ---
 topic: "Agile vs Waterfall: Choosing a Methodology"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Would you build a bridge in two-week sprints, changing the design after every demo? Probably not. Would you build a mobile app by writing every requirement down for six months before writing a single line of code? Probably not either. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and those two questions sit at the heart of one of the oldest debates in software development: Agile versus Waterfall.

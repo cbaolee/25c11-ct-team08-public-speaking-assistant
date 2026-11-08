@@ -1,6 +1,6 @@
 ---
 topic: "Heat management strategies for desert marathon runners"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how elite desert marathoners turn extreme thermoregulation into a competitive advantage.

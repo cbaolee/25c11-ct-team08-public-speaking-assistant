@@ -1,6 +1,6 @@
 ---
 topic: "Analyzing shot selection in professional basketball"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will unpack how data analytics reshapes the expected‑value calculus of every shot taken on the hardwood.

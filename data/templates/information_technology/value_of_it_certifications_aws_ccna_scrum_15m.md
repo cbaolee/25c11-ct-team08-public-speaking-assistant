@@ -1,6 +1,6 @@
 ---
 topic: "Value of IT Certifications (AWS, CCNA, Scrum)"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 How much is a certificate really worth? I don't mean the exam fee. I mean its value to your career. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'll try to answer a question that students and junior professionals ask constantly: "Are IT certifications worth it? Should I spend my time and money on them?"

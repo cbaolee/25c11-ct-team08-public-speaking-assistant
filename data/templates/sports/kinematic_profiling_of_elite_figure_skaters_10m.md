@@ -1,6 +1,6 @@
 ---
 topic: "Kinematic profiling of elite figure skaters"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect how precise movement analytics unlock the artistry and efficiency of top‑level figure skating.

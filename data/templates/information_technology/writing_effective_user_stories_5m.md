@@ -1,6 +1,6 @@
 ---
 topic: "Writing Effective User Stories"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 A team once received this requirement: "The system shall support search." Simple, right? The developers built a search box that searched product names. The product owner was unhappy, because she expected to search by category and price too. The testers didn't know what to test. And the customers wanted to search by brand, which nobody had even mentioned. Three weeks of work, and everyone was disappointed.

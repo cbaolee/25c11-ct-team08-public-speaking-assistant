@@ -1,6 +1,6 @@
 ---
 topic: "Product Demo for Potential Customers"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Hi everyone, and thank you so much for being here today! My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }} at {{ argument_company_name }}.

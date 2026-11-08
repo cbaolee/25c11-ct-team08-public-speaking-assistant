@@ -1,6 +1,6 @@
 ---
 topic: "Transition offense efficiency in rugby union"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how rapid transition offense shapes outcomes in high‑stakes rugby union matches.

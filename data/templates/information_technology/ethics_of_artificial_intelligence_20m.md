@@ -1,6 +1,6 @@
 ---
 topic: "Ethics of Artificial Intelligence"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 If an algorithm rejected your loan application, your job application, or your university application, would you have the right to know why? And who would be responsible if it got it wrong? Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Questions like these are at the heart of today's topic: the ethics of artificial intelligence.

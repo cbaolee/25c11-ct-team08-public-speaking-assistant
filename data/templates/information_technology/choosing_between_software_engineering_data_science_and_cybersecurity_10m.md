@@ -1,6 +1,6 @@
 ---
 topic: "Choosing Between Software Engineering, Data Science and Cybersecurity"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Software engineering, data science, or cybersecurity: if you're an IT student, there's a good chance you've changed your mind about these three at least once this year. Hi everyone, and thanks for coming. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's make that decision a little easier.

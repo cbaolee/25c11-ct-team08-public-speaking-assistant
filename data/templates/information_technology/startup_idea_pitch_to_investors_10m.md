@@ -1,6 +1,6 @@
 ---
 topic: "Startup Idea Pitch to Investors"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, and thank you for your time today. My name is {{ argument_founder_name }}, and I'm {{ argument_founder_role }} of {{ argument_startup_name }}.

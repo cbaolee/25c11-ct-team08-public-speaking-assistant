@@ -1,6 +1,6 @@
 ---
 topic: "Shot selection analysis in professional darts"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good evening, athletes, trainers, and students of the game. In this session we will dissect how elite dartists choose targets to maximize expected scoring value.

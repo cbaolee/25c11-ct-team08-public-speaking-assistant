@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanics of rotational power in tennis"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect the mechanics that power the modern forehand.

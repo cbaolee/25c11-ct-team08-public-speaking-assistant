@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanics of the tennis topspin forehand"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the next fifteen minutes we will unpack how elite players generate, control, and exploit topspin on the forehand wing.

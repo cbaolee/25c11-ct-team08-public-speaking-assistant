@@ -1,6 +1,6 @@
 ---
 topic: "Optimal nutrition timing for strength athletes"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good morning, coaches and performance analysts. Today we will evaluate how precise nutrition timing drives maximal strength adaptations.

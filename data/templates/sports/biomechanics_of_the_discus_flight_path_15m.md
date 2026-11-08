@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanics of the discus flight path"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect the aerodynamic journey of the discus from release to landing.

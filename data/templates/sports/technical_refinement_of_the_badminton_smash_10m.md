@@ -1,6 +1,6 @@
 ---
 topic: "Technical refinement of the badminton smash"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how elite shuttlers perfect their smash under intense pressure.

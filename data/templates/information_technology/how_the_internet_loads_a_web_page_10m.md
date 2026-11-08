@@ -1,6 +1,6 @@
 ---
 topic: "How the Internet Loads a Web Page"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 You've probably done this a dozen times today without a second thought: you open your browser, type {{ argument_example_website_address }}, press Enter, and about a second later, the page appears. Hello everyone, I'm {{ argument_speaker_name }}, and that one second is our topic today.

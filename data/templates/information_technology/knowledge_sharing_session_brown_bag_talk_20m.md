@@ -1,6 +1,6 @@
 ---
 topic: "Knowledge Sharing Session (Brown Bag Talk)"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Hi everyone! Welcome, and thanks for coming. Please, go ahead and enjoy your lunch. That's the whole point of a brown bag session: we eat, we learn something, and nobody has to take notes unless they want to.

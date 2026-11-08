@@ -1,6 +1,6 @@
 ---
 topic: "Building a Strong Developer Portfolio"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Let's sit on the other side of the hiring table for a moment. When a company posts a junior developer position, it may receive dozens or even hundreds of applications. Many of them look very similar: the same degree, the same courses, the same list of technologies. A recruiter or engineer reviewing them often has only a minute or two for each one. So what makes someone stand out? Very often, it's a link to a project that clearly shows what they can do.

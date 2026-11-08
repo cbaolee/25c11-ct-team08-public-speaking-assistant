@@ -1,6 +1,6 @@
 ---
 topic: "Psychological factors influencing free throw success"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. Today we will explore how mental dynamics drive free‑throw performance.

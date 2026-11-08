@@ -1,6 +1,6 @@
 ---
 topic: "Standard, High-Quality and Advanced Programs Compared"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Three programs, one faculty, and a lot of confused families. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} If you're applying to IT at {{ argument_university_name }}, there's one choice that puzzles almost everyone: the difference between the standard program, the high-quality program, and the advanced program.

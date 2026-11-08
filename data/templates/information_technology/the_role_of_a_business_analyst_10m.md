@@ -1,6 +1,6 @@
 ---
 topic: "The Role of a Business Analyst"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 There's a story that's been told in software companies for decades, usually with a funny cartoon of a tree swing. The customer explains what they want. The salesperson promises something slightly different. The designer draws something else. The developers build something else again. And in the end, what the customer actually needed was a simple tire hanging from a tree branch.

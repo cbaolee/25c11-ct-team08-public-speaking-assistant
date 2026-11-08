@@ -1,6 +1,6 @@
 ---
 topic: "Psychological coping mechanisms for injury rehab"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good evening, athletes, trainers, and students of the game. Today we will examine the core psychological principles that empower successful injury rehabilitation.

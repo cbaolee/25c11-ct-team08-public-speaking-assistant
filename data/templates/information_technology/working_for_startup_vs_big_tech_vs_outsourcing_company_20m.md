@@ -1,6 +1,6 @@
 ---
 topic: "Working for Startup vs Big Tech vs Outsourcing Company"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 "Startups are where you really learn." "Big tech is the only place with real engineering." "Outsourcing is just for beginners." If you're an IT student, you've probably heard all three, often from people who've only ever worked in one of them. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'd like to help you with a decision that almost every student and junior developer faces sooner or later: startup, big tech, or outsourcing company?

@@ -1,6 +1,6 @@
 ---
 topic: "Answering \"Tell Me About a Project You Built\""
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Sure. The project I'd like to talk about is {{ argument_project_name }}, which {{ argument_project_purpose }}

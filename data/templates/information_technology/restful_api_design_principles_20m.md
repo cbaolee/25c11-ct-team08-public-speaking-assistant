@@ -1,6 +1,6 @@
 ---
 topic: "RESTful API Design Principles"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Picture an API that works perfectly. Every feature is there. And yet, two days after receiving it, the developer who has to integrate with it sends a polite message: "I'm not sure how this is supposed to work." The endpoint names are inconsistent. Errors come back as two hundred OK, with an error message hidden inside. And every list returns all ten thousand records at once.

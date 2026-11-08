@@ -1,6 +1,6 @@
 ---
 topic: "Estimating Tasks with Story Points"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Raise your hand if you've ever said "this will take two days," and it took two weeks. Keep your hand up if it happened more than once. Thank you, you can put them down now. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and today we're going to talk about something every software team struggles with: estimation. More specifically, how to estimate work using story points.

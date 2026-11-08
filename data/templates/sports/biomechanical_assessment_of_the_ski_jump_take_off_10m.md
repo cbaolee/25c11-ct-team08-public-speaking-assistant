@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical assessment of the ski jump take‑off"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we will dissect the take‑off phase and its implications for squad management and long‑term sustainability.

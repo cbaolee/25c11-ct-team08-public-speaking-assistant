@@ -1,6 +1,6 @@
 ---
 topic: "ERP Systems in Enterprises"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, {{ argument_speaker_role }}, and today we're going to talk about ERP systems: what they are, the key concepts behind them, how they work, why companies invest so much in them, and, most importantly, what they mean for your daily work. Along the way, we'll also do a short group exercise.

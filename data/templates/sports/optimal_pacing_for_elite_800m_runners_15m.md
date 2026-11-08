@@ -1,6 +1,6 @@
 ---
 topic: "Optimal pacing for elite 800m runners"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good morning, coaches and performance analysts. Today we will unpack the data‑driven framework that guides elite 800m pacing decisions.

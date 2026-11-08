@@ -1,6 +1,6 @@
 ---
 topic: "Energy expenditure modeling in Ironman triathlons"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we will dissect how precise energy modeling can dictate performance across the swim, bike, and run.

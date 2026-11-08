@@ -1,6 +1,6 @@
 ---
 topic: "Shot clock management in professional basketball"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect how elite teams manipulate the 24‑second clock to gain strategic advantage.

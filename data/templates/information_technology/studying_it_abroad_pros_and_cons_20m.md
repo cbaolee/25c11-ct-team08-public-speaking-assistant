@@ -1,6 +1,6 @@
 ---
 topic: "Studying IT Abroad: Pros and Cons"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. If you've ever pictured yourself studying computer science in another country, in a new city, with a new language and a new kind of classroom, then this talk is for you. My name is {{ argument_speaker_name }}, and today we'll look closely at a dream that many IT students share: studying abroad.

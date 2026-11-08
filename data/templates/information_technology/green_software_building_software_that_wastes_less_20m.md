@@ -1,6 +1,6 @@
 ---
 topic: "Green Software: Building Software That Wastes Less"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 When you send an email, watch a video, or ask an AI chatbot a question, where does the energy come from?

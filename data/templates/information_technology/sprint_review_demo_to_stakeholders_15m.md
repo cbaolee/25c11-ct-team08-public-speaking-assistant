@@ -1,6 +1,6 @@
 ---
 topic: "Sprint Review Demo to Stakeholders"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Good {{ argument_time_of_day }}, and welcome to the review of sprint {{ argument_sprint_number }}. For those who don't know me, I'm {{ argument_speaker_name }}, {{ argument_speaker_role }} on the {{ argument_team_name }} team. We'll show you what we built, and then we want to hear what you think, because your feedback directly shapes what we work on next.

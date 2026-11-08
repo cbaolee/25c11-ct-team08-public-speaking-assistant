@@ -1,6 +1,6 @@
 ---
 topic: "Health IT and Electronic Medical Records"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 You walk into a new clinic or hospital. The doctor asks: "What medicines are you taking? Have you had any surgery? Any allergies?" And you try to remember. Maybe you brought a plastic bag full of old prescriptions, test results, and X-ray films. Maybe you forgot it at home. Maybe you had the same blood test last month at another hospital, but nobody can see the results, so you have to do it again.

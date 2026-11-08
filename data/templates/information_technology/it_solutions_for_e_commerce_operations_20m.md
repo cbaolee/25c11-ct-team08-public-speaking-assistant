@@ -1,6 +1,6 @@
 ---
 topic: "IT Solutions for E-commerce Operations"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Every time someone taps "Place order" in a shopping app, a small miracle happens, and almost nobody sees it. Good {{ argument_time_of_day }}, everyone, and welcome to {{ argument_event_name }}. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

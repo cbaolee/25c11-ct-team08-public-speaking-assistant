@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanics of the hammer throw release"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how elite throwers translate raw power into optimal release angles under competition pressure.

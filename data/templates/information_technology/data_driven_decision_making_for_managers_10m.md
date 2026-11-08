@@ -1,6 +1,6 @@
 ---
 topic: "Data-Driven Decision Making for Managers"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, we're going to talk about how we, as managers, can make better decisions with data. And we'll begin with an animal that lives in a surprising number of meeting rooms.

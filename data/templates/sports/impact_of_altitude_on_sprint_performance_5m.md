@@ -1,6 +1,6 @@
 ---
 topic: "Impact of altitude on sprint performance"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. Our focus today is the aerodynamic and physiological consequences of competing at altitude.

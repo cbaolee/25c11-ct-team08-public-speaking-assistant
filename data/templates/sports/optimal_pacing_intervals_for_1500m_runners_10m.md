@@ -1,6 +1,6 @@
 ---
 topic: "Optimal pacing intervals for 1500m runners"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will explore how data‑driven pacing can unlock peak efficiency over the 1500m distance.

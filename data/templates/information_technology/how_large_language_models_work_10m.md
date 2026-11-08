@@ -1,6 +1,6 @@
 ---
 topic: "How Large Language Models Work"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 When you type a question into ChatGPT, Claude, or Gemini, and a fluent answer appears word by word, it can feel as if someone is thinking on the other side of the screen. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and today I want to open up that box, which many of us use every day but rarely look inside: large language models.

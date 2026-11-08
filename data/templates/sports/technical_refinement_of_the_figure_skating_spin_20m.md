@@ -1,6 +1,6 @@
 ---
 topic: "Technical refinement of the figure skating spin"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the next twenty minutes we will explore how elite skaters perfect their spins under the most intense competitive pressure.

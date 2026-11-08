@@ -1,6 +1,6 @@
 ---
 topic: "Becoming a Data Analyst from Zero"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Imagine a coffee chain with twenty shops. The manager asks: "Sales dropped last month. Why?" One person might guess: "Maybe it was the rain." Another might say: "Maybe customers don't like the new menu." A data analyst doesn't guess. They look at the sales data by shop, by day, by product, and by time of day. And they might find something like this: sales dropped mainly in three shops near universities, mainly in the afternoon, starting the week the students' exam period ended. In other words, it's not the menu and it's not the rain. It's the semester break. And that leads to a very different decision.

@@ -1,6 +1,6 @@
 ---
 topic: "Backend Developer Roadmap"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 When you order food in a delivery app, you see a menu, a cart, and a "Place order" button. That's the front end. But the moment you press that button, a whole hidden world starts working. Your order is checked and saved in a database. Your payment is sent to a payment provider. The restaurant is notified. A driver is matched to your order. Your location is updated every few seconds. And all of this happens for thousands of other customers at exactly the same time, without mixing anything up and without losing a single order.

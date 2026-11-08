@@ -1,6 +1,6 @@
 ---
 topic: "Kickoff Meeting with a New Client"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome. On behalf of {{ argument_vendor_company_name }}, I'd like to thank the team from {{ argument_client_company_name }} for joining us today. We're excited to be starting this project with you.

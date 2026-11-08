@@ -1,6 +1,6 @@
 ---
 topic: "AI Engineer Learning Path"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Ask a room of IT students what they want to become, and more and more hands go up for the same answer: AI engineer. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's look at what that path really involves, beyond the hype.

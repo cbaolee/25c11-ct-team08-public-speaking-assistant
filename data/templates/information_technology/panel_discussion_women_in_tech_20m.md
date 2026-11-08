@@ -1,6 +1,6 @@
 ---
 topic: "Panel Discussion: Women in Tech"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 [Moderator script for a panel with three panelists. Timings for each round are shown in brackets. Panelists' answers are not scripted.]

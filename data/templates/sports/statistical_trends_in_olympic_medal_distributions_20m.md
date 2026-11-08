@@ -1,6 +1,6 @@
 ---
 topic: "Statistical trends in Olympic medal distributions"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good evening, athletes, trainers, and students of the game. We will explore how data analytics uncovers shifting patterns in Olympic podium outcomes.

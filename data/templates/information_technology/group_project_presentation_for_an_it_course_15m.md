@@ -1,6 +1,6 @@
 ---
 topic: "Group Project Presentation for an IT Course"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 [Speaker 1: {{ argument_speaker_1_name }}]

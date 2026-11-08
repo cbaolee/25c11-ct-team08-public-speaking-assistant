@@ -1,6 +1,6 @@
 ---
 topic: "Statistical analysis of clutch shooting in NBA finals"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good afternoon, sports fans and fellow tacticians. Today we dissect the statistical underpinnings of clutch shooting in the NBA Finals.

@@ -1,6 +1,6 @@
 ---
 topic: "Load distribution in Olympic weightlifting platforms"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good evening, athletes, trainers, and students of the game. Today we will examine how biomechanics and physiology converge on the weightlifting platform.

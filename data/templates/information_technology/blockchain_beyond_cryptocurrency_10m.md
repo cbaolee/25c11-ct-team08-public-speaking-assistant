@@ -1,6 +1,6 @@
 ---
 topic: "Blockchain Beyond Cryptocurrency"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 When I say the word "blockchain," what's the first thing that comes to mind? For most people, it's Bitcoin, price charts going up and down, and maybe a few stories about people getting rich, or losing everything, overnight.

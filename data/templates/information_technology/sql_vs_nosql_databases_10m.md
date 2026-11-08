@@ -1,6 +1,6 @@
 ---
 topic: "SQL vs NoSQL Databases"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Here's a decision that takes ten minutes to make at the start of a project, and can take ten months to undo later. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and the decision I mean is this one: should we use a SQL database or a NoSQL database?

@@ -1,6 +1,6 @@
 ---
 topic: "Frontend Developer Roadmap"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Every button you click, every menu you open, and every animation you see on a website was built by someone. That someone is a front-end developer. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'll share a roadmap for becoming one: what to learn, in what order, how long it usually takes, and what mistakes to avoid along the way.

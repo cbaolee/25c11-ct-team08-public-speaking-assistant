@@ -1,6 +1,6 @@
 ---
 topic: "Salary Negotiation for IT Roles"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hi {{ argument_recruiter_name }}, thank you for the offer for the {{ argument_role_title }} position, and for the time you and the team have spent with me during the process.

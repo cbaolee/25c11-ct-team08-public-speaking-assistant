@@ -1,6 +1,6 @@
 ---
 topic: "IT Club Recruitment Speech"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hi everyone! I'm {{ argument_speaker_name }}, {{ argument_speaker_role }} of {{ argument_club_name }}.

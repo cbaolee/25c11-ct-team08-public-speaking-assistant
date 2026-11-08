@@ -1,6 +1,6 @@
 ---
 topic: "Optimal line running strategies in American football"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good morning, coaches and performance analysts. Today we will unpack the evolving art of line running through the lens of data analytics and expected‑value optimization.

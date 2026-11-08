@@ -1,6 +1,6 @@
 ---
 topic: "Research Paper Presentation at a Seminar"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. Today's paper is "{{ argument_paper_title }}," by {{ argument_paper_authors }}, published at {{ argument_publication_venue }} I'm {{ argument_presenter_name }}, and {{ argument_presenter_background }}

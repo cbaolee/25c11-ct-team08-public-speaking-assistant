@@ -1,6 +1,6 @@
 ---
 topic: "What Is Cloud Computing"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Two quick questions to start. Raise your hand if you've used the cloud today. Now raise your hand if, today, you've sent an email, watched a video online, or opened a shared document. If your hand went up the second time but not the first, you've just discovered why this topic is so confusing. Good {{ argument_time_of_day }}. I'm {{ argument_speaker_name }}, and in the next few minutes, I'd like to answer a question that sounds simple but often isn't: what exactly is "the cloud"?

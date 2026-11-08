@@ -1,6 +1,6 @@
 ---
 topic: "Technical analysis of the backhand slice in tennis"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how the backhand slice shapes outcomes when pressure mounts in elite tennis.

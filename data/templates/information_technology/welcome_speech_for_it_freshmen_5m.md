@@ -1,6 +1,6 @@
 ---
 topic: "Welcome Speech for IT Freshmen"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome!

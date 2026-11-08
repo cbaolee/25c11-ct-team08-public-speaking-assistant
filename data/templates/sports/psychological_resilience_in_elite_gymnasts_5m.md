@@ -1,6 +1,6 @@
 ---
 topic: "Psychological resilience in elite gymnasts"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how mental fortitude translates into performance under the most exacting conditions.

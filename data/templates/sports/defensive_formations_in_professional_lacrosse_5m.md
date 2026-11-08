@@ -1,6 +1,6 @@
 ---
 topic: "Defensive formations in professional lacrosse"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. Today I will break down the defensive formations that elite lacrosse teams deploy under high‑tempo pressure.

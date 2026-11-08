@@ -1,6 +1,6 @@
 ---
 topic: "Psychological preparation for high‑stakes tennis matches"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good evening, athletes, trainers, and students of the game. Today we explore the science behind mental readiness for high‑stakes tennis encounters.

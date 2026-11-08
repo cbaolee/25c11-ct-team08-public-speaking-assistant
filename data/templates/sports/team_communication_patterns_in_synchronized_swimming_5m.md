@@ -1,6 +1,6 @@
 ---
 topic: "Team communication patterns in synchronized swimming"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how elite squads synchronize their verbal and non‑verbal cues under the microscope of competition.

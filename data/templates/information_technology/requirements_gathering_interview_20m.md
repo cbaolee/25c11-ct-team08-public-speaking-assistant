@@ -1,6 +1,6 @@
 ---
 topic: "Requirements Gathering Interview"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, {{ argument_interviewee_name }}. Thank you for making time for this conversation. I know your schedule is busy.

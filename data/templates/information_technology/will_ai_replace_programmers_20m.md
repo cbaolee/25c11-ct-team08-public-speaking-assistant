@@ -1,6 +1,6 @@
 ---
 topic: "Will AI Replace Programmers"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 "Will AI replace programmers?" People ask that question constantly: students, parents, junior developers, and sometimes very senior engineers. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'd like to answer it directly.

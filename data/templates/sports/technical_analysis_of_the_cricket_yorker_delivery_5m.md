@@ -1,6 +1,6 @@
 ---
 topic: "Technical analysis of the cricket yorker delivery"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the next few minutes we will unpack the yorker through the lens of high‑pressure decision‑making.

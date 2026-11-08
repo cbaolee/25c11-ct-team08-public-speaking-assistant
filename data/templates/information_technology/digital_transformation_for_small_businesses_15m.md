@@ -1,6 +1,6 @@
 ---
 topic: "Digital Transformation for Small Businesses"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 There's a small bakery on your street. The owner takes orders by phone, writes them in a notebook, and counts the cash at the end of the day. Now imagine the same bakery taking orders online, accepting QR payments, and knowing exactly which cake sells best on rainy weekends. Same bakery, same owner, same cakes. The difference between those two pictures is what today is about. Good {{ argument_time_of_day }}, everyone, and thank you for joining {{ argument_event_name }}. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

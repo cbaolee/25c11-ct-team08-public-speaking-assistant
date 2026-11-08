@@ -1,6 +1,6 @@
 ---
 topic: "Statistical analysis of turnover rates in NBA games"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will unpack how turnover frequency reshapes expected value across an NBA contest.

@@ -1,6 +1,6 @@
 ---
 topic: "Load monitoring using GPS in professional rugby"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we examine how GPS‑derived metrics inform squad rotation and injury mitigation.

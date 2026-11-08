@@ -1,6 +1,6 @@
 ---
 topic: "Strategic player rotation in professional baseball"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good afternoon. Whether you are on the touchline or in the analytics room, today's topic changes how we view competition.

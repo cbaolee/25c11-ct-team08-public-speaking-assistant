@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical load of the high jump approach"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will quantify how the high‑jump approach translates biomechanical load into vertical potential.

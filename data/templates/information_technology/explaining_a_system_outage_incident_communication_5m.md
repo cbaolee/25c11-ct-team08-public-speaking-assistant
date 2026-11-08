@@ -1,6 +1,6 @@
 ---
 topic: "Explaining a System Outage (Incident Communication)"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, {{ argument_speaker_role }}, and I owe you a clear account of the outage that affected {{ argument_affected_service }} {{ argument_when_it_happened }}.

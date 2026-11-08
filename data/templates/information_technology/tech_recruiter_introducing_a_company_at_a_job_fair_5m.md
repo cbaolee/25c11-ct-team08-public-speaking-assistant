@@ -1,6 +1,6 @@
 ---
 topic: "Tech Recruiter Introducing a Company at a Job Fair"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hello everyone, and welcome to our booth! My name is {{ argument_recruiter_name }}, and I'm {{ argument_recruiter_role }} at {{ argument_company_name }}. I know there are many companies here today, so I'll keep this short and tell you exactly what you'd want to know: who we are, what our engineers actually do, who we're looking for, and how to apply.

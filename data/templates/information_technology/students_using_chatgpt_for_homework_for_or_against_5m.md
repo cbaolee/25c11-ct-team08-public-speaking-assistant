@@ -1,6 +1,6 @@
 ---
 topic: "Students Using ChatGPT for Homework: For or Against"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, {{ argument_audience_greeting }}. My name is {{ argument_speaker_name }}, and today I'll argue a position that may sound like a compromise, but I believe is the only realistic one: students should be allowed to use ChatGPT and similar AI tools for homework, but only in ways that support learning, not replace it.

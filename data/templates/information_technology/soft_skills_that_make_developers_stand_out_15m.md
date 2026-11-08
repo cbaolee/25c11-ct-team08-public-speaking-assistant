@@ -1,6 +1,6 @@
 ---
 topic: "Soft Skills That Make Developers Stand Out"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Two candidates apply for the same developer position. Their technical skills are very similar. Both solve the coding problem. Both have decent projects. But in the interview, the first candidate answers questions with one-word replies, struggles to explain their own project, and gets defensive when the interviewer points out a small bug. The second candidate thinks out loud, asks clarifying questions, explains their project clearly, and says, "Good catch, I didn't think about that case. Let me fix it."

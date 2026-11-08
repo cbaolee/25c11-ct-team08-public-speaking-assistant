@@ -1,6 +1,6 @@
 ---
 topic: "Cybersecurity Basics for Everyone"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 A short text message arrives on your phone: "Your parcel could not be delivered. Please confirm your address within 24 hours using this link." Would you click it? Every day, somewhere in the world, people do, and some of them lose their savings because of it. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and today we're going to talk about cybersecurity. But don't worry: this isn't a talk for hackers or IT experts. This is a talk for everyone who has a phone, an email address, a bank account, or a social media profile. In other words, all of us.

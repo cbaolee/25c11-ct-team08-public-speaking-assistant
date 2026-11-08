@@ -1,6 +1,6 @@
 ---
 topic: "Tactical use of the off‑side trap in soccer"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect how the off‑side trap reshapes attacking dynamics.

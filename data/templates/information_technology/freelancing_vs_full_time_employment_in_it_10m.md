@@ -1,6 +1,6 @@
 ---
 topic: "Freelancing vs Full-Time Employment in IT"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Take two developers. One wakes up at seven, commutes to an office, and joins the morning stand-up. The other opens a laptop at a cafe at ten and answers messages from three different clients. Which one has the better working life? It depends. Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's compare these two very different ways of working in IT: full-time employment and freelancing.

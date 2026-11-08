@@ -1,6 +1,6 @@
 ---
 topic: "Fintech: Technology in Modern Banking"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Think about how your parents paid for things twenty years ago. Cash, mostly. Maybe a bank card. To transfer money, they probably had to visit a bank branch, fill in a paper form, and wait in line. Opening a bank account could take an hour and a stack of documents.

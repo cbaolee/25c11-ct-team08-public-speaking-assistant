@@ -1,6 +1,6 @@
 ---
 topic: "Recursion Explained Simply"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Stand between two mirrors, and you'll see your reflection repeated again and again, each copy a little smaller than the last. Hold on to that picture, because it's the easiest way into today's topic.

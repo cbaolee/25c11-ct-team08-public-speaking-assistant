@@ -1,6 +1,6 @@
 ---
 topic: "Explaining a Technical Problem to Non-Technical Colleagues"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hi everyone, thanks for making time for this. I know most of you are busy, so I'll keep it short and simple, and I'll try to avoid technical jargon. If I do slip into tech-speak at any point, please stop me and ask. There are no silly questions here. I want to explain a technical problem that affects your work too: what it is, what it means for you, and what we're doing about it.

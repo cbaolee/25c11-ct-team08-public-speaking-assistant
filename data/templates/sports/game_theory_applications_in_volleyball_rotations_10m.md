@@ -1,6 +1,6 @@
 ---
 topic: "Game theory applications in volleyball rotations"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect how rotation decisions become a strategic game.

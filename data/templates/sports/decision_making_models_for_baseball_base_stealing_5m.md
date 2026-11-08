@@ -1,6 +1,6 @@
 ---
 topic: "Decision making models for baseball base stealing"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. Today we break down the calculus behind every daring dash to second.

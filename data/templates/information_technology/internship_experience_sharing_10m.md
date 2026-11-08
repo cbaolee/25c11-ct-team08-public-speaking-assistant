@@ -1,6 +1,6 @@
 ---
 topic: "Internship Experience Sharing"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 If you're about to apply for your first internship, I have bad news and good news. The bad news: you'll probably be rejected a few times. The good news: almost everyone is, and it gets much better after that. Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'd like to share my internship experience with you: how I got it, what it was actually like, the mistakes I made, and what I wish someone had told me before I started.

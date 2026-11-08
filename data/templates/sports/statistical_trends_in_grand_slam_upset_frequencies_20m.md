@@ -1,6 +1,6 @@
 ---
 topic: "Statistical trends in Grand Slam upset frequencies"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good afternoon, sports fans and fellow tacticians. In the next twenty minutes we will explore how upset patterns have reshaped Grand Slam strategy.

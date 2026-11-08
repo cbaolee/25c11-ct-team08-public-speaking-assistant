@@ -1,6 +1,6 @@
 ---
 topic: "Burnout and Mental Health in the IT Industry"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, and thank you for being here. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical analysis of the javelin release angle"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Welcome, fellow competitors and sports science enthusiasts. The javelin’s flight path hinges on a delicate balance of angle, velocity, and aerodynamics, making its release one of the sport’s most scrutinized mechanics.

@@ -1,6 +1,6 @@
 ---
 topic: "Machine Learning Workflow Overview"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 If you train a brilliant model and nobody can ever use it, have you really built a machine learning system? Welcome, everyone, to today's session of {{ argument_course_or_event_name }}. I'm {{ argument_speaker_name }}, and that question is why today we're going to step back from individual algorithms and look at the bigger picture: the complete workflow of a machine learning project, from the first idea all the way to a model running in the real world.

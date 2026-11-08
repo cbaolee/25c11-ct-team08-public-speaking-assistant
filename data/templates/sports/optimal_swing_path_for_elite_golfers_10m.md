@@ -1,6 +1,6 @@
 ---
 topic: "Optimal swing path for elite golfers"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will unpack how data analytics can reveal the optimal swing path that maximizes expected ball flight value.

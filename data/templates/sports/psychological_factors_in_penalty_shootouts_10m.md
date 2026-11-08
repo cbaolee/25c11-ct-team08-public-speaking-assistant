@@ -1,6 +1,6 @@
 ---
 topic: "Psychological factors in penalty shootouts"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good evening, athletes, trainers, and students of the game. Let’s dissect the mental dynamics that decide penalty shootouts.

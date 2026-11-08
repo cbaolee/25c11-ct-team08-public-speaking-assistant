@@ -1,6 +1,6 @@
 ---
 topic: "Recovery nutrition timing for sprinters"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how precise nutrient delivery shapes sprint performance under pressure.

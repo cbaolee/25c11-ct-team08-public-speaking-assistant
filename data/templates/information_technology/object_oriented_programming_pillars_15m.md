@@ -1,6 +1,6 @@
 ---
 topic: "Object-Oriented Programming Pillars"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 If a program can be written perfectly well with just functions and variables, why did our industry bother to invent objects at all? It's a fair question, and many people quietly wonder about it. Good {{ argument_time_of_day }}, everyone, and thank you for joining this session of {{ argument_event_or_course_name }}. I'm {{ argument_speaker_name }}, and over the next quarter of an hour or so, we're going to answer that question by exploring one of the most influential ideas in software development: object-oriented programming, and in particular, its four pillars.

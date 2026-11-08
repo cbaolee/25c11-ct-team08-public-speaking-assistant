@@ -1,6 +1,6 @@
 ---
 topic: "Strategic time‑out usage in NBA games"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. I will evaluate how elite coaches manipulate time‑outs to shift momentum.

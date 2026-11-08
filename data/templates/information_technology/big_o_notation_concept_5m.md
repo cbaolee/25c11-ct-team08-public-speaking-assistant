@@ -1,6 +1,6 @@
 ---
 topic: "Big-O Notation Concept"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 A program that handles a hundred records in a blink can freeze on a million. Same code, same laptop. The only thing that changed is the size of the input. I'm {{ argument_speaker_name }}, and in the next five minutes I'd like to give you the idea that explains why: Big-O notation. It has a slightly scary name, but the idea behind it is simple.

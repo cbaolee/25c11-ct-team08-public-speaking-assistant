@@ -1,6 +1,6 @@
 ---
 topic: "Docker and Containers for Beginners"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 "But it works on my machine." Raise your hand if you've ever heard that sentence, or said it yourself. Yes, I see a lot of hands, and a few guilty smiles.

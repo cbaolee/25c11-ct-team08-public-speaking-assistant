@@ -1,6 +1,6 @@
 ---
 topic: "Git and Version Control Basics"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Hi everyone, I'm {{ argument_speaker_name }}, and today's topic is Git: a tool you'll use almost every day as a developer, and one that will probably save you from disaster more than once.

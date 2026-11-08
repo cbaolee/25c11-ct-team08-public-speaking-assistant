@@ -1,6 +1,6 @@
 ---
 topic: "Digital Addiction and Screen Time"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Hello, everyone, and thank you for coming. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

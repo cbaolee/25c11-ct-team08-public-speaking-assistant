@@ -1,6 +1,6 @@
 ---
 topic: "Hosting a Tech Meetup"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 [Opening, at the start of the event]

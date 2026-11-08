@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical efficiency of the butterfly stroke"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. Today we dissect the biomechanical drivers that make the butterfly stroke both powerful and efficient.

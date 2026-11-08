@@ -1,6 +1,6 @@
 ---
 topic: "Giving Constructive Code Review Feedback"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hey {{ argument_colleague_name }}, thanks for making time for this. I've gone through your pull request for {{ argument_feature_name }}, and I thought it would be easier to talk through my comments together rather than leave a long list in the review tool. Written comments can sometimes sound harsher than we mean them, so I'd rather just have a quick chat.

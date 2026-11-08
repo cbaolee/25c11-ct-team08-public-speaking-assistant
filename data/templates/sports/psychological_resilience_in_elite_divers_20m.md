@@ -1,6 +1,6 @@
 ---
 topic: "Psychological resilience in elite divers"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good evening, athletes, trainers, and students of the game. In this session we will analyze how mental fortitude drives performance through sports biomechanics and physiological output.

@@ -1,6 +1,6 @@
 ---
 topic: "Psychological preparation for Olympic debutants"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good afternoon, sports fans and fellow tacticians. Today we explore the mental architecture that underpins a first‑time Olympian’s performance.

@@ -1,6 +1,6 @@
 ---
 topic: "Onboarding Welcome Speech for New Developers"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone, and a very warm welcome to {{ argument_company_name }}! My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }}. I'm really happy to see all of you here today.

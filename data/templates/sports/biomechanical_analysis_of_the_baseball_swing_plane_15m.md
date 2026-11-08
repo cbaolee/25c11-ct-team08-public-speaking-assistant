@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical analysis of the baseball swing plane"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good evening, athletes, trainers, and students of the game. Today we will dissect the biomechanical underpinnings of the swing plane that separate major leaguers from the rest.

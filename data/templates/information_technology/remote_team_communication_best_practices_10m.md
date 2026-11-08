@@ -1,6 +1,6 @@
 ---
 topic: "Remote Team Communication Best Practices"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Quick question before we start: how many messages did you send at work yesterday? Twenty? Fifty? And how many of them needed a second message to explain what you meant in the first one? I'm {{ argument_speaker_name }}, and that second message is what today is about: how we communicate as a remote team, and how to get it right the first time.

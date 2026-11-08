@@ -1,6 +1,6 @@
 ---
 topic: "Strategic time management in professional boxing rounds"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the high‑stakes arena of professional boxing, every second of a round can tip the balance between victory and defeat.

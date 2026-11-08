@@ -1,6 +1,6 @@
 ---
 topic: "Strategic player rotations in NBA playoffs"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the high‑stakes environment of the NBA postseason, coaching rotations become a decisive lever for success.

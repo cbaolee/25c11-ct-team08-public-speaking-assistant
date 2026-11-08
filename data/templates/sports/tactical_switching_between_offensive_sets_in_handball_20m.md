@@ -1,6 +1,6 @@
 ---
 topic: "Tactical switching between offensive sets in handball"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good afternoon. Whether you are on the touchline or in the analytics room, today's topic changes how we view competition.

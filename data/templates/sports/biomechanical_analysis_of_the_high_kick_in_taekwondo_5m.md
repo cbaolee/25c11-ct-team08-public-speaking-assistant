@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical analysis of the high kick in Taekwondo"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Welcome, fellow competitors and sports science enthusiasts. The high kick is a decisive weapon that blends speed, range, and deception.

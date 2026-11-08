@@ -1,6 +1,6 @@
 ---
 topic: "Self-Taught Programmer Path"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_self_taught_story_one_sentence }}

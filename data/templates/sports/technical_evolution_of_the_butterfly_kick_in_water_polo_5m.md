@@ -1,6 +1,6 @@
 ---
 topic: "Technical evolution of the butterfly kick in water polo"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. In the next few minutes we will trace how the butterfly kick has transformed offensive dynamics in water polo.

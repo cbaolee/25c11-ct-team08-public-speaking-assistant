@@ -1,6 +1,6 @@
 ---
 topic: "Asking for Help Without Losing Credibility"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 {{ argument_helper_name }}, got ten minutes sometime today? I'm working on something and I could really use your input. No rush if you're in the middle of something, I can work around your schedule.

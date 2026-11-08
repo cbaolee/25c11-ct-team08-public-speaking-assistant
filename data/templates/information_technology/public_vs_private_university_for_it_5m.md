@@ -1,6 +1,6 @@
 ---
 topic: "Public vs Private University for IT"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Two universities can look almost identical in a brochure, and still give you four very different years. Hello everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's look at a choice many students and parents struggle with when deciding where to study IT: a public university or a private one?

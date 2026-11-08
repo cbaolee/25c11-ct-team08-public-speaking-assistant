@@ -1,6 +1,6 @@
 ---
 topic: "Statistical modeling of goal expectancy in soccer"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good afternoon, sports fans and fellow tacticians. Today we will explore how elite coaches translate statistical modeling into actionable game‑planning for goal expectancy.

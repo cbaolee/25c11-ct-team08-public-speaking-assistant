@@ -1,6 +1,6 @@
 ---
 topic: "Negotiating Project Scope Changes"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone, and thank you for making time for this discussion. As you know, last week {{ argument_requester_name }} asked whether we could add {{ argument_requested_change }} to the current phase of {{ argument_project_name }}. I'd like to use today's meeting to look at that request together, understand the impact, and agree on the best way forward.

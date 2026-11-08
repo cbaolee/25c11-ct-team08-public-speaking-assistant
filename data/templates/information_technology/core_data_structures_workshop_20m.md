@@ -1,6 +1,6 @@
 ---
 topic: "Core Data Structures Workshop: Arrays, Lists, Stacks, Queues and Hash Tables"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome to {{ argument_workshop_name }}. I'm {{ argument_speaker_name }}, and for the next twenty minutes, we're going to explore the core data structures that almost every program relies on: arrays, linked lists, stacks, queues, and hash tables.

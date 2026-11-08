@@ -1,6 +1,6 @@
 ---
 topic: "Hackathon Final Pitch"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 {{ argument_opening_hook }}

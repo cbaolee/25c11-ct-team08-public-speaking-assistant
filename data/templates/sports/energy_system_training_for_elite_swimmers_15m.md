@@ -1,6 +1,6 @@
 ---
 topic: "Energy system training for elite swimmers"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we will dissect how targeted energy system training drives performance at the elite swimming level.

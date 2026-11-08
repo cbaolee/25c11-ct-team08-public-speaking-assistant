@@ -1,6 +1,6 @@
 ---
 topic: "Why English Is an Advantage for IT Professionals"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hi everyone. I'm {{ argument_speaker_name }}, and I'd like to convince you, in just a few minutes, that English might be the most valuable skill you can add to your IT toolkit, even more than the next programming language.

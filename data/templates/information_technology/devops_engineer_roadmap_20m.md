@@ -1,6 +1,6 @@
 ---
 topic: "DevOps Engineer Roadmap"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 For years, many software companies lived through the same painful routine. Developers would spend weeks writing new features. Then, once a month, or even once a quarter, they would hand everything over to the operations team, the people who ran the servers. The operations team would try to install it, often late at night. Something would break. The developers would say: "It worked on our machines." The operations team would say: "Your code broke our servers." Everyone was stressed, releases were slow and risky, and customers waited months for improvements.

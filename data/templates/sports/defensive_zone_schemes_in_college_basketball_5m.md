@@ -1,6 +1,6 @@
 ---
 topic: "Defensive zone schemes in college basketball"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. I will examine how zone defenses generate measurable biomechanical advantages at the collegiate level.

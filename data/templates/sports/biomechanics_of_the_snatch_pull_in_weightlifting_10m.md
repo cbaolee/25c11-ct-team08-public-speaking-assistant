@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanics of the snatch pull in weightlifting"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will unpack the quantitative underpinnings of the snatch pull and why it matters for elite lifts.

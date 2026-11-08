@@ -1,6 +1,6 @@
 ---
 topic: "Full-Day Coding Workshop Introduction and Agenda"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Good morning, everyone, and welcome to {{ argument_workshop_name }}!

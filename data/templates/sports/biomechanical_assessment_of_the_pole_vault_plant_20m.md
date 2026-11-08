@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical assessment of the pole vault plant"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect the plant phase that separates world‑record attempts from ordinary clears.

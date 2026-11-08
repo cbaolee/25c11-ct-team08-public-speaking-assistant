@@ -1,6 +1,6 @@
 ---
 topic: "Sprint Retrospective Facilitation"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Hi everyone, welcome, and thanks for joining. Grab a coffee if you haven't already, and let's get settled.

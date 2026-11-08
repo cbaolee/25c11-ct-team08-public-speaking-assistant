@@ -1,6 +1,6 @@
 ---
 topic: "Optimal recovery protocols for contact sport athletes"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good morning, coaches and performance analysts. Today we will evaluate how data‑driven recovery protocols can elevate durability in high‑impact sports.

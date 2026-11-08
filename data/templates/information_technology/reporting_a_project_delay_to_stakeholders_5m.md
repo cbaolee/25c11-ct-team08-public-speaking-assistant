@@ -1,6 +1,6 @@
 ---
 topic: "Reporting a Project Delay to Stakeholders"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you for joining at short notice. I asked for this meeting because I have an important update on {{ argument_project_name }}, and I wanted you to hear it directly from me, as early as possible, rather than in a status report.

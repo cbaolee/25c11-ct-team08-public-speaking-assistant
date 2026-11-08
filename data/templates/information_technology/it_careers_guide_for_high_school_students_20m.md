@@ -1,6 +1,6 @@
 ---
 topic: "Careers in IT: A Guide for High School Students"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone, and hello, {{ argument_school_name }}! My name is {{ argument_speaker_name }}, and {{ argument_speaker_background }}

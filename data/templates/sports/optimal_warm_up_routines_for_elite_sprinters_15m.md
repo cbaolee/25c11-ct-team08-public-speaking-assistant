@@ -1,6 +1,6 @@
 ---
 topic: "Optimal warm‑up routines for elite sprinters"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good morning, coaches and performance analysts. Today we explore how science shapes the pre‑race ritual for world‑class speed athletes.

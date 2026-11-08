@@ -1,6 +1,6 @@
 ---
 topic: "Self-Introduction for an IT Job Interview"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Hello, I'm {{ argument_candidate_name }}, and I'm applying for the {{ argument_role_title }} position at {{ argument_company_name }}.

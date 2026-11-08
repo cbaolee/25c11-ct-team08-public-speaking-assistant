@@ -1,6 +1,6 @@
 ---
 topic: "Technical evolution of the rowing catch phase"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the high‑pressure environment of elite rowing, the catch phase determines the boat's acceleration potential.

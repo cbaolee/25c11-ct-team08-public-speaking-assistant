@@ -1,6 +1,6 @@
 ---
 topic: "Load management protocols for NBA preseason"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Welcome, fellow competitors and sports science enthusiasts. The preseason offers a unique window to calibrate athlete load before the grind of the regular season begins.

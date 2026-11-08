@@ -1,6 +1,6 @@
 ---
 topic: "AI Trends: What's Real and What's Hype"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you, {{ argument_host_thanks }}, for the kind introduction. It's a pleasure to be here at {{ argument_event_name }}.

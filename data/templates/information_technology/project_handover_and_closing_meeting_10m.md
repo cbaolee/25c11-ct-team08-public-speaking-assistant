@@ -1,6 +1,6 @@
 ---
 topic: "Project Handover and Closing Meeting"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you all for being here for this final meeting of the {{ argument_project_name }} project. My name is {{ argument_speaker_name }}, and as you know, I've been the {{ argument_speaker_role }} on our side throughout the project.

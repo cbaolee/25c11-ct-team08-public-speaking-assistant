@@ -1,6 +1,6 @@
 ---
 topic: "Load management and injury tradeoffs"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how elite athletes balance performance peaks with long-term health.

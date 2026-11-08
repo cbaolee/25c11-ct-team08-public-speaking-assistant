@@ -1,6 +1,6 @@
 ---
 topic: "Career Switching into IT from Another Field"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Before I tell you anything about IT, I'd like to tell you who I was before it. My name is {{ argument_speaker_name }}. {{ argument_speaker_switch_story }}

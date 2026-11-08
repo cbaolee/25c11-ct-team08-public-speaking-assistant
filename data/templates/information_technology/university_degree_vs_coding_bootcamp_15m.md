@@ -1,6 +1,6 @@
 ---
 topic: "University Degree vs Coding Bootcamp"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Four years, or a few months? That question is asked more and more often, by high school graduates, by university students thinking about dropping out, and by people who want to switch careers: "Do I really need a four-year university degree to work in IT? Or can I just do a coding bootcamp?" Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

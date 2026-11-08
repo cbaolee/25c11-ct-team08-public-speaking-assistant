@@ -1,6 +1,6 @@
 ---
 topic: "Positional play in elite futsal"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. Today we dissect the biomechanical engine that powers positional superiority in world‑class futsal.

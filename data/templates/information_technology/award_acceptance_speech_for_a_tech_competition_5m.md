@@ -1,6 +1,6 @@
 ---
 topic: "Award Acceptance Speech for a Tech Competition"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Thank you. Thank you so much.

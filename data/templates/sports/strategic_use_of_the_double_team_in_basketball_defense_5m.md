@@ -1,6 +1,6 @@
 ---
 topic: "Strategic use of the double team in basketball defense"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Hello everyone, and welcome to today's tactical breakdown. In the next few minutes we will explore how elite defenders manipulate spacing and decision‑making under pressure.

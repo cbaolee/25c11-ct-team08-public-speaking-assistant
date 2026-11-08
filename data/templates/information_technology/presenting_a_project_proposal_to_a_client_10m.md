@@ -1,6 +1,6 @@
 ---
 topic: "Presenting a Project Proposal to a Client"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you for inviting us here today, and for the time your team spent with us over the past few weeks sharing your challenges and goals. My name is {{ argument_speaker_name }}, {{ argument_speaker_role }} at {{ argument_vendor_company_name }}, and with me today is {{ argument_colleagues_present }}.

@@ -1,6 +1,6 @@
 ---
 topic: "Product Manager Pitching a New Feature"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. Thanks for giving me a few minutes. I'm {{ argument_speaker_name }}, product manager for {{ argument_product_area }}, and today I'd like to pitch a new feature: {{ argument_feature_name }}. By the end of this, I'll be asking for your support to {{ argument_the_ask }}.

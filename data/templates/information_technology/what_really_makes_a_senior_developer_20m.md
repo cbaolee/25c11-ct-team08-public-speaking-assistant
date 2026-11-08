@@ -1,6 +1,6 @@
 ---
 topic: "What Really Makes a Senior Developer"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Here's a question that sounds simple: what's the difference between a developer with five years of experience and a senior developer? If your answer is "about five years," I hope this talk changes your mind. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

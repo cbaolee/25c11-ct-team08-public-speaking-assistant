@@ -1,6 +1,6 @@
 ---
 topic: "Data Privacy in the Social Media Era"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone. Before I even introduce myself, a quick question: how many of you have accepted the terms and conditions of a social media app without reading them? Please raise your hand. Don't be shy.

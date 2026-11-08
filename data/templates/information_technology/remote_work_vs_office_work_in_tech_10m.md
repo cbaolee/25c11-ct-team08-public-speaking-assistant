@@ -1,6 +1,6 @@
 ---
 topic: "Remote Work vs Office Work in Tech"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 10
 ---
 Kitchen table or office desk? Video call or whiteboard? Pajamas or proper shoes? Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}

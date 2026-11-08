@@ -1,6 +1,6 @@
 ---
 topic: "Parents' Concerns About Children Choosing IT"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Thank you for coming today. I know many of you made time in a busy week, and some of you may be a little worried about the path your child has chosen. That's completely understandable, and it's exactly why we're here. My name is {{ argument_speaker_name }}, and {{ argument_speaker_background }}

@@ -1,6 +1,6 @@
 ---
 topic: "Injury prevention through proprioceptive drills in soccer"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. Our focus today is the biomechanical safeguard that proprioceptive conditioning provides on the pitch.

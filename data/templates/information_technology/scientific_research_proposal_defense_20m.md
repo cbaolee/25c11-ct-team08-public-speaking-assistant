@@ -1,6 +1,6 @@
 ---
 topic: "Scientific Research Proposal Defense"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, members of the evaluation committee, and everyone present. My name is {{ argument_researcher_name }}, {{ argument_researcher_details }} Today, I'm presenting my research proposal, titled "{{ argument_proposal_title }}," {{ argument_proposal_context }}

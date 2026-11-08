@@ -1,6 +1,6 @@
 ---
 topic: "Analyzing clutch performance in NFL quarterbacks"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Welcome, fellow competitors and sports science enthusiasts. Today we dissect the decisive moments that separate clutch legends from the rest.

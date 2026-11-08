@@ -1,6 +1,6 @@
 ---
 topic: "University Open Day: Introducing the IT Faculty"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone, and a very warm welcome to {{ argument_university_name }}'s Open Day! On behalf of the {{ argument_faculty_name }}, it's a pleasure to have you here. My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }}.

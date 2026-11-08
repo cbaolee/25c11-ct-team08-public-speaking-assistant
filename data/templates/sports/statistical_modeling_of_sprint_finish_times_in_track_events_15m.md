@@ -1,6 +1,6 @@
 ---
 topic: "Statistical modeling of sprint finish times in track events"
-category: "Sport"
+Category: "Sports"
 duration_min: 15
 ---
 Good afternoon, sports fans and fellow tacticians. Today we will dissect the analytical framework that predicts sprint finish times at the elite level.

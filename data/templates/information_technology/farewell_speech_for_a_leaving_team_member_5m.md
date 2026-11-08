@@ -1,6 +1,6 @@
 ---
 topic: "Farewell Speech for a Leaving Team Member"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Okay, everyone, can I have your attention for a few minutes? Thank you.

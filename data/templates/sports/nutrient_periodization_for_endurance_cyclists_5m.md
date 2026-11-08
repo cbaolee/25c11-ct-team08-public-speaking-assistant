@@ -1,6 +1,6 @@
 ---
 topic: "Nutrient periodization for endurance cyclists"
-category: "Sport"
+Category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. I will break down how targeted nutrition cycles amplify performance over long‑distance events.

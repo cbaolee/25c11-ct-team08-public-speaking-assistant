@@ -1,6 +1,6 @@
 ---
 topic: "Serve and volley resurgence in modern tennis"
-category: "Sport"
+Category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we explore why the classic serve‑and‑volley approach is re‑emerging in the data‑driven era of professional tennis.

@@ -1,6 +1,6 @@
 ---
 topic: "QA Tester: Why Testing Matters"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Every bug a tester finds is a bug a customer never will. That is the whole case for testing, in one sentence. Good {{ argument_time_of_day }}, everyone. My name is {{ argument_speaker_name }}, and I work in quality assurance. Today, I'd like to convince you of something: testing is not the boring last step before release. It's one of the most valuable investments a software team can make.

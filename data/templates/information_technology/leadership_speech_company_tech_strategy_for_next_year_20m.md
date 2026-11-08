@@ -1,6 +1,6 @@
 ---
 topic: "Leadership Speech: Company Tech Strategy for Next Year"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you all for being here.

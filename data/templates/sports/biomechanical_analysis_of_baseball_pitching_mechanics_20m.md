@@ -1,6 +1,6 @@
 ---
 topic: "Biomechanical analysis of baseball pitching mechanics"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good morning, coaches and performance analysts. Today we will explore how data analytics reshapes our understanding of pitching performance.

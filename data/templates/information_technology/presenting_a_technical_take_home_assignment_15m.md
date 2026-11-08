@@ -1,6 +1,6 @@
 ---
 topic: "Presenting a Technical Take-Home Assignment"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 15
 ---
 Hello, and thanks for reviewing my work. I'm {{ argument_candidate_name }}, and today I'll walk you through my solution to the take-home assignment for the {{ argument_role_title }} position.

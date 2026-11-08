@@ -1,6 +1,6 @@
 ---
 topic: "Tactical use of the pick and roll in NBA offenses"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good afternoon, sports fans and fellow tacticians. Our discussion will dissect how elite coaching leverages the pick and roll to dominate modern NBA play.

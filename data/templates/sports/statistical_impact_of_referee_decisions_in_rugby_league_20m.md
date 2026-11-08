@@ -1,6 +1,6 @@
 ---
 topic: "Statistical impact of referee decisions in rugby league"
-category: "Sport"
+Category: "Sports"
 duration_min: 20
 ---
 Good afternoon, sports fans and fellow tacticians. Our discussion will dissect how officiating shapes outcomes through a lens of elite coaching and tactical game‑planning.

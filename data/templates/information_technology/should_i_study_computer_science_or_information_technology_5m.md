@@ -1,6 +1,6 @@
 ---
 topic: "Should I Study Computer Science or Information Technology"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Every admissions season brings the same question from students and parents, almost word for word: "Should I study Computer Science or Information Technology?" Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} In the next few minutes, let's answer that question properly.

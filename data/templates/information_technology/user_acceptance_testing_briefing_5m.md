@@ -1,6 +1,6 @@
 ---
 topic: "User Acceptance Testing Briefing"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }} on the {{ argument_project_name }} project. Over the next {{ argument_uat_duration }}, you'll be doing something really important: user acceptance testing, or UAT for short. In the next few minutes, I'll explain what that means, how it will work, and what we need from you.

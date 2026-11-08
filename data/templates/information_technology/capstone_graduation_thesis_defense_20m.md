@@ -1,6 +1,6 @@
 ---
 topic: "Capstone / Graduation Thesis Defense"
-category: "Technology"
+Category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, distinguished members of the committee, my supervisor, {{ argument_supervisor_name }}, and everyone present. My name is {{ argument_student_name }}, {{ argument_student_details }} Today, it's my honor to present and defend my graduation thesis, titled: "{{ argument_thesis_title }}."
