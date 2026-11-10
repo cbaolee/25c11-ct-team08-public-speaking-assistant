@@ -115,6 +115,17 @@ header.top.hero .brand .lk-dark { display: block; }
 .nav button:hover { background: var(--accent-soft); color: var(--accent); }
 .nav button[aria-current="page"] { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(29, 78, 216, .35); }
 .nav button:focus-visible { outline-offset: 3px; }
+/* Sliding pill: one blue shape behind the buttons that glides from the old screen to the new one (placed by moveNavPill) */
+.nav { position: relative; }
+.nav::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: 0; width: var(--pill-w, 0); transform: translateX(var(--pill-x, 0));
+  border-radius: var(--r-pill); background: var(--accent); box-shadow: 0 2px 8px rgba(29, 78, 216, .35); opacity: 0; pointer-events: none;
+  transition: transform .45s cubic-bezier(.65, 0, .35, 1), width .45s cubic-bezier(.65, 0, .35, 1); }
+.nav.pill-on::before { opacity: 1; }
+.nav.pill-still::before { transition: none; }
+.nav button { position: relative; z-index: 1; transition: background .15s, color .3s; }
+.nav.pill-on button[aria-current="page"] { background: transparent; box-shadow: none; }
+.nav.pill-on button[aria-current="page"]:hover { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .nav::before { transition: none; } }
 .acct { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
 .userbtn { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 4px 12px 4px 4px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font: 600 15px var(--sans); color: var(--ink); }
 .userbtn:hover { background: var(--accent-soft); border-color: var(--accent-line); }
@@ -141,7 +152,58 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 72px; }
 .screen { display: none; }
 .screen.active { display: block; }
 .head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+/* After login: every screen sits on the landing stage's dark backdrop (same colours and washes, no mic, no light beam).
+   Fixed behind everything, so panels scroll over it. */
+body.app-view { background: #05070D; }
+body.app-view::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(5, 7, 13, 0) 0%, rgba(5, 7, 13, .30) 50%, rgba(5, 7, 13, .62) 100%),
+    radial-gradient(90% 60% at 30% 100%, rgba(42, 50, 78, .55), rgba(42, 50, 78, 0) 70%),
+    linear-gradient(to bottom, #07080C 0%, #0A0D16 40%, #141A2C 80%, #1A2036 100%); }
+body.app-view::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background: radial-gradient(60% 70% at 22% 45%, rgba(59, 108, 246, .12), rgba(59, 108, 246, 0) 70%); }
+/* Text that sits straight on the backdrop (screen titles) turns light; panels keep their own colours */
+body.app-view .screen > .head h1, body.app-view .screen > .head h2 { color: #fff; }
+body.app-view .screen > .head .sub { color: #C9D0DB; }
+/* Ombre frame on every panel (not pop-ups): the border fades from white to transparent, so the dark backdrop shows through */
+/* Ivory + white: the solid header (after login, and on the landing once scrolled) is ivory, its controls stay white */
+header.top:not(.hero) { background: #FAF7F0; }
+header.top:not(.hero) .nav { background: #fff; }
+/* Landing below the stage: page colour turns ivory too (the stage's floor fade follows --paper) */
+body.landing-view { --paper: #FAF7F0; background: var(--paper); }
+/* Pop-up windows and the account menu after login: ivory sheet, white controls inside */
+body.app-view .box, body.app-view .menu { background: #FAF7F0; }
+body.app-view .passage { background: #fff; border: 1px solid var(--line); }   /* no blue side bar: same plain frame as the other boxes */
+/* Segmented tabs after login: one white pill slides from the old choice to the new one (placed by moveSegPills) */
+body.app-view .seg, .l-auth .seg { position: relative; }
+body.app-view .seg::before, .l-auth .seg::before { content: ""; position: absolute; left: 0; top: 0; width: var(--seg-w, 0); height: var(--seg-h, 0); transform: translate(var(--seg-x, 0), var(--seg-y, 0));
+  border-radius: 8px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong); opacity: 0; pointer-events: none;
+  transition: transform .4s cubic-bezier(.65, 0, .35, 1), width .4s cubic-bezier(.65, 0, .35, 1); }
+body.app-view .seg.pill-on::before, .l-auth .seg.pill-on::before { opacity: 1; }
+body.app-view .seg.pill-still::before, .l-auth .seg.pill-still::before { transition: none; }
+body.app-view .seg button, .l-auth .seg button { position: relative; z-index: 1; transition: color .25s; }
+body.app-view .seg.pill-on button[aria-selected="true"], .l-auth .seg.pill-on button[aria-selected="true"] { background: transparent; box-shadow: none; }
+/* Log in / Sign up tabs on the dark card: the sliding pill is the translucent white of the old selected tab */
+.l-auth .seg::before { background: rgba(255, 255, 255, .16); box-shadow: 0 0 0 1px rgba(255, 255, 255, .28); }
+/* Pop-ups after login: fade in while rising a little from below */
+body.app-view .mbg.show { animation: mbgIn .35s ease-out; }
+body.app-view .mbg.show .box { animation: boxUp .5s cubic-bezier(.2, .7, .3, 1); }
+@keyframes mbgIn { from { opacity: 0; } }
+@keyframes boxUp { from { opacity: 0; transform: translateY(40px); } }
+@media (prefers-reduced-motion: reduce) { body.app-view .mbg.show, body.app-view .mbg.show .box { animation: none; } }
+/* Page change: the old screen slides out to the left while the new one slides in from the right (see go) */
+main { position: relative; }
+.screen.leaving { display: block; position: absolute; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { body.app-view .seg::before { transition: none; } }   /* text blocks stay white on the ivory sheet */
+body.app-view header.top { border-bottom-color: rgba(255, 255, 255, .9);
+  box-shadow: 0 3px 0 rgba(255, 255, 255, .28), 0 7px 0 rgba(255, 255, 255, .12), 0 8px 22px 4px rgba(255, 255, 255, .07); }
+body.app-view .panel:not(.ov):not(.go), body.app-view .chartbox { background-color: #FAF7F0; }   /* ivory, softer than pure white on the dark backdrop */
+body.app-view .panel, body.app-view .chartbox { border-color: rgba(255, 255, 255, .9);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .28), 0 0 0 7px rgba(255, 255, 255, .12), 0 0 22px 8px rgba(255, 255, 255, .07); }
 .back { margin-bottom: 10px; }
+/* On the dark backdrop the back button gets a light framed chip so it stays easy to see */
+body.app-view .btn.back { background: var(--paper); border-color: var(--line-strong); color: var(--ink); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+body.app-view .btn.back:hover:not(:disabled) { background: var(--surface); border-color: var(--accent-line); color: var(--accent); }
 .panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); padding: 20px; }
 .panel > h3 + * { margin-top: 12px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
@@ -173,9 +235,40 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .switch { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--accent-soft); margin-top: 14px; }
 .switch input { width: 22px; height: 22px; accent-color: var(--accent); margin-top: 2px; }
 .switch label { margin: 0; }
+/* ---------- custom select (enhanceSelect): same look as a field, its list slides down/up, the selected-row highlight glides ---------- */
+.csel-native { display: none !important; }
+.csel { position: relative; display: block; width: 100%; }
+.csel-btn { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); font: 400 16px var(--sans);
+  background: var(--surface); color: var(--ink); display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; cursor: pointer; }
+.csel-btn:focus-visible { outline: 3px solid var(--accent-line); outline-offset: 0; border-color: var(--accent); }
+.csel-btn:disabled { opacity: .5; cursor: not-allowed; }
+.csel-btn .v { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.csel-btn svg { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .25s; }
+.csel-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.csel-list { position: fixed; z-index: 400; margin: 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-ctl);
+  box-shadow: var(--shadow-pop); max-height: 280px; overflow-y: auto; }
+.csel-list li { position: relative; z-index: 1; padding: 9px 12px; border-radius: 8px; font: 400 15px var(--sans); color: var(--ink); cursor: pointer; transition: color .2s, font-weight .2s; }
+.csel-list li:hover, .csel-list li.kb { background: rgba(27, 36, 51, .05); }
+.csel-list li[aria-selected="true"] { font-weight: 600; color: var(--accent); background: transparent; }
+.csel-hl { position: absolute; left: 4px; right: 4px; top: 0; border-radius: 8px; background: var(--accent-soft); pointer-events: none; z-index: 0;
+  transition: transform .28s cubic-bezier(.65, 0, .35, 1), height .28s cubic-bezier(.65, 0, .35, 1); }
+.csel-list.still .csel-hl { transition: none; }
+.l-auth .csel-btn { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .26); color: #fff; }
+.csel-list.dark { background: #121826; border-color: rgba(255, 255, 255, .16); }
+.csel-list.dark li { color: #E6EAF1; }
+.csel-list.dark li:hover, .csel-list.dark li.kb { background: rgba(255, 255, 255, .06); }
+.csel-list.dark li[aria-selected="true"] { color: #fff; background: transparent; }
+.csel-list.dark .csel-hl { background: rgba(143, 176, 255, .22); }
+@media (prefers-reduced-motion: reduce) { .csel-hl { transition: none; } }
 .pwwrap { position: relative; }
-.pwwrap input { padding-right: 74px; }
-.pwwrap button { position: absolute; right: 6px; top: 6px; }
+.pwwrap input { padding-right: 48px; }
+/* Eye toggle inside every password field: black on white fields, white on coloured/dark ones */
+.pwwrap .eye { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 8px; background: transparent; color: #111827; cursor: pointer; padding: 0; }
+.pwwrap .eye:hover { background: rgba(0, 0, 0, .06); }
+.pwwrap .eye svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.l-auth .pwwrap .eye { color: #fff; }
+.l-auth .pwwrap .eye:hover { background: rgba(255, 255, 255, .12); }
 
 /* ---------- segmented tabs ---------- */
 .seg { display: inline-flex; padding: 3px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--r-ctl); gap: 2px; flex-wrap: wrap; }
@@ -209,7 +302,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .bar > i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 4px; }
 
 /* ---------- chat (Generate Script) ---------- */
-.chat { display: flex; flex-direction: column; gap: 14px; height: min(520px, 62vh); overflow-y: auto; padding: 4px 2px 12px; }
+.chat { display: flex; flex-direction: column; gap: 14px; height: clamp(200px, calc(100vh - 480px), 420px); overflow-y: auto;   /* short enough that the topic picker and input stay on screen */ padding: 4px 2px 12px; }
 .bubble { max-width: min(680px, 92%); padding: 14px 16px; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--surface); line-height: 1.6; font-size: 16px; }
 .bubble.me { align-self: flex-end; background: var(--accent-soft); border-color: var(--accent-line); white-space: pre-wrap; }
 .bubble.ai { align-self: flex-start; }
@@ -339,8 +432,15 @@ table.t tr:last-child td { border-bottom: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 #toast { position: fixed; bottom: 24px; right: 24px; left: 24px; margin-left: auto; max-width: 400px; display: none; align-items: flex-start; gap: 10px; background: var(--ink); color: #fff; padding: 12px 16px; border-radius: var(--r-ctl); box-shadow: var(--shadow-pop); z-index: 200; font: 500 15px/1.45 var(--sans); border-left: 5px solid var(--ok-soft); }
-#toast.show { display: flex; }
+/* Slides in from beyond the right edge of the screen and back out the same way (no fade) */
+#toast { display: flex; visibility: hidden; transform: translateX(calc(100% + 32px));
+  transition: transform .45s cubic-bezier(.4, 0, .2, 1), visibility 0s linear .45s; }
+#toast.show { visibility: visible; transform: none; transition: transform .45s cubic-bezier(.2, .7, .3, 1), visibility 0s; }
+@media (prefers-reduced-motion: reduce) { #toast, #toast.show { transition: none; } }
 #toast.err { border-left-color: #FCA5A5; }
+/* Status toasts: light green for success, light red for errors, no side bar */
+#toast { background: var(--ok-soft); color: var(--ok); border: 1px solid #A7F3D0; }
+#toast.err { background: var(--bad-soft); color: var(--bad); border: 1px solid #FECACA; }
 #toast svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; margin-top: 1px; }
 
 /* ---------- landing ---------- */
@@ -364,9 +464,11 @@ table.t tr:last-child td { border-bottom: 0; }
 .l-stage.is-auth::after { opacity: 1; }
 /* Scene is sized like background-size: cover by syncStage(); every child is placed in % of the 1600 x 893 photo */
 .l-scene { position: absolute; left: 0; top: 0; pointer-events: none; background: var(--stage-img) 0 0 / 100% 100% no-repeat;
-  perspective: 1400px; perspective-origin: 26% 60%; }
+  perspective: 1400px; perspective-origin: 26% 60%;
+  /* while it trails the sign-up scroll (followStep), its top edge fades so it never shows a hard line */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fadeT, 0px)); mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fadeT, 0px)); }
 .l-mic { position: absolute; left: 13.75%; top: 32.47%; width: 23.75%; height: 67.53%; transform-style: preserve-3d;
-  transform-origin: 52.9% 50%; transition: transform var(--t-mic) var(--ease-mic); }
+  transform-origin: 52.9% 50%; transition: transform var(--t-mic) var(--ease-mic); rotate: calc(var(--sway, 0) * -3.5deg); }
 .l-stage.is-auth .l-mic { transform: rotateY(540deg); }   /* 1.5 turns, ends mirrored */
 .l-mic span { position: absolute; inset: 0; background: var(--mic-img) 0 0 / 100% 100% no-repeat; transform: translateZ(calc(var(--i) * -1.2px));
   filter: brightness(.35); }
@@ -383,9 +485,9 @@ table.t tr:last-child td { border-bottom: 0; }
    intro -> auth it swings down-left, auth -> intro it swings up-right.
    The beam sits in photo coordinates: its source is above the photo at (-71, -400) and at rest it points 36.6deg
    to the right, the same line as the beam in the photo, so it hands back to the still image without a jump. */
-.l-scene::before { content: ""; position: absolute; inset: 0; background: #05070D; opacity: 0; }
-.l-beam { position: absolute; left: -59.4%; top: -44.8%; width: 110%; height: 350%; pointer-events: none; opacity: 0;
-  transform-origin: 50% 0; transform: rotate(-36.6deg); mix-blend-mode: screen; filter: blur(22px);
+.l-scene::before { content: ""; position: absolute; inset: 0; background: #05070D; opacity: calc(var(--live, 0) * .55); }
+.l-beam { position: absolute; left: -59.4%; top: -44.8%; width: 110%; height: 350%; pointer-events: none; opacity: var(--live, 0);
+  transform-origin: 50% 0; transform: rotate(-36.6deg); rotate: calc(var(--bsway, 0) * 8deg); mix-blend-mode: screen; filter: blur(22px);
   background: radial-gradient(ellipse 11.6% 2.7% at 50% 30.9%, rgba(235, 241, 255, .35), rgba(235, 241, 255, 0)),   /* pool where the beam lands */
     linear-gradient(to bottom, rgba(220, 230, 255, .55), rgba(170, 195, 255, .32) 32%, rgba(170, 195, 255, .22) 70%, rgba(170, 195, 255, .10));
   /* soft-edged cone (a mask, not clip-path, so the blur is not cut off into a hard edge) */
@@ -402,8 +504,9 @@ table.t tr:last-child td { border-bottom: 0; }
 @keyframes ldimIn  { 0%, 100% { opacity: 0; } 8%, 90% { opacity: .55; } }
 @keyframes ldimOut { 0%, 100% { opacity: 0; } 8%, 90% { opacity: .55; } }
 @keyframes lwave { 0% { transform: scale(.35); opacity: 0; } 15% { opacity: .7; } 100% { transform: scale(1.6); opacity: 0; } }
-.l-stage-in { position: relative; z-index: 2; max-width: 1120px; margin: 0 auto; padding: 120px 24px 112px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.l-copy { grid-column: 2; display: grid; align-items: center; }
+.l-stage-in { position: relative; z-index: 2; max-width: 1120px; margin: 0 auto; padding: max(120px, calc(50vh - 200px)) 24px 190px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-height: calc(100vh + 140px); align-content: start; }   /* the stage fills the first screen; the white fade (.l-floor) starts just below it */
+.l-copy { grid-column: 2; display: grid; align-items: start; }   /* top-aligned: the taller sign-up form grows downwards and never shifts the intro */
 /* Intro and auth share one grid cell and cross-fade together while the mic turns */
 .l-pane { grid-area: 1 / 1; transition: opacity var(--t-text) var(--ease-text), transform var(--t-text) var(--ease-text), filter var(--t-text) var(--ease-text), visibility 0s linear var(--t-text); }
 .l-auth, .l-stage.is-auth .l-intro { opacity: 0; transform: translateY(18px) scale(.97); filter: blur(8px); visibility: hidden; }
@@ -417,10 +520,15 @@ table.t tr:last-child td { border-bottom: 0; }
 .l-stage .btn:not(.btn-primary):not(.btn-ghost) { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .55); color: #fff; }
 .l-stage .btn:not(.btn-primary):not(.btn-ghost):hover { background: rgba(255, 255, 255, .16); border-color: #fff; }
 .l-stage :focus-visible { outline-color: #fff; }
+/* Floor: the dark stage melts into the page colour where the sample section starts (under the text, z-index 1);
+   .l-stage-in keeps 50px of plain dark above it */
+.l-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 140px; z-index: 2;   /* above the stage washes, below the text (later in the DOM) */ pointer-events: none;
+  background: linear-gradient(to bottom, rgba(247, 248, 250, 0) 0%, rgba(247, 248, 250, .06) 25%, rgba(247, 248, 250, .25) 50%, rgba(247, 248, 250, .6) 75%, var(--paper) 100%); }
+@media (max-width: 900px) { .l-floor { height: 80px; } }
 .landing { max-width: 1120px; margin: 0 auto; padding: 48px 24px 72px; }
 @media (max-width: 900px) {
   .l-stage::before { background: linear-gradient(to bottom, rgba(5, 7, 13, .62) 0, rgba(5, 7, 13, 0) 130px), linear-gradient(to bottom, rgba(5, 7, 13, 0) 240px, #05070D 440px); }
-  .l-stage-in { grid-template-columns: minmax(0, 1fr); padding: 300px 16px 72px; }
+  .l-stage-in { grid-template-columns: minmax(0, 1fr); padding: 300px 16px 130px; min-height: calc(100vh + 80px); }
   .l-copy { grid-column: 1; }
   .landing { padding: 32px 16px 56px; }
 }
@@ -607,6 +715,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
       <div class="l-beam"></div>
       <svg class="l-waves" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="30"/><circle cx="50" cy="50" r="30"/></svg>
     </div>
+    <div class="l-floor" aria-hidden="true"></div>
     <div class="l-stage-in">
       <div class="l-copy">
         <div class="l-pane l-intro" id="lIntro">
@@ -634,7 +743,6 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
       <label for="auPass" data-t="auth.password"></label>
       <div class="pwwrap">
         <input type="password" id="auPass" autocomplete="current-password">
-        <button type="button" class="btn btn-ghost btn-sm" id="pwToggle" aria-pressed="false" data-t="auth.show"></button>
       </div>
       <div id="pass2Wrap" hidden>
         <label for="auPass2" data-t="auth.password2"></label>
@@ -766,7 +874,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
         <div class="sheet-title"><strong id="sheetTitle" class="note"></strong><span class="note" id="sheetMeta"></span></div>
         <div class="sheet" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
       </div>
-      <div id="paneMine" class="row" style="margin-top:14px"><button class="btn" type="button" id="goScript" data-t="practice.makeScript"></button></div>
+      <div id="paneMine" class="row" style="margin-top:14px"><button class="btn btn-primary" type="button" id="goScript" data-t="practice.makeScript"></button></div>
       <div id="paneSample" class="row" style="margin-top:14px"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button><span class="note" data-t="practice.sampleNote"></span></div>
       <div id="paneOwn" style="margin-top:14px">
         <label for="ownText" style="margin-top:0" data-t="practice.ownLabel"></label>
@@ -1757,6 +1865,7 @@ function openModal(id, opts) {
   const m = $('#' + id);
   m._opener = document.activeElement;
   m._lock = !!opts.lock;
+  if (m._closing) { m._closing.forEach(a => a.cancel()); m._closing = null; }   // reopened while it was still closing
   m.classList.add('show');
   S.modal.push(id);
   document.body.style.overflow = 'hidden';
@@ -1765,8 +1874,16 @@ function openModal(id, opts) {
 }
 function closeModal(id, restore) {
   const m = $('#' + id);
-  if (!m || !m.classList.contains('show')) return;
-  m.classList.remove('show');
+  if (!m || !m.classList.contains('show') || m._closing) return;
+  /* After login: mirror of the opening, the window fades out while sinking a little, then it is hidden */
+  const box = $('.box', m);
+  if (S.view === 'app' && box && m.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const opt = { duration: 320, easing: 'cubic-bezier(.4, 0, .8, .4)', fill: 'forwards' };
+    const anims = [box.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(40px)' }], opt),
+      m.animate([{ opacity: 1 }, { opacity: 0 }], opt)];
+    m._closing = anims;
+    anims[0].onfinish = () => { if (m._closing !== anims) return; m._closing = null; m.classList.remove('show'); anims.forEach(a => a.cancel()); };
+  } else m.classList.remove('show');
   S.modal = S.modal.filter(x => x !== id);
   if (!S.modal.length) document.body.style.overflow = '';
   if (restore === false) return;
@@ -1785,39 +1902,161 @@ function confirmBox(title, msg, okLabel, cb) {
 }
 
 /* ---------- views / navigation ---------- */
+/* Every password field gets an eye button on its right: open eye = show the password, crossed eye = hide it again */
+const EYE_OPEN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_SHUT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.9 5.2A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-2.6 3.6M6.6 6.6A17.4 17.4 0 0 0 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/><path d="M3 3l18 18"/></svg>';
+function paintEye(b, inp) {
+  const shown = inp.type === 'text';
+  b.innerHTML = shown ? EYE_SHUT : EYE_OPEN;
+  b.setAttribute('aria-pressed', String(shown));
+  b.setAttribute('aria-label', T(shown ? 'auth.hide' : 'auth.show')); b.title = b.getAttribute('aria-label');
+}
+function setupPwEyes() {
+  $$('input[type=password]').forEach(inp => {
+    let wrap = inp.parentElement;
+    if (!wrap.classList.contains('pwwrap')) { wrap = document.createElement('div'); wrap.className = 'pwwrap'; inp.before(wrap); wrap.appendChild(inp); }
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'eye'; b.setAttribute('aria-controls', inp.id);
+    b.onclick = () => { inp.type = inp.type === 'password' ? 'text' : 'password'; paintEye(b, inp); };
+    wrap.appendChild(b); paintEye(b, inp);
+    inp._eye = b;
+  });
+}
+/* Old screen: pinned where it was (out of the flow) and slid out to the left, then hidden */
+/* Left-to-right order of the screens, used for the slide direction: the nav order (Home, Script, Practice),
+   then Profile (with the baseline) on the far right. A report sits just right of the screen it was opened from. */
+const SCREEN_ORDER = { home: 0, script: 1, practice: 2, profile: 3 };
+function screenPos(name, from) {
+  if (name === 'report') return (SCREEN_ORDER[from] !== undefined ? SCREEN_ORDER[from] : 0) + .5;
+  return SCREEN_ORDER[name] !== undefined ? SCREEN_ORDER[name] : 0;
+}
+function leaveScreen(el, dir) {
+  dir = dir || 1;
+  /* go() jumps the window to the top for the new screen; shift the old one up by the same amount,
+     so the part the user was looking at stays exactly where it was while it slides out */
+  el.style.top = (el.offsetTop - window.scrollY) + 'px'; el.style.left = el.offsetLeft + 'px'; el.style.width = el.offsetWidth + 'px';
+  el.classList.add('leaving'); el.setAttribute('aria-hidden', 'true');
+  const a = el.animate([
+    { opacity: 1, transform: 'none', filter: 'none' },
+    { opacity: 0, transform: 'translateX(' + (-56 * dir) + 'px)', filter: 'blur(8px)' }
+  ], { duration: 450, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
+  const done = () => { a.cancel(); el.classList.remove('leaving'); el.removeAttribute('aria-hidden'); el.style.top = el.style.left = el.style.width = ''; };
+  a.onfinish = done; el._leaveDone = done;
+}
+function endLeaving() { $$('.screen.leaving').forEach(s => { if (s._leaveDone) s._leaveDone(); }); }
+/* Slide the white pill of each segmented tab group to its selected button; animate=false jumps there */
+function moveSegPills(animate, root) {
+  $$('.seg', root || $('#v-app')).forEach(seg => {
+    const cur = $('button[aria-selected="true"]', seg);
+    if (!cur || !cur.offsetWidth) { seg.classList.remove('pill-on'); return; }
+    const still = !animate || !seg.classList.contains('pill-on');
+    seg.classList.toggle('pill-still', still);
+    seg.style.setProperty('--seg-x', cur.offsetLeft + 'px'); seg.style.setProperty('--seg-y', cur.offsetTop + 'px');
+    seg.style.setProperty('--seg-w', cur.offsetWidth + 'px'); seg.style.setProperty('--seg-h', cur.offsetHeight + 'px');
+    seg.classList.add('pill-on');
+    if (still) { getComputedStyle(seg, '::before').transform; seg.classList.remove('pill-still'); }
+  });
+}
+/* Any tab change inside the app (Practice: My script / Sample / Write my own, Record / Upload) slides its pill */
+new MutationObserver(() => moveSegPills(true)).observe(document.getElementById('v-app'), { subtree: true, attributes: true, attributeFilter: ['aria-selected'] });
+/* Tab change inside a panel (Practice: My script / Sample / Write my own, Record / Upload):
+   the old content fades out, the panel grows or shrinks to the new height, the new content fades in.
+   The click is held back during the fade-out, then passed on to the tab's own handler. */
+document.getElementById('v-app').addEventListener('click', e => {
+  const b = e.target.closest('.seg button');
+  if (!b || b._passing || b.disabled || b.getAttribute('aria-selected') === 'true') return;
+  const seg = b.closest('.seg'), panel = b.closest('.panel');
+  if (!panel || seg._busy || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  e.stopImmediatePropagation(); e.preventDefault();
+  seg._busy = true;
+  const after = () => [...seg.parentElement.children].slice([...seg.parentElement.children].indexOf(seg) + 1).filter(el => !el.hidden && el.offsetParent !== null);
+  $$('button', seg).forEach(x => x.setAttribute('aria-selected', String(x === b)));   // pill starts sliding now
+  const h0 = panel.offsetHeight, old = after();
+  Promise.all(old.map(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-in', fill: 'forwards' }).finished)).then(() => {
+    b._passing = true; b.click(); b._passing = false;
+    old.forEach(el => el.getAnimations().forEach(a => a.cancel()));
+    const h1 = panel.offsetHeight;
+    panel.style.overflow = 'hidden';
+    const grow = panel.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: 380, easing: 'cubic-bezier(.65, 0, .35, 1)' });
+    grow.onfinish = grow.oncancel = () => { panel.style.overflow = ''; };
+    after().forEach(el => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 320, delay: 140, easing: 'ease-out', fill: 'backwards' }));
+    seg._busy = false;
+  });
+}, true);
+/* Slide the blue pill under the current nav button; animate=false jumps there (first show, resize) */
+function moveNavPill(animate) {
+  const nav = $('#nav'), cur = $('#nav [aria-current="page"]');
+  if (!nav || nav.hidden || !cur || !cur.offsetWidth) { if (nav) nav.classList.remove('pill-on'); return; }
+  const still = !animate || !nav.classList.contains('pill-on');
+  nav.classList.toggle('pill-still', still);
+  nav.style.setProperty('--pill-x', cur.offsetLeft + 'px');
+  nav.style.setProperty('--pill-w', cur.offsetWidth + 'px');
+  nav.classList.add('pill-on');
+  if (still) { getComputedStyle(nav, '::before').transform; nav.classList.remove('pill-still'); }   // apply the jump, then turn the slide back on
+}
 const RENDER = {};
 function syncHeader() { document.documentElement.style.setProperty('--hh', ($('#topbar').offsetHeight || 64) + 'px'); }
 function syncHero() {
   document.body.classList.toggle('landing-view', S.view === 'landing');
+  document.body.classList.toggle('app-view', S.view === 'app');
   $('#topbar').classList.toggle('hero', S.view === 'landing' && window.scrollY <= 40);
 }
 /* Size the scene like background-size: cover (left centre); on narrow screens a 440px-high strip at 18% */
 let stageRef = 0;   // stage height on the intro; the scene keeps this size while the taller sign-up form is open
+let sceneB = 0;     // scene bottom edge inside the stage, before any follow offset
 function syncStage() {
   const st = $('#lStage'), sc = $('#lScene');
   if (!st.offsetWidth) return;
   const W = st.offsetWidth, full = st.offsetHeight, narrow = window.innerWidth <= 900;
   let H = full;
   if (!st.classList.contains('is-auth')) stageRef = full; else if (stageRef) H = Math.min(full, stageRef);
+  H = Math.min(H, window.innerHeight);   // the photo covers the first screen; below it the stage fades to dark
   const h = narrow ? 440 : Math.max(H, W * 893 / 1600), w = h * 1600 / 893;
   const top = narrow ? 0 : (H - h) / 2;
   sc.style.width = w + 'px'; sc.style.height = h + 'px';
   sc.style.left = (narrow ? (W - w) * .18 : 0) + 'px';
   sc.style.top = top + 'px';
   st.classList.toggle('tall', !narrow && top + h < full - 1);
-  st.style.setProperty('--sceneb', Math.round(top + h) + 'px');
+  sceneB = top + h;
+  st.style.setProperty('--sceneb', Math.round(sceneB + follow.y) + 'px');
+  kickFollow();
 }
+/* Sign-up: the scene trails the scroll on a loose spring, so the mic stays beside the form and overshoots a little;
+   while it moves, the live beam fades in over the baked one and sways with the speed */
+const follow = { y: 0, v: 0, raf: 0 };
+function followTarget() {
+  const st = $('#lStage');
+  if (S.view !== 'landing' || !st.classList.contains('is-auth') || window.innerWidth <= 900) return 0;
+  return Math.max(0, Math.min(window.scrollY, st.offsetHeight - sceneB));
+}
+function followStep() {
+  const t = followTarget(), calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (calm) { follow.y = t; follow.v = 0; }
+  else { follow.v += (t - follow.y) * .035 - follow.v * .3; follow.y += follow.v; }   // soft, well-damped spring
+  const done = Math.abs(t - follow.y) < .3 && Math.abs(follow.v) < .03;
+  if (done) { follow.y = t; follow.v = 0; }
+  const st = $('#lStage'), sc = $('#lScene');
+  sc.style.translate = '0 ' + follow.y.toFixed(1) + 'px';
+  sc.style.setProperty('--fadeT', Math.min(follow.y, 160).toFixed(0) + 'px');
+  sc.style.setProperty('--sway', Math.max(-1, Math.min(1, follow.v / 32)).toFixed(3));
+  sc.style.setProperty('--bsway', Math.max(-1, Math.min(1, follow.v / 22)).toFixed(3));   // light sways livelier than the mic
+  sc.style.setProperty('--live', Math.min(1, Math.abs(follow.v) / 3).toFixed(3));
+  st.style.setProperty('--sceneb', Math.round(sceneB + follow.y) + 'px');
+  follow.raf = done ? 0 : requestAnimationFrame(followStep);
+}
+function kickFollow() { if (!follow.raf) follow.raf = requestAnimationFrame(followStep); }
 function setStageAuth(on) {
   $('#lStage').classList.toggle('is-auth', on);
   if (on) $('#lStage').classList.add('swept');   // lets the light swing back on the way out too
   $('#lIntro').inert = on; $('#lAuth').inert = !on;
+  kickFollow();
 }
 function showView(v) {
   S.view = v;
   $('#v-landing').hidden = v !== 'landing';
   $('#v-app').hidden = v !== 'app';
   $('#nav').hidden = v !== 'app';
-  syncHero(); syncHeader(); syncStage();
+  syncHero(); syncHeader(); syncStage(); moveNavPill(false);
 }
 function paintAvatar(el) {
   el.textContent = '';
@@ -1835,29 +2074,190 @@ function renderAccount() {
 function go(name, opts) {
   opts = opts || {};
   if (!S.user) { showView('landing'); return; }
+  const fromPos = screenPos(S.screen, S.from);   // measured before S.from changes
   if ((name === 'report' || name === 'profile') && S.screen !== name) S.from = S.screen;
+  const dir = screenPos(name, S.from) < fromPos ? -1 : 1;   // 1: old slides left, new comes from the right
   stopPlayback();
   S.screen = name;
+  endLeaving();   // a fast second click: finish the previous slide-out first
+  const prev = $('.screen.active'), next = $('#s-' + name);
+  const slide = prev && next && prev !== next && !$('#v-app').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (slide) leaveScreen(prev, dir);
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === 's-' + name));
+  if (slide) next.animate([
+    { opacity: 0, transform: 'translateX(' + (56 * dir) + 'px)', filter: 'blur(8px)' },
+    { opacity: 1, transform: 'none', filter: 'none' }
+  ], { duration: 600, delay: 120, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'backwards' });
   const navName = name === 'report' ? (['script', 'practice'].indexOf(S.from) >= 0 ? S.from : 'home') : name;
   $$('#nav [data-go]').forEach(b => { if (b.getAttribute('data-go') === navName) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+  moveNavPill(true);
   if (RENDER[name]) RENDER[name]();
+  moveSegPills(false);
   window.scrollTo(0, 0);
   if (!opts.silent) focusHeading();
   setTimeout(redrawCharts, 0);
 }
 
-/* ---------- user menu ---------- */
+/* ---------- drop-down slide (account menu, select lists): unrolls downwards, rolls back up; no fade ---------- */
+const calmMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isDropOpen = el => !el.hidden && !el._closing;
+function slideDown(el) {
+  if (el._closing) { el._closing.cancel(); el._closing = null; }
+  el.hidden = false;
+  if (calmMotion() || !el.animate) return;
+  el.animate([{ clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-8px)' }, { clipPath: 'inset(0 0 0 0)', transform: 'none' }],
+    { duration: 280, easing: 'cubic-bezier(.2, .7, .3, 1)' });
+}
+function slideUp(el, done) {
+  if (el.hidden || el._closing) return;
+  if (calmMotion() || !el.animate) { el.hidden = true; if (done) done(); return; }
+  el.getAnimations().forEach(a => a.cancel());
+  const a = el.animate([{ clipPath: 'inset(0 0 0 0)', transform: 'none' }, { clipPath: 'inset(0 0 100% 0)', transform: 'translateY(-8px)' }],
+    { duration: 220, easing: 'cubic-bezier(.4, 0, .8, .4)', fill: 'forwards' });
+  el._closing = a;
+  a.onfinish = () => { if (el._closing !== a) return; el._closing = null; el.hidden = true; a.cancel(); if (done) done(); };
+}
+
+/* ---------- user menu: opens on hover or click, a second click rolls it back up ---------- */
+let menuLeaveTimer = 0;
 function closeUserMenu(focusBtn) {
   const m = $('#userMenu');
   if (!m) return;
-  m.hidden = true; $('#userBtn').setAttribute('aria-expanded', 'false');
+  clearTimeout(menuLeaveTimer);
+  if (isDropOpen(m)) slideUp(m);
+  $('#userBtn').setAttribute('aria-expanded', 'false');
   if (focusBtn) $('#userBtn').focus();
+}
+function openUserMenu(focusFirst) {
+  const m = $('#userMenu');
+  clearTimeout(menuLeaveTimer);
+  if (!isDropOpen(m)) slideDown(m);
+  $('#userBtn').setAttribute('aria-expanded', 'true');
+  if (focusFirst) $('[role=menuitem]', m).focus();
 }
 function toggleUserMenu() {
   const m = $('#userMenu');
-  if (m.hidden) { m.hidden = false; $('#userBtn').setAttribute('aria-expanded', 'true'); $('[role=menuitem]', m).focus(); }
-  else closeUserMenu(true);
+  // a click right after the hover opened it means "open", not "close"
+  if (isDropOpen(m) && Date.now() - (m._hoverAt || 0) > 600) closeUserMenu(true);
+  else openUserMenu(true);
+}
+function setupUserMenuHover() {
+  const acct = $('#acct'), m = $('#userMenu');
+  if (!acct || !matchMedia('(hover: hover)').matches) return;
+  acct.addEventListener('mouseenter', () => {
+    if ($('#userBtn').hidden) return;
+    clearTimeout(menuLeaveTimer);
+    if (!isDropOpen(m)) { m._hoverAt = Date.now(); openUserMenu(false); }
+  });
+  acct.addEventListener('mouseleave', () => {
+    clearTimeout(menuLeaveTimer);
+    menuLeaveTimer = setTimeout(() => { if (!m.contains(document.activeElement)) closeUserMenu(); }, 280);
+  });
+}
+
+/* ---------- custom select: the native <select> stays (hidden) as the source of truth, so all existing code keeps
+   reading/writing .value and listening to change; the button + list are only the visible layer ---------- */
+let openCsel = null;
+const CHEVRON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+function enhanceSelect(sel) {
+  if (sel._csel) return;
+  const wrap = document.createElement('div'), btn = document.createElement('button'), list = document.createElement('ul'), hl = document.createElement('div');
+  wrap.className = 'csel';
+  wrap.style.cssText = sel.getAttribute('style') || '';
+  if (wrap.style.width === 'auto') wrap.style.display = 'inline-block';
+  btn.type = 'button'; btn.className = 'csel-btn'; btn.id = sel.id + 'Btn';
+  btn.setAttribute('aria-haspopup', 'listbox'); btn.setAttribute('aria-expanded', 'false');
+  btn.innerHTML = '<span class="v"></span>' + CHEVRON;
+  list.className = 'csel-list'; list.setAttribute('role', 'listbox'); list.id = sel.id + 'List'; list.hidden = true; list.tabIndex = -1;
+  if (sel.closest('.l-auth')) list.classList.add('dark');
+  hl.className = 'csel-hl';
+  btn.setAttribute('aria-controls', list.id);
+  sel.classList.add('csel-native'); sel.tabIndex = -1;
+  sel.after(wrap); wrap.appendChild(btn); document.body.appendChild(list);
+  $$('label[for="' + sel.id + '"]').forEach(l => { l.htmlFor = btn.id; });
+  sel.focus = o => btn.focus(o);
+
+  const P = HTMLSelectElement.prototype;
+  const refresh = () => {
+    const o = sel.options[sel.selectedIndex];
+    $('.v', btn).textContent = o ? o.textContent : '';
+    btn.disabled = sel.disabled;
+  };
+  ['value', 'selectedIndex'].forEach(k => {
+    const d = Object.getOwnPropertyDescriptor(P, k);
+    Object.defineProperty(sel, k, { configurable: true, get() { return d.get.call(sel); }, set(v) { d.set.call(sel, v); refresh(); } });
+  });
+  new MutationObserver(refresh).observe(sel, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['disabled'] });
+  sel.addEventListener('change', refresh);
+
+  let kb = -1;
+  const items = () => $$('li', list);
+  const placeHl = animate => {
+    const cur = items()[sel.selectedIndex];
+    list.classList.toggle('still', !animate);
+    if (!cur) { hl.style.height = '0px'; return; }
+    hl.style.transform = 'translateY(' + cur.offsetTop + 'px)'; hl.style.height = cur.offsetHeight + 'px';
+    if (!animate) { getComputedStyle(hl).transform; list.classList.remove('still'); }
+  };
+  const setKb = i => {
+    const li = items(); if (!li.length) return;
+    kb = (i + li.length) % li.length;
+    li.forEach((x, j) => x.classList.toggle('kb', j === kb));
+    btn.setAttribute('aria-activedescendant', li[kb].id); li[kb].scrollIntoView({ block: 'nearest' });
+  };
+  const place = () => {
+    const r = btn.getBoundingClientRect(), h = list.offsetHeight;
+    list.style.minWidth = r.width + 'px'; list.style.left = Math.max(8, Math.min(r.left, innerWidth - list.offsetWidth - 8)) + 'px';
+    list.style.top = (r.bottom + 4 + h > innerHeight - 8 && r.top - 4 - h > 8 ? r.top - 4 - h : r.bottom + 4) + 'px';
+  };
+  const open = () => {
+    if (sel.disabled) return;
+    if (openCsel && openCsel !== api) openCsel.close();
+    list.innerHTML = ''; list.appendChild(hl);
+    [...sel.options].forEach((o, i) => {
+      const li = document.createElement('li');
+      li.id = list.id + '-' + i; li.setAttribute('role', 'option'); li.textContent = o.textContent;
+      li.setAttribute('aria-selected', String(i === sel.selectedIndex)); li.dataset.i = i;
+      list.appendChild(li);
+    });
+    slideDown(list); place(); placeHl(false);
+    btn.setAttribute('aria-expanded', 'true'); openCsel = api;
+    setKb(Math.max(0, sel.selectedIndex));
+  };
+  const close = () => {
+    if (openCsel === api) openCsel = null;
+    btn.setAttribute('aria-expanded', 'false'); btn.removeAttribute('aria-activedescendant');
+    slideUp(list);
+  };
+  const choose = i => {
+    if (i === sel.selectedIndex) { close(); return; }
+    items().forEach((x, j) => x.setAttribute('aria-selected', String(j === i)));
+    Object.getOwnPropertyDescriptor(P, 'selectedIndex').set.call(sel, i); refresh();
+    placeHl(true);   // highlight glides to the new choice, then the list rolls up
+    sel.dispatchEvent(new Event('input', { bubbles: true })); sel.dispatchEvent(new Event('change', { bubbles: true }));
+    setTimeout(close, calmMotion() ? 0 : 300);
+  };
+  const api = { close, wrap, list };
+  btn.addEventListener('click', () => { if (isDropOpen(list)) close(); else open(); });
+  list.addEventListener('click', e => { const li = e.target.closest('li'); if (li) { choose(+li.dataset.i); btn.focus(); } });
+  btn.addEventListener('keydown', e => {
+    const k = e.key, isOpen = isDropOpen(list);
+    if (!isOpen && (k === 'ArrowDown' || k === 'ArrowUp' || k === 'Enter' || k === ' ')) { e.preventDefault(); open(); return; }
+    if (!isOpen) return;
+    if (k === 'ArrowDown' || k === 'ArrowUp') { e.preventDefault(); setKb(kb + (k === 'ArrowDown' ? 1 : -1)); }
+    else if (k === 'Enter' || k === ' ') { e.preventDefault(); choose(kb); }
+    else if (k === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+    else if (k === 'Tab') close();
+  });
+  sel._csel = api; refresh();
+}
+function setupSelects() {
+  $$('select').forEach(enhanceSelect);
+  document.addEventListener('mousedown', e => {
+    if (openCsel && !openCsel.wrap.contains(e.target) && !openCsel.list.contains(e.target)) openCsel.close();
+  }, true);
+  window.addEventListener('scroll', e => { if (openCsel && !openCsel.list.contains(e.target)) openCsel.close(); }, true);
+  window.addEventListener('resize', () => { if (openCsel) openCsel.close(); });
 }
 
 /* ---------- auth ---------- */
@@ -1874,7 +2274,39 @@ function fillSignupForm(reset) {
   $('#suTopics').innerHTML = Object.keys(TOPICS).map(k => '<label><input type="checkbox" name="suTopic" value="' + k + '"' + (p.topics && p.topics.indexOf(k) >= 0 ? ' checked' : '') + '> ' + esc(TOPICS[k]) + '</label>').join('');
   ['eSuAge', 'eSuAccent', 'eSuTopics'].forEach(i => $('#' + i).classList.remove('show'));
 }
+/* Log in <-> Sign up on the open panel: the card blurs, shrinks and swipes out, the form changes while it is
+   invisible (so the size jump never shows), then it swipes in from the other side. Sign up moves left, log in moves right. */
+let authSwipe = null;
 function setAuthMode(mode) {
+  const a = $('#lAuth'), calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* Log in <-> Sign up: the tab pill slides; fields that leave fade out; the card then grows or shrinks
+     (width and height) to its new size while the new fields fade in. Fields shared by both stay put. */
+  const extra = [$('#pass2Wrap'), $('#signupExtra')], btn = $('#auBtn');
+  [a, btn].concat(extra).forEach(el => el.getAnimations().forEach(x => x.cancel()));   // a fast second click starts clean
+  authSwipe = null;
+  if (mode === S.authMode || !$('#lStage').classList.contains('is-auth') || calm || !a.animate) { applyAuthMode(mode); moveSegPills(false, a); return; }
+  $('#aTabIn').setAttribute('aria-selected', String(mode === 'in'));
+  $('#aTabUp').setAttribute('aria-selected', String(mode === 'up'));
+  moveSegPills(true, a);   // pill starts at once
+  const r0 = a.getBoundingClientRect();
+  const leaving = (mode === 'in' ? extra : []).filter(el => !el.hidden).concat(btn);
+  const fades = leaving.map(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-in', fill: 'forwards' }));
+  const token = {}; authSwipe = token;
+  Promise.all(fades.map(f => f.finished)).then(() => {
+    if (authSwipe !== token) return;
+    applyAuthMode(mode);
+    fades.forEach(f => f.cancel());
+    const r1 = a.getBoundingClientRect();
+    moveSegPills(true, a);   // final spot in the resized card
+    a.style.overflow = 'hidden';
+    const grow = a.animate([{ width: r0.width + 'px', height: r0.height + 'px' }, { width: r1.width + 'px', height: r1.height + 'px' }],
+      { duration: 420, easing: 'cubic-bezier(.65, 0, .35, 1)' });
+    grow.onfinish = grow.oncancel = () => { a.style.overflow = ''; if (authSwipe === token) authSwipe = null; };
+    (mode === 'up' ? extra : []).concat(btn).forEach(el =>
+      el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 340, delay: 160, easing: 'ease-out', fill: 'backwards' }));
+  }).catch(() => {});
+}
+function applyAuthMode(mode) {
   S.authMode = mode;
   $('#aTabIn').setAttribute('aria-selected', String(mode === 'in'));
   $('#aTabUp').setAttribute('aria-selected', String(mode === 'up'));
@@ -2018,7 +2450,7 @@ function onGateAgree() {
       lvl: $('#gLvl'), max: BASELINE_SECONDS, onTick: s => renderGate(s),
       onEnd: sec => {
         S.grec = null;
-        const min = Math.min(10, BASELINE_SECONDS);
+        const min = Math.min(1, BASELINE_SECONDS);   // 1 s accepted so the UI is quick to test
         if (sec < min) { renderGate(0, T('profile.tooShort', { n: min })); return; }
         S.baseline = { ts: Date.now() }; S.gate.saved = true; renderGate(sec); toast(T('profile.toastSaved'));
       }
@@ -2116,8 +2548,22 @@ function addBubble(cls, html) {
   if (cls === 'ai') d.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + html;
   else d.innerHTML = html;
   feed.appendChild(d);
-  feed.scrollTop = feed.scrollHeight;
+  /* Chat-style entry: the feed glides down to the new message while it rises and fades in */
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!calm && d.animate && feed.offsetParent) {
+    feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
+    d.animate([{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }],
+      { duration: 420, easing: 'cubic-bezier(.2, .7, .3, 1)' });
+  } else feed.scrollTop = feed.scrollHeight;
   return d;
+}
+/* The answer replaces the loading lines in the same bubble: fade the new content in and glide to the bottom */
+function revealBubble(d) {
+  const feed = $('#chatFeed');
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches || !d.animate) { feed.scrollTop = feed.scrollHeight; return; }
+  [...d.children].slice(1).forEach((el, i) => el.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+    { duration: 380, delay: i * 50, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'backwards' }));
+  feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
 }
 function renderChatFile() {
   const box = $('#chatFile');
@@ -2136,7 +2582,6 @@ function generateScript(req, again) {
   const ai = addBubble('ai', '<div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div><p class="note" role="status"></p>');
   const status = $('.note', ai);
   status.textContent = req.file ? T('script.extracting') : (again ? T('script.regenerating') : T('script.generating'));
-  const feed = $('#chatFeed'); feed.scrollTop = feed.scrollHeight;
   setTimeout(() => { if (req.file) status.textContent = T('script.generating'); }, 900);
   setTimeout(() => {
     const pool = SCRIPTS[req.topic], text = pool[S.scriptN++ % pool.length];
@@ -2156,7 +2601,7 @@ function generateScript(req, again) {
     $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
     ai._script = { title, text, topic: req.topic, req };
     S.chatBusy = false; $('#chatSend').disabled = false;
-    feed.scrollTop = feed.scrollHeight;
+    revealBubble(ai);
   }, req.file ? 1900 : 1300);
 }
 /* Refusal reply: the message stays in the box so the person can edit it and send again. No script is generated. */
@@ -2174,7 +2619,7 @@ function refuseRequest(txt, reason) {
       '<p>' + esc(T(reason === 'inject' ? 'script.blockedInject' : 'script.blockedHarm')) + '</p>' +
       '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
     S.chatBusy = false; $('#chatSend').disabled = false;
-    const feed = $('#chatFeed'); feed.scrollTop = feed.scrollHeight;
+    revealBubble(ai);
     $('#chatIn').focus();
   }, 700);
 }
@@ -2744,7 +3189,7 @@ function toggleBaseline() {
       lvl: $('#blLvl'), max: BASELINE_SECONDS, onTick: s => renderBaseline(s),
       onEnd: sec => {
         S.brec = null;
-        const min = Math.min(10, BASELINE_SECONDS);
+        const min = Math.min(1, BASELINE_SECONDS);   // 1 s accepted so the UI is quick to test
         if (sec < min) { renderBaseline(0, T('profile.tooShort', { n: min })); return; }
         S.baseline = { ts: Date.now() }; renderBaseline(sec); toast(T('profile.toastSaved'));
       }
@@ -2872,7 +3317,9 @@ function init() {
   $('#authBack').onclick = () => { setStageAuth(false); $('#lLogin').focus({ preventScroll: true }); };
   $('#aTabIn').onclick = () => setAuthMode('in'); $('#aTabUp').onclick = () => setAuthMode('up');
   $('#authForm').addEventListener('submit', onAuthSubmit);
-  $('#pwToggle').onclick = () => { const p = $('#auPass'), show = p.type === 'password'; p.type = show ? 'text' : 'password'; $('#auPass2').type = p.type; $('#pwToggle').textContent = T(show ? 'auth.hide' : 'auth.show'); $('#pwToggle').setAttribute('aria-pressed', String(show)); };
+  setupPwEyes();
+  setupSelects();
+  setupUserMenuHover();
   $('#userBtn').onclick = toggleUserMenu;
   $('#userMenu').addEventListener('click', e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
@@ -2966,8 +3413,8 @@ function init() {
   $('#audioSave').onclick = () => { closeModal('mAudio'); toast(T('audio.ok')); };
   $('#permSave').onclick = () => { S.consent = $('#pmChk').checked; closeModal('mPerm'); toast(T(S.consent ? 'consent.toastOn' : 'consent.toastOff')); };
 
-  window.addEventListener('resize', () => { syncHeader(); syncStage(); });
-  window.addEventListener('scroll', syncHero, { passive: true });
+  window.addEventListener('resize', () => { syncHeader(); syncStage(); moveNavPill(false); moveSegPills(false); moveSegPills(false, $('#lAuth')); });
+  window.addEventListener('scroll', () => { syncHero(); kickFollow(); }, { passive: true });
   if (window.ResizeObserver) new ResizeObserver(syncStage).observe($('#lStage'));
   showView('landing'); renderAccount();
 }
