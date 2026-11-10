@@ -129,8 +129,7 @@ def evaluate_session(
 
 def analyze_baseline(
     audio_path: Path, 
-    *, 
-    settings: Any, 
+    *,
     vad_params: Any
 ) -> BaselineProfile:
     """
@@ -141,17 +140,17 @@ def analyze_baseline(
         
         probe(
             audio_path,
-            max_seconds=settings.max_audio_seconds,
-            max_bytes=settings.max_audio_bytes,
-            allowed_formats=settings.allowed_audio_formats
+            max_seconds=max_audio_seconds,
+            max_bytes=max_upload_bytes,
+            allowed_formats=frozenset(allowed_formats)
         )
         
         master = decode_to_master(
             audio_path,
             workdir=workdir,
-            max_seconds=settings.max_audio_seconds,
-            cap_margin_s=settings.decode_cap_margin_s,
-            timeout_s=settings.decode_timeout_s
+            max_seconds=max_audio_seconds,
+            cap_margin_s=duration_cap_margin_s,
+            timeout_s=decode_timeout_s
         )
         
         segments = detect_speech(master, params=vad_params)
