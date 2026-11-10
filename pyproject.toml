@@ -29,6 +29,7 @@ dependencies = [
     "pytest>=9.2.0",
     "reportlab>=4.0.0",
     "ruff>=0.17.3",
+    "python-multipart>=0.0.33",
 ]
 
 [tool.pytest.ini_options]
