@@ -2,18 +2,24 @@ import wave
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-import string
+from collections.abc import Sequence
  
 from src.audio_processing.contracts import (
     MASTER_SAMPLE_RATE,
     MasterAudio,
     SpeechSegment,
     Pause,
-    WordTimestamp,
     ClassifiedPause,
     PauseKind,
     InsufficientAudio
 )
+from src.audio_processing.alignment import AlignedItem
+from src.audio_processing.text_norm import normalize_token, trailing_punct
+
+
+# Dung sai đồng bộ đồng hồ VAD và STT khi xác định "từ ngay trước pause". Đây KHÔNG phải ngưỡng chấm
+# điểm của ADR-003; chỉ bù độ lệch thời gian giữa hai nguồn. Giá trị khởi điểm, sẽ hiệu chỉnh ở M7.
+WORD_PAUSE_TOLERANCE_S = 0.1
 
 
 @dataclass(frozen=True)
@@ -32,7 +38,7 @@ def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pa
     """
     pauses = []
     for previous, following in zip(segments, segments[1:]):
-        gap = following.start_s - previous.end_s
+        gap = round(following.start_s - previous.end_s, 6)  # chống sai số float ở biên min_pause_s
         if gap >= min_pause_s:
             pauses.append(Pause(start_s=previous.end_s, end_s=following.start_s))
     return pauses
@@ -94,58 +100,60 @@ def check_audio_quality(segments: list[SpeechSegment], duration_s: float) -> Non
         raise InsufficientAudio(r"Speech < 30% of audio duration")
 
 
-def _normalize_word(word: str) -> str:
-    """Chuẩn hóa từ: lowercase và bỏ dấu câu ở đuôi."""
-    return word.lower().rstrip(string.punctuation)
+def after_ref_index(
+    items: Sequence[AlignedItem], pause_start_s: float, ref_tokens: Sequence[str]
+) -> int | None:
+    """ref_index của từ nghe được ngay trước pause; None nếu không có từ nào trước.
+
+    Ứng viên: item có hyp (end_s không None; del bị loại) và
+    end_s <= pause_start_s + WORD_PAUSE_TOLERANCE_S (dung sai đồng bộ VAD/STT, không phải ngưỡng
+    chấm điểm ADR-003; hiệu chỉnh ở M7). Chọn end_s lớn nhất, hoà thì item xuất hiện sau cùng trong items. Nếu item đó là ins (không có
+    ref_index) thì dùng ref gần nhất phía trước nó trong items (phase3 #2), bỏ qua item mà token
+    gốc ref_tokens[ref_index] chỉ có dấu câu (normalize_token rỗng, vd "—"); item del vẫn tính.
+    """
+    best_pos = None
+    for pos, item in enumerate(items):
+        if item.end_s is None or item.end_s > pause_start_s + WORD_PAUSE_TOLERANCE_S:
+            continue
+        if best_pos is None or item.end_s >= items[best_pos].end_s:
+            best_pos = pos
+    if best_pos is None:
+        return None
+    for pos in range(best_pos, -1, -1):
+        ref = items[pos].ref_index
+        if ref is not None and normalize_token(ref_tokens[ref]) != ():
+            return ref
+    return None
 
 
 def classify_pauses(
-    pauses: list[Pause], 
-    words: list[WordTimestamp], 
-    script: str, 
-    *, 
-    hesitation_threshold_s: float
+    pauses: list[Pause],
+    items: Sequence[AlignedItem],
+    script: str,
+    *,
+    hesitation_threshold_s: float,
+    forgot_word_s: float = 1.2,
 ) -> list[ClassifiedPause]:
+    """Phân loại mọi Pause (ADR-004 D6), giữ đủ số lượng và thứ tự đầu vào.
+
+    Ưu tiên: punctuation > forgot_word (>= forgot_word_s) > hesitation (>= ngưỡng) > natural.
+    "Tại dấu câu" = token gốc script.split()[after_ref_index] có trailing_punct khác rỗng,
+    nên cùng một từ xuất hiện có/không có dấu câu được phân biệt theo vị trí (1.9.2 #26).
+    Biên tính bao gồm (>=).
     """
-    Phân loại mỗi Pause thành RHETORICAL, HESITATION, hoặc FORGOT_WORD.
-    """
-    if not pauses:
-        return []
-
-    # 1. Tìm vị trí dấu câu trong script (. , ; : ? !) và lấy các từ chứa nó
-    punctuation_marks = {'.', ',', ';', ':', '?', '!'}
-    script_punct_words = set()
-    
-    for token in script.split():
-        if token and token[-1] in punctuation_marks:
-            norm_token = _normalize_word(token)
-            if norm_token:
-                script_punct_words.add(norm_token)
-
-    classified_pauses = []
-
+    ref_tokens = script.split()
+    result = []
     for pause in pauses:
-        pause_duration = pause.end_s - pause.start_s
-        
-        # Tìm từ STT kết thúc ngay trước khoảng lặng (sai số nhỏ 0.1s)
-        preceding_words = [w for w in words if w.end_s <= pause.start_s + 0.1]
-        
-        is_at_punctuation = False
-        
-        # 2. Kiểm tra xem từ ngay trước pause có nằm tại vị trí dấu câu không
-        if preceding_words:
-            last_word = _normalize_word(preceding_words[-1].word)
-            if last_word in script_punct_words:
-                is_at_punctuation = True
-
-        # 3. Logic phân loại theo thứ tự ưu tiên
-        if is_at_punctuation:
-            classified_pauses.append(ClassifiedPause(pause, PauseKind.RHETORICAL))
-            
-        elif pause_duration >= 1.2:
-            classified_pauses.append(ClassifiedPause(pause, PauseKind.FORGOT_WORD))
-            
-        elif pause_duration >= hesitation_threshold_s:
-            classified_pauses.append(ClassifiedPause(pause, PauseKind.HESITATION))
-
-    return classified_pauses
+        ref = after_ref_index(items, pause.start_s, ref_tokens)
+        at_punct = ref is not None and bool(trailing_punct(ref_tokens[ref]))
+        duration = round(pause.end_s - pause.start_s, 6)  # chống sai số float ở biên 0.7/1.2
+        if at_punct:
+            kind = PauseKind.PUNCTUATION
+        elif duration >= forgot_word_s:
+            kind = PauseKind.FORGOT_WORD
+        elif duration >= hesitation_threshold_s:
+            kind = PauseKind.HESITATION
+        else:
+            kind = PauseKind.NATURAL
+        result.append(ClassifiedPause(pause, kind, ref))
+    return result

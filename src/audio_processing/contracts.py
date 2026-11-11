@@ -71,14 +71,16 @@ class SttResult:
 
 @dataclass(frozen=True)
 class BaselineProfile:
-    median_pause_s: float         # trung vị khoảng lặng >= 0.35s của baseline
-    hesitation_threshold_s: float # = min(1.2, 2 × median_pause_s)
-    median_f0_hz: float           # median F0 từ Parselmouth
+    median_pause_s: float | None  # trung vị khoảng lặng >= 0.35s; None nếu không có khoảng lặng (D12)
+    hesitation_threshold_s: float # = min(1.2, 2 × median_pause_s); 0.7 nếu < 5 khoảng lặng (D13)
+    median_f0_hz: float | None    # median F0 từ Parselmouth; None nếu không có F0 (D12)
+    mean_loudness_db: float | None  # dB trung bình của baseline (D11); None nếu không đo được
     flags: list[str]              # ["no_baseline", "baseline_pause_unreliable"]
 
 
 class PauseKind(Enum):
-    RHETORICAL = "rhetorical"     # nằm tại dấu câu trong script → không trừ điểm
+    PUNCTUATION = "punctuation"   # tại dấu câu trong script → không trừ điểm (D6)
+    NATURAL = "natural"           # >= 0.35 s, < ngưỡng cá nhân, không tại dấu câu
     HESITATION = "hesitation"     # >= ngưỡng cá nhân, không tại dấu câu → trừ điểm
     FORGOT_WORD = "forgot_word"   # >= 1.2s giữa câu → chỉ hiển thị nhãn đỏ
 
@@ -87,25 +89,12 @@ class PauseKind(Enum):
 class ClassifiedPause:
     pause: Pause  
     kind: PauseKind
+    after_ref_index: int | None = None  # ref_index của từ nghe được ngay trước pause (D6)
 
 
 class InsufficientAudio(Exception):
     """Tiếng nói < 30% tổng thời lượng, hoặc STT trả về rỗng."""
     pass
-
-
-@dataclass(frozen=True)
-class EvaluationResult:
-    status: str                     # "ok" | "insufficient_audio"
-    overall: float | None           # 0–100 hoặc None
-    label: str | None               # "Tốt" | "Khá" | "Cần cải thiện" | "Cần luyện thêm" | None
-    components: dict                # {"accuracy": float|None, "fluency": float|None, "pronunciation": float|None, "semantic": float|None}
-    fluency_detail: dict            # {"wpm": float, "hesitations_per_min": float, "pause_threshold_s": float, "filler_pct": float}
-    pitch_detail: dict              # {"range_semitones": float|None, "f0_ref_hz": float|None}
-    alignment: list[dict]           # [{"ref_word", "hyp_word", "status": "equal|near_miss|sub|del|ins"}]
-    stt: dict                       # {"provider": str, "model": str}
-    flags: list[str]
-    display_only: dict              # {"loudness_db_timeline": list, ...}
 
 
 @dataclass(frozen=True)
