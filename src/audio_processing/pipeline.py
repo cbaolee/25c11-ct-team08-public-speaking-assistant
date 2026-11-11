@@ -26,14 +26,16 @@ from src.audio_processing.stt import transcribe
 from src.audio_processing.alignment import align
 from src.audio_processing.text_norm import is_filler
 from src.audio_processing.baseline import (
-    compute_baseline_pause_profile, compute_baseline_f0, mean_loudness_db, extract_loudness_db
+    compute_baseline_pause_profile, compute_baseline_f0, mean_loudness_db, extract_loudness_db,
+    loudness_series
 )
 from src.audio_processing.result_schema import (
     AlignmentItem, EvaluationResultV2, FillerItem, PauseItem, SentenceItem
 )
 from src.audio_processing.scoring import (
     Encoder, accuracy_scores, build_sentence_pairs, combine_pronunciation, compute_fluency,
-    compute_overall, compute_wpm, filler_pct, find_fillers, get_label, hesitations_per_min,
+    compute_overall, compute_warnings, compute_wpm, filler_pct, find_fillers, get_label,
+    hesitations_per_min,
     score_filler, score_hesitation, score_pitch, score_semantic, score_sentences, score_wpm,
     speech_span,
 )
@@ -193,7 +195,7 @@ def evaluate_session(
             },
             pitch_detail={"range_semitones": pitch.range_semitones, "f0_ref_hz": pitch.f0_ref_hz,
                           "f0_ref_source": pitch.f0_ref_source,
-                          "contour_st": None},  # Series: Pha 3B (phase3 #30)
+                          "contour_st": pitch.contour_st},
             audio={"duration_s": master.duration_s, "voiced_ratio": voiced_ratio},
             baseline=_baseline_block(baseline),
             alignment=[AlignmentItem(**asdict(it)) for it in result.items],
@@ -210,8 +212,8 @@ def evaluate_session(
             sentences=[SentenceItem(**asdict(sr)) for sr in sentences],
             stt=stt_block,
             flags=flags,
-            warnings=[],  # Pha 3B (D7)
-            display_only={"loudness_db": None,  # Series: Pha 3B
+            warnings=compute_warnings(wpm, r_pct, pitch.range_semitones),
+            display_only={"loudness_db": loudness_series(master),
                           "loudness_ref_db": baseline.mean_loudness_db if baseline else None},
         )
 

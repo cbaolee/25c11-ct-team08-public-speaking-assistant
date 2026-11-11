@@ -243,10 +243,11 @@ class PitchResult:
     f0_ref_hz: float | None
     f0_ref_source: Literal["baseline", "session"] | None
     flags: list[str] = field(default_factory=list)
+    contour_st: dict | None = None
 
 
-def _extract_f0(master: MasterAudio) -> list[float]:
-    """Trích F0 hữu thanh (Hz, > 0) từ file bằng Parselmouth.
+def _extract_f0(master: MasterAudio) -> list[tuple[float, float]]:
+    """Trích F0 hữu thanh từ file bằng Parselmouth: [(time_s, f0_hz)], chỉ khung hz > 0.
 
     Giữ nguyên tham số cũ (phase3 #19): Sound(path).to_pitch() mặc định.
     Tách riêng để test monkeypatch, không cần audio thật.
@@ -254,7 +255,52 @@ def _extract_f0(master: MasterAudio) -> list[float]:
     snd = parselmouth.Sound(str(master.path))
     pitch = snd.to_pitch()
     f0_values = pitch.selected_array["frequency"]
-    return [float(v) for v in f0_values[f0_values > 0]]
+    times = pitch.xs()
+    return [(float(t), float(v)) for t, v in zip(times, f0_values, strict=True) if v > 0]
+
+
+def f0_contour_st(
+    track: Sequence[tuple[float, float]], f0_ref_hz: float | None, duration_s: float,
+    step_s: float = 0.1,
+) -> dict | None:
+    """Series đường cong cao độ theo semitone so với f0_ref (ADR-004 D10).
+
+    Ô i phủ [i*step, (i+1)*step); giá trị = 12*log2(median(hz trong ô) / f0_ref); ô không có
+    khung hữu thanh -> None. Không bao giờ chứa NaN/inf. ref/duration không hợp lệ -> None.
+    """
+    if f0_ref_hz is None or not math.isfinite(f0_ref_hz) or f0_ref_hz <= 0:
+        return None
+    if not math.isfinite(duration_s) or duration_s <= 0:
+        return None
+    n = math.ceil(round(duration_s / step_s, 9))
+    cells: list[list[float]] = [[] for _ in range(n)]
+    for t, hz in track:
+        if not (math.isfinite(t) and math.isfinite(hz)) or hz <= 0:
+            continue
+        i = math.floor(round(t / step_s, 9))  # cùng kiểu chống sai số float như n
+        if t >= 0 and i < n:
+            cells[i].append(hz)
+    values = [
+        float(12.0 * math.log2(float(np.median(c)) / f0_ref_hz)) if c else None for c in cells
+    ]
+    return {"start_s": 0.0, "step_s": step_s, "values": values}
+
+
+def compute_warnings(
+    wpm: float | None, filler_pct: float | None, range_st: float | None
+) -> list[str]:
+    """Cảnh báo không ảnh hưởng điểm (ADR-004 D7): thứ tự wpm, filler, monotone; None -> bỏ qua."""
+    out: list[str] = []
+    if wpm is not None:
+        if wpm < 110:
+            out.append("wpm_slow")
+        elif wpm > 175:
+            out.append("wpm_fast")
+    if filler_pct is not None and filler_pct >= 4:
+        out.append("filler_high")
+    if range_st is not None and range_st < 4:
+        out.append("monotone")
+    return out
 
 
 def score_pitch(master: MasterAudio, baseline: BaselineProfile | None) -> PitchResult:
@@ -264,9 +310,10 @@ def score_pitch(master: MasterAudio, baseline: BaselineProfile | None) -> PitchR
     Praat lỗi -> score None + flags ["no_f0"], không trả 0.0 (§8, ADR-004 D18).
     """
     try:
-        f0 = [v for v in _extract_f0(master) if math.isfinite(v) and v > 0]
+        track = [(t, v) for t, v in _extract_f0(master) if math.isfinite(v) and v > 0]
     except Exception:
-        f0 = []
+        track = []
+    f0 = [v for _, v in track]
     if not f0:
         return PitchResult(None, None, None, None, ["no_f0"])
 
@@ -279,7 +326,8 @@ def score_pitch(master: MasterAudio, baseline: BaselineProfile | None) -> PitchR
     r_st = pitch_range_st(f0, f0_ref)
     if r_st is None:
         return PitchResult(None, None, None, None, ["no_f0"])
-    return PitchResult(pitch_score_from_range(r_st), r_st, f0_ref, source, [])
+    contour = f0_contour_st(track, f0_ref, master.duration_s)
+    return PitchResult(pitch_score_from_range(r_st), r_st, f0_ref, source, [], contour)
 
 
 def combine_pronunciation(clarity: float | None, pitch: float | None) -> float | None:

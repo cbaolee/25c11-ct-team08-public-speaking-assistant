@@ -12,6 +12,7 @@ làm tròn half-up 1 chữ số (phase3_decision #14), nên các biên nhãn ở
 Mọi số bên dưới là số tính tay, không phải số đo.
 """
 
+import json
 import math
 from decimal import Decimal
 from types import SimpleNamespace
@@ -114,12 +115,17 @@ def _baseline(f0):
     )
 
 
-def _fake_master():
-    return SimpleNamespace(path="khong_ton_tai.wav")
+def _fake_master(duration_s=2.2):
+    return SimpleNamespace(path="khong_ton_tai.wav", duration_s=duration_s)
+
+
+def _track(hz_values, step=0.01):
+    """Danh sách Hz -> track [(time_s, hz)] cách đều 0.01 s (hợp đồng mới của _extract_f0)."""
+    return [(step * (i + 1), float(hz)) for i, hz in enumerate(hz_values)]
 
 
 def test_score_pitch_with_baseline(monkeypatch):
-    f0 = _f0_from_st([k * 0.625 for k in range(11)])
+    f0 = _track(_f0_from_st([k * 0.625 for k in range(11)]))
     monkeypatch.setattr(scoring, "_extract_f0", lambda master: f0)
     res = scoring.score_pitch(_fake_master(), _baseline(120.0))
     assert res.f0_ref_source == "baseline"
@@ -130,7 +136,7 @@ def test_score_pitch_with_baseline(monkeypatch):
 
 
 def test_score_pitch_without_baseline_uses_session_median(monkeypatch):
-    f0 = _f0_from_st([k * 0.625 for k in range(11)])
+    f0 = _track(_f0_from_st([k * 0.625 for k in range(11)]))
     monkeypatch.setattr(scoring, "_extract_f0", lambda master: f0)
     res = scoring.score_pitch(_fake_master(), None)
     assert res.f0_ref_source == "session"
@@ -141,7 +147,7 @@ def test_score_pitch_without_baseline_uses_session_median(monkeypatch):
 
 
 def test_score_pitch_baseline_f0_none_falls_back_to_session(monkeypatch):
-    monkeypatch.setattr(scoring, "_extract_f0", lambda master: [100.0, 110.0, 120.0])
+    monkeypatch.setattr(scoring, "_extract_f0", lambda master: _track([100.0, 110.0, 120.0]))
     res = scoring.score_pitch(_fake_master(), _baseline(None))
     assert res.f0_ref_source == "session"
     assert res.f0_ref_hz == pytest.approx(110.0)
@@ -164,6 +170,152 @@ def test_score_pitch_praat_error(monkeypatch):
     res = scoring.score_pitch(_fake_master(), None)
     assert res.score is None
     assert res.flags == ["no_f0"]
+
+
+def test_score_pitch_returns_contour_when_voiced(monkeypatch):
+    track = _track(_f0_from_st([k * 0.625 for k in range(11)]))
+    monkeypatch.setattr(scoring, "_extract_f0", lambda master: track)
+    res = scoring.score_pitch(_fake_master(0.3), _baseline(120.0))
+    # duration 0.3 -> 3 ô; khung t = 0.01..0.11 nằm ở ô0 và ô1, ô2 không có khung
+    assert res.contour_st is not None
+    assert res.contour_st["start_s"] == 0.0 and res.contour_st["step_s"] == 0.1
+    assert len(res.contour_st["values"]) == 3
+    assert res.contour_st["values"][2] is None
+    assert isinstance(res.contour_st["values"][0], float)
+
+
+def test_score_pitch_contour_uses_same_f0_ref(monkeypatch):
+    # f0_ref = baseline 100; khung (0.05, 200) -> 12 * log2(200 / 100) = 12 (tính tay)
+    monkeypatch.setattr(scoring, "_extract_f0", lambda master: [(0.05, 200.0)])
+    res = scoring.score_pitch(_fake_master(0.1), _baseline(100.0))
+    assert res.contour_st["values"] == [pytest.approx(12.0)]
+
+
+def test_score_pitch_calls_extract_f0_once(monkeypatch):
+    calls = []
+
+    def fake(master):
+        calls.append(1)
+        return _track([100.0, 200.0, 150.0])
+
+    monkeypatch.setattr(scoring, "_extract_f0", fake)
+    scoring.score_pitch(_fake_master(), None)
+    assert len(calls) == 1
+
+
+def test_score_pitch_no_f0_has_no_contour(monkeypatch):
+    monkeypatch.setattr(scoring, "_extract_f0", lambda master: [])
+    res = scoring.score_pitch(_fake_master(), _baseline(120.0))
+    assert res.contour_st is None and res.flags == ["no_f0"]
+
+
+def test_score_pitch_praat_error_has_no_contour(monkeypatch):
+    def boom(master):
+        raise RuntimeError("praat loi")
+
+    monkeypatch.setattr(scoring, "_extract_f0", boom)
+    res = scoring.score_pitch(_fake_master(), None)
+    assert res.contour_st is None and res.flags == ["no_f0"]
+
+
+def test_pitch_result_contour_default_none():
+    assert scoring.PitchResult(None, None, None, None, []).contour_st is None
+
+
+# ------------------------------------------------------------ f0_contour_st ----
+
+
+def test_f0_contour_st_hand_computed():
+    # f0_ref = 100. Ô0 [0, 0.1): khung 100 và 200 -> median 150 -> 12 * log2(1.5).
+    # Ô1, ô2: không khung -> None.
+    res = scoring.f0_contour_st([(0.01, 100.0), (0.05, 200.0)], 100.0, 0.3)
+    assert res["start_s"] == 0.0 and res["step_s"] == 0.1
+    assert len(res["values"]) == 3
+    assert res["values"][0] == pytest.approx(12 * math.log2(1.5))
+    assert res["values"][1] is None and res["values"][2] is None
+
+
+def test_f0_contour_st_length_is_float_safe():
+    # 2.2 / 0.1 = 22.000000000000004 -> ceil thô ra 23; hợp đồng: 22
+    res = scoring.f0_contour_st([(0.05, 100.0)], 100.0, 2.2)
+    assert len(res["values"]) == 22
+
+
+@pytest.mark.parametrize(("dur", "n"), [(0.3, 3), (0.25, 3), (1.0, 10), (0.05, 1)])
+def test_f0_contour_st_length_cases(dur, n):
+    assert len(scoring.f0_contour_st([], 100.0, dur)["values"]) == n
+
+
+def test_f0_contour_st_unvoiced_cells_are_none():
+    res = scoring.f0_contour_st([(0.25, 100.0)], 100.0, 0.5)
+    assert res["values"] == [None, None, pytest.approx(0.0), None, None]
+
+
+def test_f0_contour_st_cell_boundary_half_open():
+    # step 0.5 (đúng nhị phân): t = 0.5 thuộc ô1 [0.5, 1.0), không thuộc ô0.
+    res = scoring.f0_contour_st([(0.5, 200.0)], 100.0, 1.0, step_s=0.5)
+    assert res["values"] == [None, pytest.approx(12.0)]
+
+
+def test_f0_contour_st_ignores_out_of_range_and_bad_frames():
+    track = [
+        (-0.01, 400.0),        # t < 0
+        (0.3, 400.0),          # t >= n * step (n = 3)
+        (0.01, math.nan),      # hz không hữu hạn
+        (0.02, math.inf),
+        (0.03, 0.0),           # hz <= 0
+        (0.04, -50.0),
+        (0.05, 100.0),         # khung duy nhất hợp lệ -> ST 0
+    ]
+    res = scoring.f0_contour_st(track, 100.0, 0.3)
+    assert res["values"] == [pytest.approx(0.0), None, None]
+
+
+@pytest.mark.parametrize("ref", [None, math.nan, 0.0, -1.0])
+def test_f0_contour_st_invalid_ref_is_none(ref):
+    assert scoring.f0_contour_st([(0.05, 100.0)], ref, 1.0) is None
+
+
+@pytest.mark.parametrize("dur", [0.0, -1.0])
+def test_f0_contour_st_nonpositive_duration_is_none(dur):
+    assert scoring.f0_contour_st([(0.05, 100.0)], 100.0, dur) is None
+
+
+def test_f0_contour_st_never_contains_nan_or_inf():
+    track = [(0.01, math.nan), (0.02, math.inf), (0.15, 120.0), (0.16, 90.0)]
+    res = scoring.f0_contour_st(track, 100.0, 0.4)
+    for v in res["values"]:
+        assert v is None or (isinstance(v, float) and math.isfinite(v))
+    json.dumps(res, allow_nan=False)
+
+
+# --------------------------------------------------------- compute_warnings ----
+
+
+def test_compute_warnings_each_code():
+    assert scoring.compute_warnings(100.0, None, None) == ["wpm_slow"]
+    assert scoring.compute_warnings(180.0, None, None) == ["wpm_fast"]
+    assert scoring.compute_warnings(None, 5.0, None) == ["filler_high"]
+    assert scoring.compute_warnings(None, None, 3.9) == ["monotone"]
+
+
+def test_compute_warnings_boundaries():
+    assert scoring.compute_warnings(110.0, None, None) == []  # 110 không slow
+    assert scoring.compute_warnings(109.99, None, None) == ["wpm_slow"]
+    assert scoring.compute_warnings(175.0, None, None) == []  # 175 không fast
+    assert scoring.compute_warnings(175.01, None, None) == ["wpm_fast"]
+    assert scoring.compute_warnings(None, 4.0, None) == ["filler_high"]  # 4.0 là high
+    assert scoring.compute_warnings(None, 3.99, None) == []
+    assert scoring.compute_warnings(None, None, 4.0) == []  # 4.0 không monotone
+
+
+def test_compute_warnings_all_none_is_empty():
+    assert scoring.compute_warnings(None, None, None) == []
+
+
+def test_compute_warnings_order():
+    assert scoring.compute_warnings(100.0, 5.0, 3.0) == ["wpm_slow", "filler_high", "monotone"]
+    assert scoring.compute_warnings(200.0, 5.0, 3.0) == ["wpm_fast", "filler_high", "monotone"]
 
 
 def test_pitch_result_is_frozen():

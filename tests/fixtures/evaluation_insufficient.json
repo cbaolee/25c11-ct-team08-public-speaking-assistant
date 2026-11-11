@@ -1,0 +1,62 @@
+{
+  "schema_version": "2.0",
+  "status": "insufficient_audio",
+  "reason": "low_voiced_ratio",
+  "overall": null,
+  "label": null,
+  "components": {
+    "accuracy": null,
+    "fluency": null,
+    "pronunciation": null,
+    "semantic": null
+  },
+  "subscores": {
+    "f_wpm": null,
+    "f_pause": null,
+    "f_filler": null,
+    "p_clarity": null,
+    "p_pitch": null
+  },
+  "accuracy_detail": {
+    "n_ref": null,
+    "n_sub": null,
+    "n_del": null,
+    "n_ins": null,
+    "n_near_miss": null,
+    "n_homophone": null,
+    "n_oov": null
+  },
+  "fluency_detail": {
+    "wpm": null,
+    "hesitations_per_min": null,
+    "hesitation_count": null,
+    "forgot_word_count": null,
+    "pause_threshold_s": null,
+    "filler_pct": null,
+    "filler_count": null
+  },
+  "pitch_detail": {
+    "range_semitones": null,
+    "f0_ref_hz": null,
+    "f0_ref_source": null,
+    "contour_st": null
+  },
+  "audio": {
+    "duration_s": 10.0,
+    "voiced_ratio": 0.1
+  },
+  "baseline": null,
+  "alignment": [],
+  "pauses": [],
+  "fillers": [],
+  "sentences": [],
+  "stt": null,
+  "flags": [
+    "no_baseline"
+  ],
+  "warnings": [],
+  "display_only": {
+    "loudness_db": null,
+    "loudness_ref_db": null
+  }
+}

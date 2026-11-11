@@ -105,6 +105,24 @@ def extract_loudness_db(master: MasterAudio) -> list[float]:
         return []
 
 
+def loudness_series(master: MasterAudio, step_s: float = 0.1) -> dict | None:
+    """Series độ to (dB) theo thời gian, lấy tại TÂM ô t = (i + 0.5) * step (ADR-004 D10).
+
+    Dùng to_intensity() mặc định; giá trị không hữu hạn/None -> None; mọi exception -> None.
+    """
+    try:
+        snd = parselmouth.Sound(str(master.path))
+        intensity = snd.to_intensity()
+        n = math.ceil(round(master.duration_s / step_s, 9))
+        values: list[float | None] = []
+        for i in range(n):
+            db = intensity.get_value((i + 0.5) * step_s)
+            values.append(float(db) if db is not None and math.isfinite(db) else None)
+        return {"start_s": 0.0, "step_s": step_s, "values": values}
+    except Exception:
+        return None
+
+
 def build_baseline_profile(master: MasterAudio, vad_params: Any) -> BaselineProfile:
     """
     Orchestrator phân tích toàn bộ audio baseline và trả về BaselineProfile.

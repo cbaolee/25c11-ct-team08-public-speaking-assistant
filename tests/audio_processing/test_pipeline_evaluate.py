@@ -26,9 +26,13 @@ from src.audio_processing.contracts import (
 from src.audio_processing.result_schema import EvaluationResultV2
 
 SCRIPT = "Good morning my friends."
-# F0 giả (Hz). f0_ref = median = 100 -> ST = [0, 0, 0, 12]; P90 (numpy linear) = 8.4, P10 = 0
-# -> R_st = 8.4 >= 6 -> P_pitch = 100.
-F0 = [100.0, 100.0, 100.0, 200.0]
+# F0 giả: cặp (time_s, Hz) trải trong duration 2.2 s. f0_ref = median Hz = 100
+# -> ST = [0, 0, 0, 12]; P90 (numpy linear) = 8.4, P10 = 0 -> R_st = 8.4 >= 6 -> P_pitch = 100.
+# Thời gian chọn giữa ô 0.1 s: ô 0, 5, 10, 15 (không nằm sát biên ô).
+F0 = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 200.0)]
+# Series độ to giả cố định (22 ô = ceil(2.2 / 0.1)), có cả None.
+LOUDNESS = {"start_s": 0.0, "step_s": 0.1,
+            "values": [None] + [60.0 + i * 0.5 for i in range(20)] + [None]}
 
 
 def fake_encode(texts):
@@ -62,6 +66,7 @@ def run(monkeypatch, tmp_path: Path):
         script=SCRIPT,
         stt_flags=(),
         stt_exc=None,
+        loudness=LOUDNESS,
     ):
         audio = tmp_path / "a.wav"
         audio.write_bytes(b"x")
@@ -83,6 +88,7 @@ def run(monkeypatch, tmp_path: Path):
 
         monkeypatch.setattr(pipeline, "transcribe", fake_transcribe)
         monkeypatch.setattr(scoring, "_extract_f0", lambda m: list(f0))
+        monkeypatch.setattr(pipeline, "loudness_series", lambda m, *a, **k: loudness)
         return pipeline.evaluate_session(
             audio, script, baseline, vad_params=VadParams(), encode=fake_encode
         )
@@ -113,7 +119,11 @@ def test_ok_full_hand_calculation(run):
     assert r.pitch_detail["range_semitones"] == pytest.approx(8.4)
     assert r.pitch_detail["f0_ref_hz"] == pytest.approx(100.0)
     assert r.pitch_detail["f0_ref_source"] == "session"
-    assert r.pitch_detail["contour_st"] is None  # Pha 3B
+    # contour_st: 22 ô, khung ở ô 0, 5, 10 (ST 0) và ô 15 (ST 12 = 12*log2(200/100)); còn lại None
+    cs = r.pitch_detail["contour_st"]
+    assert cs["start_s"] == 0.0 and cs["step_s"] == 0.1 and len(cs["values"]) == 22
+    assert [i for i, v in enumerate(cs["values"]) if v is not None] == [0, 5, 10, 15]
+    assert cs["values"][0] == pytest.approx(0.0) and cs["values"][15] == pytest.approx(12.0)
     assert r.subscores["p_pitch"] == 100.0 and r.components["pronunciation"] == 100.0
     # S: một câu, cosine 1.0 -> 100
     assert r.components["semantic"] == 100.0
@@ -130,7 +140,7 @@ def test_ok_full_hand_calculation(run):
     assert r.flags == ["no_baseline"]
     assert r.baseline is None
     assert r.warnings == []
-    assert r.display_only == {"loudness_db": None, "loudness_ref_db": None}
+    assert r.display_only == {"loudness_db": LOUDNESS, "loudness_ref_db": None}
 
 
 def test_baseline_merged_and_used(run):
@@ -375,6 +385,96 @@ def test_near_miss_at_pipeline_level(run):
     assert r.components["pronunciation"] == pytest.approx(50.0)
     # Overall = 0.4*100 + 0.3*(275/3) + 0.2*50 + 0.1*100 = 40 + 27.5 + 10 + 10 = 87.5
     assert r.overall == pytest.approx(87.5)
+
+
+# ---- Bước E1: contour_st, loudness_db, warnings (số tự tính tay, không phải số đo) ----
+
+def test_loudness_series_passed_through(run):
+    custom = {"start_s": 0.0, "step_s": 0.1, "values": [70.0] * 22}
+    assert run(loudness=custom).display_only["loudness_db"] == custom
+
+
+def test_loudness_series_none_is_kept_none(run):
+    r = run(loudness=None)
+    assert r.status == "ok" and r.display_only["loudness_db"] is None
+
+
+def test_contour_none_and_no_f0_flag_when_no_f0(run):
+    r = run(f0=[])
+    assert r.pitch_detail["contour_st"] is None
+    assert "no_f0" in r.flags
+
+
+def test_warnings_empty_in_default_fixture(run):
+    # WPM 120 (ngưỡng cảnh báo 110/175), filler 0 %, R_st 8.4 >= 4 -> không cảnh báo
+    assert run().warnings == []
+
+
+def test_warning_wpm_slow(run):
+    # 4 từ, span 0.0 -> 2.2 = 2.2 s -> WPM = 4 / (2.2/60) = 109.09 < 110
+    words = [w("Good", 0.0, 0.4), w("morning", 0.6, 1.0),
+             w("my", 1.2, 1.6), w("friends.", 1.8, 2.2)]
+    r = run(words=words)
+    assert r.fluency_detail["wpm"] == pytest.approx(109.0909, abs=1e-3)
+    assert r.warnings == ["wpm_slow"]
+
+
+def test_warning_wpm_fast(run):
+    # span 1.0 s -> WPM = 4 / (1/60) = 240 > 175 (voiced 1.0/2.2 = 45 % >= 30 %)
+    words = [w("Good", 0.0, 0.2), w("morning", 0.25, 0.5),
+             w("my", 0.55, 0.75), w("friends.", 0.8, 1.0)]
+    r = run(words=words, segments=(SpeechSegment(0.0, 1.0),))
+    assert r.fluency_detail["wpm"] == pytest.approx(240.0)
+    assert r.warnings == ["wpm_fast"]
+
+
+def test_warning_filler_high(run):
+    # Cùng dữ liệu test_stt_filler_listed...: R = 1/4 = 25 % >= 4; WPM 120; R_st 8.4
+    words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
+             w("my", 1.1, 1.5), w("friends.", 1.6, 2.0)]
+    assert run(words=words).warnings == ["filler_high"]
+
+
+def test_warning_monotone(run):
+    # F0 phẳng: mọi ST = 0 -> R_st = 0 < 4 -> monotone. WPM 120, không filler.
+    flat = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 100.0)]
+    r = run(f0=flat)
+    assert r.pitch_detail["range_semitones"] == pytest.approx(0.0)
+    assert r.warnings == ["monotone"]
+
+
+def test_warnings_order_slow_filler_monotone(run):
+    # span 2.2 s, 4 từ thật = 109.09 WPM (slow) + 1 filler (25 %) + F0 phẳng
+    words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
+             w("my", 1.2, 1.6), w("friends.", 1.8, 2.2)]
+    flat = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 100.0)]
+    r = run(words=words, f0=flat)
+    assert r.warnings == ["wpm_slow", "filler_high", "monotone"]
+
+
+def test_insufficient_has_no_warnings_loudness_or_contour(run):
+    r = run(segments=(SpeechSegment(0.0, 1.0),), duration=10.0)
+    assert r.status == "insufficient_audio"
+    assert r.warnings == []
+    assert r.display_only["loudness_db"] is None
+    assert r.pitch_detail.get("contour_st") is None
+
+
+def test_empty_transcript_has_no_warnings_or_loudness(run):
+    r = run(words=[])
+    assert r.status == "insufficient_audio"
+    assert r.warnings == [] and r.display_only["loudness_db"] is None
+
+
+@pytest.mark.parametrize("kwargs", [
+    {},
+    {"f0": []},
+    {"loudness": None},
+    {"segments": (SpeechSegment(0.0, 1.0),), "duration": 10.0},
+])
+def test_result_json_is_strict(run, kwargs):
+    r = run(**kwargs)
+    json.dumps(r.model_dump(mode="json"), allow_nan=False)
 
 
 def test_empty_script_gives_null_scores(run):

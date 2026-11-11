@@ -1099,6 +1099,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 </div></div>
 
 <div id="toast" role="status" aria-live="polite"></div>
+<script src="/static/js/evaluate_client.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -1107,10 +1108,12 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 const PREFILL_ONBOARDING = true;   // true = first-run form is pre-filled (just press Save)
 const PREFILL = { gender: 'Male', age: 21, accent: 'American English', topics: ['politics', 'current_affairs', 'arts', 'charity'] };
 const OWN_MAX_CHARS = 300;         // max characters in "write my own text"
+const BASELINE_MIN_SECONDS = 10;   // shortest baseline accepted (the backend also rejects audio with too little speech)
 const BASELINE_SECONDS = 30;       // length of the baseline recording (lower it for quick demos)
 const SPEAKING_WPM_FOR_ESTIMATE = 145;   // midpoint of the 130-160 target, only used for "about 0:25" hints
 const USER_NAME = 'Nguyen Van A';
 const SHOW_DEMO_LABELS = false;   // false = hide every "Sample data" / "Demo only" label (clean demo). true = show them again
+const USE_SIM = new URLSearchParams(location.search).get('sim') === '1';   // true (or ?sim=1) = old simulated evaluation (simulate()/score()); false = POST /api/evaluate
 const SEED_SAMPLE_DATA = true;      // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
 const ALWAYS_ASK_BASELINE = true;  // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
 const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
@@ -1214,6 +1217,9 @@ const TEXT = {
     recNote: 'Press Start, read the text aloud, then press Stop.', recording: 'Recording...',
     recordingFollow: 'Recording... Read the text aloud. The highlight follows along.', recFinished: 'Recording finished.',
     dropText: 'Choose an audio file (mp3, wav, webm, m4a)', errAudio: 'That is not an audio file.',
+    micDenied: 'Microphone access was blocked. Allow it in your browser, or upload an audio file instead.',
+    micNodevice: 'No usable microphone was found. Upload an audio file instead.',
+    micUnsupported: 'This browser cannot record audio here. Upload an audio file instead.',
     noAudio: 'No audio yet.', recInProgress: 'Recording in progress...',
     audioReady: 'Recording ready ({time}).', fileReady: 'File ready: {name}',
     evaluate: 'Evaluate', hintNoText: 'Choose the text to read first.', hintNoAudio: 'Record or upload your audio.',
@@ -1237,7 +1243,20 @@ const TEXT = {
     step2: 'Step 2 of 2', step2Text: 'Transcribing and measuring pace, pauses and pitch...',
     queue: 'Waiting in line', queueText: 'Many people are practising right now. Starting in {n} s...',
     errTitle: 'We could not transcribe your recording', errMsg: 'Nothing was scored or saved. Check your connection and try again.', retry: 'Try again',
-    saved: 'Saved to History.'
+    saved: 'Saved to History.',
+    errTooLong: 'This recording is longer than the allowed limit. Please choose a shorter one.',
+    errTooLarge: 'This file is too large. Please choose a smaller one.',
+    errNoStream: 'No audio was found in this file. Please check the file and try again.',
+    errFormat: 'This file format is not supported. Please upload an audio-only file.',
+    errCorrupt: 'This audio could not be read. It may be damaged; try another file or record again.',
+    errBaseline: 'Your saved baseline could not be used. Please record it again in Profile.',
+    errNet: 'Could not reach the server. Nothing was scored or saved. Check your connection and try again.',
+    errServer: 'The server could not score this recording. Nothing was scored or saved. Please try again.',
+    errTimeout: 'The analysis took too long and was stopped. Nothing was scored or saved. Please try again.',
+    insEmpty: 'We could not recognise any words in this recording. Please record again in a quieter place, closer to the microphone.',
+    noPitch: 'No pitch could be measured in this recording.',
+    noVol: 'No loudness could be measured in this recording.',
+    naPart: 'This part could not be scored for this recording, so there is no breakdown to show.'
   },
 
   report: {
@@ -1293,6 +1312,8 @@ const TEXT = {
     baselineTitle: 'Baseline voice', baselineNote: 'Read the passage naturally, as in a normal conversation. Your pitch and pauses are compared with this recording.',
     start: 'Start recording', stop: 'Stop recording', again: 'Record again', recording: 'Recording...',
     saved: 'Baseline saved on {date}', none: 'No baseline yet', tooShort: 'Too short: record at least {n} s',
+    analysing: 'Analysing your baseline...',
+    errInsufficient: 'We could not hear enough speech in this recording. Please record again, reading the passage aloud.',
     toastSaved: 'Baseline voice saved.', timerSuffix: ' / {t}', progress: 'Baseline recording progress',
     okAvatar: 'Photo updated.', okRemoved: 'Photo removed.', errImage: 'Choose an image file.'
   },
@@ -1581,24 +1602,28 @@ function score(an) {
   return { status: 'ok', N, sub, del, near, A, wpm, Fwpm, hes, H, Fpause, R, Ffiller, F, Pclar, Rst, Ppitch, P, cosOk, nSent: an.cos.length, S, overall };
 }
 
+/* score shown through the same rule as the backend (display_round: 1 decimal, half-up); null -> N/A. fx = other measures. */
+const sh = v => { const r = EvaluateClient.displayRound(v); return r == null ? T('common.na') : r.toFixed(1); };
+const fx = (v, d) => (v == null || !Number.isFinite(v) ? T('common.na') : v.toFixed(d));
+const hasBase = sc => (sc.flags ? !sc.flags.includes('no_baseline') : !!S.baseline);
 /* Next-step advice: deterministic templates over the lowest sub-scores (the LLM never grades). */
 function adviceList(sc, limit, below) {
   const items = [
     { key: 'wpm', v: sc.Fwpm, area: 'areaWpm', val: Math.round(sc.wpm) },
-    { key: 'pause', v: sc.Fpause, area: 'areaPause', val: sc.H.toFixed(1) },
-    { key: 'filler', v: sc.Ffiller, area: 'areaFiller', val: sc.R.toFixed(1) },
+    { key: 'pause', v: sc.Fpause, area: 'areaPause', val: fx(sc.H, 1) },
+    { key: 'filler', v: sc.Ffiller, area: 'areaFiller', val: fx(sc.R, 1) },
     { key: 'accuracy', v: sc.A, area: 'areaAccuracy', val: sc.sub + sc.del },
     { key: 'clarity', v: sc.Pclar, area: 'areaClarity', val: sc.near },
-    { key: 'pitch', v: sc.Ppitch, area: 'areaPitch', val: sc.Rst.toFixed(1) },
+    { key: 'pitch', v: sc.Ppitch, area: 'areaPitch', val: fx(sc.Rst, 1) },
     { key: 'semantic', v: sc.S, area: 'areaSemantic', val: sc.nSent - sc.cosOk }
   ];
-  return items.filter(x => x.v < (below == null ? 85 : below)).sort((a, b) => a.v - b.v).slice(0, limit)
+  return items.filter(x => x.v != null && x.v < (below == null ? 85 : below)).sort((a, b) => a.v - b.v).slice(0, limit)
     .map(x => ({ key: x.key, v: x.v, area: T('report.' + x.area), text: T('report.adv_' + x.key, { v: x.val }) }));
 }
 
 /* Progress (ADR-003): mean of the last 3 scored sessions minus the 3 before; needs >= 6. */
 function progressDelta(sessions) {
-  const sc = sessions.filter(s => s.sc.status === 'ok').sort((a, b) => a.ts - b.ts).map(s => s.sc.overall);
+  const sc = sessions.filter(s => s.sc.status === 'ok').sort((a, b) => a.ts - b.ts).map(s => s.sc.overall).filter(v => v != null);
   if (sc.length < ADR.minSessionsForDelta) return { d: null, n: sc.length };
   return { d: mean(sc.slice(-3)) - mean(sc.slice(-6, -3)), n: sc.length };
 }
@@ -2420,6 +2445,21 @@ function loginAs(u) {
   if (ALWAYS_ASK_BASELINE || !S.baseline) openBaselineGate();
 }
 
+/* POST the baseline recording to /api/baseline. cb({profile}) on success, cb({msg}) on any failure (nothing is saved on failure). */
+function postBaseline(rec, cb) {
+  const fd = new FormData();
+  fd.append('audio', rec.blob, 'baseline' + (EXT_BY_MIME[(rec.mime || '').split(';')[0]] || '.webm'));
+  const ctrl = new AbortController();
+  let timedOut = false;
+  const tm = setTimeout(() => { timedOut = true; ctrl.abort(); }, 60000);
+  fetch('/api/baseline', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
+    clearTimeout(tm);
+    if (res.ok && j && j.status === 'insufficient_audio') { cb({ msg: T('profile.errInsufficient') }); return; }
+    if (res.ok && j && j.status === 'ok') { const pr = EvaluateClient.pickBaselineProfile(j); cb(pr ? { profile: pr } : { msg: T('eval.errServer') }); return; }
+    if (res.status === 422 && j && j.error_code) { cb({ msg: EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer')) }); return; }
+    cb({ msg: T('eval.errServer') });
+  })).catch(() => { clearTimeout(tm); cb({ msg: T(timedOut ? 'eval.errTimeout' : 'eval.errNet') }); });
+}
 /* ---------- baseline window (opens after log in) ---------- */
 function openBaselineGate() {
   S.gate = { saved: false };
@@ -2444,16 +2484,26 @@ function renderGate(sec, msg) {
 }
 function onGateAgree() {
   if (S.grec) { S.grec.stop(false); return; }
+  if (S.gate && S.gate.busy) return;
   if (S.gate && S.gate.saved) { closeModal('mBaseline', false); focusHeading(); return; }
   requireConsent(() => {
     S.grec = startRecorder({
       lvl: $('#gLvl'), max: BASELINE_SECONDS, onTick: s => renderGate(s),
-      onEnd: sec => {
+      onEnd: (sec, auto, rec) => {
         S.grec = null;
-        const min = Math.min(1, BASELINE_SECONDS);   // 1 s accepted so the UI is quick to test
-        if (sec < min) { renderGate(0, T('profile.tooShort', { n: min })); return; }
-        S.baseline = { ts: Date.now() }; S.gate.saved = true; renderGate(sec); toast(T('profile.toastSaved'));
-      }
+        const min = BASELINE_MIN_SECONDS;
+        if (sec < min || !rec || !rec.blob) { renderGate(0, T('profile.tooShort', { n: min })); return; }
+        if (USE_SIM) { S.baseline = { ts: Date.now() }; S.gate.saved = true; renderGate(sec); toast(T('profile.toastSaved')); return; }
+        const g = S.gate, user = S.user;
+        g.busy = true; renderGate(0, T('profile.analysing'));
+        postBaseline(rec, r => {
+          if (S.gate !== g || S.user !== user) return;   // logged out meanwhile
+          g.busy = false;
+          if (!r.profile) { renderGate(0, r.msg); return; }   // gate stays locked, nothing saved
+          S.baseline = { ts: Date.now(), profile: r.profile }; g.saved = true; renderGate(sec); toast(T('profile.toastSaved'));
+        });
+      },
+      onError: code => { S.grec = null; renderGate(0, T('practice.mic' + code.charAt(0).toUpperCase() + code.slice(1))); }
     });
     renderGate(0);
   });
@@ -2461,7 +2511,9 @@ function onGateAgree() {
 function logout() {
   hideTip(); stopPlayback();
   [S.rec, S.brec, S.grec].forEach(r => { if (r) r.cancel(); });
-  S.rec = S.brec = S.grec = null; S.follow = null; S.gate = null; S.afterConsent = null; S.onDeny = null;
+  if (audioTestStop) { audioTestStop(); audioTestStop = null; }
+  S.sessions.forEach(revokeAudio); revokeAudio(S.cur);
+  S.rec = S.brec = S.grec = null; S.bbusy = null; S.follow = null; S.gate = null; S.afterConsent = null; S.onDeny = null;
   if (S.ev) { S.ev.timers.forEach(clearTimeout); S.ev = null; }
   S.modal.slice().forEach(id => closeModal(id, false));
   saveAccount();
@@ -2487,12 +2539,12 @@ function dayCounts() {
   while (i >= 0 && set.has(days[i].key)) { streak++; i--; }
   return { days, practised: set.size, streak };
 }
-const lineSpec = (ss, pick, o) => Object.assign({
+const lineSpec = (ss0, pick, o) => { const ss = ss0.filter(s => pick(s) != null); return Object.assign({   // null values are left out, not drawn as 0
   kind: 'line',
   pts: ss.map(s => ({ x: 0, y: pick(s), tip: fmtDay(s.ts) + ' · ' + (o.fmtTip || (v => v.toFixed(0)))(pick(s)) })),
   xTick: (p, i) => fmtDay(ss[i].ts),
   table: { head: [T('history.colDate'), o.col], rows: ss.map(s => [fmtDay(s.ts), (o.fmtTip || (v => v.toFixed(0)))(pick(s))]) }
-}, o);
+}, o); };
 RENDER.home = function () {
   const ss = scored(), n = S.user.name;
   $('#homeH').textContent = T(S.sessions.length ? 'home.welcome' : 'home.welcomeNew', { name: n });
@@ -2513,11 +2565,11 @@ RENDER.home = function () {
     nx = '<span class="pill info">' + esc(T('home.nextKicker')) + '</span><h2>' + esc(T('home.nextWeakT', { area: adv.area })) + '</h2><p>' + esc(adv.text) + '</p><div class="row" style="margin-top:16px"><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('home.nextWeakCta')) + '</button><button class="btn" type="button" data-go="script">' + esc(T('home.nextScriptCta')) + '</button></div>';
   }
   $('#nextStep').innerHTML = nx;
-  $('#latest').innerHTML = '<h3>' + esc(T('home.latestTitle')) + '</h3><div class="bigscore"><b class="num">' + Math.round(last.sc.overall) + '</b><span class="mute">' + esc(T('report.outOf')) + '</span></div><div style="margin-top:10px">' + deltaPill(pd) + '</div><p class="note" style="margin-top:10px">' + esc(fmtDayLong(last.ts) + ' · ' + last.title) + '</p><div class="row" style="margin-top:14px"><button class="btn" type="button" data-open="' + last.id + '">' + esc(T('home.openReport')) + '</button></div>';
+  $('#latest').innerHTML = '<h3>' + esc(T('home.latestTitle')) + '</h3><div class="bigscore"><b class="num">' + sh(last.sc.overall) + '</b><span class="mute">' + esc(T('report.outOf')) + '</span></div><div style="margin-top:10px">' + deltaPill(pd) + '</div><p class="note" style="margin-top:10px">' + esc(fmtDayLong(last.ts) + ' · ' + last.title) + '</p><div class="row" style="margin-top:14px"><button class="btn" type="button" data-open="' + last.id + '">' + esc(T('home.openReport')) + '</button></div>';
 
-  const ov = ss.map(s => s.sc.overall);
-  $('#capScore').textContent = T('home.capScore', { v: Math.round(last.sc.overall), lo: Math.round(Math.min.apply(null, ov)), hi: Math.round(Math.max.apply(null, ov)) });
-  chart('#chScore', lineSpec(ss, s => s.sc.overall, { aria: T('home.cScore'), col: T('history.colScore'), yMax: 100 }));
+  const sn = ss.filter(s => s.sc.overall != null), ov = sn.map(s => s.sc.overall);   // null overall is not 0: left out of min/max and the chart
+  $('#capScore').textContent = T('home.capScore', { v: sh(last.sc.overall), lo: sh(Math.min.apply(null, ov)), hi: sh(Math.max.apply(null, ov)) });
+  chart('#chScore', lineSpec(sn, s => s.sc.overall, { aria: T('home.cScore'), col: T('history.colScore'), yMax: 100 }));
   const dc = dayCounts();
   $('#capActivity').textContent = T('home.capActivity', { days: dc.practised, n: 14, streak: dc.streak === 0 ? T('home.streakNone') : dc.streak === 1 ? T('home.streakDay') : T('home.streakDays', { n: dc.streak }) });
   chart('#chActivity', {
@@ -2526,11 +2578,11 @@ RENDER.home = function () {
     xTick: (p, i) => fmtDay(dc.days[i].d),
     table: { head: [T('history.colDate'), T('chart.minutes')], rows: dc.days.map(x => [fmtDay(x.d), x.min.toFixed(1)]) }
   });
-  $('#capWpm').textContent = T('home.capWpm', { v: Math.round(last.sc.wpm) });
+  $('#capWpm').textContent = T('home.capWpm', { v: fx(last.sc.wpm, 0) });
   chart('#chWpm', lineSpec(ss, s => s.sc.wpm, { aria: T('home.cWpm'), col: T('report.unitWpm'), band: { lo: ADR.wpmLo, hi: ADR.wpmHi, label: ADR.wpmLo + '–' + ADR.wpmHi }, fmtTip: v => Math.round(v) + ' ' + T('report.unitWpm') }));
-  $('#capPitch').textContent = T('home.capPitch', { v: last.sc.Rst.toFixed(1) });
+  $('#capPitch').textContent = T('home.capPitch', { v: fx(last.sc.Rst, 1) });
   chart('#chPitch', lineSpec(ss, s => s.sc.Rst, { aria: T('home.cPitch'), col: T('report.unitSt'), yMin: 0, ref: { y: ADR.monotone, label: ADR.monotone + ' ' + T('report.unitSt') }, fmtY: v => v.toFixed(0), fmtTip: v => v.toFixed(1) + ' ' + T('report.unitSt') }));
-  $('#capClarity').textContent = T('home.capClarity', { v: Math.round(last.sc.Pclar) });
+  $('#capClarity').textContent = T('home.capClarity', { v: fx(last.sc.Pclar, 0) });
   chart('#chClarity', lineSpec(ss, s => s.sc.Pclar, { aria: T('home.cClarity'), col: T('history.colScore'), yMax: 100 }));
   renderHistory();
 };
@@ -2660,27 +2712,98 @@ function onChatAction(e) {
 }
 RENDER.script = function () { fillTopicSelect(); };
 
-/* ---------- recorder helper (SIM: no microphone is opened in this prototype) ---------- */
-function levelAnim(lvlEl) {
+/* ---------- recorder helper (real microphone: getUserMedia + MediaRecorder + AnalyserNode) ---------- */
+/* levelAnim(lvlEl, stream): level bars driven by the real mic level (RMS per slice of the waveform).
+   With no `stream` it opens the mic itself (Profile mic test) and closes its own tracks on stop. */
+function levelAnim(lvlEl, stream, onErr) {
   const bars = $$('i', lvlEl);
-  lvlEl.classList.add('live');
-  const iv = setInterval(() => bars.forEach((b, k) => { b.style.height = (4 + Math.random() * 30 * (0.4 + 0.6 * Math.sin((k + 1) / 13 * Math.PI))) + 'px'; }), 110);
-  return () => { clearInterval(iv); lvlEl.classList.remove('live'); bars.forEach(b => { b.style.height = ''; }); };
+  let ctx = null, iv = null, own = null, stopped = false;
+  const attach = st => {
+    if (stopped) { if (own) own.getTracks().forEach(t => t.stop()); return; }
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      ctx = new AC();
+      if (ctx.state === 'suspended') ctx.resume();
+      const an = ctx.createAnalyser(); an.fftSize = 1024;
+      ctx.createMediaStreamSource(st).connect(an);   // not connected to destination: no echo
+      const buf = new Uint8Array(an.fftSize), seg = Math.floor(buf.length / bars.length);
+      lvlEl.classList.add('live');
+      iv = setInterval(() => {
+        an.getByteTimeDomainData(buf);
+        bars.forEach((b, k) => {
+          let s = 0;
+          for (let i = k * seg; i < (k + 1) * seg; i++) { const d = (buf[i] - 128) / 128; s += d * d; }
+          const lv = Math.min(1, Math.sqrt(s / seg) * 5);
+          b.style.height = (4 + 34 * lv * (0.4 + 0.6 * Math.sin((k + 1) / (bars.length + 1) * Math.PI))) + 'px';
+        });
+      }, 70);
+    } catch (e) { /* no AudioContext: bars stay idle, recording itself is unaffected */ }
+  };
+  if (stream) attach(stream);
+  else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(st => { own = st; attach(st); }).catch(e => { if (!stopped && onErr) onErr(e); });
+  } else if (onErr) Promise.resolve().then(() => { if (!stopped) onErr({ name: 'unsupported' }); });
+  return () => {
+    stopped = true; clearInterval(iv);
+    if (own) own.getTracks().forEach(t => t.stop());
+    if (ctx && ctx.state !== 'closed') ctx.close().catch(() => { });
+    lvlEl.classList.remove('live'); bars.forEach(b => { b.style.height = ''; });
+  };
 }
+/* startRecorder(o) -> {stop, cancel} returned synchronously; the mic opens asynchronously.
+   o.onTick(sec) · o.onEnd(sec, auto, {blob, mime}) fires after the Blob is ready · o.onError('denied'|'nodevice'|'unsupported').
+   Baseline and practice recordings both go through this one function, so they share one capture chain (browser defaults,
+   no extra signal-processing constraints). */
 function startRecorder(o) {
-  const t0 = Date.now(), stopLvl = levelAnim(o.lvl);
+  const MIMES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
+  let stream = null, mr = null, t0 = 0, tickIv = null, stopLvl = null;
+  const chunks = [];
+  const release = () => {
+    clearInterval(tickIv);
+    if (stopLvl) { stopLvl(); stopLvl = null; }
+    if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  };
   const r = {
+    done: false,
     stop(auto) {
-      if (r.done) return; r.done = true;
-      clearInterval(r.iv); stopLvl();
-      o.onEnd(Math.round((Date.now() - t0) / 100) / 10, !!auto);
+      if (r.done) return; r.done = true; r.auto = !!auto;
+      if (mr && mr.state !== 'inactive') mr.stop();            // onstop -> release() + onEnd with the Blob
+      else { release(); o.onEnd(0, !!auto, { blob: null, mime: '' }); }   // stopped before the mic was ready
     },
     cancel() {                       // abort without calling onEnd (log out, leaving the page)
-      if (r.done) return; r.done = true;
-      clearInterval(r.iv); stopLvl();
+      if (r.done) return; r.done = true; r.cancelled = true;
+      if (mr && mr.state !== 'inactive') mr.stop(); else release();
     }
   };
-  r.iv = setInterval(() => { const s = (Date.now() - t0) / 1000; o.onTick(s); if (o.max && s >= o.max) r.stop(true); }, 200);
+  const fail = err => {
+    if (r.done) return; r.done = true; release();
+    const n = err && err.name;
+    const code = n === 'NotAllowedError' || n === 'SecurityError' ? 'denied' : n === 'unsupported' ? 'unsupported' : 'nodevice';
+    if (o.onError) o.onError(code, err);
+  };
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    Promise.resolve().then(() => fail({ name: 'unsupported' }));   // async so the caller has stored the handle first
+    return r;
+  }
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(st => {
+    if (r.done) { st.getTracks().forEach(t => t.stop()); return; }   // stop/cancel arrived before the mic was ready
+    stream = st;
+    try {
+      const mime = MIMES.find(m => MediaRecorder.isTypeSupported(m));
+      const opt = { audioBitsPerSecond: 32000 }; if (mime) opt.mimeType = mime;
+      mr = new MediaRecorder(st, opt);
+      mr.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      mr.onstop = () => {
+        release();
+        if (r.cancelled) return;
+        const type = mr.mimeType || mime || '';
+        o.onEnd(Math.round((Date.now() - t0) / 100) / 10, !!r.auto, { blob: new Blob(chunks, { type }), mime: type });
+      };
+      stopLvl = levelAnim(o.lvl, st);
+      t0 = Date.now(); mr.start();
+      tickIv = setInterval(() => { const s = (Date.now() - t0) / 1000; o.onTick(s); if (o.max && s >= o.max) r.stop(true); }, 200);
+    } catch (e) { fail({ name: 'unsupported' }); }
+  }).catch(fail);
   return r;
 }
 function requireConsent(cb) {
@@ -2805,7 +2928,15 @@ function toggleRecording() {
     S.follow = txt ? { segs: buildFollow(txt.text), idx: -2 } : null;
     S.rec = startRecorder({
       lvl: $('#recLvl'), onTick: s => { $('#recTimer').textContent = fmtClock(s); followTick(s); },
-      onEnd: sec => { S.rec = null; S.follow = null; S.audio = { kind: 'rec', dur: sec }; renderPractice(); }
+      onEnd: (sec, auto, rec) => {
+        S.rec = null; S.follow = null;
+        if (rec && rec.blob) S.audio = { kind: 'rec', dur: sec, blob: rec.blob, mime: rec.mime };
+        renderPractice();
+      },
+      onError: code => {
+        S.rec = null; S.follow = null; S.voiceTab = 'up'; renderPractice();
+        showErr($('#upErr'), T('practice.mic' + code.charAt(0).toUpperCase() + code.slice(1)));
+      }
     });
     renderPractice();
     $('#sheet').scrollTop = 0;
@@ -2816,13 +2947,14 @@ function onAudioFile(e) {
   e.target.value = '';
   if (!f) return;
   if (!(f.type || '').startsWith('audio/') && !/\.(mp3|wav|webm|m4a)$/i.test(f.name)) { showErr(err, T('practice.errAudio')); return; }
-  clearErr(err); S.audio = { kind: 'file', name: f.name, dur: null }; S.stepBack = false; renderPractice();
+  clearErr(err); S.audio = { kind: 'file', name: f.name, dur: null, file: f, mime: f.type || '' }; S.stepBack = false; renderPractice();
 }
 
 /* ---- evaluation (SIM). Real app: POST audio -> FastAPI -> STT fallback router -> VAD/Parselmouth -> score() ---- */
 function runEval() {
   const scn = $('#demoScenario').value, txt = S.texts[S.src];
   if (!txt || !S.audio) return;
+  if (!USE_SIM) { runEvalReal(txt); return; }
   S.ev = { timers: [] };
   const later = (fn, ms) => { S.ev.timers.push(setTimeout(fn, ms)); };
   const steps = [];
@@ -2839,6 +2971,7 @@ function runEval() {
   run(0);
 }
 function cancelEval() {
+  if (S.ev && S.ev.ctrl) S.ev.ctrl.abort();   // user cancel: S.ev is cleared below, so the fetch catch stays silent
   if (S.ev) { S.ev.timers.forEach(clearTimeout); S.ev = null; }
   closeModal('mOverlay');
 }
@@ -2858,14 +2991,52 @@ function finishEval(scn, txt) {
   toast(T('eval.saved'));
 }
 
+/* ---- real evaluation: POST /api/evaluate (USE_SIM = false). S.audio is kept until a scored result is saved, so Retry re-sends the same audio. ---- */
+const EXT_BY_MIME = { 'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a' };
+const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', no_audio_stream: 'errNoStream', unsupported_format: 'errFormat', corrupt: 'errCorrupt', invalid_baseline: 'errBaseline' };
+function showEvalError(msg) { $('#meMsg').textContent = msg; openModal('mError', { focus: '#meRetry' }); }
+function runEvalReal(txt) {
+  const au = S.audio, blob = au.blob || au.file;
+  if (!blob) return;
+  const fname = au.kind === 'file' ? au.name : 'recording' + (EXT_BY_MIME[(au.mime || '').split(';')[0]] || '.webm');
+  const fd = new FormData();
+  fd.append('audio', blob, fname); fd.append('script', txt.text);
+  const bp = S.baseline && S.baseline.profile;   // demo accounts have S.baseline = {ts} with no profile -> nothing sent -> backend flags no_baseline
+  if (bp) fd.append('baseline_profile', JSON.stringify({ median_pause_s: bp.median_pause_s, hesitation_threshold_s: bp.hesitation_threshold_s, median_f0_hz: bp.median_f0_hz, mean_loudness_db: bp.mean_loudness_db, flags: bp.flags }));
+  const ctrl = new AbortController(), ev = S.ev = { timers: [], ctrl, timedOut: false };
+  ev.timers.push(setTimeout(() => { ev.timedOut = true; ctrl.abort(); }, 120000));
+  $('#ovStep').textContent = T('eval.step1'); $('#ovText').textContent = T('eval.step1Text');
+  openModal('mOverlay', { lock: true, focus: '#ovCancel' });
+  const end = () => { ev.timers.forEach(clearTimeout); S.ev = null; closeModal('mOverlay', false); };
+  fetch('/api/evaluate', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
+    if (S.ev !== ev) return;                       // cancelled by the user meanwhile
+    end();
+    if (res.ok && j && j.status) { finishEvalReal(j, txt); return; }
+    if (res.status === 422 && j && j.error_code) { showEvalError(EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer'))); return; }
+    showEvalError(T('eval.errServer'));
+  })).catch(() => {
+    if (S.ev !== ev) return;                       // user cancel -> no error
+    end(); showEvalError(T(ev.timedOut ? 'eval.errTimeout' : 'eval.errNet'));
+  });
+}
+function finishEvalReal(j, txt) {
+  const m = EvaluateClient.mapResult(j, txt.text), base = { ts: Date.now(), title: txt.short, topicKey: txt.topic, an: m.an, sc: m.sc, dur: m.an.dur, accent: S.profile ? S.profile.accent : null, demo: false, raw: j };
+  if (m.sc.status !== 'ok') { S.audio = null; S.cur = Object.assign({ id: S.nextId++ }, base); go('report'); return; }   // insufficient_audio: shown, never saved
+  const ses = Object.assign({ id: S.nextId++, audioUrl: URL.createObjectURL(S.audio.blob || S.audio.file) }, base);
+  S.audio = null; S.sessions.push(ses); S.cur = ses;
+  go('report');
+  toast(T('eval.saved'));
+}
+
 /* ---------- Report ---------- */
 const FILLERS = ['um', 'uh', 'er'];
+const fillerOf = w => w.fillerText || FILLERS[w.i % 3];
 function wordHtml(w) {
   const cls = { wrong: 'w-wrong', near: 'w-near', missing: 'w-missing' }[w.status];
   let h = cls
     ? '<button type="button" class="w ' + cls + '" data-i="' + w.i + '" aria-label="' + esc(plain(w.raw) + ', ' + T({ wrong: 'tip.wrongT', near: 'tip.nearT', missing: 'tip.missT' }[w.status])) + '">' + esc(w.raw) + '</button>'
     : '<span class="w" data-i="' + w.i + '">' + esc(w.raw) + '</span>';
-  if (w.fillerAfter) h += ' <span class="fillerchip" data-wi="' + w.i + '" data-k="filler">' + FILLERS[w.i % 3] + '</span>';
+  if (w.fillerAfter) h += ' <span class="fillerchip" data-wi="' + w.i + '" data-k="filler">' + fillerOf(w) + '</span>';
   if (w.pauseAfter && w.pauseAfter.kind !== 'natural') {
     const forgot = w.pauseAfter.kind === 'forgot', d = w.pauseAfter.dur.toFixed(1);
     h += ' <span class="pausechip ' + (forgot ? 'bad' : 'warn') + '" data-wi="' + w.i + '" data-k="pause" role="img" aria-label="' + esc(T(forgot ? 'report.pauseForgot' : 'report.pauseHes')) + ', ' + d + ' s">' + d + ' s</span>';
@@ -2882,7 +3053,7 @@ function buildTranscript(an) {
 /* ---- hover notes: what went wrong at this exact spot (replaces the old legend + caption under the transcript) ---- */
 function tipWord(w) {
   const L = ['• ' + T({ wrong: 'tip.wrong', near: 'tip.near', missing: 'tip.missing' }[w.status])];
-  if (w.fillerAfter) L.push('• ' + T('tip.fillerAfter', { f: FILLERS[w.i % 3] }));
+  if (w.fillerAfter) L.push('• ' + T('tip.fillerAfter', { f: fillerOf(w) }));
   if (w.pauseAfter && w.pauseAfter.kind !== 'natural') L.push('• ' + T(w.pauseAfter.kind === 'forgot' ? 'tip.forgotAfter' : 'tip.hesAfter', { d: w.pauseAfter.dur.toFixed(1) }));
   return '“' + plain(w.raw) + '”\n' + L.join('\n');
 }
@@ -2892,7 +3063,7 @@ function tipFor(el) {
   if (k) {
     const w = an.words[+el.getAttribute('data-wi')]; if (!w) return null;
     const head = T('tip.after', { w: plain(w.raw) });
-    return k === 'filler' ? head + '\n• ' + T('tip.filler', { f: FILLERS[w.i % 3] })
+    return k === 'filler' ? head + '\n• ' + T('tip.filler', { f: fillerOf(w) })
       : head + '\n• ' + T(w.pauseAfter.kind === 'forgot' ? 'tip.forgot' : 'tip.hes', { d: w.pauseAfter.dur.toFixed(1) });
   }
   const w = an.words[+el.getAttribute('data-i')];
@@ -2917,29 +3088,30 @@ function partsHtml(sc) {
     ['P', 'pP', 'wP', sc.P, T('report.dP')],
     ['S', 'pS', 'wS', sc.S, T('report.dS', { n: sc.cosOk, total: sc.nSent })]
   ];
-  return '<ul class="parts">' + rows.map(r => '<li><button type="button" class="partbtn" data-part="' + r[0] + '" aria-haspopup="dialog"><div class="top"><span>' + esc(T('report.' + r[1])) + ' <small>' + esc(T('report.' + r[2])) + '</small></span><span>' + (Number.isFinite(r[3]) ? Math.round(r[3]) : esc(T('common.na'))) + '</span></div><div class="bar" aria-hidden="true"><i style="width:' + (Number.isFinite(r[3]) ? Math.round(r[3]) : 0) + '%"></i></div><small>' + esc(r[4]) + '</small><span class="more">' + esc(T('part.view')) + IC.chev + '</span></button></li>').join('') + '</ul>';
+  return '<ul class="parts">' + rows.map(r => '<li><button type="button" class="partbtn" data-part="' + r[0] + '" aria-haspopup="dialog"><div class="top"><span>' + esc(T('report.' + r[1])) + ' <small>' + esc(T('report.' + r[2])) + '</small></span><span>' + esc(sh(r[3])) + '</span></div><div class="bar" aria-hidden="true"><i style="width:' + (Number.isFinite(r[3]) ? Math.round(r[3]) : 0) + '%"></i></div><small>' + esc(r[4]) + '</small><span class="more">' + esc(T('part.view')) + IC.chev + '</span></button></li>').join('') + '</ul>';
 }
 const overallLabel = v => (v >= 85 ? 'good' : v >= 70 ? 'fair' : v >= 50 ? 'improve' : 'more');
 function overviewHtml(s) {
   const sc = s.sc;
   const parts = [['pA', sc.A], ['pF', sc.F], ['pP', sc.P], ['pS', sc.S]].map(p => ({ name: T('report.' + p[0]), v: p[1] }));
-  const hi = parts.reduce((m, p) => (p.v > m.v ? p : m)), lo = parts.reduce((m, p) => (p.v < m.v ? p : m));
+  const vp = parts.filter(p => Number.isFinite(p.v));
+  const hi = vp.length ? vp.reduce((m, p) => (p.v > m.v ? p : m)) : null, lo = vp.length ? vp.reduce((m, p) => (p.v < m.v ? p : m)) : null;
   const adv = adviceList(sc, 1)[0];
-  const verdict = sc.overall != null ? T('overview.verdict_' + overallLabel(sc.overall)) : T('overview.na');
+  const verdict = sc.overall != null ? T('overview.verdict_' + overallLabel(EvaluateClient.displayRound(sc.overall))) : T('overview.na');
   const rows = [];
-  if (lo.v >= 85) rows.push(['good', T('overview.strongest'), T('overview.allGood')]);
+  if (!lo) { /* no part could be scored */ } else if (lo.v >= 85) rows.push(['good', T('overview.strongest'), T('overview.allGood')]);
   else {
     rows.push(['good', T('overview.strongest'), '<b>' + esc(hi.name) + '</b>']);
     rows.push(['warn', T('overview.improve'), '<b>' + esc(lo.name) + '</b>']);
   }
   rows.push(['focus', T('overview.focus'), adv ? '<b>' + esc(adv.area.charAt(0).toUpperCase() + adv.area.slice(1)) + '.</b> ' + esc(adv.text) : esc(T('part.nothing'))]);
-  const ok = v => (v >= 85 ? '' : ' warn');
+  const ok = v => (v == null || v >= 85 ? '' : ' warn');
   const tiles = [
-    [Math.round(sc.wpm) + '<small>' + esc(T('report.unitWpm')) + '</small>', T('overview.gPace'), sc.Fwpm],
-    [sc.H.toFixed(1), T('overview.gHes'), sc.Fpause],
-    [sc.R.toFixed(1) + '<small>%</small>', T('overview.gFiller'), sc.Ffiller],
-    [esc(T('overview.gWords', { n: sc.sub + sc.del, total: sc.N })), T('overview.gWrong'), sc.A],
-    [sc.Rst.toFixed(1) + '<small>' + esc(T('report.unitSt')) + '</small>', T('overview.gPitch'), sc.Ppitch]
+    [sc.wpm == null ? esc(T('common.na')) : Math.round(sc.wpm) + '<small>' + esc(T('report.unitWpm')) + '</small>', T('overview.gPace'), sc.Fwpm],
+    [esc(fx(sc.H, 1)), T('overview.gHes'), sc.Fpause],
+    [sc.R == null ? esc(T('common.na')) : fx(sc.R, 1) + '<small>%</small>', T('overview.gFiller'), sc.Ffiller],
+    [sc.sub == null || sc.del == null ? esc(T('common.na')) : esc(T('overview.gWords', { n: sc.sub + sc.del, total: sc.N })), T('overview.gWrong'), sc.A],
+    [sc.Rst == null ? esc(T('common.na')) : fx(sc.Rst, 1) + '<small>' + esc(T('report.unitSt')) + '</small>', T('overview.gPitch'), sc.Ppitch]
   ];
   return '<h2>' + esc(T('overview.title')) + '</h2>' +
     '<p class="ov-verdict">' + esc(verdict) + '</p>' +
@@ -2956,18 +3128,19 @@ RENDER.report = function () {
   $('#repState').hidden = !bad; $('#repMain').hidden = bad;
   hideTip();
   if (bad) {
-    $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(T('report.stInsD', { p: Math.round(sc.voicedRatio * 100) })) + '</p><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
+    $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(sc.reason === 'empty_transcript' ? T('eval.insEmpty') : T('report.stInsD', { p: Math.round((sc.voicedRatio || 0) * 100) })) + '</p><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
     return;
   }
   $('#repOverview').innerHTML = overviewHtml(s);
   $('#tx').innerHTML = buildTranscript(an);
   S.play = { t: 0, on: false, iv: null };
+  bindPlayerAudio(s);
   const pd = progressDelta(S.sessions.filter(x => x.ts <= s.ts));
   $('#repScoreCard').innerHTML = '<h3>' + esc(T('report.overall')) + '</h3>' +
-    (sc.overall != null ? '<div class="hero-score" style="margin-top:8px"><b class="num">' + Math.round(sc.overall) + '</b><span>' + esc(T('report.outOf')) + '</span></div>' : '<div class="hero-score" style="margin-top:8px"><b>' + esc(T('common.na')) + '</b></div>') +
+    (sc.overall != null ? '<div class="hero-score" style="margin-top:8px"><b class="num">' + sh(sc.overall) + '</b><span>' + esc(T('report.outOf')) + '</span></div>' : '<div class="hero-score" style="margin-top:8px"><b>' + esc(T('common.na')) + '</b></div>') +
     '<div style="margin-top:10px">' + (pd.d == null ? '<p class="note">' + esc(T('report.deltaNeed', { n: pd.n })) + '</p>' : deltaPill(pd, false)) + '</div>' +
     '<h3 style="margin-top:20px">' + esc(T('report.parts')) + '</h3>' + partsHtml(sc) +
-    (S.baseline ? '' : '<p class="note" style="margin-top:12px">' + esc(T('report.noBaseline')) + '</p>');
+    (hasBase(sc) ? '' : '<p class="note" style="margin-top:12px">' + esc(T('report.noBaseline')) + '</p>');
   drawVolume(s);
   updatePlayer();
 };
@@ -3000,25 +3173,25 @@ function partA(s) {
     secHtml(T('part.measured'), statRows([T('part.colMeasure'), T('part.colNote'), T('part.colCount')], [
       [T('part.A_total'), T('part.A_totalH'), sc.N], [T('part.A_wrong'), T('part.A_wrongH'), sc.sub],
       [T('part.A_miss'), T('part.A_missH'), sc.del], [T('part.A_near'), T('part.A_nearH'), sc.near]
-    ]) + '<p class="note" style="margin-top:8px">' + esc(T('part.A_formula', { bad, total: sc.N, a: Math.round(sc.A) })) + '</p>') +
+    ]) + '<p class="note" style="margin-top:8px">' + esc(T('part.A_formula', { bad, total: sc.N, a: sh(sc.A) })) + '</p>') +
     (rev.length ? secHtml(T('part.review'), '<p class="note" style="margin-bottom:8px">' + esc(T('part.reviewHint')) + '</p>' + wordChips(rev, 16)) : '') +
     secHtml(T('part.suggest'), tipsHtml(tips));
 }
 function partF(s) {
   const sc = s.sc, an = s.an, areas = [], tips = [];
-  if (sc.Fwpm < 85) areas.push(T('report.areaWpm'));
-  if (sc.Fpause < 85) areas.push(T('report.areaPause'));
-  if (sc.Ffiller < 85) areas.push(T('report.areaFiller'));
-  if (sc.Fwpm < 85) tips.push(T(sc.wpm < ADR.wpmLo ? 'part.F_tipSlow' : 'part.F_tipFast', { v: Math.round(sc.wpm) }));
-  if (sc.Fpause < 85) tips.push(T('part.F_tipPause', { v: sc.H.toFixed(1) }));
-  if (sc.Ffiller < 85) tips.push(T('part.F_tipFiller', { v: sc.R.toFixed(1) }));
+  if (sc.Fwpm != null && sc.Fwpm < 85) areas.push(T('report.areaWpm'));
+  if (sc.Fpause != null && sc.Fpause < 85) areas.push(T('report.areaPause'));
+  if (sc.Ffiller != null && sc.Ffiller < 85) areas.push(T('report.areaFiller'));
+  if (sc.Fwpm != null && sc.Fwpm < 85) tips.push(T(sc.wpm < ADR.wpmLo ? 'part.F_tipSlow' : 'part.F_tipFast', { v: Math.round(sc.wpm) }));
+  if (sc.Fpause != null && sc.Fpause < 85) tips.push(T('part.F_tipPause', { v: fx(sc.H, 1) }));
+  if (sc.Ffiller != null && sc.Ffiller < 85) tips.push(T('part.F_tipFiller', { v: fx(sc.R, 1) }));
   const win = paceWindows(an), inBand = win.filter(w => w.wpm >= ADR.wpmLo && w.wpm <= ADR.wpmHi).length;
   const longest = an.pauses.reduce((m, p) => (!m || p.dur > m.dur ? p : m), null), hes = an.pauses.filter(p => p.kind !== 'natural').length;
   return secHtml(T('part.assess'), '<p>' + esc(T('part.F_' + bandOf(sc.F)) + (areas.length ? ' ' + T('part.F_watch', { areas: areas.join(', ') }) : '')) + '</p>') +
     secHtml(T('part.measured'), statRows([T('part.colMeasure'), T('part.colResult'), T('part.colTarget'), T('part.colScore')], [
-      [T('part.F_pace'), Math.round(sc.wpm) + ' ' + T('report.unitWpm'), T('part.F_paceT'), Math.round(sc.Fwpm)],
-      [T('part.F_pause'), sc.H.toFixed(1) + ' / min', T('part.F_pauseT'), Math.round(sc.Fpause)],
-      [T('part.F_filler'), sc.R.toFixed(1) + '%', T('part.F_fillerT'), Math.round(sc.Ffiller)]
+      [T('part.F_pace'), (sc.wpm == null ? T('common.na') : Math.round(sc.wpm)) + ' ' + T('report.unitWpm'), T('part.F_paceT'), sh(sc.Fwpm)],
+      [T('part.F_pause'), fx(sc.H, 1) + ' / min', T('part.F_pauseT'), sh(sc.Fpause)],
+      [T('part.F_filler'), fx(sc.R, 1) + '%', T('part.F_fillerT'), sh(sc.Ffiller)]
     ]) + '<p class="note" style="margin-top:8px">' + esc(T('part.F_avg')) + '</p>') +
     chartBox(T('report.cPace'), 'capPace', 'chPace', T('part.F_paceRead', { n: inBand, total: win.length })) +
     chartBox(T('report.cPause'), 'capPause', 'chPause', longest ? T('part.F_pauseRead', { d: longest.dur.toFixed(1), t: fmtTime(longest.start), h: hes, n: an.pauses.length }) : '') +
@@ -3026,17 +3199,17 @@ function partF(s) {
 }
 function partP(s) {
   const sc = s.sc, an = s.an, near = an.words.filter(w => w.status === 'near'), areas = [], tips = [];
-  if (sc.Pclar < 85) areas.push(T('report.areaClarity'));
-  if (sc.Ppitch < 85) areas.push(T('report.areaPitch'));
+  if (sc.Pclar != null && sc.Pclar < 85) areas.push(T('report.areaClarity'));
+  if (sc.Ppitch != null && sc.Ppitch < 85) areas.push(T('report.areaPitch'));
   if (near.length) tips.push(T('part.P_tipNear', { n: near.length }));
-  if (sc.Rst < ADR.monotone) tips.push(T('part.P_tipMono', { v: sc.Rst.toFixed(1) }));
-  else if (sc.Ppitch < 85) tips.push(T('part.P_tipRange', { v: sc.Rst.toFixed(1) }));
+  if (sc.Rst != null && sc.Rst < ADR.monotone) tips.push(T('part.P_tipMono', { v: fx(sc.Rst, 1) }));
+  else if (sc.Ppitch != null && sc.Ppitch < 85) tips.push(T('part.P_tipRange', { v: fx(sc.Rst, 1) }));
   return secHtml(T('part.assess'), '<p>' + esc(T('part.P_' + bandOf(sc.P)) + (areas.length ? ' ' + T('part.P_watch', { areas: areas.join(', ') }) : '')) + '</p>' +
       '<div class="callout">' + esc(T('report.lgNote')) + '</div>') +
     secHtml(T('part.measured'), statRows([T('part.colMeasure'), T('part.colResult'), T('part.colTarget'), T('part.colScore')], [
-      [T('part.P_clar'), sc.near + ' / ' + sc.N, T('part.P_clarT'), Math.round(sc.Pclar)],
-      [T('part.P_pitch'), sc.Rst.toFixed(1) + ' ' + T('report.unitSt'), T('part.P_pitchT'), Math.round(sc.Ppitch)]
-    ]) + '<p class="note" style="margin-top:8px">' + esc(T('part.P_avg')) + '</p>' + (S.baseline ? '' : '<p class="note" style="margin-top:6px">' + esc(T('report.noBaseline')) + '</p>')) +
+      [T('part.P_clar'), sc.near == null || sc.N == null ? T('common.na') : sc.near + ' / ' + sc.N, T('part.P_clarT'), sh(sc.Pclar)],
+      [T('part.P_pitch'), fx(sc.Rst, 1) + ' ' + T('report.unitSt'), T('part.P_pitchT'), sh(sc.Ppitch)]
+    ]) + '<p class="note" style="margin-top:8px">' + esc(T('part.P_avg')) + '</p>' + (hasBase(sc) ? '' : '<p class="note" style="margin-top:6px">' + esc(T('report.noBaseline')) + '</p>')) +
     chartBox(T('report.cPitch'), 'capRepPitch', 'chRepPitch', '') +
     (near.length ? secHtml(T('part.review'), '<p class="note" style="margin-bottom:8px">' + esc(T('part.reviewHint')) + '</p>' + wordChips(near, 16)) : '') +
     secHtml(T('part.suggest'), tipsHtml(tips));
@@ -3049,7 +3222,7 @@ function partS(s) {
       [T('part.S_ok'), T('part.S_okT'), sc.cosOk + ' / ' + sc.nSent]
     ])) +
     secHtml(T('part.S_listTitle'), '<p class="note" style="margin-bottom:8px">' + esc(T('part.S_listHint')) + '</p><ul class="sentlist">' +
-      an.sentences.map((t, i) => { const ok = an.cos[i] >= ADR.cosine; return '<li><span class="pill ' + (ok ? 'ok' : 'bad') + '">' + an.cos[i].toFixed(2) + '</span><span>' + esc(t) + '</span></li>'; }).join('') + '</ul>') +
+      an.sentences.map((t, i) => { const ok = an.cos[i] != null && an.cos[i] >= ADR.cosine; return '<li><span class="pill ' + (ok ? 'ok' : 'bad') + '">' + fx(an.cos[i], 2) + '</span><span>' + esc(t) + '</span></li>'; }).join('') + '</ul>') +
     secHtml(T('part.suggest'), tipsHtml(tips));
 }
 const PART_BODY = { A: partA, F: partF, P: partP, S: partS };
@@ -3058,14 +3231,14 @@ function openPart(key) {
   const s = S.cur;
   if (!s || s.sc.status !== 'ok' || !PART_BODY[key]) return;
   hideTip();
-  const v = s.sc[key], b = bandOf(v);
+  const v = s.sc[key], b = bandOf(v);   // v null: part not scored -> N/A pill, no body, no charts
   $('#mpartTitle').textContent = T('report.' + PART_KEYS[key]);
-  const pill = $('#mpartPill'); pill.className = 'pill ' + BAND_PILL[b]; pill.textContent = Math.round(v) + ' / 100 · ' + T('part.band_' + b);
+  const pill = $('#mpartPill'); pill.className = 'pill ' + (v == null ? 'warn' : BAND_PILL[b]); pill.textContent = v == null ? T('common.na') : sh(v) + ' / 100 · ' + T('part.band_' + b);
   $('#mpartSub').textContent = T('part.weight', { w: T('report.w' + key) });
-  $('#mpartBody').innerHTML = PART_BODY[key](s);
+  $('#mpartBody').innerHTML = v == null ? '<p class="note">' + esc(T('eval.naPart')) + '</p>' : PART_BODY[key](s);
   openModal('mPart', { focus: '.box' });
   $('#mPart .box').scrollTop = 0;
-  if (PART_CHARTS[key]) PART_CHARTS[key](s);          // draw after the window is visible, so the charts get their width
+  if (v != null && PART_CHARTS[key]) PART_CHARTS[key](s);          // draw after the window is visible, so the charts get their width
 }
 function seekWord(i) {
   const words = S.cur.an.words, w = words[i];
@@ -3097,8 +3270,9 @@ function drawPause(s) {
   });
 }
 function drawPitch(s) {
-  const an = s.an, sc = s.sc, sp = an.words.filter(w => w.status !== 'missing');
-  $('#capRepPitch').textContent = T('report.capPitch', { r: sc.Rst.toFixed(1) });
+  const an = s.an, sc = s.sc, sp = an.words.filter(w => w.start != null && w.f0 != null);
+  $('#capRepPitch').textContent = T('report.capPitch', { r: fx(sc.Rst, 1) });
+  if (!sp.length) { $('#capRepPitch').textContent = T('eval.noPitch'); $('#chRepPitch').innerHTML = ''; $('#chRepPitch')._spec = null; return; }
   chart('#chRepPitch', {
     kind: 'line', xNum: true, xMin: 0, xMax: an.dur, aria: T('report.cPitch'), endLabel: false, ref: { y: 0 }, fmtY: v => v.toFixed(0),
     pts: sp.map(w => ({ x: w.start, y: w.f0, tip: fmtTime(w.start) + ' · ' + w.f0.toFixed(1) + ' ' + T('report.unitSt') })),
@@ -3107,7 +3281,8 @@ function drawPitch(s) {
   });
 }
 function drawVolume(s) {
-  const an = s.an, sp = an.words.filter(w => w.status !== 'missing');
+  const an = s.an, sp = an.words.filter(w => w.start != null && w.vol != null);
+  if (!sp.length) { $('#volRead').textContent = T('eval.noVol'); $('#chVol').innerHTML = ''; $('#chVol')._spec = null; return; }
   const hiW = sp.reduce((m, w) => (w.vol > m.vol ? w : m)), loW = sp.reduce((m, w) => (w.vol < m.vol ? w : m));
   $('#volRead').textContent = T('report.volRead', { tHi: fmtTime(hiW.start), hi: hiW.vol.toFixed(0), tLo: fmtTime(loW.start), lo: loW.vol.toFixed(0), r: (hiW.vol - loW.vol).toFixed(0) });
   chart('#chVol', {
@@ -3117,8 +3292,30 @@ function drawVolume(s) {
     table: { head: [T('chart.time'), T('report.unitDb')], rows: sp.map(w => [fmtTime(w.start), w.vol.toFixed(0)]) }
   });
 }
-/* simulated playback (no real audio in the prototype) */
-function stopPlayback() { if (S.play.iv) clearInterval(S.play.iv); S.play.iv = null; S.play.on = false; if ($('#playBtn')) updatePlayer(); }
+/* playback: real <audio> when the session has audioUrl (evaluated recording), otherwise the old simulated clock (sample sessions) */
+let PA = null;
+const hasAudio = () => !!(PA && S.cur && S.cur.audioUrl && PA._url === S.cur.audioUrl);
+function bindPlayerAudio(s) {
+  if (!PA) {
+    PA = new Audio(); PA.preload = 'auto';
+    PA.addEventListener('loadedmetadata', () => { if (!Number.isFinite(PA.duration)) { PA._fix = true; PA.currentTime = 1e101; } });   // MediaRecorder webm has no duration: force the browser to scan to the end (UNTESTED trick)
+    PA.addEventListener('timeupdate', () => {
+      if (PA._fix) { PA._fix = false; PA.currentTime = 0; return; }
+      if (hasAudio()) { S.play.t = PA.currentTime; updatePlayer(); }
+    });
+    PA.addEventListener('ended', () => { S.play.on = false; if (hasAudio()) { S.play.t = S.cur.an.dur; updatePlayer(); } });
+    PA.addEventListener('pause', () => { if (hasAudio()) { S.play.on = false; updatePlayer(); } });
+  }
+  PA.pause(); PA._fix = false;
+  if (s && s.audioUrl) { if (PA._url !== s.audioUrl) { PA._url = s.audioUrl; PA.src = s.audioUrl; } }
+  else if (PA._url) { PA._url = null; PA.removeAttribute('src'); PA.load(); }
+}
+function revokeAudio(s) {
+  if (!s || !s.audioUrl) return;
+  if (PA && PA._url === s.audioUrl) { PA.pause(); PA._url = null; PA.removeAttribute('src'); PA.load(); }
+  URL.revokeObjectURL(s.audioUrl); s.audioUrl = null;
+}
+function stopPlayback() { if (S.play.iv) clearInterval(S.play.iv); S.play.iv = null; S.play.on = false; if (PA && !PA.paused) PA.pause(); if ($('#playBtn')) updatePlayer(); }
 function updatePlayer() {
   const s = S.cur; if (!s || !s.an) return;
   const dur = s.an.dur, t = Math.min(S.play.t, dur);
@@ -3133,6 +3330,10 @@ function updatePlayer() {
 }
 function startPlayback() {
   const s = S.cur; if (!s) return;
+  if (hasAudio()) {
+    if (S.play.t >= s.an.dur - 0.05) { S.play.t = 0; PA.currentTime = 0; }
+    S.play.on = true; PA.play().catch(() => { S.play.on = false; updatePlayer(); }); updatePlayer(); return;
+  }
   if (S.play.t >= s.an.dur) S.play.t = 0;
   S.play.on = true;
   S.play.iv = setInterval(() => {
@@ -3142,7 +3343,7 @@ function startPlayback() {
   }, 100);
   updatePlayer();
 }
-function seekTo(t, play) { stopPlayback(); S.play.t = Math.max(0, t); if (play) startPlayback(); else updatePlayer(); }
+function seekTo(t, play) { stopPlayback(); S.play.t = Math.max(0, t); if (hasAudio()) PA.currentTime = S.play.t; if (play) startPlayback(); else updatePlayer(); }
 function onTxClick(e) {
   const tb = e.target.closest('.tx-time'), wb = e.target.closest('.w[data-i]');
   if (tb) { seekTo(parseFloat(tb.getAttribute('data-t0')), true); return; }
@@ -3154,7 +3355,7 @@ function renderHistory() {
   const ss = scored();
   $('#histBody').innerHTML = ss.slice().reverse().map(s => {
     const lab = fmtDay(s.ts) + ', ' + s.title;
-    return '<tr><td>' + esc(fmtDayLong(s.ts)) + '</td><td>' + esc(s.title) + '</td><td class="num">' + fmtTime(s.dur) + '</td><td class="num">' + (s.sc.overall != null ? Math.round(s.sc.overall) : esc(T('common.na'))) + '</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn btn-ghost btn-sm" type="button" data-open="' + s.id + '" aria-label="' + esc(T('history.open') + ': ' + lab) + '">' + esc(T('history.open')) + '</button><button class="btn btn-danger-ghost btn-sm" type="button" data-del="' + s.id + '" aria-label="' + esc(T('history.delete') + ': ' + lab) + '">' + esc(T('history.delete')) + '</button></div></td></tr>';
+    return '<tr><td>' + esc(fmtDayLong(s.ts)) + '</td><td>' + esc(s.title) + '</td><td class="num">' + fmtTime(s.dur) + '</td><td class="num">' + esc(sh(s.sc.overall)) + '</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn btn-ghost btn-sm" type="button" data-open="' + s.id + '" aria-label="' + esc(T('history.open') + ': ' + lab) + '">' + esc(T('history.open')) + '</button><button class="btn btn-danger-ghost btn-sm" type="button" data-del="' + s.id + '" aria-label="' + esc(T('history.delete') + ': ' + lab) + '">' + esc(T('history.delete')) + '</button></div></td></tr>';
   }).join('');
 }
 function openReport(id) { const s = S.sessions.find(x => x.id === id); if (s) { S.cur = s; go('report'); } }
@@ -3184,15 +3385,25 @@ function renderBaseline(sec, msg) {
 }
 function toggleBaseline() {
   if (S.brec) { S.brec.stop(false); return; }
+  if (S.bbusy) return;
   requireConsent(() => {
     S.brec = startRecorder({
       lvl: $('#blLvl'), max: BASELINE_SECONDS, onTick: s => renderBaseline(s),
-      onEnd: sec => {
+      onEnd: (sec, auto, rec) => {
         S.brec = null;
-        const min = Math.min(1, BASELINE_SECONDS);   // 1 s accepted so the UI is quick to test
-        if (sec < min) { renderBaseline(0, T('profile.tooShort', { n: min })); return; }
-        S.baseline = { ts: Date.now() }; renderBaseline(sec); toast(T('profile.toastSaved'));
-      }
+        const min = BASELINE_MIN_SECONDS;
+        if (sec < min || !rec || !rec.blob) { renderBaseline(0, T('profile.tooShort', { n: min })); return; }
+        if (USE_SIM) { S.baseline = { ts: Date.now() }; renderBaseline(sec); toast(T('profile.toastSaved')); return; }
+        const tok = S.bbusy = {}, user = S.user;
+        renderBaseline(0, T('profile.analysing'));
+        postBaseline(rec, r => {
+          if (S.bbusy !== tok || S.user !== user) return;   // logged out meanwhile
+          S.bbusy = null;
+          if (!r.profile) { renderBaseline(0, r.msg); return; }   // nothing saved; an older baseline (if any) stays
+          S.baseline = { ts: Date.now(), profile: r.profile }; renderBaseline(sec); toast(T('profile.toastSaved'));
+        });
+      },
+      onError: code => { S.brec = null; renderBaseline(0, T('practice.mic' + code.charAt(0).toUpperCase() + code.slice(1))); }
     });
     renderBaseline(0);
   });
@@ -3249,7 +3460,11 @@ function openAudioModal() {
 function testMic() {
   if (audioTestStop) return;
   $('#auTestNote').textContent = T('audio.testing');
-  audioTestStop = levelAnim($('#auLvl'));
+  audioTestStop = levelAnim($('#auLvl'), null, e => {   // mic could not be opened: stop the test and say why (no "working" message)
+    if (audioTestStop) { audioTestStop(); audioTestStop = null; }
+    const n = e && e.name;
+    $('#auTestNote').textContent = T('practice.mic' + (n === 'NotAllowedError' || n === 'SecurityError' ? 'Denied' : n === 'unsupported' ? 'Unsupported' : 'Nodevice'));
+  });
   setTimeout(() => { if (audioTestStop) { audioTestStop(); audioTestStop = null; $('#auTestNote').textContent = T('audio.testOk'); } }, 1800);
 }
 
@@ -3274,7 +3489,7 @@ function init() {
     const d = e.target.closest('[data-del]');
     if (d) {
       const id = +d.getAttribute('data-del');
-      confirmBox(T('history.delT'), T('history.delD'), T('history.delOk'), () => { S.sessions = S.sessions.filter(x => x.id !== id); if (S.cur && S.cur.id === id) S.cur = null; RENDER.home(); toast(T('history.deleted')); focusHeading(); });
+      confirmBox(T('history.delT'), T('history.delD'), T('history.delOk'), () => { S.sessions.filter(x => x.id === id).forEach(revokeAudio); S.sessions = S.sessions.filter(x => x.id !== id); if (S.cur && S.cur.id === id) S.cur = null; RENDER.home(); toast(T('history.deleted')); focusHeading(); });
       return;
     }
     const c = e.target.closest('[data-close]'); if (c) { const m = c.closest('.mbg'); if (m) closeModal(m.id); return; }
@@ -3360,6 +3575,7 @@ function init() {
   $('#dropBtn').onclick = () => $('#fileIn').click();
   $('#fileIn').onchange = onAudioFile;
   $('#evalBtn').onclick = runEval;
+  if (!USE_SIM) { const sc = $('#demoScenario'); if (sc && sc.parentNode) sc.parentNode.hidden = true; }   // demo scenario picker only exists for the simulation
   $('#ovCancel').onclick = cancelEval;
   $('#meRetry').onclick = () => { closeModal('mError', false); runEval(); };
 
@@ -3370,7 +3586,7 @@ function init() {
   $('#seek').addEventListener('input', e => seekTo(+e.target.value / 10, false));
 
   // history (bottom of Home) / profile
-  $('#delAll').onclick = () => confirmBox(T('history.delAllT'), T('history.delAllD'), T('history.delAllOk'), () => { S.sessions = []; S.cur = null; RENDER.home(); toast(T('history.deletedAll')); focusHeading(); });
+  $('#delAll').onclick = () => confirmBox(T('history.delAllT'), T('history.delAllD'), T('history.delAllOk'), () => { S.sessions.forEach(revokeAudio); S.sessions = []; S.cur = null; RENDER.home(); toast(T('history.deletedAll')); focusHeading(); });
   $('#mcfOk').onclick = () => { const cb = S.confirmCb; S.confirmCb = null; closeModal('mConfirm'); if (cb) cb(); };
   $('#editInfo').onclick = () => openProfileModal(false);
   $('#avChange').onclick = () => $('#avFile').click();
