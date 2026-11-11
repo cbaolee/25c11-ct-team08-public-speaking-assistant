@@ -131,3 +131,15 @@ def classify_pair(
         raise RuntimeError("không thể xảy ra: OOV đã return ở trên")
     status, homophone = classify_sim(*best)
     return PhoneticMatch(status, homophone, False)
+
+
+def pron_keys(
+    word: str,
+    *,
+    pron: Callable[[str], list[list[str]]] = pronunciations,
+) -> frozenset[tuple[str, ...]]:
+    """Tập chuỗi phoneme đã bỏ stress của `word`; OOV trả frozenset rỗng.
+
+    Dùng cho alignment: hai từ đồng âm <=> hai tập có giao khác rỗng (ADR-005 P8 bước 2).
+    """
+    return frozenset(tuple(_strip_stress(p)) for p in pron(word))
