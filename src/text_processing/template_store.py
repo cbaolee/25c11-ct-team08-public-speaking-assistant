@@ -1,13 +1,14 @@
 """WP-B0 (Member 1): Template Store and Template Linter.
 
 Responsibilities (Brief §5.3, §5.4):
-- Load markdown templates from `data/templates/<category_slug>/<topic_slug>.md`
+- Load markdown templates from `data/templates/<category_slug>/<topic_slug>_<duration>m.md`
 - Validate frontmatter (`topic`, `category`, `duration_min` in {5, 10, 15, 20})
 - Index templates by `template_id` ("<category_slug>/<topic_slug>") and topic name
 - Provide `list_topics()` for `GET /api/topics`
 - Provide `lint_template_file()` for pytest validation of the 600-template repository
 """
 
+import logging
 import re
 from bisect import bisect_left
 from dataclasses import dataclass
@@ -16,15 +17,9 @@ from typing import Literal
 
 from .contracts import CATEGORY_SLUG_MAP, VALID_DURATIONS, TemplateDocument, TopicMetadata
 
+logger = logging.getLogger(__name__)
+
 DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "data" / "templates"
-FRONTMATTER_RE = re.compile(
-    r"^---\r?\n"
-    r'topic:\s*"([^"]+)"\r?\n'
-    r'category:\s*"([^"]+)"\r?\n'
-    r"duration_min:\s*(\d+)\r?\n"
-    r"---\r?\n(.*)$",
-    re.DOTALL,
-)
 SLOT_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 # Each alternative of the quoted string starts with a different character: no backtracking blow-up.
 _QUOTED = r'"((?:[^"\\]|\\["\\])*)"[ \t]*'
@@ -35,10 +30,26 @@ _HEADER_RES = (
 )
 # Linter-only: a slot glued to an extra `{` or `}` (`{{{ x }}`) is not valid, unlike SLOT_RE.
 _STRICT_SLOT_RE = re.compile(r"(?<!\{)\{\{\s*[a-z0-9_]+\s*\}\}(?!\})")
-_UNESCAPE_RE =re.compile(r'\\(["\\])')
+_UNESCAPE_RE = re.compile(r'\\(["\\])')
 _HEADING_RE = re.compile(r"#{1,6}(?:[ \t]|$)")
+_SUFFIX_RE = re.compile(r"_([0-9]{1,9})m\Z")
+_NON_SLUG_RE = re.compile(r"[^a-z0-9]+")
 
 Severity = Literal["error", "warning"]
+# These make a file unusable or let `{{ }}` leak into a script; content-quality rules do not block.
+BLOCKING_RULES = frozenset(
+    {
+        "file_not_found",
+        "encoding",
+        "frontmatter_format",
+        "unknown_category_dir",
+        "category_mismatch",
+        "duration_invalid",
+        "topic_empty",
+        "body_empty",
+        "slot_syntax",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -72,9 +83,9 @@ class ParsedTemplate:
 
 
 def slugify_topic(topic: str) -> str:
-    """Convert a topic title into a clean snake_case slug (Brief §5.3)."""
-    cleaned = re.sub(r"[^a-z0-9\s_]", "", topic.lower())
-    return re.sub(r"[\s_]+", "_", cleaned).strip("_")
+    """Slugify a topic (D-15): lowercase, drop apostrophes, non-[a-z0-9] runs become `_`."""
+    lowered = topic.casefold().replace("'", "").replace("’", "")
+    return _NON_SLUG_RE.sub("_", lowered).strip("_")
 
 
 def _normalize(raw: str) -> str:
@@ -116,11 +127,13 @@ def find_slots(body: str) -> list[tuple[str, int]]:
     return [(m.group(1), bisect_left(newlines, m.start()) + 1) for m in SLOT_RE.finditer(body)]
 
 
-def lint_template_text(raw: str, *, category_slug: str, path: str = "") -> list[LintIssue]:
-    """Lint one template's text against Brief §5.3 (front matter, slots, headings)."""
+def lint_template_text(
+    raw: str, *, category_slug: str, path: str = "", file_stem: str | None = None
+) -> list[LintIssue]:
+    """Lint one template's text against Brief §5.3; with `file_stem`, also D-15 file naming."""
 
-    def issue(rule: str, msg: str, line: int | None = None) -> LintIssue:
-        return LintIssue(rule, "error", msg, path, line)
+    def issue(rule: str, msg: str, line: int | None = None, sev: Severity = "error") -> LintIssue:
+        return LintIssue(rule, sev, msg, path, line)
 
     try:
         tpl = parse_front_matter(raw)
@@ -155,6 +168,14 @@ def lint_template_text(raw: str, *, category_slug: str, path: str = "") -> list[
             reported.add(name)
             out.append(issue("argument_slot_repeated", f"Slot '{name}' repeats.", n + offset))
         seen.add(name)
+
+    if file_stem is not None:
+        suffix = _SUFFIX_RE.search(file_stem)
+        if suffix is None or suffix.group(1) != str(tpl.duration_min):
+            out.append(issue("duration_suffix_mismatch", "File name must end with _<duration>m."))
+        slug_part = file_stem[: suffix.start()] if suffix else file_stem
+        if tpl.topic.strip() and slug_part != slugify_topic(tpl.topic):
+            out.append(issue("filename_slug", "File name differs from topic slug.", sev="warning"))
     return out
 
 
@@ -169,7 +190,42 @@ def lint_template_file(file_path: Path, templates_dir: Path | None = None) -> li
         raw = read_template_text(file_path)
     except UnicodeDecodeError:
         return [LintIssue("encoding", "error", "File is not valid UTF-8.", rel)]
-    return lint_template_text(raw, category_slug=file_path.parent.name, path=rel)
+    except OSError:
+        return [LintIssue("file_not_found", "error", "File could not be read.", rel)]
+    return lint_template_text(
+        raw, category_slug=file_path.parent.name, path=rel, file_stem=file_path.stem
+    )
+
+
+def _iter_template_files(templates_dir: Path) -> list[Path]:
+    if not templates_dir.is_dir():
+        return []
+    return [
+        md
+        for category_dir in sorted(templates_dir.iterdir())
+        if category_dir.is_dir()
+        for md in sorted(category_dir.glob("*.md"))
+        if md.is_file()
+    ]
+
+
+def lint_corpus(templates_dir: Path) -> list[LintIssue]:
+    """Lint every template, then flag topics repeated across files (case-insensitive)."""
+    issues: list[LintIssue] = []
+    first_seen: dict[str, str] = {}
+    for md_file in _iter_template_files(templates_dir):
+        issues.extend(lint_template_file(md_file, templates_dir))
+        rel = md_file.relative_to(templates_dir).as_posix()
+        try:
+            topic = parse_front_matter(read_template_text(md_file)).topic.strip().lower()
+        except (TemplateFormatError, UnicodeDecodeError, OSError):
+            continue
+        if topic and topic in first_seen:
+            msg = f"Topic already used by {first_seen[topic]}."
+            issues.append(LintIssue("topic_duplicate", "error", msg, rel, 2))
+        elif topic:
+            first_seen[topic] = rel
+    return issues
 
 
 class TemplateStore:
@@ -179,48 +235,48 @@ class TemplateStore:
         self.templates_dir = templates_dir or DEFAULT_TEMPLATES_DIR
         self._by_id: dict[str, TemplateDocument] = {}
         self._by_topic_lower: dict[str, TemplateDocument] = {}
+        self.load_issues: list[LintIssue] = []
 
     def load(self) -> int:
-        """Scan `self.templates_dir` and index all valid `.md` templates.
+        """Index every usable template and return how many were loaded.
 
-        Returns the number of loaded templates.
-        TODO (Member 1 - WP-B0): Refine slug resolution and strict validation if needed.
+        A file with any lint issue in `BLOCKING_RULES` is skipped. Every finding, including
+        non-blocking ones of loaded files, is kept in `self.load_issues`. When two files share a
+        topic, the first in traversal order wins the topic lookup.
         """
         self._by_id.clear()
         self._by_topic_lower.clear()
-        if not self.templates_dir.exists():
-            return 0
-
-        for category_dir in sorted(self.templates_dir.iterdir()):
-            if not category_dir.is_dir():
+        self.load_issues = []
+        skipped = 0
+        for md_file in _iter_template_files(self.templates_dir):
+            issues = lint_template_file(md_file, self.templates_dir)
+            self.load_issues.extend(issues)
+            if any(i.rule in BLOCKING_RULES for i in issues):
+                skipped += 1
                 continue
-            category_slug = category_dir.name
-            for md_file in sorted(category_dir.glob("*.md")):
-                raw = md_file.read_text(encoding="utf-8")
-                match = FRONTMATTER_RE.match(raw)
-                if not match:
-                    continue
-                topic, category, duration_str, body = match.groups()
-                duration_min = int(duration_str)
-                if duration_min not in VALID_DURATIONS:
-                    continue
-                topic_slug = md_file.stem
-                template_id = f"{category_slug}/{topic_slug}"
-                meta = TopicMetadata(
-                    template_id=template_id,
-                    category_slug=category_slug,
-                    category=CATEGORY_SLUG_MAP.get(category_slug, category),
-                    topic=topic.strip(),
-                    topic_slug=topic_slug,
-                    duration_min=duration_min,
-                )
-                doc = TemplateDocument(
-                    metadata=meta,
-                    body=body.strip(),
-                    file_path=str(md_file),
-                )
-                self._by_id[template_id] = doc
-                self._by_topic_lower[topic.strip().lower()] = doc
+            try:
+                parsed = parse_front_matter(read_template_text(md_file))
+            except (TemplateFormatError, UnicodeDecodeError, OSError):
+                skipped += 1  # the file changed between the lint read and this read
+                continue
+            category_slug = md_file.parent.name
+            template_id = f"{category_slug}/{md_file.stem}"
+            meta = TopicMetadata(
+                template_id=template_id,
+                category_slug=category_slug,
+                category=CATEGORY_SLUG_MAP[category_slug],
+                topic=parsed.topic.strip(),
+                topic_slug=md_file.stem,
+                duration_min=parsed.duration_min,
+            )
+            doc = TemplateDocument(meta, parsed.body.strip(), str(md_file))
+            self._by_id[template_id] = doc
+            first = self._by_topic_lower.setdefault(meta.topic.lower(), doc)
+            if first is not doc:
+                msg = f"Topic already used by {first.metadata.template_id}."
+                rel = md_file.relative_to(self.templates_dir).as_posix()
+                self.load_issues.append(LintIssue("topic_duplicate", "error", msg, rel, 2))
+        logger.info("Template store: loaded %d, skipped %d", len(self._by_id), skipped)
         return len(self._by_id)
 
     def list_topics(self, category_slug: str | None = None) -> list[TopicMetadata]:
