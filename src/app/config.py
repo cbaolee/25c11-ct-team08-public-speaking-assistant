@@ -17,10 +17,19 @@ class Settings(BaseSettings):
     groq_llm_fallback_model_1: str = ""
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
-    
+
     # THÊM 2 DÒNG NÀY CHO MODULE STT MỚI:
     deepgram_api_key: str = ""
     gladia_api_key: str = ""
+
+    # Supabase: database and storage
+    supabase_url: str = ""
+    supabase_service_key: str = ""
+    audio_bucket: str = "audio"
+    series_bucket: str = "series"
+    baselines_bucket: str = "baselines"
+    retention_full_sessions: int = 10
+    signed_url_ttl_s: int = 600
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
