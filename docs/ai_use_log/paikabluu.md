@@ -1,0 +1,3 @@
+| Date       | PR / Issue                           | Tool        | What AI was used for                                                                                                                                                  |
+| ---------- | ------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-12 | #22 / #07         | Claude Code | Mapped scanned PDFs to `no_text_layer` in `parser.py` and `pipeline.py`; wrote `tests/test_parser_no_text_layer.py` (reportlab PDFs, mocked LLM)                       |
