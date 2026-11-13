@@ -1,38 +1,63 @@
 """WP-B3 (Member 2): Token-Budget Rate Limiter and Template Slot Engine.
 
 Responsibilities (Brief §5.4, §5.5):
-- Parse `{{ argument_... }}` and entity slots from a `TemplateDocument`
-- Batch slots within Groq's 8K TPM per-model token budget
-- Fill slots via LLM using retrieved top-k chunks and anti-injection delimiters
+- Parse ``{{ argument_... }}`` and entity slots from a ``TemplateDocument``
 - Assemble filled values using pure regex string replacement (NEVER Jinja2)
 - Normalize punctuation at slot boundaries and post-validate word count
 """
 
+from __future__ import annotations
+
+import logging
 import re
+from typing import Any
 
 from .contracts import (
     TARGET_WORD_COUNT_RANGES,
     DocumentChunk,
     GeneratedScript,
-    ParagraphCitation,
     TemplateDocument,
     TemplateSlot,
 )
 from .limiter import TokenBucketLimiter
 from .retrieval import SemanticRetriever
 
+logger = logging.getLogger(__name__)
+
 SLOT_PATTERN = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 
 
-def parse_slots(template: TemplateDocument, context_window_chars: int = 160) -> list[TemplateSlot]:
-    """Extract all `{{ slot_name }}` placeholders with surrounding lead-in and follow text."""
+# ---------------------------------------------------------------------------
+# Slot parsing
+# ---------------------------------------------------------------------------
+
+
+def parse_slots(
+    template: TemplateDocument,
+    context_window_chars: int = 200,
+) -> list[TemplateSlot]:
+    """Extract all ``{{ slot_name }}`` placeholders with surrounding context."""
     slots: list[TemplateSlot] = []
     body = template.body
-    for match in SLOT_PATTERN.finditer(body):
+    matches = list(SLOT_PATTERN.finditer(body))
+    for i, match in enumerate(matches):
         name = match.group(1)
         start, end = match.span()
-        lead_start = max(0, start - context_window_chars)
-        follow_end = min(len(body), end + context_window_chars)
+
+        lead_start = body.rfind("\n\n", 0, start)
+        lead_start = 0 if lead_start == -1 else lead_start + 2
+        if i > 0 and matches[i - 1].end() > lead_start:
+            lead_start = matches[i - 1].end()
+        lead_start = max(lead_start, start - context_window_chars)
+        lead_in = body[lead_start:start].strip()
+
+        follow_end = body.find("\n\n", end)
+        follow_end = len(body) if follow_end == -1 else follow_end
+        if i + 1 < len(matches) and matches[i + 1].start() < follow_end:
+            follow_end = matches[i + 1].start()
+        follow_end = min(follow_end, end + context_window_chars)
+        follow_text = body[end:follow_end].strip()
+
         slot_type = "argument" if name.startswith("argument_") else "entity"
         slots.append(
             TemplateSlot(
@@ -40,18 +65,23 @@ def parse_slots(template: TemplateDocument, context_window_chars: int = 160) -> 
                 slot_type=slot_type,
                 start_char=start,
                 end_char=end,
-                lead_in=body[lead_start:start].strip(),
-                follow_text=body[end:follow_end].strip(),
+                lead_in=lead_in,
+                follow_text=follow_text,
             )
         )
     return slots
 
 
-def assemble_template(template_body: str, slot_values: dict[str, str]) -> str:
-    """Pure regex string replacement for slots without Jinja2 evaluation (Brief §5.4).
+# ---------------------------------------------------------------------------
+# Assembly (pure regex, NEVER Jinja2)
+# ---------------------------------------------------------------------------
 
-    Normalizes duplicate terminal periods (`..` -> `.`) when a filled argument ends with a period
-    and the template immediately follows the slot with a period.
+
+def assemble_template(template_body: str, slot_values: dict[str, str]) -> str:
+    """Replace ``{{ slot_name }}`` placeholders with filled values.
+
+    Normalises duplicate terminal periods (``..`` → ``.``) and ensures
+    anti-SSTI by avoiding Jinja2 rendering.
     """
 
     def _replace(match: re.Match[str]) -> str:
@@ -60,15 +90,25 @@ def assemble_template(template_body: str, slot_values: dict[str, str]) -> str:
             return match.group(0)
         val = slot_values[slot_name].strip()
         after_pos = match.end()
-        if after_pos < len(template_body) and template_body[after_pos] == "." and val.endswith("."):
-            val = val[:-1].rstrip()
+        has_trailing_punct = after_pos < len(template_body) and template_body[after_pos] in ".!?,;:"
+        if has_trailing_punct:
+            while val and val[-1] in ".!?,;:":
+                val = val[:-1].rstrip()
+        else:
+            if val and val[-1] not in ".!?":
+                val += "."
         return val
 
     return SLOT_PATTERN.sub(_replace, template_body)
 
 
+# ---------------------------------------------------------------------------
+# Post-validation
+# ---------------------------------------------------------------------------
+
+
 def validate_assembled_script(text: str, duration_min: int) -> list[str]:
-    """Post-check assembled script for leftover `{{ }}` and word count (Brief §5.2 Stage 7)."""
+    """Post-check assembled script for leftover ``{{ }}`` and word count."""
     issues: list[str] = []
     if "{{" in text or "}}" in text:
         issues.append("unresolved_slots")
@@ -79,47 +119,42 @@ def validate_assembled_script(text: str, duration_min: int) -> list[str]:
     return issues
 
 
+# ---------------------------------------------------------------------------
+# TemplateEngine Skeleton (completed in next PR)
+# ---------------------------------------------------------------------------
+
+
 class TemplateEngine:
-    """Orchestrates slot extraction, retrieval, batched LLM filling, and assembly (Brief §5.4)."""
+    """Engine for slot batching and LLM slot-filling orchestration."""
 
     def __init__(
         self,
-        retriever: SemanticRetriever | None = None,
+        client: Any = None,
         limiter: TokenBucketLimiter | None = None,
+        retriever: SemanticRetriever | None = None,
     ) -> None:
-        self.retriever = retriever or SemanticRetriever()
+        self.client = client
         self.limiter = limiter or TokenBucketLimiter()
+        self.retriever = retriever or SemanticRetriever()
 
     def fill_template(
         self,
         template: TemplateDocument,
         chunks: list[DocumentChunk] | None = None,
+        raw_text: str | None = None,
     ) -> GeneratedScript:
-        """Fill all slots in `template` using retrieved chunks and LLM batches.
-
-        TODO (Member 2 - WP-B3):
-        1. Group `parse_slots(template)` into token-budget batches.
-        2. Retrieve top-k chunks per slot via `self.retriever`.
-        3. Call Groq model chain to get JSON `{slot_name: {text, source_chunk_ids}}`.
-        4. Verify citations and assemble final text via `assemble_template()`.
-        """
+        """Fill slots in template (skeleton placeholder)."""
         slots = parse_slots(template)
-        dummy_values = {s.name: f"[Filled content for {s.name}]" for s in slots}
-        assembled = assemble_template(template.body, dummy_values)
-        citations = [
-            ParagraphCitation(paragraph=i + 1, heading=None, page=None, status="uncited")
-            for i, _ in enumerate(assembled.split("\n\n"))
-            if _.strip()
-        ]
-        flags = ["uncited"] if not chunks else []
+        slot_values = {s.name: f"Filled content for {s.name}." for s in slots}
+        script_text = assemble_template(template.body, slot_values)
         return GeneratedScript(
-            script=assembled,
-            word_count=len(assembled.split()),
+            script=script_text,
+            word_count=len(script_text.split()),
             duration_min=template.metadata.duration_min,
             source="template",
             template_id=template.metadata.template_id,
             models_used=[],
-            citations=citations,
-            flags=flags,
+            citations=[],
+            flags=[],
+            warnings=[],
         )
-

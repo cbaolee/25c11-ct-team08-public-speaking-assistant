@@ -4,3 +4,4 @@
 | 2026-11-13 | #9 (WP-B2) | Antigravity | Implemented singleton SemanticRetriever and unit tests with offline mock             |
 | 2026-11-13 | #9 (WP-B2) | Antigravity | Implemented deterministic citation verification and unit tests                      |
 | 2026-11-13 | #9 (WP-B3) | Antigravity | Implemented TokenBucketLimiter in limiter.py and comprehensive unit tests        |
+| 2026-11-13 | #9 (WP-B3) | Antigravity | Implemented parse_slots, regex assemble_template, and post-validator tests   |
