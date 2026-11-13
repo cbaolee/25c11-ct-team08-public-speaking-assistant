@@ -140,7 +140,23 @@ def verify_paragraph_citation(
     reported_chunk_ids: list[int],
     retrieved_chunks: list[DocumentChunk],
 ) -> ParagraphCitation:
-    """Deterministically verify LLM-reported chunk IDs against `retrieved_chunks` (Brief §5.6)."""
+    """Deterministically verify LLM-reported chunk IDs against *retrieved_chunks*.
+
+    If a reported ``chunk_id`` exists in the retrieved set the citation is
+    ``"cited"`` with the chunk's heading and page number.  Otherwise (including
+    when the LLM invents a chunk ID) the citation is ``"uncited"``.
+    """
+    by_id = {c.chunk_id: c for c in retrieved_chunks}
+    for cid in reported_chunk_ids:
+        if cid in by_id:
+            chunk = by_id[cid]
+            return ParagraphCitation(
+                paragraph=paragraph_index,
+                heading=chunk.heading,
+                page=chunk.page,
+                status="cited",
+                chunk_id=chunk.chunk_id,
+            )
     return ParagraphCitation(
         paragraph=paragraph_index,
         heading=None,

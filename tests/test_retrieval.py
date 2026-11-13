@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from src.text_processing.contracts import DocumentChunk
-from src.text_processing.retrieval import SemanticRetriever
+from src.text_processing.retrieval import SemanticRetriever, verify_paragraph_citation
 
 
 class MockSentenceTransformer:
@@ -179,3 +179,79 @@ class TestSemanticRetriever:
         m1 = SemanticRetriever.get_model()
         m2 = SemanticRetriever.get_model()
         assert m1 is m2
+
+
+
+# ---------------------------------------------------------------------------
+# Citation Verification Tests
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyParagraphCitation:
+    """Tests for deterministic citation verification against retrieved chunks."""
+
+    def test_valid_citation_exact_match(self, sample_chunks: list[DocumentChunk]) -> None:
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks[:3],
+        )
+        assert citation.status == "cited"
+        assert citation.paragraph == 1
+        assert citation.heading == "Results"
+        assert citation.page == 3
+        assert citation.chunk_id == 2
+
+    def test_valid_citation_multiple_reported_takes_first_match(
+        self, sample_chunks: list[DocumentChunk]
+    ) -> None:
+        citation = verify_paragraph_citation(
+            paragraph_index=2,
+            reported_chunk_ids=[999, 1, 0],
+            retrieved_chunks=sample_chunks[:3],
+        )
+        assert citation.status == "cited"
+        assert citation.chunk_id == 1
+        assert citation.heading == "Methods"
+
+    def test_invalid_citation_hallucinated_chunk_id(
+        self, sample_chunks: list[DocumentChunk]
+    ) -> None:
+        citation = verify_paragraph_citation(
+            paragraph_index=3,
+            reported_chunk_ids=[999],
+            retrieved_chunks=sample_chunks[:3],
+        )
+        assert citation.status == "uncited"
+        assert citation.chunk_id is None
+        assert citation.heading is None
+        assert citation.page is None
+
+    def test_empty_reported_chunk_ids_marks_uncited(
+        self, sample_chunks: list[DocumentChunk]
+    ) -> None:
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[],
+            retrieved_chunks=sample_chunks,
+        )
+        assert citation.status == "uncited"
+        assert citation.chunk_id is None
+
+    def test_empty_retrieved_chunks_marks_uncited(self) -> None:
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1, 2],
+            retrieved_chunks=[],
+        )
+        assert citation.status == "uncited"
+        assert citation.chunk_id is None
+
+    def test_paragraph_index_preserved(self, sample_chunks: list[DocumentChunk]) -> None:
+        for idx in (1, 5, 42):
+            citation = verify_paragraph_citation(
+                paragraph_index=idx,
+                reported_chunk_ids=[0],
+                retrieved_chunks=sample_chunks,
+            )
+            assert citation.paragraph == idx
