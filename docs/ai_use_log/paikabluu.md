@@ -1,0 +1,3 @@
+| Date       | PR / Issue                           | Tool        | What AI was used for                                                                                                                                                  |
+| ---------- | ------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-13 | #25 / #07    | Claude Code | Wrote layer-1 moderation in `moderation.py`: blocklist, NFKC and invisible-character handling, size ceiling, LRU + TTL cache, `<` escaping, plus 108 tests; 4 separate Claude review passes (found a 184 s NFKC slowdown) |
