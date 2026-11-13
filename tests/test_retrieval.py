@@ -105,9 +105,7 @@ class TestSemanticRetriever:
         retriever = SemanticRetriever()
         assert retriever.retrieve_top_k("test query", sample_chunks, k=0) == []
 
-    def test_retrieve_top_k_k_greater_than_chunks(
-        self, sample_chunks: list[DocumentChunk]
-    ) -> None:
+    def test_retrieve_top_k_k_greater_than_chunks(self, sample_chunks: list[DocumentChunk]) -> None:
         retriever = SemanticRetriever()
         result = retriever.retrieve_top_k("biodiversity", sample_chunks, k=10)
         assert len(result) == len(sample_chunks)
@@ -120,9 +118,7 @@ class TestSemanticRetriever:
         result = retriever.retrieve_top_k("any query", sample_chunks, k=3)
         assert [c.chunk_id for c in result] == [0, 1, 2]
 
-    def test_encode_chunks_returns_correct_shape(
-        self, sample_chunks: list[DocumentChunk]
-    ) -> None:
+    def test_encode_chunks_returns_correct_shape(self, sample_chunks: list[DocumentChunk]) -> None:
         retriever = SemanticRetriever()
         embeddings = retriever.encode_chunks(sample_chunks)
         assert embeddings is not None
@@ -179,7 +175,6 @@ class TestSemanticRetriever:
         m1 = SemanticRetriever.get_model()
         m2 = SemanticRetriever.get_model()
         assert m1 is m2
-
 
 
 # ---------------------------------------------------------------------------
