@@ -2,3 +2,4 @@
 | ---------- | ------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 2026-11-12 | #23 / #07       | Claude Code | Wrote the strict template linter (front matter keys, slot syntax, duplicate slots, no heading, `duration_min`) in `template_store.py` and its tests                    |
 | 2026-11-12 | #24 / #07        | Claude Code | Wrote `TemplateStore` loading, D-15 filename rule (`slugify_topic`), `lint_corpus`, duplicate-topic handling and tests; templates in `data/templates/` not modified    |
+| 2026-11-12 | #22 / #07         | Claude Code | Mapped scanned PDFs to `no_text_layer` in `parser.py` and `pipeline.py`; wrote `tests/test_parser_no_text_layer.py` (reportlab PDFs, mocked LLM)                       |

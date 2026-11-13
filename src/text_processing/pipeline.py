@@ -84,7 +84,8 @@ class ScriptGenerationPipeline:
                         status_code=422,
                     )
             except DocumentParserError as exc:
-                error_code = "no_text_layer" if exc.error_code == "empty_pdf" else "invalid_pdf"
+                no_text = exc.error_code in ("empty_pdf", "no_text_layer")
+                error_code = "no_text_layer" if no_text else "invalid_pdf"
                 raise ScriptGenerationError(
                     error_code=error_code,
                     message=exc.message,
