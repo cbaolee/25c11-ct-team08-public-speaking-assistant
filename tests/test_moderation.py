@@ -1,22 +1,26 @@
-"""Unit tests for Layer 1 content moderation, decision cache and delimiter wrapping (WP-B1)."""
+"""Unit tests for Layer 1 + optional Layer 2 moderation, decision cache and delimiter wrapping."""
 
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import sys
 import threading
 import time
 import unicodedata
 
+import httpx
 import pytest
 
 from src.text_processing import ContentModerator, ScriptGenerationError
+from src.text_processing import moderation as moderation_module
 from src.text_processing.moderation import (
     _INVISIBLE_RE,
     _DecisionCache,
     build_blocklist_pattern,
     normalize_for_moderation,
+    parse_llama_guard_output,
     wrap_untrusted_document_context,
 )
 
@@ -155,7 +159,7 @@ def test_default_blocklist_allows_normal_text(text: str) -> None:
     ],
 )
 def test_known_false_positives(text: str) -> None:
-    # Behaviour documented for Security review, revisit when Layer 2 lands.
+    # Documented for Security review: a Layer 1 block is final, Layer 2 never overrides it.
     assert ContentModerator().check_text(text).allowed is False
 
 
@@ -450,3 +454,430 @@ def test_wrap_untrusted_document_context_format_and_escaping() -> None:
     wrapped = wrap_untrusted_document_context("plain text")
     assert wrapped.startswith(_OPEN + "\nplain text\n" + _CLOSE + "\nIMPORTANT:")
     assert "a &lt; b" in wrap_untrusted_document_context("a < b")
+
+
+# --- Layer 2 (Llama Guard via Ollama); every HTTP call goes through httpx.MockTransport ---
+
+OLLAMA = "http://ollama.test:11434"
+GUARD_TEXT = "A calm talk about wildlife conservation."
+UNAVAILABLE = "moderation_layer2_unavailable"
+UNSAFE_REASON = "Input flagged by safety classifier."
+
+
+def _ollama_reply(content: object, status: int = 200) -> httpx.Response:
+    return httpx.Response(status, json={"message": {"role": "assistant", "content": content}})
+
+
+class FakeOllama:
+    """MockTransport handler: replays `replies` in order (last one repeats), records requests."""
+
+    def __init__(self, *replies: httpx.Response | BaseException) -> None:
+        self.replies = list(replies) or [_ollama_reply("safe")]
+        self.requests: list[httpx.Request] = []
+
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        reply = self.replies.pop(0) if len(self.replies) > 1 else self.replies[0]
+        if isinstance(reply, BaseException):
+            raise reply
+        return reply
+
+    @property
+    def contents(self) -> list[str]:
+        return [json.loads(r.content)["messages"][0]["content"] for r in self.requests]
+
+
+def _client(handler: FakeOllama) -> httpx.Client:
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def _moderator(fake: FakeOllama, url: str = OLLAMA, **kwargs: object) -> ContentModerator:
+    return ContentModerator(True, url, http_client=_client(fake), **kwargs)  # type: ignore[arg-type]
+
+
+def test_layer2_disabled_is_layer1_only_and_never_calls_ollama() -> None:
+    def forbidden(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("Ollama must not be called when Layer 2 is disabled")
+
+    client = httpx.Client(transport=httpx.MockTransport(forbidden))
+    moderator = ContentModerator(False, OLLAMA, fail_mode="closed", http_client=client)
+    decision = moderator.check_text(GUARD_TEXT)
+    assert (decision.allowed, decision.layer, decision.reason) == (True, "regex", None)
+    assert moderator.check_text(INJECTION).layer == "regex"
+    assert ContentModerator()._client is None
+
+
+def test_layer2_safe_is_cached_per_user() -> None:
+    fake = FakeOllama(_ollama_reply("safe"))
+    moderator = _moderator(fake)
+    first = moderator.check_text(GUARD_TEXT, user_id="u1")
+    assert (first.allowed, first.layer, first.reason, first.flagged_terms) == (
+        True,
+        "llama_guard",
+        None,
+        [],
+    )
+    assert moderator.check_text(GUARD_TEXT, user_id="u1").layer == "cache"
+    assert len(fake.requests) == 1
+    assert moderator.check_text(GUARD_TEXT, user_id="u2").layer == "llama_guard"
+    assert len(fake.requests) == 2
+
+
+@pytest.mark.parametrize(
+    ("reply", "codes"),
+    [("unsafe\nS1", ["S1"]), ("unsafe\nS1,S10", ["S1", "S10"]), (" Unsafe \n S2 \n", ["S2"])],
+)
+def test_layer2_unsafe_is_rejected_and_cached(reply: str, codes: list[str]) -> None:
+    fake = FakeOllama(_ollama_reply(reply))
+    moderator = _moderator(fake)
+    decision = moderator.check_text(GUARD_TEXT)
+    assert (decision.allowed, decision.layer) == (False, "llama_guard")
+    assert (decision.reason, decision.flagged_terms) == (UNSAFE_REASON, codes)
+    again = moderator.check_text(GUARD_TEXT)
+    assert (again.layer, again.allowed, again.flagged_terms) == ("cache", False, codes)
+    assert len(fake.requests) == 1
+
+
+@pytest.mark.parametrize("text", [INJECTION, "what the fuck", "\u200b\u200b"])
+def test_layer1_block_or_empty_after_normalization_skips_ollama(text: str) -> None:
+    fake = FakeOllama(_ollama_reply("safe"))
+    decision = _moderator(fake).check_text(text)
+    assert fake.requests == []
+    assert decision.layer == "regex"
+    assert decision.allowed is (text == "\u200b\u200b")
+
+
+def test_layer1_too_large_skips_ollama() -> None:
+    fake = FakeOllama(_ollama_reply("safe"))
+    decision = _moderator(fake, max_normalized_chars=1000).check_text("a" * 1001)
+    assert (decision.allowed, decision.reason, decision.layer) == (False, TOO_LARGE, "regex")
+    assert fake.requests == []
+
+
+FAILURES = {
+    "connect_error": lambda: httpx.ConnectError("refused"),
+    "connect_timeout": lambda: httpx.ConnectTimeout("slow"),
+    "transport_unexpected_error": lambda: UnicodeError("boom"),
+    "read_timeout": lambda: httpx.ReadTimeout("slow"),
+    "http_500": lambda: _ollama_reply("safe", status=500),
+    "not_json": lambda: httpx.Response(200, content=b"<html>not json</html>"),
+    "json_list": lambda: httpx.Response(200, json=["safe"]),
+    "missing_message": lambda: httpx.Response(200, json={"done": True}),
+    "content_is_number": lambda: _ollama_reply(5),
+    "empty_output": lambda: _ollama_reply(""),
+    "deep_json": lambda: httpx.Response(200, content=b"[" * 100_000 + b"]" * 100_000),
+    "unknown_output": lambda: _ollama_reply("looks fine to me"),
+}
+
+
+@pytest.mark.parametrize("fail_mode", ["open", "closed"])
+@pytest.mark.parametrize("make_reply", FAILURES.values(), ids=FAILURES.keys())
+def test_layer2_failure_follows_fail_mode_and_is_never_cached(make_reply, fail_mode: str) -> None:
+    fake = FakeOllama(make_reply())
+    moderator = _moderator(fake, fail_mode=fail_mode)
+    for _ in range(2):
+        decision = moderator.check_text(GUARD_TEXT)
+        assert decision.reason == UNAVAILABLE
+        assert decision.flagged_terms == []
+        if fail_mode == "open":
+            assert (decision.allowed, decision.layer) == (True, "regex")
+        else:
+            assert (decision.allowed, decision.layer) == (False, "llama_guard")
+    assert len(fake.requests) == 2
+    assert len(moderator._cache) == 0
+
+
+def test_layer2_recovers_after_a_failure() -> None:
+    fake = FakeOllama(httpx.ConnectError("refused"), _ollama_reply("safe"))
+    moderator = _moderator(fake, fail_mode="closed")
+    assert moderator.check_text(GUARD_TEXT).allowed is False
+    recovered = moderator.check_text(GUARD_TEXT)
+    assert (recovered.allowed, recovered.layer, recovered.reason) == (True, "llama_guard", None)
+    assert moderator.check_text(GUARD_TEXT).layer == "cache"
+    assert len(fake.requests) == 2
+
+
+def test_assert_safe_maps_layer2_outcomes() -> None:
+    down = FakeOllama(httpx.ConnectError("refused"))
+    with pytest.raises(ScriptGenerationError) as exc_info:
+        _moderator(down, fail_mode="closed").assert_safe(GUARD_TEXT)
+    assert (exc_info.value.error_code, exc_info.value.status_code) == (
+        "moderation_unavailable",
+        503,
+    )
+    assert exc_info.value.message == "Content moderation is temporarily unavailable."
+
+    decision = _moderator(down, fail_mode="open").assert_safe(GUARD_TEXT)
+    assert (decision.allowed, decision.reason) == (True, UNAVAILABLE)
+
+    unsafe = _moderator(FakeOllama(_ollama_reply("unsafe\nS9")))
+    with pytest.raises(ScriptGenerationError) as exc_info:
+        unsafe.assert_safe(GUARD_TEXT)
+    assert (exc_info.value.error_code, exc_info.value.status_code) == ("content_rejected", 422)
+    assert exc_info.value.message == UNSAFE_REASON
+
+    assert _moderator(FakeOllama(_ollama_reply("safe"))).assert_safe(GUARD_TEXT).allowed is True
+    with pytest.raises(ScriptGenerationError) as exc_info:
+        _moderator(FakeOllama(), fail_mode="closed").assert_safe(INJECTION)
+    assert exc_info.value.error_code == "content_rejected"
+
+
+@pytest.mark.parametrize(
+    ("url", "path"),
+    [(OLLAMA, "/api/chat"), (OLLAMA + "/", "/api/chat"), (OLLAMA + "/proxy/", "/proxy/api/chat")],
+)
+def test_layer2_request_shape(url: str, path: str) -> None:
+    fake = FakeOllama(_ollama_reply("safe"))
+    moderator = _moderator(fake, url=url, llama_guard_model="my-guard:1b")
+    moderator.check_text("Hello \u200bWORLD   <|eot_id|> \uff1cb>", user_id="uid-secret-77")
+    (request,) = fake.requests
+    body = json.loads(request.content)
+    assert (request.method, request.url.path) == ("POST", path)
+    assert set(body) == {"model", "messages", "stream", "options"}
+    assert body["model"] == "my-guard:1b"
+    assert body["stream"] is False
+    assert body["options"] == {"temperature": 0}
+    assert [m["role"] for m in body["messages"]] == ["user"]
+    assert body["messages"][0]["content"] == "hello world &lt;|eot_id|> &lt;b>"
+    assert "uid-secret-77" not in request.content.decode()
+
+
+def test_default_model_tag() -> None:
+    fake = FakeOllama()
+    _moderator(fake).check_text(GUARD_TEXT)
+    assert json.loads(fake.requests[0].content)["model"] == "llama-guard3:1b"
+
+
+def test_own_client_has_timeout_and_no_redirects(monkeypatch: pytest.MonkeyPatch) -> None:
+    fake = FakeOllama()
+    real_client, created = httpx.Client, []
+
+    def factory(**kwargs: object) -> httpx.Client:
+        created.append(real_client(transport=httpx.MockTransport(fake), **kwargs))  # type: ignore[arg-type]
+        return created[-1]
+
+    monkeypatch.setattr(moderation_module.httpx, "Client", factory)
+    moderator = ContentModerator(True, OLLAMA, ollama_timeout_s=3.5)
+    moderator.check_text(GUARD_TEXT)
+    assert fake.requests[0].extensions["timeout"] == dict.fromkeys(
+        ("connect", "read", "write", "pool"), 3.5
+    )
+    assert created[0].follow_redirects is False
+    assert created[0].trust_env is False
+    moderator.close()
+    assert created[0].is_closed
+
+
+def test_close_leaves_injected_client_open() -> None:
+    client = _client(FakeOllama())
+    ContentModerator(True, OLLAMA, http_client=client).close()
+    assert client.is_closed is False
+
+
+def test_layer2_chunk_boundaries() -> None:
+    fake = FakeOllama()
+    moderator = _moderator(fake, layer2_max_chars=10, layer2_max_calls=3)
+    assert moderator.check_text("a" * 10).allowed is True
+    assert fake.contents == ["a" * 10]
+    assert moderator.check_text("b" * 11).allowed is True
+    assert fake.contents[1:] == ["b" * 10, "b"]
+    assert moderator.check_text("c" * 30).allowed is True
+    assert len(fake.requests) == 6
+
+
+def test_layer2_unsafe_chunk_stops_and_rejects_whole_text() -> None:
+    fake = FakeOllama(_ollama_reply("safe"), _ollama_reply("unsafe\nS4"), _ollama_reply("safe"))
+    moderator = _moderator(fake, layer2_max_chars=10, layer2_max_calls=3)
+    decision = moderator.check_text("a" * 25)
+    assert (decision.allowed, decision.layer, decision.flagged_terms) == (
+        False,
+        "llama_guard",
+        ["S4"],
+    )
+    assert len(fake.requests) == 2
+
+
+@pytest.mark.parametrize("fail_mode", ["open", "closed"])
+def test_layer2_too_many_chunks_is_unavailable_without_calls(fail_mode: str) -> None:
+    fake = FakeOllama()
+    moderator = _moderator(fake, layer2_max_chars=10, layer2_max_calls=3, fail_mode=fail_mode)
+    decision = moderator.check_text("a" * 31)
+    assert decision.reason == UNAVAILABLE
+    assert decision.allowed is (fail_mode == "open")
+    assert fake.requests == []
+    assert len(moderator._cache) == 0
+
+
+@pytest.mark.parametrize(
+    "make_reply",
+    [
+        lambda: _ollama_reply("safe"),
+        lambda: _ollama_reply("unsafe\nS1"),
+        lambda: _ollama_reply("?"),
+        lambda: httpx.ConnectError("conn-exc-marker-2468"),
+    ],
+    ids=["safe", "unsafe", "unparsable", "exception"],
+)
+def test_layer2_does_not_log_content(make_reply, caplog: pytest.LogCaptureFixture) -> None:
+    marker, user_id, blocked = "zq7-l2-marker-7731", "uid-zq7-7731", "fuck"
+    fake = FakeOllama(make_reply())
+    moderator = _moderator(fake, fail_mode="closed")
+    with caplog.at_level(logging.DEBUG):
+        moderator.check_text(f"{marker} wildlife talk", user_id=user_id)
+        moderator.check_text(f"{marker} wildlife talk", user_id=user_id)
+        moderator.check_text(f"{marker} {blocked}", user_id=user_id)
+    for secret in (marker, user_id, blocked, "conn-exc-marker-2468", "wildlife"):
+        assert secret not in caplog.text
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"fail_mode": "maybe"},
+        {"fail_mode": None},
+        *({"ollama_timeout_s": v} for v in (0, -1, float("nan"), float("inf"), True, "5", None)),
+        *({"layer2_max_chars": v} for v in (0, -1, True, 1.5, "4", None)),
+        *({"layer2_max_calls": v} for v in (0, -1, True, 1.5, "4", None)),
+    ],
+)
+def test_constructor_rejects_invalid_layer2_config(kwargs: dict[str, object]) -> None:
+    with pytest.raises(ValueError):
+        ContentModerator(False, **kwargs)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "url", [None, "", "   ", "localhost:11434", "ftp://ollama.test", "http:/x", 123, b"http://x"]
+)
+def test_enabled_layer2_requires_http_ollama_url(url: object) -> None:
+    with pytest.raises(ValueError):
+        ContentModerator(True, url)  # type: ignore[arg-type]
+
+
+def test_enabled_layer2_builds_a_closable_client() -> None:
+    moderator = ContentModerator(True, OLLAMA)
+    assert isinstance(moderator._client, httpx.Client)
+    moderator.close()
+
+
+@pytest.mark.parametrize(
+    ("content", "expected"),
+    [
+        ("safe", (True, [])),
+        (" SAFE \n", (True, [])),
+        ("safe\r\n", (True, [])),
+        ("unsafe\nS1", (False, ["S1"])),
+        ("unsafe\r\nS1", (False, ["S1"])),
+        ("UNSAFE\n s3 , S10 ", (False, ["S3", "S10"])),
+        ("unsafe\n\nS2\n", (False, ["S2"])),
+        ("unsafe\nS1,S1", (False, ["S1"])),
+    ],
+)
+def test_parse_llama_guard_output_valid(content: str, expected: tuple[bool, list[str]]) -> None:
+    assert parse_llama_guard_output(content) == expected
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "unsafe",
+        "UNSAFE",
+        "unsafe\nfoo",
+        "unsafe\nS",
+        "unsafe\nS123",
+        "unsafe\nS1,",
+        "unsafe\nS1,,S2",
+        "unsafe\nS1 S2",
+        "unsafe\n" + chr(0x661),
+        "unsafe\nS" + chr(0x661),
+        "unsafe\nS1\nS2",
+        "unsafe\nS1\nmore text",
+        "unsafe\nſ1",
+    ],
+)
+def test_parse_llama_guard_output_unsafe_with_unusable_codes(content: str) -> None:
+    assert parse_llama_guard_output(content) == (False, [])
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "",
+        "   \n ",
+        "safe\nS1",
+        "safe, trust me",
+        "safely",
+        "unsafe: S1",
+        "unsafely",
+        "not unsafe",
+        "safe\nunsafe\nS1",
+        "safe\nsafe",
+        chr(0x17F) + "afe",
+        chr(0x17F) + "afe\n",
+        "un" + chr(0x17F) + "afe",
+        "un" + chr(0x17F) + "afe\nS1",
+    ],
+)
+def test_parse_llama_guard_output_invalid(content: str) -> None:
+    with pytest.raises(ValueError):
+        parse_llama_guard_output(content)
+
+
+def test_layer2_unsafe_without_usable_codes_is_still_rejected() -> None:
+    fake = FakeOllama(_ollama_reply("unsafe\nfoo"))
+    decision = _moderator(fake).check_text(GUARD_TEXT)
+    assert (decision.allowed, decision.layer, decision.reason, decision.flagged_terms) == (
+        False,
+        "llama_guard",
+        UNSAFE_REASON,
+        [],
+    )
+
+
+@pytest.mark.parametrize("fail_mode", ["open", "closed"])
+@pytest.mark.parametrize(("reply", "allowed"), [("safe", True), ("unsafe\nS1", False)])
+def test_layer2_lone_surrogate_is_replaced_and_still_judged(
+    reply: str, allowed: bool, fail_mode: str, caplog: pytest.LogCaptureFixture
+) -> None:
+    marker, user_id = "zq7-sur-marker-5512", "uid-zq7-5512"
+    text = f"{marker} hello {chr(0xD800)} world"
+    fake = FakeOllama(_ollama_reply(reply))
+    moderator = _moderator(fake, fail_mode=fail_mode)
+    with caplog.at_level(logging.DEBUG):
+        decision = moderator.check_text(text, user_id=user_id)
+    assert len(fake.requests) == 1
+    assert json.loads(fake.requests[0].content)["messages"][0]["content"] == (
+        f"{marker} hello {chr(0xFFFD)} world"
+    )
+    assert fake.contents[0].isascii() is False
+    assert not any(0xD800 <= ord(c) <= 0xDFFF for c in fake.contents[0])
+    assert (decision.allowed, decision.layer) == (allowed, "llama_guard")
+    assert decision.reason != UNAVAILABLE
+    assert moderator.check_text(text, user_id=user_id).layer == "cache"
+    for secret in (marker, user_id, "hello", chr(0xD800), "ud800"):
+        assert secret not in caplog.text
+
+
+@pytest.mark.parametrize("fail_mode", ["open", "closed"])
+def test_layer2_does_not_swallow_keyboard_interrupt(fail_mode: str) -> None:
+    moderator = _moderator(FakeOllama(KeyboardInterrupt()), fail_mode=fail_mode)
+    with pytest.raises(KeyboardInterrupt):
+        moderator.check_text(GUARD_TEXT)
+    assert len(moderator._cache) == 0
+
+
+@pytest.mark.parametrize("fail_mode", ["open", "closed"])
+def test_layer2_does_not_mask_programming_errors(
+    fail_mode: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def boom(self: ContentModerator, chunk: str) -> tuple[bool, list[str]]:
+        raise RuntimeError("bug")
+
+    monkeypatch.setattr(ContentModerator, "_post_chunk", boom)
+    with pytest.raises(RuntimeError):
+        _moderator(FakeOllama(), fail_mode=fail_mode).check_text(GUARD_TEXT)
+
+
+def test_fullwidth_less_than_reaches_ollama_escaped() -> None:
+    fake = FakeOllama()
+    _moderator(fake).check_text("tag " + chr(0xFF1C) + "b>")
+    assert fake.contents == ["tag &lt;b>"]
