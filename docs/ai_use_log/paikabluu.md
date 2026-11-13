@@ -1,0 +1,3 @@
+| Date       | PR / Issue                           | Tool        | What AI was used for                                                                                                                                                  |
+| ---------- | ------------------------------------ | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-11-12 | #23 / #07       | Claude Code | Wrote the strict template linter (front matter keys, slot syntax, duplicate slots, no heading, `duration_min`) in `template_store.py` and its tests                    |
