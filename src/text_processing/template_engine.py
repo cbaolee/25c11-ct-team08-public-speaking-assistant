@@ -18,25 +18,10 @@ from .contracts import (
     TemplateDocument,
     TemplateSlot,
 )
+from .limiter import TokenBucketLimiter
 from .retrieval import SemanticRetriever
 
 SLOT_PATTERN = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
-
-
-class TokenBucketLimiter:
-    """Per-model token and request rate limiter for Groq model fallback chains (Brief §5.5).
-
-    TODO (Member 2 - WP-B3):
-    Implement RPM (30 RPM) and TPM (8,000 TPM) token-bucket tracking per model ID.
-    """
-
-    def __init__(self, rpm_limit: int = 30, tpm_limit: int = 8000) -> None:
-        self.rpm_limit = rpm_limit
-        self.tpm_limit = tpm_limit
-
-    def can_consume(self, model_id: str, estimated_tokens: int) -> bool:
-        """Return True if `model_id` has enough budget for `estimated_tokens`."""
-        return estimated_tokens <= self.tpm_limit
 
 
 def parse_slots(template: TemplateDocument, context_window_chars: int = 160) -> list[TemplateSlot]:
