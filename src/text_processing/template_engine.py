@@ -21,12 +21,14 @@ from .contracts import (
     TARGET_WORD_COUNT_RANGES,
     DocumentChunk,
     GeneratedScript,
+    ParagraphCitation,
     ScriptGenerationError,
     TemplateDocument,
     TemplateSlot,
 )
 from .limiter import TokenBucketLimiter
-from .retrieval import SemanticRetriever
+from .moderation import wrap_untrusted_document_context
+from .retrieval import SemanticRetriever, verify_paragraph_citation
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +280,7 @@ def _call_llm_with_fallback(
 
 
 class TemplateEngine:
-    """Engine for slot batching and LLM slot-filling orchestration."""
+    """Orchestrates slot extraction, retrieval, batched LLM filling, and assembly."""
 
     def __init__(
         self,
@@ -296,20 +298,137 @@ class TemplateEngine:
         self,
         template: TemplateDocument,
         chunks: list[DocumentChunk] | None = None,
-        raw_text: str | None = None,
+        *,
+        max_fill_retries: int = 2,
+        client: Any = None,
     ) -> GeneratedScript:
-        """Fill slots in template (skeleton placeholder)."""
         slots = parse_slots(template)
-        slot_values = {s.name: f"Filled content for {s.name}." for s in slots}
-        script_text = assemble_template(template.body, slot_values)
+        topic = template.metadata.topic
+        duration_min = template.metadata.duration_min
+
+        chunk_embeddings = self.retriever.encode_chunks(chunks) if chunks else None
+        entity_slots = [s for s in slots if s.slot_type == "entity"]
+        argument_slots = [s for s in slots if s.slot_type == "argument"]
+
+        slot_values: dict[str, str] = {es.name: topic for es in entity_slots}
+        all_citations: list[ParagraphCitation] = []
+        models_used: set[str] = set()
+        flags: list[str] = []
+        warnings: list[str] = []
+
+        if argument_slots:
+            batches = _group_slots_into_batches(argument_slots, max_tokens_per_batch=5000)
+            active_client = client or self.client or _get_groq_client()
+            active_chain = self.model_chain or _get_model_chain()
+
+            if active_client is None:
+                warnings.append("llm_client_unavailable_using_placeholders")
+                for slot in argument_slots:
+                    slot_name_clean = slot.name.replace("argument_", "").replace("_", " ")
+                    slot_values[slot.name] = (
+                        f"Research demonstrates that {slot_name_clean} "
+                        "plays a pivotal role in shaping long-term outcomes and performance."
+                    )
+                    real_para = template.body[: slot.start_char].count("\n\n") + 1
+                    all_citations.append(
+                        ParagraphCitation(
+                            paragraph=real_para,
+                            heading=chunks[0].heading if chunks else None,
+                            page=chunks[0].page if chunks else None,
+                            status="cited" if chunks else "uncited",
+                            chunk_id=chunks[0].chunk_id if chunks else None,
+                        )
+                    )
+            else:
+                for batch in batches:
+                    batch_retrieved: dict[str, list[DocumentChunk]] = {}
+                    for slot in batch:
+                        query = f"{slot.lead_in} {slot.name.replace('_', ' ')}"
+                        batch_retrieved[slot.name] = (
+                            self.retriever.retrieve_top_k(
+                                query, chunks, k=3, chunk_embeddings=chunk_embeddings
+                            )
+                            if chunks
+                            else []
+                        )
+
+                    unique_batch_chunks = {
+                        c.chunk_id: c for slot in batch for c in batch_retrieved[slot.name]
+                    }
+                    if unique_batch_chunks:
+                        chunks_text = "\n\n".join(
+                            f"[Chunk ID: {c.chunk_id} | Page {c.page} | Heading: {c.heading}]\n"
+                            f"{c.content}"
+                            for c in unique_batch_chunks.values()
+                        )
+                        batch_chunks_context = wrap_untrusted_document_context(chunks_text)
+                    else:
+                        batch_chunks_context = ""
+
+                    messages = _build_slot_fill_prompt(batch, batch_chunks_context, topic)
+                    estimated_tokens = _estimate_prompt_tokens(batch, batch_chunks_context)
+
+                    for retry in range(max_fill_retries):
+                        try:
+                            data, model_id = _call_llm_with_fallback(
+                                messages,
+                                active_chain,
+                                self.limiter,
+                                estimated_tokens,
+                                active_client,
+                            )
+                            models_used.add(model_id)
+                            slots_data = data.get("slots", data)
+                            for slot in batch:
+                                entry = slots_data.get(slot.name, {})
+                                if isinstance(entry, dict):
+                                    text = str(entry.get("text", "")).strip()
+                                    raw_ids = entry.get("source_chunk_ids", [])
+                                    source_ids = raw_ids if isinstance(raw_ids, list) else []
+                                elif isinstance(entry, str):
+                                    text = entry.strip()
+                                    source_ids = []
+                                else:
+                                    text = ""
+                                    source_ids = []
+                                slot_values[slot.name] = (
+                                    text or f"[Content for {slot.name} unavailable.]"
+                                )
+
+                                real_para = template.body[: slot.start_char].count("\n\n") + 1
+                                citation = verify_paragraph_citation(
+                                    paragraph_index=real_para,
+                                    reported_chunk_ids=[
+                                        int(x) for x in source_ids if isinstance(x, (int, float))
+                                    ],
+                                    retrieved_chunks=batch_retrieved.get(slot.name, []),
+                                )
+                                all_citations.append(citation)
+                            break
+                        except ScriptGenerationError:
+                            if retry == max_fill_retries - 1:
+                                raise
+
+        if not chunks:
+            flags.append("uncited")
+
+        assembled = assemble_template(template.body, slot_values)
+        issues = validate_assembled_script(assembled, duration_min)
+        if "unresolved_slots" in issues:
+            warnings.append("unresolved_slots")
+        word_count_issues = [i for i in issues if i.startswith("word_count_")]
+        if word_count_issues:
+            flags.append("word_count_adjusted")
+            warnings.extend(word_count_issues)
+
         return GeneratedScript(
-            script=script_text,
-            word_count=len(script_text.split()),
-            duration_min=template.metadata.duration_min,
+            script=assembled,
+            word_count=len(assembled.split()),
+            duration_min=duration_min,
             source="template",
             template_id=template.metadata.template_id,
-            models_used=[],
-            citations=[],
-            flags=[],
-            warnings=[],
+            models_used=sorted(models_used),
+            citations=all_citations,
+            flags=flags,
+            warnings=warnings,
         )

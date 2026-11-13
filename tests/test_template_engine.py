@@ -8,11 +8,13 @@ from unittest.mock import MagicMock
 import pytest
 
 from src.text_processing.contracts import (
+    DocumentChunk,
     TemplateDocument,
     TopicMetadata,
 )
 from src.text_processing.limiter import TokenBucketLimiter
 from src.text_processing.template_engine import (
+    TemplateEngine,
     _call_llm_with_fallback,
     _group_slots_into_batches,
     assemble_template,
@@ -128,3 +130,105 @@ class TestSlotBatchingAndFallback:
         )
         assert model_used == "fallback-model"
         assert "slots" in data
+
+
+class TestTemplateEngine:
+    @pytest.fixture()
+    def sample_chunks(self) -> list[DocumentChunk]:
+        return [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Pacing Dynamics",
+                page=1,
+                content="Optimal pacing prevents early glycogen depletion.",
+            ),
+            DocumentChunk(
+                chunk_id=2,
+                heading="Biomechanical Data",
+                page=2,
+                content="Sensors reveal efficiency improvements of 4-6%.",
+            ),
+        ]
+
+    def test_fill_template_mock_llm(
+        self,
+        sample_template: TemplateDocument,
+        sample_chunks: list[DocumentChunk],
+    ) -> None:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content=json.dumps(
+                        {
+                            "slots": {
+                                "argument_core_mechanism": {
+                                    "text": "aerobic capacity dictates pacing thresholds.",
+                                    "source_chunk_ids": [1],
+                                },
+                                "argument_case_evidence": {
+                                    "text": "elite runners exhibit consistent velocity profiles.",
+                                    "source_chunk_ids": [2],
+                                },
+                                "argument_counter_perspective": {
+                                    "text": "early splits force rivals into physiological debt.",
+                                    "source_chunk_ids": [],
+                                },
+                                "argument_synthesis": {
+                                    "text": "integrating biomechanics ensures optimal pacing.",
+                                    "source_chunk_ids": [1, 2],
+                                },
+                            }
+                        }
+                    )
+                )
+            )
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        engine = TemplateEngine(client=mock_client)
+        result = engine.fill_template(sample_template, chunks=sample_chunks)
+
+        assert result.source == "template"
+        assert result.template_id == sample_template.metadata.template_id
+        assert "{{" not in result.script
+        assert len(result.citations) == 4
+
+        c1 = result.citations[0]
+        assert c1.status == "cited"
+        assert c1.chunk_id == 1
+        assert c1.paragraph == 2
+
+    def test_fill_template_no_chunks_marks_uncited(
+        self,
+        sample_template: TemplateDocument,
+    ) -> None:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content=json.dumps(
+                        {
+                            "slots": {
+                                "argument_core_mechanism": {"text": "mech", "source_chunk_ids": []},
+                                "argument_case_evidence": {"text": "ev", "source_chunk_ids": []},
+                                "argument_counter_perspective": {
+                                    "text": "cp",
+                                    "source_chunk_ids": [],
+                                },
+                                "argument_synthesis": {"text": "synth", "source_chunk_ids": []},
+                            }
+                        }
+                    )
+                )
+            )
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        engine = TemplateEngine(client=mock_client)
+        result = engine.fill_template(sample_template, chunks=None)
+
+        assert "uncited" in result.flags
+        assert all(c.status == "uncited" for c in result.citations)
