@@ -425,6 +425,7 @@ def test_get_repos_returns_cached_memory_in_dev(monkeypatch):
     from src.app.db import factory
 
     monkeypatch.setattr(factory.settings, "app_env", "dev")
+    monkeypatch.setattr(factory.settings, "supabase_url", "")
     get_repos.cache_clear()
     try:
         assert get_repos() is get_repos()
@@ -436,6 +437,7 @@ def test_get_repos_rejects_non_dev_without_persistent_adapter(monkeypatch):
     from src.app.db import factory
 
     monkeypatch.setattr(factory.settings, "app_env", "test")
+    monkeypatch.setattr(factory.settings, "supabase_url", "")
     get_repos.cache_clear()
     try:
         with pytest.raises(StorageError):
