@@ -105,7 +105,7 @@ def test_ok_full_hand_calculation(run):
     # round-trip JSON
     assert EvaluationResultV2.model_validate_json(r.model_dump_json()) == r
     assert set(r.model_dump()) == ALL_KEYS
-    assert r.schema_version == "2.0"
+    assert r.schema_version == "2.1"
     # A = 100 (4/4 equal), P_clarity = 100 (không near-miss)
     assert r.components["accuracy"] == 100.0
     assert r.subscores["p_clarity"] == 100.0
@@ -265,7 +265,7 @@ def test_stt_flags_are_merged_in_order_without_duplicates(run):
 
 def _minimal_result() -> EvaluationResultV2:
     return EvaluationResultV2(
-        schema_version="2.0", status="insufficient_audio", reason="low_voiced_ratio",
+        schema_version="2.1", status="insufficient_audio", reason="low_voiced_ratio",
         overall=None, label=None, components={}, subscores={}, accuracy_detail={},
         fluency_detail={}, pitch_detail={}, audio={"duration_s": 1.0, "voiced_ratio": 0.0},
         baseline=None, alignment=[], pauses=[], fillers=[], sentences=[], stt=None,
@@ -292,7 +292,7 @@ def test_api_evaluate_returns_v2_json(monkeypatch):
     cap: dict = {}
     r = _post_eval(monkeypatch, None, cap)
     assert r.status_code == 200
-    assert EvaluationResultV2.model_validate(r.json()).schema_version == "2.0"
+    assert EvaluationResultV2.model_validate(r.json()).schema_version == "2.1"
     assert cap["baseline"] is None
 
 
