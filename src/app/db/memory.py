@@ -143,10 +143,11 @@ class MemoryBaselineRepo:
     def replace_current_baseline(
         self, user_id: UUID, data: NewBaseline
     ) -> tuple[BaselineRow, BaselineRow | None]:
+        if any(row.id == data.id for rows in self._state.baselines.values() for row in rows):
+            raise ConflictError(f"Baseline already exists: {data.id}")
         existing_rows = self._state.baselines.get(user_id, [])
         previous = next((row for row in existing_rows if row.is_current), None)
         new_row = BaselineRow(
-            id=uuid4(),
             user_id=user_id,
             is_current=True,
             recorded_at=_now(),
