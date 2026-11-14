@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import (
@@ -182,14 +183,39 @@ def test_save_compact_session_for_other_user_returns_false():
 def test_replace_current_baseline_keeps_exactly_one_current():
     repos = build_memory_repos()
     user_id = uuid4()
-    data = NewBaseline(hesitation_threshold_s=0.7)
 
-    first, old_first = repos.baselines.replace_current_baseline(user_id, data)
-    second, old_second = repos.baselines.replace_current_baseline(user_id, data)
+    first, old_first = repos.baselines.replace_current_baseline(
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+    )
+    second, old_second = repos.baselines.replace_current_baseline(
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+    )
 
     assert old_first is None
     assert old_second == first
     assert repos.baselines.get_current_baseline(user_id) == second
+
+
+def test_replace_current_baseline_same_id_raises_conflict():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    data = NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+    repos.baselines.replace_current_baseline(user_id, data)
+
+    with pytest.raises(ConflictError):
+        repos.baselines.replace_current_baseline(user_id, data)
+
+
+def test_new_script_rejects_unsupported_duration():
+    with pytest.raises(ValidationError):
+        NewScript(
+            title="Practice",
+            body="A short script.",
+            word_count=3,
+            source="written",
+            content_hash="hash-1",
+            duration_min=7,
+        )
 
 
 def test_profile_patch_only_changes_fields_that_were_set():
@@ -233,7 +259,7 @@ def test_delete_profile_removes_user_database_rows():
     user_id = uuid4()
     repos.profiles.upsert_profile(user_id, ProfileUpsert(target_accent="US"))
     repos.baselines.replace_current_baseline(
-        user_id, NewBaseline(hesitation_threshold_s=0.7)
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
     )
     repos.scripts.create_script(user_id, _new_script())
     repos.sessions.create_session(user_id, _new_session())

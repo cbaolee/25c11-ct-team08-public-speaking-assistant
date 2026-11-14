@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, model_validator
 
 ScriptSource = Literal["generated_template", "generated_llm", "written"]
 SessionStatus = Literal["ok", "insufficient_audio"]
+ScriptDuration = Literal[5, 10, 15, 20]
 
 
 class StorageError(Exception):
@@ -43,6 +44,7 @@ class ProfileRow(ProfileUpsert):
 
 
 class NewBaseline(BaseModel):
+    id: UUID                                # created by the app, the audio path needs it
     hesitation_threshold_s: float
     median_pause_s: float | None = None
     median_f0_hz: float | None = None
@@ -52,7 +54,6 @@ class NewBaseline(BaseModel):
 
 
 class BaselineRow(NewBaseline):
-    id: UUID
     user_id: UUID
     is_current: bool
     recorded_at: datetime
@@ -66,7 +67,7 @@ class NewScript(BaseModel):
     content_hash: str
     topic: str | None = None
     category: str | None = None
-    duration_min: int | None = None
+    duration_min: ScriptDuration | None = None
     citations: list[dict] = Field(default_factory=list)
     template_id: str | None = None
     models_used: list[str] = Field(default_factory=list)
