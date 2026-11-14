@@ -139,3 +139,61 @@ def test_encode_opus_reports_timeout(tmp_path, monkeypatch):
 
     with pytest.raises(AudioEncodingError, match="timed out"):
         encode_opus(tmp_path / "source.wav", tmp_path / "output.webm")
+
+
+def test_encode_opus_passes_timeout_to_ffmpeg(tmp_path, monkeypatch):
+    seen = {}
+
+    def fake_run(*args, **kwargs):
+        seen["timeout"] = kwargs["timeout"]
+        raise subprocess.TimeoutExpired(args[0], timeout=kwargs["timeout"])
+
+    monkeypatch.setattr(session_helpers.subprocess, "run", fake_run)
+
+    with pytest.raises(AudioEncodingError):
+        encode_opus(tmp_path / "source.wav", tmp_path / "output.webm", timeout_s=5)
+    assert seen["timeout"] == 5
+
+
+@pytest.mark.skipif(not _supports_libopus(), reason="FFmpeg with libopus is required")
+def test_encode_opus_overwrites_existing_output(tmp_path):
+    wav_path = tmp_path / "source.wav"
+    out_path = tmp_path / "output.webm"
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-nostdin",
+            "-v",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "sine=frequency=220:duration=1:sample_rate=16000",
+            "-y",
+            str(wav_path),
+        ],
+        check=True,
+    )
+    out_path.write_bytes(b"")
+
+    encode_opus(wav_path, out_path)
+
+    assert out_path.stat().st_size > 0
+
+
+def test_compact_session_orders_mistakes_by_script_position():
+    _, mistakes = compact_session(_load_fixture("evaluation_ok_mixed.json"))
+
+    order = [
+        (item["type"], item.get("status") or item.get("kind") or item.get("text"))
+        for item in mistakes
+    ]
+    assert order == [
+        ("filler", "um"),
+        ("alignment", "del"),
+        ("alignment", "near_miss"),
+        ("pause", "hesitation"),
+        ("alignment", "sub"),
+        ("pause", "forgot_word"),
+        ("alignment", "ins"),
+    ]

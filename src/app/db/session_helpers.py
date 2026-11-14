@@ -7,16 +7,24 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from src.app.config import decode_timeout_s
+
 
 class AudioEncodingError(RuntimeError):
     """Audio could not be encoded as Opus."""
 
 
-def encode_opus(wav_path: Path, out_path: Path) -> None:
-    """Encode a WAV file as 32 kbps Opus in a WebM container."""
+def encode_opus(
+    wav_path: Path, out_path: Path, timeout_s: float = decode_timeout_s
+) -> None:
+    """Encode a WAV file as 32 kbps Opus in a WebM container.
+
+    An existing file at ``out_path`` is overwritten.
+    """
     command = [
         "ffmpeg",
         "-nostdin",
+        "-y",
         "-v",
         "error",
         "-i",
@@ -38,7 +46,7 @@ def encode_opus(wav_path: Path, out_path: Path) -> None:
             capture_output=True,
             text=True,
             check=True,
-            timeout=60,
+            timeout=timeout_s,
         )
     except FileNotFoundError as err:
         raise AudioEncodingError("FFmpeg was not found; install it and retry") from err
@@ -95,13 +103,29 @@ def compact_session(
     ``hyp_word``; fillers and pauses retain ``after_ref_index`` and their
     timing/type details. Insertions retain a null ``ref_index`` and their
     ``sentence_index`` because they have no corresponding reference word.
+
+    Mistakes are ordered by script position: a reference word ``k`` sits at
+    ``k``, while insertions, fillers, and pauses sit right after the previous
+    reference word (``k + 0.5``).
     """
     summary = copy.deepcopy(result)
-    mistakes: list[dict[str, Any]] = []
+    # Script position: word k -> k, "after word k" -> k + 0.5
+    keyed: list[tuple[float, float, str, dict[str, Any]]] = []
 
+    last_ref_index = -1
     for item in result.get("alignment", []):
-        if item["status"] != "equal":
-            mistakes.append(
+        if item["ref_index"] is not None:
+            last_ref_index = item["ref_index"]
+        if item["status"] == "equal":
+            continue
+        position = (
+            item["ref_index"] if item["ref_index"] is not None else last_ref_index + 0.5
+        )
+        keyed.append(
+            (
+                position,
+                float("-inf"),
+                "alignment",
                 {
                     "type": "alignment",
                     "status": item["status"],
@@ -109,44 +133,46 @@ def compact_session(
                     "ref_word": item["ref_word"],
                     "hyp_word": item["hyp_word"],
                     "sentence_index": item["sentence_index"],
-                }
+                },
             )
+        )
 
     for filler in result.get("fillers", []):
-        mistakes.append(
-            {
-                "type": "filler",
-                "after_ref_index": filler["after_ref_index"],
-                "text": filler["text"],
-                "source": filler["source"],
-                "start_s": filler["start_s"],
-                "end_s": filler["end_s"],
-            }
+        keyed.append(
+            (
+                filler["after_ref_index"] + 0.5,
+                filler["start_s"],
+                "filler",
+                {
+                    "type": "filler",
+                    "after_ref_index": filler["after_ref_index"],
+                    "text": filler["text"],
+                    "source": filler["source"],
+                    "start_s": filler["start_s"],
+                    "end_s": filler["end_s"],
+                },
+            )
         )
 
     for pause in result.get("pauses", []):
         if pause["kind"] in {"hesitation", "forgot_word"}:
-            mistakes.append(
-                {
-                    "type": "pause",
-                    "kind": pause["kind"],
-                    "after_ref_index": pause["after_ref_index"],
-                    "start_s": pause["start_s"],
-                    "end_s": pause["end_s"],
-                }
+            keyed.append(
+                (
+                    pause["after_ref_index"] + 0.5,
+                    pause["start_s"],
+                    "pause",
+                    {
+                        "type": "pause",
+                        "kind": pause["kind"],
+                        "after_ref_index": pause["after_ref_index"],
+                        "start_s": pause["start_s"],
+                        "end_s": pause["end_s"],
+                    },
+                )
             )
 
-    mistakes.sort(
-        key=lambda item: (
-            item.get("ref_index")
-            if item.get("ref_index") is not None
-            else item.get("after_ref_index")
-            if item.get("after_ref_index") is not None
-            else item.get("sentence_index", -1),
-            item.get("start_s", float("-inf")),
-            item["type"],
-        )
-    )
+    keyed.sort(key=lambda entry: entry[:3])
+    mistakes = [entry[3] for entry in keyed]
 
     for key in ("alignment", "pauses", "fillers", "sentences"):
         summary.pop(key, None)
