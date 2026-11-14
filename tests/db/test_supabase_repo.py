@@ -11,7 +11,7 @@ import os
 from uuid import UUID, uuid4
 
 import pytest
-from dotenv import load_dotenv
+from dotenv import dotenv_values
 
 from src.app.config import settings
 from src.app.db import factory
@@ -69,7 +69,11 @@ def test_newest_page_rejects_bad_limit():
 
 # ---------- integration tests (psc-dev only) ----------
 
-load_dotenv()
+
+def _second_user_id() -> str:
+    # Read only this one value; load_dotenv() would leak all of .env into os.environ
+    # and change other tests that read os.getenv (for example the Groq generator).
+    return os.getenv("DEV2_USER_ID") or dotenv_values(".env").get("DEV2_USER_ID") or ""
 
 
 def _new_session(*, overall: float = 80.0) -> NewSession:
@@ -85,7 +89,7 @@ def _new_session(*, overall: float = 80.0) -> NewSession:
 
 @pytest.fixture
 def env():
-    second = os.getenv("DEV2_USER_ID", "")
+    second = _second_user_id()
     required = (settings.supabase_url, settings.supabase_service_key, settings.dev_user_id, second)
     if not all(required):
         pytest.skip("Supabase dev config (incl. DEV2_USER_ID) is missing")
