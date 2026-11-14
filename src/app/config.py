@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     retention_full_sessions: int = 10
     signed_url_ttl_s: int = 600
 
+    dev_user_id: str = ""  # TODO(auth): remove when real auth is merged
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
