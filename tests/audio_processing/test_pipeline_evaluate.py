@@ -7,12 +7,15 @@ Mọi số liệu là số tính tay (ghi ở từng test), không phải số �
 
 import json
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
+from src.app.db.factory import build_memory_repos, get_repos
+from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing import pipeline, scoring
 from src.audio_processing.contracts import (
     BaselineProfile,
@@ -274,49 +277,31 @@ def _minimal_result() -> EvaluationResultV2:
     )
 
 
-def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
+def _post_eval(monkeypatch, captured: dict):
     def fake(audio_path, script, baseline, *, vad_params):
         captured["baseline"] = baseline
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
-    data = {"script": "Hello."}
-    if baseline_profile is not None:
-        data["baseline_profile"] = baseline_profile
-    return TestClient(main.app).post(
-        "/api/evaluate", files={"audio": ("a.wav", b"x", "audio/wav")}, data=data
-    )
+    # Baseline now comes from the DB (PR 6): use an empty in-memory repo and a test user.
+    repos = build_memory_repos()
+    main.app.dependency_overrides[get_repos] = lambda: repos
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=uuid4())
+    try:
+        return TestClient(main.app).post(
+            "/api/evaluate", files={"audio": ("a.wav", b"x", "audio/wav")},
+            data={"script": "Hello."},
+        )
+    finally:
+        main.app.dependency_overrides.clear()
 
 
 def test_api_evaluate_returns_v2_json(monkeypatch):
     cap: dict = {}
-    r = _post_eval(monkeypatch, None, cap)
+    r = _post_eval(monkeypatch, cap)
     assert r.status_code == 200
     assert EvaluationResultV2.model_validate(r.json()).schema_version == "2.0"
     assert cap["baseline"] is None
-
-
-def test_api_evaluate_baseline_without_loudness_ok(monkeypatch):
-    cap: dict = {}
-    body = {"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 120.0,
-            "flags": []}  # thiếu mean_loudness_db
-    r = _post_eval(monkeypatch, json.dumps(body), cap)
-    assert r.status_code == 200
-    assert cap["baseline"].mean_loudness_db is None
-    assert cap["baseline"].hesitation_threshold_s == 1.0
-
-
-@pytest.mark.parametrize("bad", [
-    '{"median_pause_s": 0.5, "bogus": 1}',   # thiếu trường + thừa trường
-    '{"median_pause_s": 0.5, "hesitation_threshold_s": "abc", "median_f0_hz": 1.0, "flags": []}',
-    '{"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 1.0, "flags": "x"}',
-    "[1, 2]",
-    "not json",
-])
-def test_api_evaluate_bad_baseline_is_422(monkeypatch, bad):
-    r = _post_eval(monkeypatch, bad, {})
-    assert r.status_code == 422
-    assert r.json()["error_code"] == "invalid_baseline"
 
 
 # ---- Bổ sung (review bước 10): số dưới đây là số tự tính tay, không phải số đo ----
