@@ -1,19 +1,24 @@
-"""Test kiểm đầu vào baseline_profile của POST /api/evaluate (CLAUDE.md 1.9.2 #23).
+"""Tests for how POST /api/evaluate gets its baseline (server reads it from the DB, M6).
 
-evaluate_session bị monkeypatch: chỉ kiểm lớp parse/validate ở main.py.
-Mọi số trong test là số tự chọn để chạm biên (không phải số đo).
+evaluate_session is monkeypatched: these tests only check which baseline main.py passes in.
+Numbers in profiles are picked by hand for the tests (not measurements).
 """
 
 import json
-from dataclasses import asdict
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
-from src.audio_processing.baseline import compute_baseline_pause_profile
-from src.audio_processing.contracts import BaselineProfile, Pause
+from src.app.db.factory import build_memory_repos, get_repos
+from src.app.db.models import NewBaseline, StorageError
+from src.app.deps import CurrentUser, get_current_user
+from src.audio_processing.contracts import BaselineProfile
 from src.audio_processing.result_schema import EvaluationResultV2
+
+USER_A = uuid4()
+USER_B = uuid4()
 
 
 def _minimal_result() -> EvaluationResultV2:
@@ -27,125 +32,85 @@ def _minimal_result() -> EvaluationResultV2:
     )
 
 
-def _post(monkeypatch, raw: str, captured: dict | None = None):
+@pytest.fixture
+def current():
+    return {"id": USER_A}
+
+
+@pytest.fixture
+def repos(current):
+    repos = build_memory_repos()
+    main.app.dependency_overrides[get_repos] = lambda: repos
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=current["id"])
+    yield repos
+    main.app.dependency_overrides.clear()
+
+
+def _store_baseline(repos, user_id, threshold: float = 0.9):
+    repos.baselines.replace_current_baseline(
+        user_id,
+        NewBaseline(id=uuid4(), hesitation_threshold_s=threshold, median_pause_s=0.45,
+                    median_f0_hz=110.0, mean_loudness_db=62.0, flags=["no_f0"]),
+    )
+
+
+def _post(monkeypatch, captured: dict, baseline_profile: str = ""):
     def fake(audio_path, script, baseline, *, vad_params):
-        if captured is not None:
-            captured["baseline"] = baseline
+        captured["baseline"] = baseline
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
     return TestClient(main.app).post(
         "/api/evaluate",
         files={"audio": ("a.wav", b"x", "audio/wav")},
-        data={"script": "Hello.", "baseline_profile": raw},
+        data={"script": "Hello.", "baseline_profile": baseline_profile},
     )
 
 
-def _body(**over) -> str:
-    base = {"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 120.0,
-            "mean_loudness_db": 60.0, "flags": []}
-    base.update(over)
-    return json.dumps(base)
-
-
-def _assert_invalid(r):
-    assert r.status_code == 422
-    assert r.json()["error_code"] == "invalid_baseline"
-
-
-# ---- Việc 1: số nguyên khổng lồ -> OverflowError phải thành 422, không phải 500 ----
-
-@pytest.mark.parametrize("field", ["hesitation_threshold_s", "median_pause_s", "median_f0_hz",
-                                   "mean_loudness_db"])
-def test_huge_integer_is_422_not_500(monkeypatch, field):
-    raw = _body(**{field: 123456789}).replace("123456789", "9" * 400)
-    assert "9" * 400 in raw
-    _assert_invalid(_post(monkeypatch, raw))
-
-
-# ---- Việc 2: miền giá trị ----
-
-@pytest.mark.parametrize("bad", [0.69, 1.21, 0.0, -1.0])
-def test_threshold_out_of_range_rejected(monkeypatch, bad):
-    _assert_invalid(_post(monkeypatch, _body(hesitation_threshold_s=bad)))
-
-
-@pytest.mark.parametrize("ok", [0.7, 1.2])
-def test_threshold_at_bounds_accepted(monkeypatch, ok):
+def test_evaluate_uses_stored_baseline(monkeypatch, repos):
+    _store_baseline(repos, USER_A)
     cap: dict = {}
-    r = _post(monkeypatch, _body(hesitation_threshold_s=ok), cap)
+    r = _post(monkeypatch, cap)
     assert r.status_code == 200
-    assert cap["baseline"].hesitation_threshold_s == ok
-
-
-def test_threshold_float_noise_below_0_7_accepted(monkeypatch):
-    # 0.6999999999999997 = 2 * 0.34999999999999987 (nhiễu float); round(.,6) -> 0.7 -> hợp lệ
-    assert _post(monkeypatch, _body(hesitation_threshold_s=0.6999999999999997)).status_code == 200
-
-
-@pytest.mark.parametrize("bad", [0.34, 0.0, -0.5])
-def test_median_pause_below_min_pause_rejected(monkeypatch, bad):
-    _assert_invalid(_post(monkeypatch, _body(median_pause_s=bad)))
-
-
-def test_median_pause_null_and_boundary_accepted(monkeypatch):
-    assert _post(monkeypatch, _body(median_pause_s=None)).status_code == 200
-    assert _post(monkeypatch, _body(median_pause_s=0.35)).status_code == 200
-    # 0.34999999999999987 -> round 6 -> 0.35
-    assert _post(monkeypatch, _body(median_pause_s=0.34999999999999987)).status_code == 200
-
-
-@pytest.mark.parametrize("bad", [0.0, -100.0])
-def test_median_f0_not_positive_rejected(monkeypatch, bad):
-    _assert_invalid(_post(monkeypatch, _body(median_f0_hz=bad)))
-
-
-def test_median_f0_null_accepted(monkeypatch):
-    assert _post(monkeypatch, _body(median_f0_hz=None)).status_code == 200
-
-
-def test_loudness_any_finite_or_null_accepted(monkeypatch):
-    assert _post(monkeypatch, _body(mean_loudness_db=-20.0)).status_code == 200
-    assert _post(monkeypatch, _body(mean_loudness_db=None)).status_code == 200
-
-
-@pytest.mark.parametrize("bad", ['"x"', "true", "NaN", "Infinity"])
-def test_loudness_not_finite_number_rejected(monkeypatch, bad):
-    raw = _body().replace("60.0", bad)
-    _assert_invalid(_post(monkeypatch, raw))
-
-
-@pytest.mark.parametrize("flags", [["no_baseline"], ["bogus"], ["no_f0", "filler_from_vad_only"]])
-def test_unknown_flag_rejected(monkeypatch, flags):
-    _assert_invalid(_post(monkeypatch, _body(flags=flags)))
-
-
-def test_allowed_flags_accepted(monkeypatch):
-    r = _post(monkeypatch, _body(flags=["baseline_pause_unreliable", "no_f0"]))
-    assert r.status_code == 200
-
-
-# ---- round-trip: profile đúng dạng analyze_baseline sinh ra phải được nhận lại ----
-
-def test_round_trip_profile_from_analyze_baseline_shape(monkeypatch):
-    pauses = [Pause(start_s=0.0, end_s=0.4)] * 5  # median 0.4 -> ngưỡng 0.8, flags []
-    pp = compute_baseline_pause_profile(pauses)
-    profile = BaselineProfile(
-        median_pause_s=pp["median_pause_s"], hesitation_threshold_s=pp["hesitation_threshold_s"],
-        median_f0_hz=118.5, mean_loudness_db=61.0, flags=pp["flags"],
+    assert cap["baseline"] == BaselineProfile(
+        median_pause_s=0.45, hesitation_threshold_s=0.9, median_f0_hz=110.0,
+        mean_loudness_db=62.0, flags=["no_f0"],
     )
+
+
+def test_evaluate_without_baseline_passes_none(monkeypatch, repos):
+    # evaluate_session turns baseline=None into the "no_baseline" flag
     cap: dict = {}
-    r = _post(monkeypatch, json.dumps(asdict(profile)), cap)
+    assert _post(monkeypatch, cap).status_code == 200
+    assert cap["baseline"] is None
+
+
+def test_evaluate_ignores_client_baseline_profile(monkeypatch, repos):
+    fake_profile = json.dumps({"median_pause_s": 0.5, "hesitation_threshold_s": 1.2,
+                               "median_f0_hz": 300.0, "mean_loudness_db": 99.0, "flags": []})
+    cap: dict = {}
+    r = _post(monkeypatch, cap, baseline_profile=fake_profile)
     assert r.status_code == 200
-    assert cap["baseline"] == profile
+    assert cap["baseline"] is None
 
 
-def test_round_trip_profile_with_nulls_and_flags(monkeypatch):
-    pp = compute_baseline_pause_profile([])  # median None, ngưỡng 0.7, unreliable
-    profile = BaselineProfile(
-        median_pause_s=pp["median_pause_s"], hesitation_threshold_s=pp["hesitation_threshold_s"],
-        median_f0_hz=None, mean_loudness_db=None, flags=pp["flags"] + ["no_f0"],
-    )
+def test_evaluate_ignores_invalid_client_baseline_profile(monkeypatch, repos):
     cap: dict = {}
-    assert _post(monkeypatch, json.dumps(asdict(profile)), cap).status_code == 200
-    assert cap["baseline"] == profile
+    assert _post(monkeypatch, cap, baseline_profile="not json").status_code == 200
+
+
+def test_evaluate_other_users_baseline_not_used(monkeypatch, repos, current):
+    _store_baseline(repos, USER_B)
+    cap: dict = {}
+    _post(monkeypatch, cap)
+    assert cap["baseline"] is None
+
+
+def test_evaluate_baseline_storage_error_returns_503(monkeypatch, repos):
+    def broken(user_id):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.baselines, "get_current_baseline", broken)
+    r = _post(monkeypatch, {})
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "baseline_unavailable"
