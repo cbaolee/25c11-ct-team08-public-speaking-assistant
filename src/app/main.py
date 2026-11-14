@@ -5,18 +5,20 @@ import shutil
 import tempfile
 from pathlib import Path
 from time import perf_counter
+from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, UploadFile, File, Form, Request
+from fastapi import Depends, FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import settings
-from src.app.db.factory import get_repos
+from src.app.db.factory import Repos, get_repos
 from src.app.db.models import NewSession, StorageError, build_object_path
 from src.app.db.session_helpers import encode_opus, split_series
+from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing.contracts import (
     AudioRejected, 
     InsufficientAudio, 
@@ -58,36 +60,22 @@ async def audio_rejected_handler(request: Request, exc: AudioRejected):
 _BASELINE_REQUIRED = ("median_pause_s", "hesitation_threshold_s", "median_f0_hz", "flags")
 
 
-def _current_user_id() -> UUID | None:
-    user_id_raw = settings.dev_user_id.strip()
-    if user_id_raw:
-        try:
-            return UUID(user_id_raw)
-        except ValueError:
-            return None
-    try:
-        from src.app.deps import get_current_user
-
-        return get_current_user().id
-    except Exception:
-        return None
-
-
 def _save_result_to_history(
     *,
+    repos: Repos,
     user_id: UUID,
     script: str,
     result,
     source_audio_path: Path | None,
 ) -> str | None:
-    repos = get_repos()
     session_id = uuid4()
     uploaded_paths: list[tuple[str, str]] = []
     try:
         if result.status == "ok":
             if source_audio_path is None or not source_audio_path.exists():
                 raise StorageError("Audio file is missing for session save")
-            encoded_path = source_audio_path.with_suffix(".webm")
+            # Own file name: the upload may already be .webm, FFmpeg refuses to overwrite input
+            encoded_path = source_audio_path.parent / f"{session_id}.webm"
             encode_opus(source_audio_path, encoded_path)
             audio_path = build_object_path(user_id, session_id, ".webm")
             audio_bytes = encoded_path.read_bytes()
@@ -226,9 +214,11 @@ def _parse_baseline(raw: str) -> BaselineProfile:
 
 @app.post("/api/evaluate")
 async def evaluate_endpoint(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
     audio: UploadFile = File(...),
     script: str = Form(...),
-    baseline_profile: str = Form("")
+    baseline_profile: str = Form(""),
 ):
     """
     Endpoint xử lý chấm điểm phiên luyện tập thuyết trình[cite: 1].
@@ -261,27 +251,26 @@ async def evaluate_endpoint(
 
         session_id = None
         saved = False
-        user_id = _current_user_id()
-        if user_id is not None:
-            save_started = perf_counter()
-            try:
-                session_id = await run_in_threadpool(
-                    _save_result_to_history,
-                    user_id=user_id,
-                    script=script,
-                    result=result,
-                    source_audio_path=audio_path,
-                )
-                saved = session_id is not None
-            except Exception:
-                logger.exception("Failed to save evaluation result to session history")
-                saved = False
-                session_id = None
-            finally:
-                logger.info(
-                    "Evaluation session save attempt took %.3f seconds",
-                    perf_counter() - save_started,
-                )
+        save_started = perf_counter()
+        try:
+            session_id = await run_in_threadpool(
+                _save_result_to_history,
+                repos=repos,
+                user_id=user.id,
+                script=script,
+                result=result,
+                source_audio_path=audio_path,
+            )
+            saved = session_id is not None
+        except Exception:
+            logger.exception("Failed to save evaluation result to session history")
+            saved = False
+            session_id = None
+        finally:
+            logger.info(
+                "Evaluation session save attempt took %.3f seconds",
+                perf_counter() - save_started,
+            )
 
         return result.model_copy(
             update={"session_id": session_id, "saved": saved}
