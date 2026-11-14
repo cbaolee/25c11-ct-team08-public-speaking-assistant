@@ -1,14 +1,17 @@
 import json
+import logging
 import math
 import shutil
 import tempfile
 from pathlib import Path
+from time import perf_counter
 from uuid import UUID, uuid4
 
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from src.app.config import settings
 from src.app.db.factory import get_repos
@@ -26,6 +29,7 @@ from src.audio_processing.result_schema import BaselineResponse
 WEB_DIR = Path(__file__).resolve().parents[1] / "web" 
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
 
@@ -146,7 +150,7 @@ def _save_result_to_history(
             try:
                 repos.files.delete_files(user_id, bucket, [path])
             except Exception:
-                pass
+                logger.exception("Failed to clean up uploaded session object in %s bucket", bucket)
         raise
 
 
@@ -259,8 +263,10 @@ async def evaluate_endpoint(
         saved = False
         user_id = _current_user_id()
         if user_id is not None:
+            save_started = perf_counter()
             try:
-                session_id = _save_result_to_history(
+                session_id = await run_in_threadpool(
+                    _save_result_to_history,
                     user_id=user_id,
                     script=script,
                     result=result,
@@ -268,8 +274,14 @@ async def evaluate_endpoint(
                 )
                 saved = session_id is not None
             except Exception:
+                logger.exception("Failed to save evaluation result to session history")
                 saved = False
                 session_id = None
+            finally:
+                logger.info(
+                    "Evaluation session save attempt took %.3f seconds",
+                    perf_counter() - save_started,
+                )
 
         return result.model_copy(
             update={"session_id": session_id, "saved": saved}
