@@ -80,7 +80,7 @@ def _insufficient(
 ) -> EvaluationResultV2:
     """Kết quả không chấm (ADR-004 D1): mọi điểm null, danh sách rỗng, KHÔNG điền 0."""
     return EvaluationResultV2(
-        schema_version="2.0", status="insufficient_audio", reason=reason,  # type: ignore[arg-type]
+        schema_version="2.1", status="insufficient_audio", reason=reason,  # type: ignore[arg-type]
         overall=None, label=None,
         components=dict.fromkeys(_COMPONENT_KEYS),
         subscores=dict.fromkeys(_SUBSCORE_KEYS),
@@ -181,7 +181,7 @@ def evaluate_session(
                              baseline.flags if baseline is not None else ["no_baseline"])
 
         return EvaluationResultV2(
-            schema_version="2.0", status="ok", reason=None,
+            schema_version="2.1", status="ok", reason=None,
             overall=overall, label=get_label(overall),  # type: ignore[arg-type]
             components={"accuracy": acc.accuracy, "fluency": fluency,
                         "pronunciation": pronunciation, "semantic": semantic},

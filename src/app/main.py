@@ -1,13 +1,22 @@
 import json
+import logging
 import math
 import shutil
 import tempfile
 from pathlib import Path
+from time import perf_counter
+from uuid import UUID, uuid4
+
 from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
+from src.app.config import settings
+from src.app.db.factory import get_repos
+from src.app.db.models import NewSession, StorageError, build_object_path
+from src.app.db.session_helpers import encode_opus, split_series
 from src.audio_processing.contracts import (
     AudioRejected, 
     InsufficientAudio, 
@@ -20,6 +29,7 @@ from src.audio_processing.result_schema import BaselineResponse
 WEB_DIR = Path(__file__).resolve().parents[1] / "web" 
 
 app = FastAPI()
+logger = logging.getLogger(__name__)
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
 
@@ -46,6 +56,102 @@ async def audio_rejected_handler(request: Request, exc: AudioRejected):
 
 
 _BASELINE_REQUIRED = ("median_pause_s", "hesitation_threshold_s", "median_f0_hz", "flags")
+
+
+def _current_user_id() -> UUID | None:
+    user_id_raw = settings.dev_user_id.strip()
+    if user_id_raw:
+        try:
+            return UUID(user_id_raw)
+        except ValueError:
+            return None
+    try:
+        from src.app.deps import get_current_user
+
+        return get_current_user().id
+    except Exception:
+        return None
+
+
+def _save_result_to_history(
+    *,
+    user_id: UUID,
+    script: str,
+    result,
+    source_audio_path: Path | None,
+) -> str | None:
+    repos = get_repos()
+    session_id = uuid4()
+    uploaded_paths: list[tuple[str, str]] = []
+    try:
+        if result.status == "ok":
+            if source_audio_path is None or not source_audio_path.exists():
+                raise StorageError("Audio file is missing for session save")
+            encoded_path = source_audio_path.with_suffix(".webm")
+            encode_opus(source_audio_path, encoded_path)
+            audio_path = build_object_path(user_id, session_id, ".webm")
+            audio_bytes = encoded_path.read_bytes()
+            repos.files.upload_file(
+                user_id,
+                settings.audio_bucket,
+                audio_path,
+                audio_bytes,
+                "audio/webm",
+                upsert=True,
+            )
+            uploaded_paths.append((settings.audio_bucket, audio_path))
+
+            result_json = result.model_dump(mode="json")
+            result_without_series, series_json = split_series(result_json)
+            series_path = build_object_path(user_id, session_id, ".series.json")
+            repos.files.upload_file(
+                user_id,
+                settings.series_bucket,
+                series_path,
+                json.dumps(series_json, separators=(",", ":")).encode("utf-8"),
+                "application/json",
+                upsert=True,
+            )
+            uploaded_paths.append((settings.series_bucket, series_path))
+        else:
+            result_without_series = result.model_dump(mode="json")
+            series_path = None
+            audio_path = None
+
+        stt = result_without_series.get("stt") or {}
+        session_row = NewSession(
+            id=session_id,
+            script_snapshot=script,
+            status=result.status,
+            result=result_without_series,
+            result_schema_version=result.schema_version,
+            reason=result.reason,
+            overall=result.overall,
+            label=result.label,
+            components=result.components,
+            audio_path=audio_path,
+            series_path=series_path,
+            audio_duration_s=(
+                result.audio.get("duration_s")
+                if isinstance(result.audio, dict)
+                else None
+            ),
+            stt_provider=(stt.get("provider") if isinstance(stt, dict) else None),
+            stt_model=(stt.get("model") if isinstance(stt, dict) else None),
+            topic=None,
+            accent=None,
+            baseline_id=None,
+            script_id=None,
+        )
+        repos.sessions.create_session(user_id, session_row)
+        return str(session_id)
+    except Exception:
+        for bucket, path in uploaded_paths:
+            try:
+                repos.files.delete_files(user_id, bucket, [path])
+            except Exception:
+                logger.exception("Failed to clean up uploaded session object in %s bucket", bucket)
+        raise
 
 
 def _num(value, name: str, *, nullable: bool) -> float | None:
@@ -145,16 +251,41 @@ async def evaluate_endpoint(
         audio_path = Path(temp_dir) / (audio.filename or "uploaded.wav")
         with open(audio_path, "wb") as buffer:
             shutil.copyfileobj(audio.file, buffer)
-            
-        # Không cần truyền settings nữa vì pipeline.py đã tự import
+
         result = evaluate_session(
             audio_path=audio_path,
             script=script,
             baseline=baseline,
-            vad_params=vad_params
+            vad_params=vad_params,
         )
-        
-        return result.model_dump(mode="json")
+
+        session_id = None
+        saved = False
+        user_id = _current_user_id()
+        if user_id is not None:
+            save_started = perf_counter()
+            try:
+                session_id = await run_in_threadpool(
+                    _save_result_to_history,
+                    user_id=user_id,
+                    script=script,
+                    result=result,
+                    source_audio_path=audio_path,
+                )
+                saved = session_id is not None
+            except Exception:
+                logger.exception("Failed to save evaluation result to session history")
+                saved = False
+                session_id = None
+            finally:
+                logger.info(
+                    "Evaluation session save attempt took %.3f seconds",
+                    perf_counter() - save_started,
+                )
+
+        return result.model_copy(
+            update={"session_id": session_id, "saved": saved}
+        ).model_dump(mode="json")
 
 
 @app.post("/api/baseline")

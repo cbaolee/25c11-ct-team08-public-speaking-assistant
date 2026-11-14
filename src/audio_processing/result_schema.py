@@ -57,7 +57,7 @@ class Series(BaseModel):
 
 
 class EvaluationResultV2(BaseModel):
-    schema_version: Literal["2.0"]
+    schema_version: Literal["2.1"]
     status: Literal["ok", "insufficient_audio"]
     reason: Literal["low_voiced_ratio", "empty_transcript"] | None
     overall: float | None  # null nếu bất kỳ thành phần nào null (§8)
@@ -79,6 +79,8 @@ class EvaluationResultV2(BaseModel):
     flags: list[str]  # no_baseline, baseline_pause_unreliable, filler_from_vad_only, no_f0, cmu_oov
     warnings: list[str]
     display_only: dict  # {loudness_db: Series|None, loudness_ref_db: float|None}
+    session_id: str | None = None
+    saved: bool = False
 
 
 class BaselineResponse(BaseModel):
