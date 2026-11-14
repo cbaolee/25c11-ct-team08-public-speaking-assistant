@@ -37,3 +37,5 @@ dependencies = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+markers = ["integration: needs a real Supabase project (psc-dev)"]
+addopts = "-m 'not integration'"
