@@ -7,12 +7,15 @@ Mọi số liệu là số tính tay (ghi ở từng test), không phải số �
 
 import json
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
+from src.app.db.factory import build_memory_repos, get_repos
+from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing import pipeline, scoring
 from src.audio_processing.contracts import (
     BaselineProfile,
@@ -272,6 +275,14 @@ def _minimal_result() -> EvaluationResultV2:
         flags=["no_baseline"], warnings=[],
         display_only={"loudness_db": None, "loudness_ref_db": None},
     )
+
+
+@pytest.fixture(autouse=True)
+def _signed_in_user():
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=uuid4())
+    main.app.dependency_overrides[get_repos] = build_memory_repos
+    yield
+    main.app.dependency_overrides.clear()
 
 
 def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):

@@ -6,15 +6,28 @@ Mọi số trong test là số tự chọn để chạm biên (không phải s�
 
 import json
 from dataclasses import asdict
-from uuid import uuid4
+from pathlib import Path
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
+from src.app.db.factory import build_memory_repos, get_repos
+from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing.baseline import compute_baseline_pause_profile
 from src.audio_processing.contracts import BaselineProfile, Pause
 from src.audio_processing.result_schema import EvaluationResultV2
+
+FIXTURES = Path(__file__).parent / "fixtures"
+
+
+@pytest.fixture(autouse=True)
+def _signed_in_user():
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=uuid4())
+    main.app.dependency_overrides[get_repos] = build_memory_repos
+    yield
+    main.app.dependency_overrides.clear()
 
 
 def _minimal_result() -> EvaluationResultV2:
@@ -33,7 +46,6 @@ def _post(
     raw: str,
     captured: dict | None = None,
     *,
-    user_id=None,
     save_handler=None,
 ):
     def fake(audio_path, script, baseline, *, vad_params):
@@ -42,7 +54,6 @@ def _post(
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
-    monkeypatch.setattr(main, "_current_user_id", lambda: user_id)
     if save_handler is not None:
         monkeypatch.setattr(main, "_save_result_to_history", save_handler)
     return TestClient(main.app).post(
@@ -173,7 +184,6 @@ def test_evaluate_returns_saved_session_id(monkeypatch):
     response = _post(
         monkeypatch,
         "",
-        user_id=uuid4(),
         save_handler=fake_save,
     )
 
@@ -196,7 +206,6 @@ def test_evaluate_save_failure_keeps_result_and_logs_without_script(
         "evaluate_session",
         lambda audio_path, script, baseline, *, vad_params: _minimal_result(),
     )
-    monkeypatch.setattr(main, "_current_user_id", lambda: uuid4())
     monkeypatch.setattr(main, "_save_result_to_history", fail_save)
 
     response = TestClient(main.app).post(
@@ -211,3 +220,67 @@ def test_evaluate_save_failure_keeps_result_and_logs_without_script(
     assert response.json()["session_id"] is None
     assert "Failed to save evaluation result to session history" in caplog.text
     assert script not in caplog.text
+
+
+def _ok_result() -> EvaluationResultV2:
+    return EvaluationResultV2.model_validate_json(
+        (FIXTURES / "evaluation_ok.json").read_text(encoding="utf-8")
+    )
+
+
+def _fake_encode(source, out):
+    assert source != out  # FFmpeg refuses to overwrite its own input
+    out.write_bytes(b"opus")
+
+
+def test_save_webm_upload_stores_audio_and_series(monkeypatch, tmp_path):
+    repos = build_memory_repos()
+    monkeypatch.setattr(main, "encode_opus", _fake_encode)
+    upload = tmp_path / "recording.webm"
+    upload.write_bytes(b"raw")
+    user_id = uuid4()
+
+    session_id = main._save_result_to_history(
+        repos=repos,
+        user_id=user_id, script="Hello.", result=_ok_result(), source_audio_path=upload
+    )
+
+    row = repos.sessions.get_session(user_id, UUID(session_id))
+    assert row.audio_path == f"{user_id}/{session_id}.webm"
+    assert row.series_path == f"{user_id}/{session_id}.series.json"
+    assert row.result["pitch_detail"]["contour_st"] is None
+    assert repos.files._state.files[("audio", row.audio_path)] == b"opus"
+
+
+def test_save_insufficient_audio_stores_row_without_files(monkeypatch):
+    repos = build_memory_repos()
+    user_id = uuid4()
+
+    session_id = main._save_result_to_history(
+        repos=repos,
+        user_id=user_id, script="Hello.", result=_minimal_result(), source_audio_path=None
+    )
+
+    row = repos.sessions.get_session(user_id, UUID(session_id))
+    assert row.status == "insufficient_audio"
+    assert row.audio_path is None and row.series_path is None
+    assert repos.files._state.files == {}
+
+
+def test_save_insert_failure_removes_uploaded_files(monkeypatch, tmp_path):
+    repos = build_memory_repos()
+    monkeypatch.setattr(main, "encode_opus", _fake_encode)
+
+    def fail_insert(*args, **kwargs):
+        raise RuntimeError("insert failed")
+
+    monkeypatch.setattr(repos.sessions, "create_session", fail_insert)
+    upload = tmp_path / "recording.webm"
+    upload.write_bytes(b"raw")
+
+    with pytest.raises(RuntimeError):
+        main._save_result_to_history(
+            repos=repos,
+            user_id=uuid4(), script="Hello.", result=_ok_result(), source_audio_path=upload
+        )
+    assert repos.files._state.files == {}
