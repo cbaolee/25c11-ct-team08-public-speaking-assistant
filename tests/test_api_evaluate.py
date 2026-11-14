@@ -18,7 +18,7 @@ from src.audio_processing.result_schema import EvaluationResultV2
 
 def _minimal_result() -> EvaluationResultV2:
     return EvaluationResultV2(
-        schema_version="2.0", status="insufficient_audio", reason="low_voiced_ratio",
+        schema_version="2.1", status="insufficient_audio", reason="low_voiced_ratio",
         overall=None, label=None, components={}, subscores={}, accuracy_detail={},
         fluency_detail={}, pitch_detail={}, audio={"duration_s": 1.0, "voiced_ratio": 0.0},
         baseline=None, alignment=[], pauses=[], fillers=[], sentences=[], stt=None,
