@@ -6,6 +6,7 @@ Mọi số trong test là số tự chọn để chạm biên (không phải s�
 
 import json
 from dataclasses import asdict
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -27,13 +28,23 @@ def _minimal_result() -> EvaluationResultV2:
     )
 
 
-def _post(monkeypatch, raw: str, captured: dict | None = None):
+def _post(
+    monkeypatch,
+    raw: str,
+    captured: dict | None = None,
+    *,
+    user_id=None,
+    save_handler=None,
+):
     def fake(audio_path, script, baseline, *, vad_params):
         if captured is not None:
             captured["baseline"] = baseline
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
+    monkeypatch.setattr(main, "_current_user_id", lambda: user_id)
+    if save_handler is not None:
+        monkeypatch.setattr(main, "_save_result_to_history", save_handler)
     return TestClient(main.app).post(
         "/api/evaluate",
         files={"audio": ("a.wav", b"x", "audio/wav")},
@@ -149,3 +160,54 @@ def test_round_trip_profile_with_nulls_and_flags(monkeypatch):
     cap: dict = {}
     assert _post(monkeypatch, json.dumps(asdict(profile)), cap).status_code == 200
     assert cap["baseline"] == profile
+
+
+def test_evaluate_returns_saved_session_id(monkeypatch):
+    session_id = uuid4()
+    saved: dict = {}
+
+    def fake_save(**kwargs):
+        saved.update(kwargs)
+        return str(session_id)
+
+    response = _post(
+        monkeypatch,
+        "",
+        user_id=uuid4(),
+        save_handler=fake_save,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["saved"] is True
+    assert response.json()["session_id"] == str(session_id)
+    assert saved["script"] == "Hello."
+
+
+def test_evaluate_save_failure_keeps_result_and_logs_without_script(
+    monkeypatch, caplog
+):
+    script = "Private practice script"
+
+    def fail_save(**kwargs):
+        raise RuntimeError("storage unavailable")
+
+    monkeypatch.setattr(
+        main,
+        "evaluate_session",
+        lambda audio_path, script, baseline, *, vad_params: _minimal_result(),
+    )
+    monkeypatch.setattr(main, "_current_user_id", lambda: uuid4())
+    monkeypatch.setattr(main, "_save_result_to_history", fail_save)
+
+    response = TestClient(main.app).post(
+        "/api/evaluate",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
+        data={"script": script},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "insufficient_audio"
+    assert response.json()["saved"] is False
+    assert response.json()["session_id"] is None
+    assert "Failed to save evaluation result to session history" in caplog.text
+    assert script not in caplog.text

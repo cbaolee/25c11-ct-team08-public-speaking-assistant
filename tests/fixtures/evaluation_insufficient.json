@@ -58,5 +58,7 @@
   "display_only": {
     "loudness_db": null,
     "loudness_ref_db": null
-  }
+  },
+  "session_id": null,
+  "saved": false
 }
