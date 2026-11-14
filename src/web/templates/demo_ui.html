@@ -840,7 +840,9 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
       <div id="chatFile"></div>
       <div class="row" style="margin-bottom:10px">
         <label for="chatTopic" style="margin:0" data-t="script.topic"></label>
-        <select id="chatTopic" style="width:auto;min-width:200px"></select>
+        <select id="chatTopic" style="width:auto;min-width:180px"></select>
+        <select id="chatTpl" style="width:auto;min-width:220px" aria-label="Template topic"></select>
+        <select id="chatDur" style="width:auto;min-width:105px" aria-label="Duration"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select>
       </div>
       <div class="row">
         <button class="btn iconbtn" type="button" id="attachBtn" data-t-aria="script.attach" data-t-title="script.attach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button>
@@ -874,7 +876,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
         <div class="sheet-title"><strong id="sheetTitle" class="note"></strong><span class="note" id="sheetMeta"></span></div>
         <div class="sheet" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
       </div>
-      <div id="paneMine" class="row" style="margin-top:14px"><button class="btn btn-primary" type="button" id="goScript" data-t="practice.makeScript"></button></div>
+      <div id="paneMine" class="row" style="margin-top:14px"><button class="btn btn-primary" type="button" id="goScript" data-t="practice.makeScript"></button><span id="mineSaved" class="row" hidden><select id="mineSel" style="width:auto;min-width:200px" aria-label="Saved scripts"></select><button class="btn btn-danger-ghost btn-sm" type="button" id="mineDel" data-t="common.delete"></button></span></div>
       <div id="paneSample" class="row" style="margin-top:14px"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button><span class="note" data-t="practice.sampleNote"></span></div>
       <div id="paneOwn" style="margin-top:14px">
         <label for="ownText" style="margin-top:0" data-t="practice.ownLabel"></label>
@@ -1115,7 +1117,7 @@ const USER_NAME = 'Nguyen Van A';
 const SHOW_DEMO_LABELS = false;   // false = hide every "Sample data" / "Demo only" label (clean demo). true = show them again
 const USE_SIM = new URLSearchParams(location.search).get('sim') === '1';   // true (or ?sim=1) = old simulated evaluation (simulate()/score()); false = POST /api/evaluate
 const SEED_SAMPLE_DATA = true;      // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
-const ALWAYS_ASK_BASELINE = true;  // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
+const ALWAYS_ASK_BASELINE = false; // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
 const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
 const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
 
@@ -2588,11 +2590,36 @@ RENDER.home = function () {
 };
 
 /* ---------- Script (Generate Script) ---------- */
+const CAT_LABELS = { cinematography: 'Cinematography', gender_studies: 'Gender studies', information_technology: 'Information technology', learning_experiences: 'Learning experiences', sports: 'Sports', wildlife: 'Wildlife', free: 'Free topic (LLM)' };
+const topicLabel = k => CAT_LABELS[k] || TOPICS[k] || k;
+const apiHdr = json => Object.assign({ 'X-User-Id': S.acctKey || 'anonymous' }, json ? { 'Content-Type': 'application/json' } : {});
+function syncTplSelect() {
+  const cat = $('#chatTopic').value, tplSel = $('#chatTpl'), durSel = $('#chatDur');
+  if (!tplSel || !durSel) return;
+  const list = (!USE_SIM && S.apiTopics ? S.apiTopics : []).filter(t => t.category_slug === cat);
+  tplSel.innerHTML = '<option value="">Custom topic (LLM)</option>' + list.map(t => '<option value="' + esc(t.template_id) + '">' + esc((t.topic || t.title) + ' (' + t.duration_min + 'm)') + '</option>').join('');
+  tplSel.value = list.length ? list[0].template_id : '';
+  tplSel.disabled = USE_SIM || cat === 'free' || !list.length;
+  syncDurLock();
+}
+function syncDurLock() {
+  const tplSel = $('#chatTpl'), durSel = $('#chatDur');
+  if (!tplSel || !durSel) return;
+  const tpl = (S.apiTopics || []).find(t => t.template_id === tplSel.value);
+  if (tpl) { durSel.value = String(tpl.duration_min); durSel.disabled = true; }
+  else durSel.disabled = false;
+}
 function fillTopicSelect() {
   const sel = $('#chatTopic'), keep = sel.value;
-  const keys = S.profile && S.profile.topics.length ? S.profile.topics : Object.keys(TOPICS);
-  sel.innerHTML = keys.map(k => '<option value="' + k + '">' + esc(TOPICS[k]) + '</option>').join('');
+  if (!USE_SIM && !S.apiTopics) {
+    fetch('/api/topics').then(r => r.ok ? r.json() : null).then(d => {
+      if (d && d.topics) { S.apiTopics = d.topics; S.apiCategories = d.categories || []; fillTopicSelect(); }
+    }).catch(() => {});
+  }
+  const keys = !USE_SIM ? Object.keys(CAT_LABELS) : (S.profile && S.profile.topics.length ? S.profile.topics : Object.keys(TOPICS));
+  sel.innerHTML = keys.map(k => '<option value="' + k + '">' + esc(topicLabel(k)) + '</option>').join('');
   if (keep && keys.indexOf(keep) >= 0) sel.value = keep;
+  syncTplSelect();
 }
 function addBubble(cls, html) {
   const feed = $('#chatFeed'), d = document.createElement('div');
@@ -2627,16 +2654,71 @@ function renderChatFile() {
 function titleFrom(txt, file, topic) {
   if (txt) { const w = txt.split(/\s+/).slice(0, 4).join(' '); return w.charAt(0).toUpperCase() + w.slice(1) + (txt.split(/\s+/).length > 4 ? '…' : ''); }
   if (file) return file.name.replace(/\.pdf$/i, '');
-  return TOPICS[topic];
+  return topicLabel(topic);
+}
+function renderBlockedBubble(ai, reason) {
+  ai.classList.add('blocked');
+  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' +
+    '<div class="row"><span class="pill bad">' + IC.alert + esc(T('script.blockedTag')) + '</span><span class="badge-demo">' + esc(T('demo.badge')) + '</span></div>' +
+    '<h3 class="blk-t">' + esc(T('script.blockedTitle')) + '</h3>' +
+    '<p>' + esc(T(reason === 'inject' ? 'script.blockedInject' : 'script.blockedHarm')) + '</p>' +
+    '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
 function generateScript(req, again) {
   S.chatBusy = true; $('#chatSend').disabled = true;
   const ai = addBubble('ai', '<div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div><p class="note" role="status"></p>');
   const status = $('.note', ai);
   status.textContent = req.file ? T('script.extracting') : (again ? T('script.regenerating') : T('script.generating'));
+  if (!USE_SIM) {
+    const fd = new FormData(), cleanTxt = (req.txt || '').replace(/^#+\s+/, '');
+    const isShortPrompt = !req.tplId && !req.file && wordsOf(cleanTxt) > 0 && wordsOf(cleanTxt) <= 25;
+    fd.append('topic', req.tplId || (isShortPrompt ? cleanTxt : titleFrom(cleanTxt, req.file, req.topic)));
+    fd.append('category', req.tplId ? req.topic : 'free');
+    fd.append('duration_min', String(req.dur || 5));
+    if (cleanTxt && !isShortPrompt) fd.append('raw_text', cleanTxt);
+    if (req.file && req.file.raw) fd.append('pdf', req.file.raw, req.file.name);
+    const failJob = (code, msg) => {
+      S.chatBusy = false; $('#chatSend').disabled = false;
+      if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#chatErr'), msg || T('script.errFile')); return; }
+      if (code === 'content_rejected') { renderBlockedBubble(ai, 'harm'); openModal('mSafety'); revealBubble(ai); return; }
+      toast(msg || T('eval.errServer'), true);
+      ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note">' + esc(msg || T('eval.errServer')) + '</p><div class="acts"><button class="btn btn-sm" type="button" data-a="again">' + esc(T('script.regenerate')) + '</button></div>';
+      ai._script = { req }; revealBubble(ai);
+    };
+    const poll = id => fetch('/api/generate-script/' + id, { headers: apiHdr() }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+      if (!ok || !j || j.status === 'failed') { failJob(j && j.error_code, j && j.message); return; }
+      if (j.status !== 'completed') {
+        status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
+        setTimeout(() => poll(id), 650); return;
+      }
+      const res = j.result || {}, text = res.script || '', paras = text.split(/\n\n+/).filter(Boolean), cites = res.citations || [], warns = res.warnings || [];
+      const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
+      let h = '<div class="row between" style="margin-bottom:8px"><strong style="font:600 14px var(--sans)"></strong><span class="note">' + esc((res.word_count || wordsOf(text)) + ' words · ' + (res.duration_min || req.dur || 5) + ' min') + '</span></div>';
+      paras.forEach((p, i) => {
+        const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
+        const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc((c.heading ? c.heading + ' · ' : '') + (c.page ? T('script.page', { n: c.page }) : 'cited')) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
+        h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
+      });
+      if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';
+      h += '<p class="note" style="margin-top:10px">' + esc(cites.length ? T('script.uncitedHelp') : T('script.citeNone')) + '</p>';
+      h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
+      ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + h;
+      $('strong', ai).textContent = T('script.scriptHeader', { title });
+      $$('.ptxt', ai).forEach((el, i) => { el.textContent = paras[i]; });
+      $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
+      $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
+      ai._script = { title, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'free'), req };
+      S.chatBusy = false; $('#chatSend').disabled = false; revealBubble(ai);
+    }).catch(() => failJob('net', T('eval.errNet')));
+    fetch('/api/generate-script', { method: 'POST', headers: apiHdr(), body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+      if (!ok || !j || !j.job_id) { failJob(j && j.error_code, j && j.message); return; }
+      poll(j.job_id);
+    }).catch(() => failJob('net', T('eval.errNet')));
+    return;
+  }
   setTimeout(() => { if (req.file) status.textContent = T('script.generating'); }, 900);
   setTimeout(() => {
-    const pool = SCRIPTS[req.topic], text = pool[S.scriptN++ % pool.length];
+    const pool = SCRIPTS[req.topic] || SCRIPTS.politics, text = pool[S.scriptN++ % pool.length];
     const sents = tokenize(text).sentences, mid = Math.ceil(sents.length / 2);
     const paras = [sents.slice(0, mid).join(' '), sents.slice(mid).join(' ')];
     const title = titleFrom(req.txt, req.file, req.topic);
@@ -2664,12 +2746,7 @@ function refuseRequest(txt, reason) {
   const ai = addBubble('ai', '<div class="skel" style="width:70%"></div><p class="note" role="status"></p>');
   $('.note', ai).textContent = T('script.checking');
   setTimeout(() => {
-    ai.classList.add('blocked');
-    ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' +
-      '<div class="row"><span class="pill bad">' + IC.alert + esc(T('script.blockedTag')) + '</span><span class="badge-demo">' + esc(T('demo.badge')) + '</span></div>' +
-      '<h3 class="blk-t">' + esc(T('script.blockedTitle')) + '</h3>' +
-      '<p>' + esc(T(reason === 'inject' ? 'script.blockedInject' : 'script.blockedHarm')) + '</p>' +
-      '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
+    renderBlockedBubble(ai, reason);
     S.chatBusy = false; $('#chatSend').disabled = false;
     revealBubble(ai);
     $('#chatIn').focus();
@@ -2677,16 +2754,18 @@ function refuseRequest(txt, reason) {
 }
 function sendChat() {
   if (S.chatBusy) return;
-  const txt = $('#chatIn').value.trim(), err = $('#chatErr');
-  if (!txt && !S.chatFile) return;
+  const txt = $('#chatIn').value.trim(), err = $('#chatErr'), tplId = $('#chatTpl') ? $('#chatTpl').value : '';
+  const tpl = (S.apiTopics || []).find(t => t.template_id === tplId);
+  if (!txt && !S.chatFile && !tplId) return;
   if (wordsOf(txt) > 3000) { showErr(err, T('script.errLong')); return; }
   clearErr(err);
   const blockedBy = screenRequest(txt);
   if (blockedBy) { refuseRequest(txt, blockedBy); return; }
   if (BANNED.some(b => new RegExp('\\b' + b + '\\b', 'i').test(txt))) { openModal('mSafety'); return; }
-  const req ={ txt, file: S.chatFile, topic: $('#chatTopic').value };
+  const tplName = tpl ? (tpl.topic || tpl.title) : '';
+  const req = { txt, file: S.chatFile, topic: $('#chatTopic').value, tplId, tplTitle: tplName, dur: +($('#chatDur') && $('#chatDur').value || 5) };
   const me = addBubble('me', '<span></span>');
-  me.firstChild.textContent = [txt, S.chatFile ? '📎 ' + S.chatFile.name : ''].filter(Boolean).join('\n');
+  me.firstChild.textContent = [tplName ? '📄 ' + tplName : '', txt, S.chatFile ? '📎 ' + S.chatFile.name : ''].filter(Boolean).join('\n');
   $('#chatIn').value = ''; S.chatFile = null; renderChatFile();
   S.lastReq = req;
   generateScript(req, false);
@@ -2698,8 +2777,15 @@ function onChatAction(e) {
   if (!sc) return;
   const a = b.getAttribute('data-a');
   if (a === 'practice') {
-    S.texts.mine = { title: T('practice.fromScript', { title: TOPICS[sc.topic] }), short: TOPICS[sc.topic], text: sc.text, topic: sc.topic };
+    const lbl = sc.title || TOPICS[sc.topic] || sc.topic;
+    S.texts.mine = { title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic };
     S.src = 'mine'; go('practice');
+  } else if (a === 'save') {
+    fetch('/api/scripts', { method: 'POST', headers: apiHdr(true), body: JSON.stringify({ title: sc.title || 'Script', script: sc.text, duration_min: sc.duration_min || 5, source: sc.source || 'free' }) })
+      .then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+        if (!ok) { toast((j && j.message) || T('eval.errServer'), true); return; }
+        toast('Script saved.'); loadSavedScripts(j.id);
+      }).catch(() => toast(T('eval.errNet'), true));
   } else if (a === 'copy') {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(sc.text).then(() => toast(T('script.copied')), () => toast(T('script.copyFail'), true));
     else toast(T('script.copyFail'), true);
@@ -2823,11 +2909,29 @@ function goStep(i) {
 }
 function setSrc(k) { S.src = k; if (S.texts[k]) S.stepBack = false; renderPractice(); }
 function pickSample() {
-  const keys = S.profile && S.profile.topics.length ? S.profile.topics : Object.keys(TOPICS);
+  const keys = (S.profile && S.profile.topics.length ? S.profile.topics : Object.keys(SCRIPTS)).filter(k => SCRIPTS[k]);
   const topic = keys[S.sampleN % keys.length], pool = SCRIPTS[topic], text = pool[Math.floor(S.sampleN / keys.length) % pool.length];
   S.sampleN++; S.stepBack = false;
   S.texts.sample = { title: T('practice.sampleTitle', { title: TOPICS[topic] }), short: TOPICS[topic], text, topic };
   renderPractice();
+}
+function loadSavedScripts(pickId) {
+  if (USE_SIM) return;
+  fetch('/api/scripts', { headers: apiHdr() }).then(r => r.ok ? r.json() : null).then(d => {
+    const list = (d && d.scripts) || [], wrap = $('#mineSaved'), sel = $('#mineSel');
+    S.savedScripts = list;
+    if (!wrap || !sel) return;
+    wrap.hidden = !list.length;
+    if (!list.length) return;
+    const curId = pickId || sel.value || list[0].id;
+    sel.innerHTML = list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.title + ' (' + s.word_count + 'w)') + '</option>').join('');
+    const chosen = list.find(s => s.id === curId) || list[0];
+    sel.value = chosen.id;
+    if (pickId || !S.texts.mine) {
+      S.texts.mine = { id: chosen.id, title: T('practice.fromScript', { title: chosen.title }), short: chosen.title, text: chosen.script, topic: 'free' };
+      if (S.screen === 'practice') renderPractice();
+    }
+  }).catch(() => {});
 }
 function renderPractice() {
   const txt = S.texts[S.src];
@@ -2875,7 +2979,7 @@ function renderPractice() {
     $('button', li).disabled = !!S.rec || !reach[i - 1] || i === cur;
   });
 }
-RENDER.practice = renderPractice;
+RENDER.practice = function () { loadSavedScripts(); renderPractice(); };
 function updateOwnCount() {
   const n = $('#ownText').value.length;
   $('#ownCnt').textContent = T('practice.ownCounter', { n, max: OWN_MAX_CHARS });
@@ -2884,10 +2988,20 @@ function useOwn() {
   const v = $('#ownText').value.trim(), err = $('#ownErr');
   if (!v) { showErr(err, T('practice.errOwnEmpty')); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
   if (v.length > OWN_MAX_CHARS) { showErr(err, T('practice.errOwnMax', { max: OWN_MAX_CHARS })); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
+  if (BANNED.some(b => new RegExp('\\b' + b + '\\b', 'i').test(v)) || screenRequest(v)) { openModal('mSafety'); return; }
   clearErr(err); $('#ownText').removeAttribute('aria-invalid');
-  S.stepBack = false;
-  S.texts.own = { title: T('practice.ownTitle'), short: T('practice.ownTitle'), text: v, topic: null };
-  renderPractice();
+  const applyOwn = () => {
+    S.stepBack = false;
+    S.texts.own = { title: T('practice.ownTitle'), short: T('practice.ownTitle'), text: v, topic: null };
+    renderPractice();
+  };
+  if (USE_SIM) { applyOwn(); return; }
+  fetch('/api/scripts', { method: 'POST', headers: apiHdr(true), body: JSON.stringify({ title: T('practice.ownTitle'), script: v, duration_min: 5, source: 'own' }) })
+    .then(r => r.json().then(j => ({ status: r.status, ok: r.ok, j }))).then(({ status, ok, j }) => {
+      if (status === 422 && j && j.error_code === 'content_rejected') { openModal('mSafety'); return; }
+      if (!ok) { showErr(err, (j && j.message) || T('eval.errServer')); return; }
+      applyOwn(); loadSavedScripts();
+    }).catch(() => applyOwn());
 }
 /* ---- follow-along (SIM): the highlight moves by TIME, assuming SPEAKING_WPM_FOR_ESTIMATE.
    Following the real voice later needs streaming STT or a local VAD: that is a new ADR ([CAN CHOT]), not part of this demo. ---- */
@@ -3547,13 +3661,15 @@ function init() {
   });
 
   // script
+  $('#chatTopic').onchange = syncTplSelect;
+  $('#chatTpl').onchange = syncDurLock;
   $('#attachBtn').onclick = () => $('#chatFileIn').click();
   $('#chatFileIn').onchange = e => {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
     if (!f) return;
     const okType = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
     if (!okType || f.size > 25 * 1024 * 1024) { showErr($('#chatErr'), T('script.errFile')); return; }
-    clearErr($('#chatErr')); S.chatFile = { name: f.name, size: f.size }; renderChatFile();
+    clearErr($('#chatErr')); S.chatFile = { name: f.name, size: f.size, raw: f }; renderChatFile();
   };
   $('#chatFile').addEventListener('click', e => { if (e.target.closest('#chatFileX')) { S.chatFile = null; renderChatFile(); $('#attachBtn').focus(); } });
   $('#chatSend').onclick = sendChat;
@@ -3563,6 +3679,16 @@ function init() {
   // practice
   $$('[data-src]').forEach(b => { b.onclick = () => setSrc(b.getAttribute('data-src')); });
   $('#goScript').onclick = () => go('script');
+  $('#mineSel').onchange = () => {
+    const s = (S.savedScripts || []).find(x => x.id === $('#mineSel').value);
+    if (s) { S.texts.mine = { id: s.id, title: T('practice.fromScript', { title: s.title }), short: s.title, text: s.script, topic: 'free' }; S.stepBack = false; renderPractice(); }
+  };
+  $('#mineDel').onclick = () => {
+    const id = $('#mineSel').value; if (!id) return;
+    fetch('/api/scripts/' + id, { method: 'DELETE', headers: apiHdr() }).then(r => {
+      if (r.ok) { if (S.texts.mine && S.texts.mine.id === id) S.texts.mine = null; toast('Script deleted.'); loadSavedScripts(); renderPractice(); }
+    }).catch(() => {});
+  };
   $('#sampleBtn').onclick = pickSample;
   $('#ownText').addEventListener('input', () => { updateOwnCount(); clearErr($('#ownErr')); $('#ownText').removeAttribute('aria-invalid'); });
   $('#ownUse').onclick = useOwn;
