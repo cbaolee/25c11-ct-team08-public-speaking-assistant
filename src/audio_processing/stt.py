@@ -1,13 +1,9 @@
 import logging
-import requests
 from typing import Any
 
-from src.audio_processing.contracts import (
-    WordTimestamp,
-    SttResult,
-    MasterAudio,
-    InsufficientAudio
-)
+import requests
+
+from src.audio_processing.contracts import InsufficientAudio, MasterAudio, SttResult, WordTimestamp
 
 logger = logging.getLogger(__name__)
 
@@ -17,16 +13,16 @@ def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -
         "Authorization": f"Token {api_key}",
         "Content-Type": "audio/wav"
     }
-    
+
     # Đọc file audio từ master.path
     with open(master.path, "rb") as f:
         audio_data = f.read()
-        
+
     response = requests.post(url, headers=headers, data=audio_data)
     response.raise_for_status()
-    
+
     data = response.json()
-    
+
     try:
         alt = data["results"]["channels"][0]["alternatives"][0]
         transcript = alt.get("transcript", "")
@@ -34,10 +30,10 @@ def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -
     except (KeyError, IndexError):
         transcript = ""
         raw_words = []
-        
+
     if not transcript.strip():
         raise InsufficientAudio("STT returned empty transcript")
-        
+
     words = []
     for w in raw_words:
         words.append(WordTimestamp(
@@ -46,7 +42,7 @@ def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -
             end_s=w["end"],
             confidence=w.get("confidence")
         ))
-        
+
     return SttResult(
         transcript=transcript,
         words=words,
@@ -60,18 +56,18 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     headers = {
         "x-gladia-key": api_key
     }
-    
+
     with open(master.path, "rb") as f:
         # Truyền tên file từ master.path.name
         files = {"audio": (master.path.name, f, "audio/wav")}
         response = requests.post(url, headers=headers, files=files)
-        
+
     response.raise_for_status()
     data = response.json()
-    
+
     transcript = ""
     words = []
-    
+
     if "prediction" in data:
         transcript = data["prediction"]
         for w in data.get("prediction_raw", {}).get("words", []):
@@ -81,10 +77,10 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
                 end_s=w.get("time_end", 0.0),
                 confidence=w.get("confidence")
             ))
-            
+
     if not transcript.strip():
         raise InsufficientAudio("STT returned empty transcript")
-        
+
     return SttResult(
         transcript=transcript,
         words=words,

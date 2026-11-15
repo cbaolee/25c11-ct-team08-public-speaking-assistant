@@ -17,12 +17,12 @@ def test_single_segment_has_no_pauses():
 
 
 def test_gap_exactly_at_threshold_is_kept():
-    segments = [seg(0.0, 1.0), seg(1.35, 2.0)]          
+    segments = [seg(0.0, 1.0), seg(1.35, 2.0)]
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == [Pause(1.0, 1.35)]
 
 
 def test_gap_just_below_threshold_is_dropped():
-    segments = [seg(0.0, 1.0), seg(1.34, 2.0)]         
+    segments = [seg(0.0, 1.0), seg(1.34, 2.0)]
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == []
 
 
@@ -36,12 +36,12 @@ def test_only_long_gaps_are_kept_in_order():
 
 
 def test_touching_segments_have_no_pause():
-    segments = [seg(0.0, 1.0), seg(1.0, 2.0)]          
+    segments = [seg(0.0, 1.0), seg(1.0, 2.0)]
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == []
 
 
 def test_leading_silence_is_not_a_pause():
-    segments = [seg(5.0, 6.0), seg(6.5, 7.0)]       
+    segments = [seg(5.0, 6.0), seg(6.5, 7.0)]
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == [Pause(6.0, 6.5)]
 
 

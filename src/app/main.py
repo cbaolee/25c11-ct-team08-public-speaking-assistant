@@ -330,9 +330,9 @@ async def delete_session(
 async def evaluate_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
-    audio: UploadFile = File(...),
-    script: str = Form(...),
-    baseline_profile: str = Form(""),
+    audio: Annotated[UploadFile, File()],
+    script: Annotated[str, Form()],
+    baseline_profile: Annotated[str, Form()] = "",
 ):
     """
     Endpoint xử lý chấm điểm phiên luyện tập thuyết trình.

@@ -5,39 +5,66 @@ from typing import Any
 
 # Import cấu hình thực tế của bạn
 from src.app.config import (
-    settings,
-    max_audio_seconds,
-    max_upload_bytes,
+    MIN_PAUSE_S,
     allowed_formats,
     decode_timeout_s,
     duration_cap_margin_s,
-    MIN_PAUSE_S
+    max_audio_seconds,
+    max_upload_bytes,
+    settings,
 )
-
-from src.audio_processing.contracts import (
-    BaselineProfile, InsufficientAudio, MasterAudio, SpeechSegment
-)
-from src.audio_processing.probe import probe
-from src.audio_processing.decode import decode_to_master
-from src.audio_processing.vad import (
-    detect_speech, find_pauses, check_audio_quality, classify_pauses, after_ref_index
-)
-from src.audio_processing.stt import transcribe
 from src.audio_processing.alignment import align
-from src.audio_processing.text_norm import is_filler
 from src.audio_processing.baseline import (
-    compute_baseline_pause_profile, compute_baseline_f0, mean_loudness_db, extract_loudness_db,
-    loudness_series
+    compute_baseline_f0,
+    compute_baseline_pause_profile,
+    extract_loudness_db,
+    loudness_series,
+    mean_loudness_db,
 )
+from src.audio_processing.contracts import (
+    BaselineProfile,
+    InsufficientAudio,
+    MasterAudio,
+    SpeechSegment,
+)
+from src.audio_processing.decode import decode_to_master
+from src.audio_processing.probe import probe
 from src.audio_processing.result_schema import (
-    AlignmentItem, EvaluationResultV2, FillerItem, PauseItem, SentenceItem
+    AlignmentItem,
+    EvaluationResultV2,
+    FillerItem,
+    PauseItem,
+    SentenceItem,
 )
 from src.audio_processing.scoring import (
-    Encoder, accuracy_scores, build_sentence_pairs, combine_pronunciation, compute_fluency,
-    compute_overall, compute_warnings, compute_wpm, filler_pct, find_fillers, get_label,
+    Encoder,
+    accuracy_scores,
+    build_sentence_pairs,
+    combine_pronunciation,
+    compute_fluency,
+    compute_overall,
+    compute_warnings,
+    compute_wpm,
+    filler_pct,
+    find_fillers,
+    get_label,
     hesitations_per_min,
-    score_filler, score_hesitation, score_pitch, score_semantic, score_sentences, score_wpm,
+    score_filler,
+    score_hesitation,
+    score_pitch,
+    score_semantic,
+    score_sentences,
+    score_wpm,
     speech_span,
+)
+from src.audio_processing.stt import transcribe
+from src.audio_processing.text_norm import is_filler
+from src.audio_processing.vad import (
+    after_ref_index,
+    check_audio_quality,
+    classify_pauses,
+    detect_speech,
+    find_pauses,
 )
 
 # Ngưỡng ngập ngừng khi chưa có baseline (scoring_framework §5.2, chốt 06/11 = 0.7 s).

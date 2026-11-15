@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Optional, Any
 
 MASTER_SAMPLE_RATE = 16000
 
@@ -16,13 +15,16 @@ class AudioProbe:
     size_bytes: int
 
 
-class AudioRejected(Exception):
+class AudioRejectedError(Exception):
     # code: "too_long" | "too_large" | "no_audio_stream"
     #       | "unsupported_format" | "corrupt"
     def __init__(self, code: str, message: str):
         super().__init__(message)
         self.code = code
         self.message = message
+
+
+AudioRejected = AudioRejectedError
 
 
 @dataclass(frozen=True)
@@ -71,7 +73,7 @@ class SttResult:
 
 @dataclass(frozen=True)
 class BaselineProfile:
-    median_pause_s: float | None  # trung vị khoảng lặng >= 0.35s; None nếu không có khoảng lặng (D12)
+    median_pause_s: float | None  # trung vị khoảng lặng >= 0.35s; None nếu không có khoảng lặng
     hesitation_threshold_s: float # = min(1.2, 2 × median_pause_s); 0.7 nếu < 5 khoảng lặng (D13)
     median_f0_hz: float | None    # median F0 từ Parselmouth; None nếu không có F0 (D12)
     mean_loudness_db: float | None  # dB trung bình của baseline (D11); None nếu không đo được
@@ -87,14 +89,17 @@ class PauseKind(Enum):
 
 @dataclass(frozen=True)
 class ClassifiedPause:
-    pause: Pause  
+    pause: Pause
     kind: PauseKind
     after_ref_index: int | None = None  # ref_index của từ nghe được ngay trước pause (D6)
 
 
-class InsufficientAudio(Exception):
+class InsufficientAudioError(Exception):
     """Tiếng nói < 30% tổng thời lượng, hoặc STT trả về rỗng."""
     pass
+
+
+InsufficientAudio = InsufficientAudioError
 
 
 @dataclass(frozen=True)
