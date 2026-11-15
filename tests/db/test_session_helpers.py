@@ -79,6 +79,22 @@ def test_compact_session_handles_insufficient_audio():
     assert mistakes == []
 
 
+def test_compact_session_handles_result_without_optional_chart_fields():
+    result = {
+        "status": "ok",
+        "overall": 80.0,
+        "alignment": [],
+        "pauses": [],
+        "fillers": [],
+        "sentences": [],
+    }
+
+    summary, mistakes = compact_session(result)
+
+    assert summary == {"status": "ok", "overall": 80.0}
+    assert mistakes == []
+
+
 def _supports_libopus() -> bool:
     if shutil.which("ffmpeg") is None:
         return False

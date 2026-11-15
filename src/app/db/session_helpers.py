@@ -176,6 +176,10 @@ def compact_session(
 
     for key in ("alignment", "pauses", "fillers", "sentences"):
         summary.pop(key, None)
-    summary["pitch_detail"]["contour_st"] = None
-    summary["display_only"]["loudness_db"] = None
+    pitch_detail = summary.get("pitch_detail")
+    if isinstance(pitch_detail, dict):
+        pitch_detail["contour_st"] = None
+    display_only = summary.get("display_only")
+    if isinstance(display_only, dict):
+        display_only["loudness_db"] = None
     return summary, mistakes
