@@ -1,8 +1,14 @@
-import pytest
-from dataclasses import dataclass
 
+import math
+
+import pytest
+
+from src.audio_processing.baseline import (
+    compute_baseline_pause_profile,
+    mean_loudness_db,
+)
 from src.audio_processing.contracts import Pause
-from src.audio_processing.baseline import compute_baseline_pause_profile
+
 
 def test_empty_pauses_uses_fixed_threshold_unreliable_not_no_baseline():
     """D13: 0 khoảng lặng -> ngưỡng 0.7, cờ unreliable, KHÔNG gắn no_baseline."""
@@ -36,7 +42,7 @@ def test_threshold_capped_at_1_2s():
     # Tạo 5 khoảng lặng, mỗi khoảng 0.8s -> 2 * 0.8 = 1.6s
     pauses = [Pause(start_s=0.0, end_s=0.8)] * 5
     result = compute_baseline_pause_profile(pauses)
-    
+
     assert "baseline_pause_unreliable" not in result["flags"]
     assert result["median_pause_s"] == 0.8
     assert result["hesitation_threshold_s"] == 1.2
@@ -46,7 +52,7 @@ def test_threshold_minimum_is_0_7s():
     # Tạo 5 khoảng lặng, mỗi khoảng 0.35s -> 2 * 0.35 = 0.7s
     pauses = [Pause(start_s=0.0, end_s=0.35)] * 5
     result = compute_baseline_pause_profile(pauses)
-    
+
     assert result["median_pause_s"] == 0.35
     assert result["hesitation_threshold_s"] == 0.7
 
@@ -73,16 +79,12 @@ def test_median_calculated_correctly():
         Pause(start_s=0.0, end_s=1.0),
     ]
     result = compute_baseline_pause_profile(pauses)
-    
+
     assert result["median_pause_s"] == 0.6
     assert result["hesitation_threshold_s"] == 1.2  # 0.6 * 2.0 = 1.2
 
 
 # --- mean_loudness_db (D11) ---
-import math
-from src.audio_processing.baseline import mean_loudness_db
-
-
 def test_mean_loudness_db_hand_computed():
     assert mean_loudness_db([60.0, 70.0, 80.0]) == pytest.approx(70.0)
 

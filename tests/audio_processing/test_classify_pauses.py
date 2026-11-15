@@ -1,16 +1,15 @@
-import pytest
-from dataclasses import dataclass
 
+import pytest
+
+from src.audio_processing.alignment import AlignedItem, align
 from src.audio_processing.contracts import (
+    InsufficientAudio,
     Pause,
+    PauseKind,
     SpeechSegment,
     WordTimestamp,
-    PauseKind,
-    InsufficientAudio
 )
-from src.audio_processing.alignment import AlignedItem, align
-from src.audio_processing.vad import classify_pauses, check_audio_quality
-
+from src.audio_processing.vad import check_audio_quality, classify_pauses
 
 # ==========================================
 # TESTS CHO HÀM check_audio_quality

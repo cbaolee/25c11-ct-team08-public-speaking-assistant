@@ -1,21 +1,20 @@
 import wave
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from collections.abc import Sequence
- 
+
+from src.audio_processing.alignment import AlignedItem
 from src.audio_processing.contracts import (
     MASTER_SAMPLE_RATE,
-    MasterAudio,
-    SpeechSegment,
-    Pause,
     ClassifiedPause,
+    InsufficientAudio,
+    MasterAudio,
+    Pause,
     PauseKind,
-    InsufficientAudio
+    SpeechSegment,
 )
-from src.audio_processing.alignment import AlignedItem
 from src.audio_processing.text_norm import normalize_token, trailing_punct
-
 
 # Dung sai đồng bộ đồng hồ VAD và STT khi xác định "từ ngay trước pause". Đây KHÔNG phải ngưỡng chấm
 # điểm của ADR-003; chỉ bù độ lệch thời gian giữa hai nguồn. Giá trị khởi điểm, sẽ hiệu chỉnh ở M7.
@@ -25,9 +24,9 @@ WORD_PAUSE_TOLERANCE_S = 0.1
 @dataclass(frozen=True)
 class VadParams:
     threshold: float = 0.5
-    min_speech_duration_ms: int = 250   
-    min_silence_duration_ms: int = 100 
-    speech_pad_ms: int = 30 
+    min_speech_duration_ms: int = 250
+    min_silence_duration_ms: int = 100
+    speech_pad_ms: int = 30
 
 
 def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pause]:
@@ -37,7 +36,7 @@ def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pa
     The input list of speech segment must be sorted
     """
     pauses = []
-    for previous, following in zip(segments, segments[1:]):
+    for previous, following in zip(segments, segments[1:], strict=False):
         gap = round(following.start_s - previous.end_s, 6)  # chống sai số float ở biên min_pause_s
         if gap >= min_pause_s:
             pauses.append(Pause(start_s=previous.end_s, end_s=following.start_s))
@@ -47,26 +46,29 @@ def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pa
 @lru_cache(maxsize=1)
 def _load_model():
     from silero_vad import load_silero_vad
- 
+
     return load_silero_vad()
- 
- 
+
+
 def _read_samples(path: Path):
     import numpy as np
     import torch
- 
+
     with wave.open(str(path), "rb") as wav:
         layout = (wav.getframerate(), wav.getnchannels(), wav.getsampwidth())
         if layout != (MASTER_SAMPLE_RATE, 1, 2):
-            raise ValueError(f"Expected 16 kHz mono 16-bit WAV, got (rate, channels, bytes)={layout}")
+            raise ValueError(
+                "Expected 16 kHz mono 16-bit WAV, "
+                f"got (rate, channels, bytes)={layout}"
+            )
         raw = wav.readframes(wav.getnframes())
     samples = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
     return torch.from_numpy(samples)
- 
- 
+
+
 def detect_speech(master: MasterAudio, *, params: VadParams) -> list[SpeechSegment]:
     from silero_vad import get_speech_timestamps
- 
+
     samples = _read_samples(master.path)
     raw = get_speech_timestamps(
         samples,
@@ -91,11 +93,11 @@ def check_audio_quality(segments: list[SpeechSegment], duration_s: float) -> Non
     """
     if not segments:
         raise InsufficientAudio("Speech < 30% of audio duration")
-    
+
     # Tính tổng thời gian tiếng nói dựa trên start_s và end_s
     total_speech = sum((seg.end_s - seg.start_s) for seg in segments)
     speech_ratio = total_speech / duration_s
-    
+
     if speech_ratio < 0.30:
         raise InsufficientAudio(r"Speech < 30% of audio duration")
 
@@ -106,10 +108,11 @@ def after_ref_index(
     """ref_index của từ nghe được ngay trước pause; None nếu không có từ nào trước.
 
     Ứng viên: item có hyp (end_s không None; del bị loại) và
-    end_s <= pause_start_s + WORD_PAUSE_TOLERANCE_S (dung sai đồng bộ VAD/STT, không phải ngưỡng
-    chấm điểm ADR-003; hiệu chỉnh ở M7). Chọn end_s lớn nhất, hoà thì item xuất hiện sau cùng trong items. Nếu item đó là ins (không có
-    ref_index) thì dùng ref gần nhất phía trước nó trong items (phase3 #2), bỏ qua item mà token
-    gốc ref_tokens[ref_index] chỉ có dấu câu (normalize_token rỗng, vd "—"); item del vẫn tính.
+    end_s <= pause_start_s + WORD_PAUSE_TOLERANCE_S (dung sai đồng bộ VAD/STT, không phải
+    ngưỡng chấm điểm ADR-003; hiệu chỉnh ở M7). Chọn end_s lớn nhất, hoà thì item xuất hiện
+    sau cùng trong items. Nếu item đó là ins (không có ref_index) thì dùng ref gần nhất phía
+    trước nó trong items (phase3 #2), bỏ qua item mà token gốc ref_tokens[ref_index] chỉ có
+    dấu câu (normalize_token rỗng, vd "—"); item del vẫn tính.
     """
     best_pos = None
     for pos, item in enumerate(items):

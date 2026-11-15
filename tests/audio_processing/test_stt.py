@@ -1,13 +1,11 @@
-import pytest
-from unittest.mock import MagicMock
 from dataclasses import dataclass
+from unittest.mock import MagicMock
 
-from src.audio_processing.stt import (
-    call_deepgram,
-    call_gladia,
-    transcribe
-)
+import pytest
+
 from src.audio_processing.contracts import InsufficientAudio, MasterAudio
+from src.audio_processing.stt import call_deepgram, call_gladia, transcribe
+
 
 @dataclass
 class MockSettings:
@@ -19,7 +17,7 @@ def mock_master(tmp_path):
     # Tạo một file wav giả để tránh FileNotFoundError khi with open(...)
     fake_audio = tmp_path / "dummy.wav"
     fake_audio.write_text("fake audio content")
-    
+
     # Khởi tạo MasterAudio với đầy đủ các tham số path, duration_s và warnings
     return MasterAudio(
         path=fake_audio,       # Giữ nguyên object Path (tmp_path tạo ra Path)
@@ -38,8 +36,20 @@ def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
                     "alternatives": [{
                         "transcript": "hello world",
                         "words": [
-                            {"word": "hello", "punctuated_word": "Hello", "start": 0.0, "end": 0.5, "confidence": 0.9},
-                            {"word": "world", "punctuated_word": "world.", "start": 0.5, "end": 1.0, "confidence": 0.8}
+                            {
+                                "word": "hello",
+                                "punctuated_word": "Hello",
+                                "start": 0.0,
+                                "end": 0.5,
+                                "confidence": 0.9,
+                            },
+                            {
+                                "word": "world",
+                                "punctuated_word": "world.",
+                                "start": 0.5,
+                                "end": 1.0,
+                                "confidence": 0.8,
+                            },
                         ]
                     }]
                 }]
@@ -49,9 +59,9 @@ def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
 
     # Monkeypatch hàm requests.post trong module stt
     monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
-    
+
     result = call_deepgram(mock_master, api_key="test_key")
-    
+
     assert result.provider == "deepgram"
     assert result.model == "nova-2"
     assert result.transcript == "hello world"
@@ -73,7 +83,7 @@ def test_empty_transcript_raises_insufficient_audio(monkeypatch, mock_master):
         return mock_resp
 
     monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
-    
+
     with pytest.raises(InsufficientAudio, match="STT returned empty transcript"):
         call_deepgram(mock_master, api_key="test_key")
 
@@ -91,7 +101,7 @@ def test_gladia_adds_filler_flag(monkeypatch, mock_master):
         return mock_resp
 
     monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
-    
+
     result = call_gladia(mock_master, api_key="test_key")
     assert result.provider == "gladia"
     assert result.model == "solaria-1"
@@ -114,9 +124,9 @@ def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
         return mock_resp
 
     monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
-    
+
     settings = MockSettings()
     result = transcribe(mock_master, settings=settings)
-    
+
     assert result.provider == "gladia"
     assert result.transcript == "fallback success"

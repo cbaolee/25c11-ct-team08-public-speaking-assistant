@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-torch = pytest.importorskip("torch")
-pytest.importorskip("numpy")
-silero_vad = pytest.importorskip("silero_vad")
-
 from src.audio_processing import vad as vad_module
 from src.audio_processing.contracts import MasterAudio, SpeechSegment
 from src.audio_processing.vad import VadParams, _read_samples, detect_speech
+
+torch = pytest.importorskip("torch")
+pytest.importorskip("numpy")
+silero_vad = pytest.importorskip("silero_vad")
 
 
 def _write_wav(path: Path, samples: list[int], *, rate=16000, channels=1) -> Path:
