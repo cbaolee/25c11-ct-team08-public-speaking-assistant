@@ -201,6 +201,8 @@ async def list_sessions(
             status_code=503,
             content={"error": "session_storage_unavailable"},
         )
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "invalid_cursor"})
     has_more = len(rows) > limit
     page = rows[:limit]
     if limit == 20 and len(rows) == limit:
@@ -262,11 +264,9 @@ async def get_session(
             )
             data["result"] = merge_series(row.result, series_json)
         except (StorageError, json.JSONDecodeError):
+            # Files may be gone if a retention run stopped halfway; still return scores.
             logger.exception("Could not load series JSON for session %s", session_id)
-            return JSONResponse(
-                status_code=503,
-                content={"error": "session_storage_unavailable"},
-            )
+            data["media_available"] = False
     if not row.is_compact and row.audio_path:
         try:
             data["audio_url"] = await run_in_threadpool(
@@ -278,10 +278,8 @@ async def get_session(
             )
         except StorageError:
             logger.exception("Could not create signed URL for session %s", session_id)
-            return JSONResponse(
-                status_code=503,
-                content={"error": "session_storage_unavailable"},
-            )
+            data["media_available"] = False
+    data.setdefault("media_available", bool(not row.is_compact and row.audio_path))
     return data
 
 

@@ -113,6 +113,29 @@ def test_list_sessions_rejects_invalid_limit(session_api):
     assert response.status_code == 422
 
 
+def test_list_sessions_rejects_invalid_cursor(session_api):
+    response = TestClient(main.app).get("/api/sessions", params={"cursor": "abc"})
+
+    assert response.status_code == 400
+    assert response.json() == {"error": "invalid_cursor"}
+
+
+def test_get_full_session_with_missing_files_still_returns_scores(session_api):
+    repos, _ = session_api
+    row = _create_session(repos, USER_A, files=True)
+    # Simulate a retention run that deleted the files but stopped before compacting.
+    repos.files.delete_files(USER_A, settings.audio_bucket, [row.audio_path])
+    repos.files.delete_files(USER_A, settings.series_bucket, [row.series_path])
+
+    response = TestClient(main.app).get(f"/api/sessions/{row.id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["overall"] == row.overall
+    assert body["media_available"] is False
+    assert "audio_url" not in body
+
+
 @pytest.mark.parametrize("method", ["get", "delete"])
 def test_session_of_another_user_returns_404(session_api, method):
     repos, _ = session_api
@@ -133,6 +156,7 @@ def test_get_full_session_restores_series_and_returns_signed_audio_url(session_a
     body = response.json()
     assert body["result"]["pitch_detail"]["contour_st"] is not None
     assert body["audio_url"].startswith("memory://")
+    assert body["media_available"] is True
     assert "audio_path" not in body
     assert "series_path" not in body
     assert "user_id" not in body
