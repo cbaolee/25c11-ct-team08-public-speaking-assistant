@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     baselines_bucket: str = "baselines"
     retention_full_sessions: int = 10
     signed_url_ttl_s: int = 600
-    baseline_required: bool = True  # chưa có baseline thì /api/evaluate trả 409
+    baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
 
     dev_user_id: str = ""  # TODO(auth): remove when real auth is merged
 

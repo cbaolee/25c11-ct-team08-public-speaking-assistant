@@ -1,7 +1,7 @@
-"""Test POST /api/evaluate: baseline lấy từ DB theo user, lưu phiên vào lịch sử.
+"""Test POST /api/evaluate: baseline comes from the DB per user, the session is saved.
 
-evaluate_session bị monkeypatch: không chạy Evaluate Pipeline thật.
-Mọi số trong test là số tự chọn (không phải số đo).
+evaluate_session is monkeypatched: the real Evaluate Pipeline does not run.
+All numbers in these tests are chosen by hand (not measured).
 """
 
 import json
@@ -35,7 +35,7 @@ def _store_baseline(repos, user_id, threshold: float = 0.9):
 
 @pytest.fixture
 def current():
-    return {"id": USER_A}  # test đổi user bằng current["id"] = ...
+    return {"id": USER_A}  # a test switches user with current["id"] = ...
 
 
 @pytest.fixture
@@ -45,7 +45,7 @@ def repos(current):
 
 @pytest.fixture(autouse=True)
 def _signed_in_user(repos, current):
-    """USER_A đã đăng nhập và đã có baseline (baseline là bắt buộc)."""
+    """USER_A is signed in and has a baseline (the baseline is required)."""
     _store_baseline(repos, USER_A)
     main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=current["id"])
     main.app.dependency_overrides[get_repos] = lambda: repos
@@ -105,12 +105,12 @@ def test_evaluate_ignores_client_baseline_profile(monkeypatch):
 
 
 def test_evaluate_without_baseline_returns_409(monkeypatch, current):
-    current["id"] = USER_B  # USER_B chưa có baseline
+    current["id"] = USER_B  # USER_B has no baseline
     cap: dict = {}
     r = _post(monkeypatch, "", cap)
     assert r.status_code == 409
     assert r.json()["error_code"] == "baseline_required"
-    assert cap == {}  # không gọi Evaluate Pipeline
+    assert cap == {}  # Evaluate Pipeline is not called
 
 
 def test_evaluate_without_baseline_allowed_when_not_required(monkeypatch, current):
@@ -125,7 +125,7 @@ def test_evaluate_other_users_baseline_not_used(monkeypatch, repos, current):
     _store_baseline(repos, USER_B, threshold=1.1)
     cap: dict = {}
     _post(monkeypatch, "", cap)
-    assert cap["baseline"].hesitation_threshold_s == 0.9  # của USER_A, không phải USER_B
+    assert cap["baseline"].hesitation_threshold_s == 0.9  # USER_A's baseline, not USER_B's
 
 
 def test_evaluate_baseline_storage_error_returns_503(monkeypatch, repos):
