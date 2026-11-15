@@ -14,6 +14,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
+from src.app.config import settings
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing import pipeline, scoring
@@ -291,6 +292,8 @@ def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
+    # Chỉ kiểm dạng JSON trả về; baseline (bắt buộc) được test ở tests/test_api_evaluate.py
+    monkeypatch.setattr(settings, "baseline_required", False)
     data = {"script": "Hello."}
     if baseline_profile is not None:
         data["baseline_profile"] = baseline_profile
@@ -305,29 +308,6 @@ def test_api_evaluate_returns_v2_json(monkeypatch):
     assert r.status_code == 200
     assert EvaluationResultV2.model_validate(r.json()).schema_version == "2.1"
     assert cap["baseline"] is None
-
-
-def test_api_evaluate_baseline_without_loudness_ok(monkeypatch):
-    cap: dict = {}
-    body = {"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 120.0,
-            "flags": []}  # thiếu mean_loudness_db
-    r = _post_eval(monkeypatch, json.dumps(body), cap)
-    assert r.status_code == 200
-    assert cap["baseline"].mean_loudness_db is None
-    assert cap["baseline"].hesitation_threshold_s == 1.0
-
-
-@pytest.mark.parametrize("bad", [
-    '{"median_pause_s": 0.5, "bogus": 1}',   # thiếu trường + thừa trường
-    '{"median_pause_s": 0.5, "hesitation_threshold_s": "abc", "median_f0_hz": 1.0, "flags": []}',
-    '{"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 1.0, "flags": "x"}',
-    "[1, 2]",
-    "not json",
-])
-def test_api_evaluate_bad_baseline_is_422(monkeypatch, bad):
-    r = _post_eval(monkeypatch, bad, {})
-    assert r.status_code == 422
-    assert r.json()["error_code"] == "invalid_baseline"
 
 
 # ---- Bổ sung (review bước 10): số dưới đây là số tự tính tay, không phải số đo ----
