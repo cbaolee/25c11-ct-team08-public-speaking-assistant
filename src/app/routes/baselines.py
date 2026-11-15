@@ -42,7 +42,8 @@ def _save_baseline(
     """Upload the Opus audio, then make the new baseline current and drop the old audio."""
     baseline_id = uuid4()
     object_path = build_object_path(user.id, baseline_id, ".webm")
-    opus_path = work_dir / "baseline.webm"
+    # Own file name: the upload may already be baseline.webm, FFmpeg refuses to overwrite input
+    opus_path = work_dir / f"{baseline_id}.webm"
     encode_opus(source_path, opus_path)
     repos.files.upload_file(
         user.id, settings.baselines_bucket, object_path, opus_path.read_bytes(), "audio/webm"
