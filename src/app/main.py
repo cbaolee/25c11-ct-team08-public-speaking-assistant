@@ -333,12 +333,13 @@ async def evaluate_endpoint(
     baseline_profile: Annotated[str, Form()] = "",
 ):
     """
-    Endpoint xử lý chấm điểm phiên luyện tập thuyết trình.
+    Score one practice session and save it to the user's history.
 
-    Baseline lấy từ DB theo user; `baseline_profile` của client được nhận nhưng bỏ qua
-    (UI cũ vẫn gửi). Khi settings.baseline_required bật, chưa có baseline thì trả 409.
+    The baseline is loaded from the DB for the current user; the client's `baseline_profile`
+    is accepted but ignored (the old UI still sends it). When settings.baseline_required is
+    on and the user has no baseline, return 409.
     """
-    # Khởi tạo trực tiếp cấu hình VAD mặc định
+    # Default VAD settings
     vad_params = VadParams()
 
     try:
