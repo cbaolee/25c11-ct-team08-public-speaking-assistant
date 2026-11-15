@@ -7,7 +7,7 @@ from time import perf_counter
 from typing import Annotated
 from uuid import UUID, uuid4
 
-from fastapi import Depends, FastAPI, UploadFile, File, Form, Request
+from fastapi import Depends, FastAPI, File, Form, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,17 +15,25 @@ from starlette.concurrency import run_in_threadpool
 
 from src.app.config import settings
 from src.app.db.factory import Repos, get_repos
-from src.app.db.models import NewSession, StorageError, build_object_path
-from src.app.db.session_helpers import encode_opus, split_series
+from src.app.db.models import (
+    NewSession,
+    SessionRow,
+    StorageError,
+    build_object_path,
+    encode_cursor,
+)
+from src.app.db.session_helpers import (
+    compact_session,
+    encode_opus,
+    merge_series,
+    split_series,
+)
 from src.app.deps import CurrentUser, get_current_user
 from src.app.routes import baselines
-from src.audio_processing.contracts import (
-    AudioRejected, 
-    VadParams 
-)
+from src.audio_processing.contracts import AudioRejected, VadParams
 from src.audio_processing.pipeline import evaluate_session
 
-WEB_DIR = Path(__file__).resolve().parents[1] / "web" 
+WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 app = FastAPI()
 logger = logging.getLogger(__name__)
@@ -53,6 +61,38 @@ async def audio_rejected_handler(request: Request, exc: AudioRejected):
         status_code=422,
         content={"error_code": exc.code, "message": exc.message}
     )
+
+
+def _delete_session_files(repos: Repos, user_id: UUID, row: SessionRow) -> None:
+    """Delete any stored audio/series files for a session."""
+    for bucket, path in (
+        (settings.audio_bucket, row.audio_path),
+        (settings.series_bucket, row.series_path),
+    ):
+        if not path:
+            continue
+        repos.files.delete_files(user_id, bucket, [path])
+
+
+def _prune_old_sessions(repos: Repos, user_id: UUID) -> None:
+    """Compact older full sessions to keep only the newest full set."""
+    try:
+        rows = repos.sessions.list_full_beyond(
+            user_id, keep=settings.retention_full_sessions
+        )
+    except Exception:
+        logger.exception("Could not list old sessions for user %s", user_id)
+        return
+
+    for row in rows:
+        try:
+            summary, mistakes = compact_session(row.result)
+            # Keep paths on the row if cleanup fails so a later prune can retry.
+            _delete_session_files(repos, user_id, row)
+            if not repos.sessions.save_compact_session(user_id, row.id, summary, mistakes):
+                continue
+        except Exception:
+            logger.exception("Could not prune session %s for user %s", row.id, user_id)
 
 
 def _save_result_to_history(
@@ -128,6 +168,10 @@ def _save_result_to_history(
             script_id=None,
         )
         repos.sessions.create_session(user_id, session_row)
+        try:
+            _prune_old_sessions(repos, user_id)
+        except Exception:
+            logger.exception("Could not prune old sessions for user %s", user_id)
         return str(session_id)
     except Exception:
         for bucket, path in uploaded_paths:
@@ -136,6 +180,150 @@ def _save_result_to_history(
             except Exception:
                 logger.exception("Failed to clean up uploaded session object in %s bucket", bucket)
         raise
+
+
+@app.get("/api/sessions")
+async def list_sessions(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 10,
+    cursor: str | None = None,
+):
+    """Return a page of the user's session summaries plus a next cursor when more exist."""
+    query_limit = min(limit + 1, 20)
+    try:
+        rows = await run_in_threadpool(
+            repos.sessions.list_sessions, user.id, query_limit, cursor
+        )
+    except StorageError:
+        logger.exception("Could not list sessions for user %s", user.id)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "session_storage_unavailable"},
+        )
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    if limit == 20 and len(rows) == limit:
+        probe_cursor = encode_cursor(page[-1].created_at, page[-1].id)
+        try:
+            has_more = bool(await run_in_threadpool(
+                repos.sessions.list_sessions, user.id, 1, probe_cursor
+            ))
+        except StorageError:
+            logger.exception("Could not check session page for user %s", user.id)
+            return JSONResponse(
+                status_code=503,
+                content={"error": "session_storage_unavailable"},
+            )
+    payload = {
+        "items": [row.model_dump(mode="json") for row in page],
+        "next_cursor": (
+            encode_cursor(page[-1].created_at, page[-1].id) if has_more and page else None
+        ),
+    }
+    return payload
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session(
+    session_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Return the full session payload or a compact summary for older sessions."""
+    try:
+        row = await run_in_threadpool(
+            repos.sessions.get_session, user.id, session_id
+        )
+    except StorageError:
+        logger.exception("Could not load session %s", session_id)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "session_storage_unavailable"},
+        )
+    if row is None:
+        return JSONResponse(status_code=404, content={"error": "session_not_found"})
+
+    data = row.model_dump(
+        mode="json", exclude={"user_id", "audio_path", "series_path"}
+    )
+
+    if not row.is_compact and row.series_path:
+        try:
+            series_json = json.loads(
+                (
+                    await run_in_threadpool(
+                        repos.files.download_file,
+                        user.id,
+                        settings.series_bucket,
+                        row.series_path,
+                    )
+                ).decode("utf-8")
+            )
+            data["result"] = merge_series(row.result, series_json)
+        except (StorageError, json.JSONDecodeError):
+            logger.exception("Could not load series JSON for session %s", session_id)
+            return JSONResponse(
+                status_code=503,
+                content={"error": "session_storage_unavailable"},
+            )
+    if not row.is_compact and row.audio_path:
+        try:
+            data["audio_url"] = await run_in_threadpool(
+                repos.files.create_signed_url,
+                user.id,
+                settings.audio_bucket,
+                row.audio_path,
+                settings.signed_url_ttl_s,
+            )
+        except StorageError:
+            logger.exception("Could not create signed URL for session %s", session_id)
+            return JSONResponse(
+                status_code=503,
+                content={"error": "session_storage_unavailable"},
+            )
+    return data
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(
+    session_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Delete files and row for a single session; unknown IDs return 404."""
+    try:
+        row = await run_in_threadpool(
+            repos.sessions.get_session, user.id, session_id
+        )
+    except StorageError:
+        logger.exception("Could not load session %s for deletion", session_id)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "session_storage_unavailable"},
+        )
+    if row is None:
+        return JSONResponse(status_code=404, content={"error": "session_not_found"})
+
+    try:
+        await run_in_threadpool(_delete_session_files, repos, user.id, row)
+    except StorageError:
+        logger.exception("Could not delete files for session %s", session_id)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "session_storage_unavailable"},
+        )
+    try:
+        deleted = await run_in_threadpool(
+            repos.sessions.delete_session, user.id, session_id
+        )
+    except StorageError:
+        logger.exception("Could not delete session row %s", session_id)
+        return JSONResponse(
+            status_code=503,
+            content={"error": "session_storage_unavailable"},
+        )
+    return {"deleted": deleted}
 
 
 @app.post("/api/evaluate")
