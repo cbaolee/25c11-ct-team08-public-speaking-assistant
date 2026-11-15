@@ -1117,7 +1117,7 @@ const USER_NAME = 'Nguyen Van A';
 const SHOW_DEMO_LABELS = false;   // false = hide every "Sample data" / "Demo only" label (clean demo). true = show them again
 const USE_SIM = new URLSearchParams(location.search).get('sim') === '1';   // true (or ?sim=1) = old simulated evaluation (simulate()/score()); false = POST /api/evaluate
 const SEED_SAMPLE_DATA = true;      // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
-const ALWAYS_ASK_BASELINE = false; // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
+const ALWAYS_ASK_BASELINE = true; // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
 const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
 const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
 
