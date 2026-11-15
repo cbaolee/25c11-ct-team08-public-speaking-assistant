@@ -37,6 +37,7 @@ def _ok_payload(profile: BaselineProfile) -> dict:
 
 
 def _fake_encode(src: Path, out: Path, timeout_s: float = 0) -> None:
+    assert src != out  # FFmpeg refuses to overwrite its own input
     out.write_bytes(b"opus")
 
 
@@ -55,10 +56,10 @@ def repos(monkeypatch, current):
     main.app.dependency_overrides.clear()
 
 
-def _post(monkeypatch, fake):
+def _post(monkeypatch, fake, filename: str = "b.wav", mime: str = "audio/wav"):
     monkeypatch.setattr(baselines, "analyze_baseline", fake)
     return TestClient(main.app).post(
-        "/api/baseline", files={"audio": ("b.wav", b"x", "audio/wav")}
+        "/api/baseline", files={"audio": (filename, b"x", mime)}
     )
 
 
@@ -83,6 +84,18 @@ def test_create_baseline_ok_saves_current(monkeypatch, repos):
     assert "user_id" not in body
     assert body["audio_path"] == f"{USER_A}/{body['id']}.webm"
     assert repos.files.download_file(USER_A, settings.baselines_bucket, body["audio_path"])
+
+
+def test_create_baseline_webm_upload_from_ui_is_saved(monkeypatch, repos):
+    # demo_ui.html sends the recording as "baseline.webm"
+    r = _post(
+        monkeypatch,
+        lambda audio_path, *, vad_params: _ok_payload(_profile()),
+        filename="baseline.webm",
+        mime="audio/webm",
+    )
+    assert r.status_code == 200
+    assert _get().json()["is_current"] is True
 
 
 def test_create_baseline_insufficient_saves_nothing(monkeypatch, repos):
