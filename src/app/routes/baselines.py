@@ -72,7 +72,7 @@ async def create_baseline(
     with tempfile.TemporaryDirectory() as temp_dir:
         work_dir = Path(temp_dir)
         audio_path = safe_upload_path(work_dir, audio.filename, stem="baseline")
-        save_upload_limited(audio, audio_path, max_bytes=max_upload_bytes)
+        await run_in_threadpool(save_upload_limited, audio, audio_path, max_bytes=max_upload_bytes)
 
         try:
             # D12: one JSON shape {schema_version, status, reason, profile, flags}

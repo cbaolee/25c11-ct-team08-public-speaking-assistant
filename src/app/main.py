@@ -132,9 +132,7 @@ async def index(request: Request):
 
 @app.exception_handler(AudioRejected)
 async def audio_rejected_handler(request: Request, exc: AudioRejected):
-    """
-    Xử lý lỗi HTTP 422 khi probe hoặc decode từ chối file audio[cite: 1].
-    """
+    """422 `{error_code, message}` when probe or decode refuses the audio file."""
     return JSONResponse(
         status_code=422,
         content={"error_code": exc.code, "message": exc.message}
@@ -517,7 +515,8 @@ async def evaluate_endpoint(
 
     with tempfile.TemporaryDirectory() as temp_dir:
         audio_path = safe_upload_path(Path(temp_dir), audio.filename)
-        save_upload_limited(audio, audio_path, max_bytes=max_upload_bytes)
+        # Copying up to 100 MB is blocking file I/O: keep it off the event loop
+        await run_in_threadpool(save_upload_limited, audio, audio_path, max_bytes=max_upload_bytes)
 
         # FFmpeg + VAD + STT + scoring take seconds: run them in a worker thread so the
         # event loop keeps serving other requests (polling, other users) meanwhile.
@@ -600,7 +599,9 @@ async def generate_script_endpoint(
         # Fixed ".pdf" suffix; the parser checks the %PDF- signature and the 25 MB limit.
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
             pdf_path = tmp_file.name
-        save_upload_limited(pdf, Path(pdf_path), max_bytes=max_upload_bytes)
+        await run_in_threadpool(
+            save_upload_limited, pdf, Path(pdf_path), max_bytes=max_upload_bytes
+        )
 
     req = ScriptGenerationRequest(
         topic=topic,
