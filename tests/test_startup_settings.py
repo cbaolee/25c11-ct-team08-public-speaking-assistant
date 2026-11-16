@@ -56,3 +56,25 @@ def test_app_starts_when_keys_are_present(monkeypatch):
     monkeypatch.setattr(main.settings, "supabase_url", "")
     with TestClient(main.app) as client:
         assert client.get("/health").status_code == 200
+
+
+# ---------- T1: SUPABASE_URL must be the project URL ----------
+
+
+def test_supabase_url_trailing_slash_is_removed():
+    assert _settings(supabase_url=" https://x.supabase.co/ ").supabase_url == "https://x.supabase.co"
+
+
+@pytest.mark.parametrize("suffix", ["/rest/v1", "/rest/v1/", "/auth/v1", "/storage/v1/"])
+def test_supabase_url_with_api_path_is_refused(suffix):
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="project URL"):
+        _settings(supabase_url="https://x.supabase.co" + suffix)
+
+
+def test_env_file_is_the_repo_root_env():
+    from src.app.config import ENV_FILE, REPO_ROOT
+
+    assert (REPO_ROOT / "pyproject.toml").is_file()  # parents[2] of config.py is the repo root
+    assert ENV_FILE == REPO_ROOT / ".env"

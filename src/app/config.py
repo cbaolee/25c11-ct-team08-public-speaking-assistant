@@ -1,4 +1,14 @@
+from pathlib import Path
+
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The one .env of the project, at the repo root. A fixed path, so the server and the tests
+# read the same file whatever folder the command is started from.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+ENV_FILE = REPO_ROOT / ".env"
+# Supabase shows these API URLs too; SUPABASE_URL must be the project URL without them.
+_SUPABASE_API_SUFFIXES = ("/rest/v1", "/auth/v1", "/storage/v1")
 
 max_audio_seconds = 1320
 # Baseline recording: the UI records 30 s; refuse anything outside [10 s, 60 s].
@@ -34,7 +44,7 @@ class Settings(BaseSettings):
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
 
-    # THÊM 2 DÒNG NÀY CHO MODULE STT MỚI:
+    # Speech-to-text providers (Deepgram primary, Gladia fallback)
     deepgram_api_key: str = ""
     gladia_api_key: str = ""
 
@@ -48,7 +58,20 @@ class Settings(BaseSettings):
     signed_url_ttl_s: int = 600
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
+
+    @field_validator("supabase_url")
+    @classmethod
+    def _check_supabase_url(cls, value: str) -> str:
+        """Keep only the project URL (https://<ref>.supabase.co): trailing "/" is removed,
+        an API path such as /rest/v1 is refused, because every request would fail later."""
+        url = value.strip().rstrip("/")
+        if url.lower().endswith(_SUPABASE_API_SUFFIXES):
+            raise ValueError(
+                "SUPABASE_URL must be the project URL https://<ref>.supabase.co, "
+                f"without an API path such as /rest/v1 (got {url!r})"
+            )
+        return url
 
 settings = Settings()
 

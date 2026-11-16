@@ -12,10 +12,11 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import re
 import time
 from typing import Any
+
+from src.app.config import settings
 
 from .contracts import (
     TARGET_WORD_COUNT_RANGES,
@@ -212,15 +213,15 @@ def _get_groq_client() -> Any:
         from groq import Groq
     except ImportError:
         return None
-    api_key = os.getenv("GROQ_API_KEY", "").strip()
+    api_key = settings.groq_api_key.strip()
     return Groq(api_key=api_key) if api_key else None
 
 
 def _get_model_chain() -> tuple[str, ...]:
     models = [
-        os.getenv("GROQ_LLM_MODEL", "").strip(),
-        os.getenv("GROQ_LLM_FALLBACK_MODEL_1", "").strip(),
-        os.getenv("GROQ_LLM_FALLBACK_MODEL_2", "").strip(),
+        settings.groq_llm_model.strip(),
+        settings.groq_llm_fallback_model_1.strip(),
+        settings.groq_llm_fallback_model_2.strip(),
     ]
     chain = [m for m in models if m]
     return tuple(chain) if chain else _DEFAULT_MODEL_CHAIN

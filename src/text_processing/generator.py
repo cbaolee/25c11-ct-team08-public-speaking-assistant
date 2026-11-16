@@ -1,9 +1,10 @@
 """Groq LLM script generator with multi-section free-topic flow and fallback chain."""
 
 import json
-import os
 from dataclasses import asdict, dataclass
 from typing import Any
+
+from src.app.config import settings
 
 from .contracts import (
     TARGET_WORD_COUNT_RANGES,
@@ -17,12 +18,6 @@ from .moderation import wrap_untrusted_document_context
 from .retrieval import SemanticRetriever, verify_paragraph_citation
 from .template_engine import TokenBucketLimiter
 
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:
-    pass
 try:
     from groq import Groq
 except ImportError:
@@ -73,11 +68,12 @@ class ScriptGenerator:
         limiter: TokenBucketLimiter | None = None,
         top_k: int = 3,
     ) -> None:
-        self.api_key = api_key or os.getenv("GROQ_API_KEY", "").strip()
+        # Keys and models come from Settings (the repo-root .env), like the rest of the app
+        self.api_key = api_key or settings.groq_api_key.strip()
         models = [
-            os.getenv("GROQ_LLM_MODEL", "").strip() or "openai/gpt-oss-120b",
-            os.getenv("GROQ_LLM_FALLBACK_MODEL_1", "").strip() or "qwen/qwen3.8-27b",
-            os.getenv("GROQ_LLM_FALLBACK_MODEL_2", "").strip() or "openai/gpt-oss-20b",
+            settings.groq_llm_model.strip() or "openai/gpt-oss-120b",
+            settings.groq_llm_fallback_model_1.strip() or "qwen/qwen3.8-27b",
+            settings.groq_llm_fallback_model_2.strip() or "openai/gpt-oss-20b",
         ]
         self.model_chain = list(dict.fromkeys(m for m in models if m))
         self.client = Groq(api_key=self.api_key) if (Groq and self.api_key) else None

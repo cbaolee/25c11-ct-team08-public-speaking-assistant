@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from src.app.config import settings
 from src.text_processing import (
     DocumentParserError,
     ScriptGenerator,
@@ -50,7 +51,7 @@ def test_validate_pdf_file_rejects_fake_pdf(tmp_path) -> None:
 
 def test_script_generator_fallback_and_citation_check(monkeypatch) -> None:
     """Verify Groq fallback model chain and citation page verification."""
-    monkeypatch.setenv("GROQ_API_KEY", "dummy_key")
+    monkeypatch.setattr(settings, "groq_api_key", "dummy_key")
     gen = ScriptGenerator()
     mock_client, ok_resp = MagicMock(), MagicMock()
     ok_resp.choices = [
