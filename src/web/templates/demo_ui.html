@@ -1107,16 +1107,16 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 /* =====================================================================
    DEMO SWITCHES
    ===================================================================== */
-const PREFILL_ONBOARDING = true;   // true = first-run form is pre-filled (just press Save)
-const PREFILL = { gender: 'Male', age: 21, accent: 'American English', topics: ['politics', 'current_affairs', 'arts', 'charity'] };
+const PREFILL_ONBOARDING = false;  // true = first-run form is pre-filled (just press Save)
+const PREFILL = { gender: 'Male', age: 21, accent: 'American English', topics: ['information_technology', 'learning_experiences'] };
 const OWN_MAX_CHARS = 300;         // max characters in "write my own text"
 const BASELINE_MIN_SECONDS = 10;   // shortest baseline accepted (the backend also rejects audio with too little speech)
 const BASELINE_SECONDS = 30;       // length of the baseline recording (lower it for quick demos)
 const SPEAKING_WPM_FOR_ESTIMATE = 145;   // midpoint of the 130-160 target, only used for "about 0:25" hints
 const USER_NAME = 'Nguyen Van A';
 const SHOW_DEMO_LABELS = false;   // false = hide every "Sample data" / "Demo only" label (clean demo). true = show them again
-const USE_SIM = new URLSearchParams(location.search).get('sim') === '1';   // true (or ?sim=1) = old simulated evaluation (simulate()/score()); false = POST /api/evaluate
-const SEED_SAMPLE_DATA = true;      // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
+const USE_SIM = false;   // demo mode off: always call the real APIs. simulate()/score() stay only until the UI refactor (2.1) removes them
+const SEED_SAMPLE_DATA = false;     // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
 const ALWAYS_ASK_BASELINE = true; // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
 const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
 const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
@@ -1128,7 +1128,8 @@ const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a
 const TEXT = {
   app: { name: 'Public Speaking Assistant', tagline: 'Read your script aloud. See exactly where to improve.' },
   common: { skip: 'Skip to content', back: 'Back', cancel: 'Cancel', save: 'Save', close: 'Close', play: 'Play', pause: 'Pause', delete: 'Delete', na: 'N/A' },
-  topics: { politics: 'Politics', current_affairs: 'Current affairs', arts: 'Arts', charity: 'Charity' },
+  /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
+  topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
   nav: { label: 'Main', home: 'Home', script: 'Script', practice: 'Practice' },
   top: { login: 'Log in', signup: 'Sign up', profile: 'Profile and baseline voice', audio: 'Audio settings', permissions: 'Permissions', changePassword: 'Change password', logout: 'Log out' },
   demo: {
@@ -1427,24 +1428,17 @@ const TOPICS = TEXT.topics;
 /* =====================================================================
    NON-UI DATA (practice scripts, banned words, mock take profiles)
    ===================================================================== */
-const SCRIPTS = {
-  politics: [
-    "Honourable guests, fellow citizens, welcome to tonight's public forum. Our community faces real choices about education, jobs and the future of our city. Tonight we will listen first, debate respectfully, and look for common ground. Every voice in this room matters, so please take your seats and let us begin.",
-    "Good morning, and thank you for joining this youth policy dialogue. Democracy works best when people take part, ask hard questions and stay open to new ideas. Over the next hour, our speakers will share their plans, and you will have the chance to challenge them. Let us keep the conversation honest and kind."
-  ],
-  current_affairs: [
-    "Good evening and welcome to today's news briefing. We begin with the stories shaping our week: rising energy prices, a new transport plan for the city, and a record number of students going abroad. Stay with us as we break down the facts, hear from experts, and explain what it all means for you.",
-    "Hello everyone, and welcome to our weekly current affairs talk. This week the world is watching climate talks, technology laws and a major sports final. We will separate the headlines from the facts, so you can leave today better informed and ready to join the discussion."
-  ],
-  arts: [
-    "Ladies and gentlemen, welcome to the opening night of our spring art exhibition. Each painting, sculpture and photograph you will see tonight tells a story about courage, memory and hope. Please take your time, ask the artists questions, and let colour and light guide you through the gallery.",
-    "Good evening, art lovers, and welcome to tonight's performance. Music, dance and poetry will fill this hall with stories from every corner of our community. Silence your phones, open your hearts, and enjoy the magic of live art. The curtain rises in just a moment."
-  ],
-  charity: [
-    "Dear friends and generous supporters, welcome to our annual charity gala. Tonight, every ticket, every song and every smile helps children in rural areas return to school. Thank you for believing that small acts of kindness can change a whole life. Let us make tonight unforgettable.",
-    "Good evening, everyone, and thank you for joining our volunteer day kickoff. Today we will plant trees, pack food boxes and visit the senior home down the road. You do not need special skills, only a warm heart and a willing hand. Let us get started together!"
-  ]
-};
+/* Generic practice texts for the Sample tab (not tied to a topic). */
+const SAMPLE_TEXTS = [
+  "Honourable guests, fellow citizens, welcome to tonight's public forum. Our community faces real choices about education, jobs and the future of our city. Tonight we will listen first, debate respectfully, and look for common ground. Every voice in this room matters, so please take your seats and let us begin.",
+  "Good morning, and thank you for joining this youth policy dialogue. Democracy works best when people take part, ask hard questions and stay open to new ideas. Over the next hour, our speakers will share their plans, and you will have the chance to challenge them. Let us keep the conversation honest and kind.",
+  "Good evening and welcome to today's news briefing. We begin with the stories shaping our week: rising energy prices, a new transport plan for the city, and a record number of students going abroad. Stay with us as we break down the facts, hear from experts, and explain what it all means for you.",
+  "Hello everyone, and welcome to our weekly current affairs talk. This week the world is watching climate talks, technology laws and a major sports final. We will separate the headlines from the facts, so you can leave today better informed and ready to join the discussion.",
+  "Ladies and gentlemen, welcome to the opening night of our spring art exhibition. Each painting, sculpture and photograph you will see tonight tells a story about courage, memory and hope. Please take your time, ask the artists questions, and let colour and light guide you through the gallery.",
+  "Good evening, art lovers, and welcome to tonight's performance. Music, dance and poetry will fill this hall with stories from every corner of our community. Silence your phones, open your hearts, and enjoy the magic of live art. The curtain rises in just a moment.",
+  "Dear friends and generous supporters, welcome to our annual charity gala. Tonight, every ticket, every song and every smile helps children in rural areas return to school. Thank you for believing that small acts of kindness can change a whole life. Let us make tonight unforgettable.",
+  "Good evening, everyone, and thank you for joining our volunteer day kickoff. Today we will plant trees, pack food boxes and visit the senior home down the road. You do not need special skills, only a warm heart and a willing hand. Let us get started together!"
+];
 const BANNED = ['kill', 'bomb', 'terror', 'fuck', 'shit', 'racist', 'suicide'];   // UI simulation only. Real check = regex + Llama-Guard (ADR-001)
 
 /* Jailbreak / harmful-instruction demo guard (UI simulation only; the real check runs locally with regex + Llama-Guard BEFORE any cloud LLM call).
@@ -1476,7 +1470,7 @@ const LEVEL_NOW = { wpm: 146, wrong: .055, near: .03, miss: .02, hes: .012, fill
 /* Seeds picked so the sample trend (about 52 -> 90) is easy to read. Sample data only, not measurements. */
 const DEMO_SEEDS = [194, 4517, 5702, 960, 5449, 4501, 3659];
 const DEMO_DAYS_AGO = [13, 11, 9, 7, 5, 3, 1];
-const DEMO_TOPIC_KEYS = ['politics', 'arts', 'politics', 'charity', 'current_affairs', 'arts', 'charity'];
+const DEMO_TOPIC_KEYS = ['information_technology', 'sports', 'information_technology', 'wildlife', 'learning_experiences', 'sports', 'wildlife'];
 
 /* =====================================================================
    SAMPLE-DATA ENGINE + SCORING (ADR-003)
@@ -2357,7 +2351,7 @@ function openAuth(mode) {
 function seedDemo() {
   const now = Date.now();
   S.sessions = DEMO_DAYS_AGO.map((d, i) => {
-    const topic = DEMO_TOPIC_KEYS[i], text = SCRIPTS[topic][i % 2];
+    const topic = DEMO_TOPIC_KEYS[i], text = SAMPLE_TEXTS[i % SAMPLE_TEXTS.length];
     const an = simulate(text, LEVELS[i], DEMO_SEEDS[i]);
     const ts = new Date(now - d * 864e5).setHours(18, 0, 0, 0);
     return { id: S.nextId++, ts, title: TOPICS[topic], topicKey: topic, an, sc: score(an), dur: an.dur, accent: PREFILL.accent, demo: true };
@@ -2590,7 +2584,7 @@ RENDER.home = function () {
 };
 
 /* ---------- Script (Generate Script) ---------- */
-const CAT_LABELS = { cinematography: 'Cinematography', gender_studies: 'Gender studies', information_technology: 'Information technology', learning_experiences: 'Learning experiences', sports: 'Sports', wildlife: 'Wildlife', free: 'Free topic (LLM)' };
+const CAT_LABELS = Object.assign({}, TOPICS, { free: 'Free topic (LLM)' });
 const topicLabel = k => CAT_LABELS[k] || TOPICS[k] || k;
 const apiHdr = json => Object.assign({ 'X-User-Id': S.acctKey || 'anonymous' }, json ? { 'Content-Type': 'application/json' } : {});
 function syncTplSelect() {
@@ -2718,7 +2712,7 @@ function generateScript(req, again) {
   }
   setTimeout(() => { if (req.file) status.textContent = T('script.generating'); }, 900);
   setTimeout(() => {
-    const pool = SCRIPTS[req.topic] || SCRIPTS.politics, text = pool[S.scriptN++ % pool.length];
+    const text = SAMPLE_TEXTS[S.scriptN++ % SAMPLE_TEXTS.length];
     const sents = tokenize(text).sentences, mid = Math.ceil(sents.length / 2);
     const paras = [sents.slice(0, mid).join(' '), sents.slice(mid).join(' ')];
     const title = titleFrom(req.txt, req.file, req.topic);
@@ -2909,10 +2903,9 @@ function goStep(i) {
 }
 function setSrc(k) { S.src = k; if (S.texts[k]) S.stepBack = false; renderPractice(); }
 function pickSample() {
-  const keys = (S.profile && S.profile.topics.length ? S.profile.topics : Object.keys(SCRIPTS)).filter(k => SCRIPTS[k]);
-  const topic = keys[S.sampleN % keys.length], pool = SCRIPTS[topic], text = pool[Math.floor(S.sampleN / keys.length) % pool.length];
+  const n = S.sampleN % SAMPLE_TEXTS.length, text = SAMPLE_TEXTS[n], label = 'Text ' + (n + 1);
   S.sampleN++; S.stepBack = false;
-  S.texts.sample = { title: T('practice.sampleTitle', { title: TOPICS[topic] }), short: TOPICS[topic], text, topic };
+  S.texts.sample = { title: T('practice.sampleTitle', { title: label }), short: label, text, topic: null };
   renderPractice();
 }
 function loadSavedScripts(pickId) {
