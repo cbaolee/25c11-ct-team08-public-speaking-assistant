@@ -1,6 +1,6 @@
 ---
 topic: "High pressing tactics in modern football"
-Category: "Sports"
+category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. In the next five minutes we will dissect why high pressing has become the hallmark of elite football teams.

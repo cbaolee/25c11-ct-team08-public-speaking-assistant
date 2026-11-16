@@ -1,6 +1,6 @@
 ---
 topic: "Receiving Criticism on Your Work Gracefully"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 {{ argument_feedback_giver_name }}, thank you for telling me this directly. It isn't the easiest thing to hear, but I'd much rather know now than find out later, when it's harder to fix.

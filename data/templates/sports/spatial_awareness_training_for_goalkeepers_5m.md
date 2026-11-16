@@ -1,6 +1,6 @@
 ---
 topic: "Spatial awareness training for goalkeepers"
-Category: "Sports"
+category: "Sports"
 duration_min: 5
 ---
 Good morning, coaches and performance analysts. Today we will explore how elite keepers develop spatial acuity to dominate the penalty area.

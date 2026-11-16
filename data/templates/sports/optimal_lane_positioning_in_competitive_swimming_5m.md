@@ -1,6 +1,6 @@
 ---
 topic: "Optimal lane positioning in competitive swimming"
-Category: "Sports"
+category: "Sports"
 duration_min: 5
 ---
 Good afternoon, sports fans and fellow tacticians. Our focus today is the subtle yet measurable impact of lane choice on race outcomes.

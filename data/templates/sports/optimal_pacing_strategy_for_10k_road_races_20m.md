@@ -1,6 +1,6 @@
 ---
 topic: "Optimal pacing strategy for 10K road races"
-Category: "Sports"
+category: "Sports"
 duration_min: 20
 ---
 Good morning, coaches and performance analysts. Today we examine how data‑driven pacing reshapes the 10K road race landscape.

@@ -1,6 +1,6 @@
 ---
 topic: "Opening Speech for a Tech Conference"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome to {{ argument_conference_name }}!

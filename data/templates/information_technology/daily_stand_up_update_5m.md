@@ -1,6 +1,6 @@
 ---
 topic: "Daily Stand-up Update"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Morning, everyone. Okay, I'll go next.
