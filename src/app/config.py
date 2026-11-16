@@ -27,7 +27,6 @@ stt_read_timeout_s = 120
 
 class Settings(BaseSettings):
     groq_api_key: str = ""
-    groq_stt_model: str = ""
     groq_llm_model: str = ""
     groq_llm_fallback_model_1: str = ""
     groq_llm_fallback_model_2: str = ""
