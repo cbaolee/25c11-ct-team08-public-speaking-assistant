@@ -34,7 +34,7 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 
 - **Language:** Python 3.12
 - **Backend:** FastAPI, Uvicorn
-- **AI services:** Groq API (LLM and Whisper speech-to-text)
+- **AI services:** Groq API (LLM for scripts), Deepgram (speech-to-text) with Gladia as fallback
 - **Document processing:** PyMuPDF4LLM
 - **Audio processing:** FFmpeg, Silero VAD
 - **Scoring:** jiwer
@@ -49,7 +49,7 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 - Python 3.12
 - [uv](https://docs.astral.sh/uv/)
 - [FFmpeg](https://ffmpeg.org/) available on your `PATH` (also used to encode stored audio as Opus)
-- A [Groq](https://console.groq.com/) API key
+- API keys for [Groq](https://console.groq.com/), [Deepgram](https://deepgram.com/) and [Gladia](https://www.gladia.io/) (the server does not start without them)
 - Access to the team's [Supabase](https://supabase.com/) project `psc-dev` (optional for local runs, see [Database setup](#database-setup))
 
 ### Installation
@@ -73,7 +73,7 @@ Database and storage variables:
 | Variable | Required | Description |
 | --- | --- | --- |
 | `APP_ENV` | Yes | `dev` locally. Any other value disables the temporary dev user. |
-| `SUPABASE_URL` | No | Project URL from *Project Settings → API*. Empty in `dev` = in-memory storage, data is lost on restart. |
+| `SUPABASE_URL` | No | Project URL `https://<ref>.supabase.co` from *Project Settings → API*, **without** `/rest/v1/` (the server refuses to start with it). Empty in `dev` = in-memory storage and accounts, data is lost on restart. |
 | `SUPABASE_SERVICE_KEY` | With `SUPABASE_URL` | Server-side key (`service_role` / `secret`). Full database access: keep it private. |
 | `DEV_USER_ID` | Integration tests | UUID of a first test user, only read by integration tests. The app itself uses real log in (`/api/auth/*`). |
 | `DEV2_USER_ID` | Integration tests | UUID of a second test user, only read by integration tests. |
@@ -110,14 +110,30 @@ uv run ruff check .
 
 ## Usage
 
-<!-- TODO -->
+Run every command from the repository root (the app reads `.env` from there).
+
+```bash
+uv run uvicorn src.app.main:app --reload
+```
+
+Then open <http://localhost:8000> in the browser on the same machine. Browsers only allow the
+microphone on `localhost` or HTTPS.
+
+1. **Sign up** with an email and a password (at least 8 characters), choose your accent and topics.
+2. **Record your baseline**: the Baseline Gate asks for 30 seconds of normal reading once.
+3. **Script Studio**: pick a template topic or describe your event (or attach a PDF up to 10 pages), then save the script.
+4. **Practice**: choose a saved script, your own text or a sample, then record or upload your voice.
+5. **Report**: scores for accuracy, fluency, pronunciation and meaning, with every marked word.
+   Home and History keep your sessions; the 10 newest keep their audio and charts.
+
+A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase project must not be paused.
 
 ## Project Structure
 
 ```
 .
 ├── .github/
-│   ├── workflows/ci.yml           # CI: ruff + pytest
+│   ├── workflows/ci.yml           # CI: ruff + pytest + JS tests
 │   ├── pull_request_template.md
 │   └── issue_template.md
 ├── db/
@@ -134,10 +150,11 @@ uv run ruff check .
 ├── src/
 │   └── app/
 │       ├── db/                    # Repository layer: models, interfaces, Supabase and in-memory versions
-│       ├── routes/                # Baseline endpoints
-│       ├── config.py              # Settings read from .env
-│       ├── deps.py                # Current user dependency (temporary dev stub)
-│       └── main.py                # FastAPI app, evaluate and session history endpoints
+│       ├── routes/                # Auth, profile and baseline endpoints
+│       ├── auth.py                # Accounts: Supabase Auth, or in memory without Supabase
+│       ├── config.py              # Settings read from the repo-root .env
+│       ├── deps.py                # Current user from the Bearer access token
+│       └── main.py                # FastAPI app: evaluate, scripts and session history endpoints
 ├── tests/
 │   └── db/                        # Repository and session helper tests
 ├── .env.example
