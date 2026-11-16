@@ -43,9 +43,10 @@ Only folders with a clear owner and current code are listed.
 ```
 db/migrations/            SQL migrations, applied in file order
 src/app/
-├── main.py               FastAPI app: /api/evaluate, /api/sessions*, static UI
-├── routes/baselines.py   /api/baseline (POST, GET)
-├── deps.py               get_current_user dependency (temporary dev stub)
+├── main.py               FastAPI app: /api/evaluate, /api/scripts*, /api/sessions*, static UI
+├── routes/               auth.py (/api/auth/*), profile.py (/api/profile), baselines.py (/api/baseline)
+├── auth.py               AuthProvider: Supabase Auth, or in-memory accounts in dev
+├── deps.py               get_current_user: user from the Bearer access token
 ├── config.py             Settings loaded from .env
 └── db/
     ├── models.py         Pydantic models, errors, object paths, cursor encoding
@@ -197,7 +198,7 @@ sequenceDiagram
 
 | Layer       | Mechanism                                                                                                                                                                                |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity    | `get_current_user` in `src/app/deps.py`. Currently a dev stub (`APP_ENV=dev` only, `TODO(auth)`); the Auth team replaces its body with real token checks without changing its signature. |
+| Identity    | `get_current_user` in `src/app/deps.py` verifies the `Authorization: Bearer` access token (Supabase Auth, or in-memory accounts in dev without Supabase); 401 `not_authenticated`. |
 | Application | The backend uses the service key, which bypasses RLS, so every query filters by `user_id` in code. Other users' rows return 404.                                                         |
 | Database    | RLS on all four tables: owner-only policies (`auth.uid()`). Tables are granted to `authenticated` and `service_role`, not `anon`.                                                        |
 | Storage     | Private buckets; policies restrict each user to the folder `{user_id}/`.                                                                                                                 |
@@ -228,3 +229,15 @@ Settings are read from `.env` by `src/app/config.py`. Database and storage setti
 | ------------------------------ | ----------------------------------------------------------------- |
 | [ADR-001](docs/adr/ADR-001.md) | Data model for profiles, baselines, scripts and practice sessions |
 | [ADR-002](docs/adr/ADR-002.md) | Report save status in the `/api/evaluate` response (schema 2.1)   |
+
+## Accounts and login
+
+| Part | What it does |
+| --- | --- |
+| `src/app/auth.py` | `AuthProvider` in two versions: `SupabaseAuthProvider` (Supabase Auth with the service key, server side only) and `MemoryAuthProvider` (dev without `SUPABASE_URL`, tests). `get_auth()` picks one, like `get_repos()`. |
+| `src/app/routes/auth.py` | `POST /api/auth/signup` creates the account and its `profiles` row (the account is removed again if the profile cannot be saved); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password`. |
+| `src/app/routes/profile.py` | `GET` / `PATCH /api/profile` for the Profile Modal and the recording consent. |
+| `src/app/deps.py` | `get_current_user` reads and verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth cannot be reached. |
+| UI | Keeps the tokens in `localStorage` (F5 keeps the login) and swaps the refresh token for a new session after a 401. |
+
+Saved scripts (`/api/scripts*`) live in the `scripts` table. `/api/evaluate` accepts `script_id` and `topic`, and stores the profile's `target_accent` with the session.
