@@ -7,15 +7,26 @@ from time import perf_counter
 from typing import Annotated, Any
 from uuid import UUID, uuid4
 
-from fastapi import BackgroundTasks, Depends, FastAPI, File, Form, Query, Request, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    Query,
+    Request,
+    Response,
+    UploadFile,
+)
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import (
     max_request_bytes,
+    max_saved_scripts,
     max_script_chars,
     max_script_words,
     max_upload_bytes,
@@ -24,9 +35,14 @@ from src.app.config import (
 )
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
+    NewScript,
     NewSession,
+    ScriptDuration,
+    ScriptRow,
+    ScriptSource,
     SessionRow,
     StorageError,
+    build_content_hash,
     build_object_path,
     encode_cursor,
 )
@@ -37,7 +53,9 @@ from src.app.db.session_helpers import (
     split_series,
 )
 from src.app.deps import CurrentUser, get_current_user
+from src.app.routes import auth as auth_routes
 from src.app.routes import baselines
+from src.app.routes import profile as profile_routes
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.pipeline import evaluate_session
@@ -47,6 +65,7 @@ from src.text_processing.contracts import (
     ScriptGenerationRequest,
 )
 from src.text_processing.pipeline import ScriptGenerationPipeline
+from src.text_processing.sanitizer import sanitize_text
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
@@ -67,6 +86,8 @@ app = FastAPI(lifespan=lifespan)
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
+app.include_router(auth_routes.router)
+app.include_router(profile_routes.router)
 app.include_router(baselines.router)
 
 _script_pipeline: ScriptGenerationPipeline | None = None
@@ -81,12 +102,21 @@ def get_script_pipeline() -> ScriptGenerationPipeline:
 
 
 class SaveScriptPayload(BaseModel):
-    """Request body for `POST /api/scripts`."""
+    """Request body for `POST /api/scripts`; values match the `scripts` table.
 
-    title: str = "Untitled Script"
-    script: str
-    duration_min: int | None = None
-    source: str = "user"
+    `source`: `generated_template` / `generated_llm` for Script Pipeline output (its
+    `GeneratedScript.source` "template" / "llm"), `written` for text the user typed.
+    """
+
+    title: str = Field(default="Untitled Script", max_length=200)
+    body: str
+    source: ScriptSource
+    duration_min: ScriptDuration | None = None
+    topic: str | None = Field(default=None, max_length=200)
+    category: str | None = Field(default=None, max_length=100)
+    template_id: str | None = Field(default=None, max_length=200)
+    models_used: list[str] = Field(default_factory=list, max_length=10)
+    citations: list[dict] = Field(default_factory=list, max_length=500)
 
 
 
@@ -164,6 +194,9 @@ def _save_result_to_history(
     result,
     source_audio_path: Path | None,
     baseline_id: UUID | None = None,
+    script_id: UUID | None = None,
+    topic: str | None = None,
+    accent: str | None = None,
 ) -> str | None:
     session_id = uuid4()
     uploaded_paths: list[tuple[str, str]] = []
@@ -223,10 +256,10 @@ def _save_result_to_history(
             ),
             stt_provider=(stt.get("provider") if isinstance(stt, dict) else None),
             stt_model=(stt.get("model") if isinstance(stt, dict) else None),
-            topic=None,
-            accent=None,
+            topic=topic,
+            accent=accent,
             baseline_id=baseline_id,
-            script_id=None,
+            script_id=script_id,
         )
         repos.sessions.create_session(user_id, session_row)
         try:
@@ -243,6 +276,23 @@ def _save_result_to_history(
         raise
 
 
+async def _fetch_page(list_rows, user_id: UUID, limit: int, cursor: str | None):
+    """One newest-first page from a repo list function, plus the next cursor (None at the end).
+
+    Asks for `limit + 1` rows to know if another page exists. The repo caps `limit` at 20,
+    so for `limit == 20` one extra 1-row call checks the next page. Raises the repo's
+    StorageError, or ValueError for a bad cursor.
+    """
+    rows = await run_in_threadpool(list_rows, user_id, min(limit + 1, 20), cursor)
+    has_more = len(rows) > limit
+    page = rows[:limit]
+    if limit == 20 and len(rows) == limit:
+        probe_cursor = encode_cursor(page[-1].created_at, page[-1].id)
+        has_more = bool(await run_in_threadpool(list_rows, user_id, 1, probe_cursor))
+    next_cursor = encode_cursor(page[-1].created_at, page[-1].id) if has_more and page else None
+    return page, next_cursor
+
+
 @app.get("/api/sessions")
 async def list_sessions(
     user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -251,11 +301,8 @@ async def list_sessions(
     cursor: str | None = None,
 ):
     """Return a page of the user's session summaries plus a next cursor when more exist."""
-    query_limit = min(limit + 1, 20)
     try:
-        rows = await run_in_threadpool(
-            repos.sessions.list_sessions, user.id, query_limit, cursor
-        )
+        page, next_cursor = await _fetch_page(repos.sessions.list_sessions, user.id, limit, cursor)
     except StorageError:
         logger.exception("Could not list sessions for user %s", user.id)
         return JSONResponse(
@@ -264,27 +311,10 @@ async def list_sessions(
         )
     except ValueError:
         return JSONResponse(status_code=400, content={"error": "invalid_cursor"})
-    has_more = len(rows) > limit
-    page = rows[:limit]
-    if limit == 20 and len(rows) == limit:
-        probe_cursor = encode_cursor(page[-1].created_at, page[-1].id)
-        try:
-            has_more = bool(await run_in_threadpool(
-                repos.sessions.list_sessions, user.id, 1, probe_cursor
-            ))
-        except StorageError:
-            logger.exception("Could not check session page for user %s", user.id)
-            return JSONResponse(
-                status_code=503,
-                content={"error": "session_storage_unavailable"},
-            )
-    payload = {
+    return {
         "items": [row.model_dump(mode="json") for row in page],
-        "next_cursor": (
-            encode_cursor(page[-1].created_at, page[-1].id) if has_more and page else None
-        ),
+        "next_cursor": next_cursor,
     }
-    return payload
 
 
 @app.get("/api/sessions/{session_id}")
@@ -403,24 +433,67 @@ def _validate_script(script: str) -> JSONResponse | None:
     return None
 
 
+MAX_TOPIC_CHARS = 200
+
+
+def _load_profile_accent(repos: Repos, user_id: UUID) -> str | None:
+    """The user's target accent for the saved session; None (and a log) if it cannot be read."""
+    try:
+        profile = repos.profiles.get_profile(user_id)
+    except StorageError:
+        logger.exception("Could not load profile accent")
+        return None
+    return profile.target_accent if profile is not None else None
+
+
 @app.post("/api/evaluate")
 async def evaluate_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
     audio: Annotated[UploadFile, File()],
     script: Annotated[str, Form()],
-    baseline_profile: Annotated[str, Form()] = "",
+    script_id: Annotated[str, Form()] = "",
+    topic: Annotated[str, Form()] = "",
 ):
     """
     Score one practice session and save it to the user's history.
 
-    The baseline is loaded from the DB for the current user; the client's `baseline_profile`
-    is accepted but ignored (the old UI still sends it). When settings.baseline_required is
-    on and the user has no baseline, return 409.
+    The baseline is loaded from the DB for the current user (any `baseline_profile` field
+    a client still sends is ignored). When settings.baseline_required is on and the user has
+    no baseline, return 409. `script_id` (optional) must be one of the caller's saved scripts:
+    the session links to it, and its topic is used when `topic` is empty. The accent stored
+    with the session is the profile's `target_accent`.
     """
     script_error = _validate_script(script)
     if script_error is not None:
         return script_error
+
+    script_row: ScriptRow | None = None
+    if script_id.strip():
+        try:
+            script_uuid = UUID(script_id.strip())
+        except ValueError:
+            return JSONResponse(
+                status_code=422,
+                content={"error_code": "invalid_script_id",
+                         "message": "The selected script id is not valid."},
+            )
+        try:
+            script_row = await run_in_threadpool(repos.scripts.get_script, user.id, script_uuid)
+        except StorageError:
+            logger.exception("Could not load script for evaluation")
+            return JSONResponse(
+                status_code=503,
+                content={"error_code": "script_storage_unavailable",
+                         "message": "Could not load the selected script. Please try again."},
+            )
+        if script_row is None:  # missing or another user's script: same answer
+            return JSONResponse(
+                status_code=404,
+                content={"error_code": "script_not_found",
+                         "message": "The selected script no longer exists."},
+            )
+    session_topic = topic.strip()[:MAX_TOPIC_CHARS] or (script_row.topic if script_row else None)
 
     # Default VAD settings
     vad_params = VadParams()
@@ -460,6 +533,7 @@ async def evaluate_endpoint(
         saved = False
         save_started = perf_counter()
         try:
+            accent = await run_in_threadpool(_load_profile_accent, repos, user.id)
             session_id = await run_in_threadpool(
                 _save_result_to_history,
                 repos=repos,
@@ -468,6 +542,9 @@ async def evaluate_endpoint(
                 result=result,
                 source_audio_path=audio_path,
                 baseline_id=baseline_row.id if baseline_row else None,
+                script_id=script_row.id if script_row else None,
+                topic=session_topic,
+                accent=accent,
             )
             saved = session_id is not None
         except Exception:
@@ -491,13 +568,6 @@ async def script_generation_error_handler(_: Request, exc: ScriptGenerationError
     return JSONResponse(status_code=exc.status_code, content=exc.to_dict())
 
 
-def _resolve_user_id(request: Request, explicit_user_id: str | None = None) -> str:
-    if explicit_user_id and explicit_user_id.strip():
-        return explicit_user_id.strip()
-    header_uid = request.headers.get("X-User-Id", "").strip()
-    return header_uid or "anonymous"
-
-
 @app.get("/api/topics")
 async def list_topics_endpoint(category: str | None = None) -> dict[str, Any]:
     """Return template topics grouped/filtered by category with `duration_min` (Brief §5.7)."""
@@ -513,7 +583,7 @@ async def list_topics_endpoint(category: str | None = None) -> dict[str, Any]:
 
 @app.post("/api/generate-script", status_code=202)
 async def generate_script_endpoint(
-    request: Request,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
     background_tasks: BackgroundTasks,
     topic: Annotated[str, Form(...)],
     category: Annotated[str, Form()] = "",
@@ -524,7 +594,7 @@ async def generate_script_endpoint(
 ) -> dict[str, Any]:
     """Queue a background script generation job and return `202 {job_id, status}` (Brief §5.5)."""
     pipeline = get_script_pipeline()
-    user_id = _resolve_user_id(request)
+    user_id = str(user.id)
     pdf_path: str | None = None
     if pdf is not None and pdf.filename:
         # Fixed ".pdf" suffix; the parser checks the %PDF- signature and the 25 MB limit.
@@ -547,10 +617,12 @@ async def generate_script_endpoint(
 
 
 @app.get("/api/generate-script/{job_id}")
-async def get_generate_script_job_endpoint(job_id: str) -> JSONResponse:
+async def get_generate_script_job_endpoint(
+    job_id: str, user: Annotated[CurrentUser, Depends(get_current_user)]
+) -> JSONResponse:
     """Poll status, progress, and result of a script generation job (Brief §5.5)."""
     job = get_script_pipeline().get_job(job_id)
-    if job is None:
+    if job is None or job.user_id != str(user.id):  # another user's job looks missing
         return JSONResponse(
             status_code=404,
             content={"error_code": "job_not_found", "message": f"Job '{job_id}' not found."},
@@ -558,49 +630,128 @@ async def get_generate_script_job_endpoint(job_id: str) -> JSONResponse:
     return JSONResponse(status_code=200, content=job.to_dict())
 
 
-@app.post("/api/scripts", status_code=201)
-async def create_saved_script_endpoint(
-    request: Request, payload: SaveScriptPayload
-) -> dict[str, Any]:
-    """Save a generated or user-written script after Stage 4 moderation (Brief §5.7, §5.8)."""
-    user_id = _resolve_user_id(request)
-    return get_script_pipeline().save_script(
-        user_id=user_id,
-        title=payload.title,
-        script=payload.script,
-        duration_min=payload.duration_min,
-        source=payload.source,
+def _script_error(status_code: int, error_code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code, content={"error_code": error_code, "message": message}
     )
 
 
+def _script_storage_unavailable() -> JSONResponse:
+    return _script_error(503, "script_storage_unavailable",
+                         "Saved scripts are not available right now. Please try again.")
+
+
+def _script_not_found() -> JSONResponse:
+    return _script_error(404, "script_not_found", "Script not found.")
+
+
+def _script_payload(row: ScriptRow) -> dict[str, Any]:
+    return row.model_dump(mode="json", exclude={"user_id", "content_hash"})
+
+
+def _save_script_row(repos: Repos, user_id: UUID, data: NewScript) -> tuple[ScriptRow, bool]:
+    """Return (row, created). The same text saved again returns the existing row."""
+    existing = repos.scripts.find_script_by_hash(user_id, data.content_hash)
+    if existing is not None:
+        return existing, False
+    if repos.scripts.count_scripts(user_id) >= max_saved_scripts:
+        raise ScriptGenerationError(
+            "rate_limited",
+            f"Maximum saved scripts limit ({max_saved_scripts}) reached.",
+            status_code=429,
+        )
+    return repos.scripts.create_script(user_id, data), True
+
+
+@app.post("/api/scripts", status_code=201)
+async def create_saved_script_endpoint(
+    payload: SaveScriptPayload,
+    response: Response,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+) -> Any:
+    """Save a generated or user-written script after Stage 4 moderation (Brief §5.7, §5.8).
+
+    201 with the new script; 200 with the existing one when the same text is already saved.
+    """
+    clean_title = sanitize_text(payload.title).strip() or "Untitled Script"
+    clean_body = sanitize_text(payload.body).strip()
+    body_error = _validate_script(clean_body)
+    if body_error is not None:
+        return body_error
+    get_script_pipeline().moderator.assert_safe(
+        f"{clean_title}\n{clean_body}", user_id=str(user.id)
+    )
+    data = NewScript(
+        title=clean_title,
+        body=clean_body,
+        word_count=len(clean_body.split()),
+        source=payload.source,
+        content_hash=build_content_hash(clean_body),
+        topic=payload.topic,
+        category=payload.category,
+        duration_min=payload.duration_min,
+        citations=payload.citations,
+        template_id=payload.template_id,
+        models_used=payload.models_used,
+    )
+    try:
+        row, created = await run_in_threadpool(_save_script_row, repos, user.id, data)
+    except StorageError:
+        logger.exception("Could not save script")
+        return _script_storage_unavailable()
+    if not created:
+        response.status_code = 200
+    return _script_payload(row)
+
+
 @app.get("/api/scripts")
-async def list_saved_scripts_endpoint(request: Request) -> dict[str, Any]:
-    """List saved scripts for the current user."""
-    user_id = _resolve_user_id(request)
-    return {"scripts": get_script_pipeline().list_scripts(user_id=user_id)}
+async def list_saved_scripts_endpoint(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 20,
+    cursor: str | None = None,
+) -> Any:
+    """Newest-first page of the user's saved scripts (summaries, no body)."""
+    try:
+        page, next_cursor = await _fetch_page(repos.scripts.list_scripts, user.id, limit, cursor)
+    except StorageError:
+        logger.exception("Could not list scripts")
+        return _script_storage_unavailable()
+    except ValueError:
+        return _script_error(400, "invalid_cursor", "The page cursor is not valid.")
+    return {"items": [row.model_dump(mode="json") for row in page], "next_cursor": next_cursor}
 
 
 @app.get("/api/scripts/{script_id}")
-async def get_saved_script_endpoint(script_id: str, request: Request) -> JSONResponse:
-    """Get a single saved script owned by the current user."""
-    user_id = _resolve_user_id(request)
-    item = get_script_pipeline().get_script(script_id=script_id, user_id=user_id)
-    if item is None:
-        return JSONResponse(
-            status_code=404,
-            content={"error_code": "script_not_found", "message": "Script not found."},
-        )
-    return JSONResponse(status_code=200, content=item)
+async def get_saved_script_endpoint(
+    script_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+) -> Any:
+    """One saved script with its body; another user's script answers 404 like a missing one."""
+    try:
+        row = await run_in_threadpool(repos.scripts.get_script, user.id, script_id)
+    except StorageError:
+        logger.exception("Could not load script")
+        return _script_storage_unavailable()
+    if row is None:
+        return _script_not_found()
+    return _script_payload(row)
 
 
 @app.delete("/api/scripts/{script_id}")
-async def delete_saved_script_endpoint(script_id: str, request: Request) -> JSONResponse:
-    """Delete a saved script owned by the current user."""
-    user_id = _resolve_user_id(request)
-    deleted = get_script_pipeline().delete_script(script_id=script_id, user_id=user_id)
+async def delete_saved_script_endpoint(
+    script_id: UUID,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+) -> Any:
+    """Delete a saved script; sessions keep their `script_snapshot` (script_id becomes null)."""
+    try:
+        deleted = await run_in_threadpool(repos.scripts.delete_script, user.id, script_id)
+    except StorageError:
+        logger.exception("Could not delete script")
+        return _script_storage_unavailable()
     if not deleted:
-        return JSONResponse(
-            status_code=404,
-            content={"error_code": "script_not_found", "message": "Script not found."},
-        )
-    return JSONResponse(status_code=200, content={"deleted": True, "id": script_id})
+        return _script_not_found()
+    return {"deleted": True, "id": str(script_id)}
