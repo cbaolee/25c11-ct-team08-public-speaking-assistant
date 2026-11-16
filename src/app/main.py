@@ -404,7 +404,10 @@ async def evaluate_endpoint(
         audio_path = safe_upload_path(Path(temp_dir), audio.filename)
         save_upload_limited(audio, audio_path, max_bytes=max_upload_bytes)
 
-        result = evaluate_session(
+        # FFmpeg + VAD + STT + scoring take seconds: run them in a worker thread so the
+        # event loop keeps serving other requests (polling, other users) meanwhile.
+        result = await run_in_threadpool(
+            evaluate_session,
             audio_path=audio_path,
             script=script,
             baseline=baseline,

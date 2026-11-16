@@ -76,7 +76,10 @@ async def create_baseline(
 
         try:
             # D12: one JSON shape {schema_version, status, reason, profile, flags}
-            payload = analyze_baseline(audio_path=audio_path, vad_params=VadParams())
+            # Heavy work (FFmpeg, VAD, Parselmouth) off the event loop.
+            payload = await run_in_threadpool(
+                analyze_baseline, audio_path=audio_path, vad_params=VadParams()
+            )
         except InsufficientAudio:
             payload = {
                 "schema_version": "2.0", "status": "insufficient_audio",
