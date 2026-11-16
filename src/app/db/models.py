@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import json
 from datetime import datetime
 from typing import Literal
@@ -126,6 +127,15 @@ class SessionRow(NewSession):
     created_at: datetime
 
 
+# Chart numbers copied from `result` into each history item, so Home can draw its charts
+# without opening every session. Compacted rows keep these keys (compact_session keeps them).
+SESSION_METRIC_PATHS: dict[str, tuple[str, str]] = {
+    "wpm": ("fluency_detail", "wpm"),
+    "pitch_range_st": ("pitch_detail", "range_semitones"),
+    "p_clarity": ("subscores", "p_clarity"),
+}
+
+
 class SessionSummary(BaseModel):
     id: UUID
     created_at: datetime
@@ -135,12 +145,30 @@ class SessionSummary(BaseModel):
     label: str | None
     components: dict | None
     is_compact: bool
+    script_id: UUID | None = None
+    audio_duration_s: float | None = None
+    wpm: float | None = None
+    pitch_range_st: float | None = None
+    p_clarity: float | None = None
 
 
 class ScorePoint(BaseModel):
     session_id: UUID
     created_at: datetime
     overall: float | None
+
+
+def read_session_metric(result: dict | None, name: str) -> float | None:
+    """Return one SESSION_METRIC_PATHS number from a result dict, or None when it is missing."""
+    section, key = SESSION_METRIC_PATHS[name]
+    part = (result or {}).get(section)
+    value = part.get(key) if isinstance(part, dict) else None
+    return value if isinstance(value, int | float) and not isinstance(value, bool) else None
+
+
+def build_content_hash(body: str) -> str:
+    """SHA-256 of the stored script text; the same text saved twice gets the same hash."""
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
 
 
 def build_object_path(user_id: UUID, object_id: UUID, suffix: str) -> str:

@@ -70,10 +70,11 @@ def test_newest_page_rejects_bad_limit():
 # ---------- integration tests (psc-dev only) ----------
 
 
-def _second_user_id() -> str:
+def _test_user_id(name: str) -> str:
     # Read only this one value; load_dotenv() would leak all of .env into os.environ
     # and change other tests that read os.getenv (for example the Groq generator).
-    return os.getenv("DEV2_USER_ID") or dotenv_values(".env").get("DEV2_USER_ID") or ""
+    # The app no longer reads DEV_USER_ID / DEV2_USER_ID: they only name the test users.
+    return os.getenv(name) or dotenv_values(".env").get(name) or ""
 
 
 def _new_session(*, overall: float = 80.0) -> NewSession:
@@ -89,13 +90,13 @@ def _new_session(*, overall: float = 80.0) -> NewSession:
 
 @pytest.fixture
 def env():
-    second = _second_user_id()
-    required = (settings.supabase_url, settings.supabase_service_key, settings.dev_user_id, second)
+    first, second = _test_user_id("DEV_USER_ID"), _test_user_id("DEV2_USER_ID")
+    required = (settings.supabase_url, settings.supabase_service_key, first, second)
     if not all(required):
-        pytest.skip("Supabase dev config (incl. DEV2_USER_ID) is missing")
+        pytest.skip("Supabase dev config (incl. DEV_USER_ID, DEV2_USER_ID) is missing")
     factory.get_supabase_client.cache_clear()
     repos = factory.build_supabase_repos()
-    owner, other_user = UUID(settings.dev_user_id), UUID(second)
+    owner, other_user = UUID(first), UUID(second)
     created = {"sessions": [], "scripts": [], "baselines": [], "files": []}
     yield repos, owner, other_user, created
     # clean up everything the test created
@@ -152,6 +153,29 @@ def test_list_sessions_newest_first_and_cursor_has_no_duplicates(env):
 
 
 @pytest.mark.integration
+def test_list_sessions_summary_reads_chart_metrics_from_result(env):
+    repos, owner, _, created = env
+    data = _new_session().model_copy(
+        update={
+            "audio_duration_s": 35.0,
+            "result": {
+                "overall": 80.0,
+                "fluency_detail": {"wpm": 132.5},
+                "pitch_detail": {"range_semitones": 6.2},
+                "subscores": {"p_clarity": None},
+            },
+        }
+    )
+    created["sessions"].append(repos.sessions.create_session(owner, data).id)
+
+    item = next(
+        r for r in repos.sessions.list_sessions(owner, limit=20, cursor=None) if r.id == data.id
+    )
+    assert (item.audio_duration_s, item.wpm, item.pitch_range_st) == (35.0, 132.5, 6.2)
+    assert item.p_clarity is None
+
+
+@pytest.mark.integration
 def test_list_score_history_oldest_first(env):
     repos, owner, _, created = env
     for score in (70.0, 75.0, 80.0):
@@ -199,6 +223,21 @@ def test_script_owner_only_and_find_by_hash(env):
     assert repos.scripts.find_script_by_hash(owner, content_hash).id == script.id
     assert repos.scripts.get_script(other_user, script.id) is None
     assert repos.scripts.find_script_by_hash(other_user, content_hash) is None
+
+
+@pytest.mark.integration
+def test_count_scripts_counts_only_own_rows(env):
+    repos, owner, other_user, created = env
+    before = repos.scripts.count_scripts(owner)
+    script = repos.scripts.create_script(
+        owner,
+        NewScript(title="IT", body="Count me.", word_count=2, source="written",
+                  content_hash=f"it-{uuid4()}"),
+    )
+    created["scripts"].append(script.id)
+
+    assert repos.scripts.count_scripts(owner) == before + 1
+    assert repos.scripts.count_scripts(other_user) >= 0
 
 
 @pytest.mark.integration

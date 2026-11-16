@@ -13,9 +13,11 @@ from src.app.db.models import (
     ProfilePatch,
     ProfileUpsert,
     StorageError,
+    build_content_hash,
     build_object_path,
     decode_cursor,
     encode_cursor,
+    read_session_metric,
 )
 
 
@@ -292,6 +294,49 @@ def test_script_lookup_hash_and_cursor_pagination():
     assert repos.scripts.find_script_by_hash(user_id, "second") == second
     assert repos.scripts.get_script(uuid4(), second.id) is None
     assert [row.id for row in page_one + page_two] == [row.id for row in expected]
+
+
+def test_count_scripts_counts_only_own_rows():
+    repos = build_memory_repos()
+    owner, other_user = uuid4(), uuid4()
+    repos.scripts.create_script(owner, _new_script("a"))
+    repos.scripts.create_script(owner, _new_script("b"))
+    repos.scripts.create_script(other_user, _new_script("c"))
+
+    assert repos.scripts.count_scripts(owner) == 2
+    assert repos.scripts.count_scripts(uuid4()) == 0
+
+
+def test_build_content_hash_same_text_same_hash():
+    assert build_content_hash("Hello world.") == build_content_hash("Hello world.")
+    assert build_content_hash("Hello world.") != build_content_hash("Hello world!")
+
+
+def test_list_sessions_summary_carries_chart_metrics():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    data = _new_session().model_copy(
+        update={
+            "audio_duration_s": 35.0,
+            "result": {
+                "fluency_detail": {"wpm": 132.5},
+                "pitch_detail": {"range_semitones": 6.2},
+                "subscores": {"p_clarity": None},
+            },
+        }
+    )
+    repos.sessions.create_session(user_id, data)
+
+    item = repos.sessions.list_sessions(user_id, limit=1, cursor=None)[0]
+    assert (item.audio_duration_s, item.wpm, item.pitch_range_st) == (35.0, 132.5, 6.2)
+    assert item.p_clarity is None  # a null sub-score stays null, never 0
+
+
+def test_read_session_metric_ignores_missing_or_non_numeric_values():
+    assert read_session_metric({}, "wpm") is None
+    assert read_session_metric({"fluency_detail": None}, "wpm") is None
+    assert read_session_metric({"fluency_detail": {"wpm": "fast"}}, "wpm") is None
+    assert read_session_metric({"fluency_detail": {"wpm": True}}, "wpm") is None
 
 
 def test_deleting_script_from_other_user_returns_false():
