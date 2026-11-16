@@ -54,3 +54,12 @@ jobs:
       - name: Run tests with pytest
         if: steps.project.outputs.exists == 'true'
         run: uv run pytest
+
+      # UI helper tests (src/web/static/js). Name the file: "node --test <folder>" fails on Node 22+.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Run JavaScript tests
+        run: node --test tests/web/evaluate_client.test.js
