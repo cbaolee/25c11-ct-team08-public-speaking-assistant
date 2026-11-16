@@ -36,7 +36,7 @@ Scientists call them Lazarus species -- animals and plants that were officially 
 
 Look at the {{ argument_lazarus_example_bird_or_mammal }}, thought extinct since the 1800s until a doctor on vacation in {{ argument_rediscovery_year_a }} stumbled across {{ argument_rediscovered_flock_count }} of them hiding in a single high mountain valley in {{ argument_rediscovery_location_a }}.
 
-Or look at {{ argument_Wallace_giant_bee_or_tree_lobster }} -- an insect four times the size of a honeybee that hadn't been seen by science for {{ argument_missing_years_count }} years, until our Search for Lost Species expedition found a living female sitting inside a termite mound in {{ argument_rediscovery_island_b }} in {{ argument_rediscovery_year_b }}!
+Or look at {{ argument_wallace_giant_bee_or_tree_lobster }} -- an insect four times the size of a honeybee that hadn't been seen by science for {{ argument_missing_years_count }} years, until our Search for Lost Species expedition found a living female sitting inside a termite mound in {{ argument_rediscovery_island_b }} in {{ argument_rediscovery_year_b }}!
 
 And on a sheer volcanic sea spire off Australia called Ball's Pyramid -- a needle of bare rock sticking {{ argument_rock_height_meters }} meters straight out of the crashing Pacific Ocean -- climbers dangling from ropes in the dark in {{ argument_stick_insect_rediscovery_year }} found {{ argument_surviving_insect_count }} giant {{ argument_tree_lobster_species }} -- a hand-sized insect thought completely extinct since rats overran its home island in 1920 -- clinging to one single bush growing out of a crack in the cliff!
 

@@ -28,7 +28,7 @@ Whenever a giant nesting colony settled in a forest, telegraph operators wired t
 
 Because {{ argument_extinct_continental_bird_name }} were colonial breeders that needed the noisy social energy of thousands of neighbors around them just to trigger their hormones to lay a single egg, once the giant flocks were broken into small scattered groups, breeding stopped completely.
 
-On {{ argument_Martha_death_date }}, at one o'clock in the afternoon in the {{ argument_zoo_city_name }} Zoo, a twenty-nine-year-old female named {{ argument_last_individual_name }} -- the very last {{ argument_extinct_continental_bird_name }} in the universe -- fell off her perch and died.
+On {{ argument_martha_death_date }}, at one o'clock in the afternoon in the {{ argument_zoo_city_name }} Zoo, a twenty-nine-year-old female named {{ argument_last_individual_name }} -- the very last {{ argument_extinct_continental_bird_name }} in the universe -- fell off her perch and died.
 
 For the first time in history, humanity knew the exact hour and minute that a species went from one to zero.
 

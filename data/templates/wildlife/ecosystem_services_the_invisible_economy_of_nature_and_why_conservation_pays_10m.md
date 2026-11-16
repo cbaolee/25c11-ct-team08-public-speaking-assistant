@@ -46,7 +46,7 @@ Now do the math: a single human worker can hand-pollinate maybe {{ argument_tree
 
 Globally, economists at the {{ argument_global_economic_forum_name }} recently added up the total value of all the "Ecosystem Services" provided by wild habitats and wildlife -- from crop pollination and coastal storm protection to fishery nurseries and soil fertility.
 
-The total came to over {{ argument_global_ecosystem_services_trillions }} trillion dollars every single year -- which is more than {{ gdp_comparison_ ratio }} the entire annual GDP of every country on Earth combined!
+The total came to over {{ argument_global_ecosystem_services_trillions }} trillion dollars every single year -- which is more than {{ gdp_comparison_ratio }} the entire annual GDP of every country on Earth combined!
 
 Over half of the world's formal economic output -- {{ argument_global_gdp_dependent_trillions }} trillion dollars of business -- is moderately or highly dependent on healthy wild nature. If nature goes bankrupt, there is no government bailout big enough to save the human economy.
 
