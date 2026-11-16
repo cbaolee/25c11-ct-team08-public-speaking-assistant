@@ -109,8 +109,21 @@ async def get_baseline(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
 ):
-    """Return the caller's current baseline, or null when there is none."""
-    row = await run_in_threadpool(repos.baselines.get_current_baseline, user.id)
+    """Return the caller's current baseline, or null when there is none.
+
+    The bucket path stays on the server (`audio_path` is internal), like `user_id`.
+    503 `baseline_unavailable` when the database cannot be read, so the UI does not
+    mistake an outage for "no baseline yet" and ask for a new recording.
+    """
+    try:
+        row = await run_in_threadpool(repos.baselines.get_current_baseline, user.id)
+    except StorageError:
+        logger.exception("Could not load baseline")
+        return JSONResponse(
+            status_code=503,
+            content={"error_code": "baseline_unavailable",
+                     "message": "Could not load the current baseline"},
+        )
     if row is None:
         return None
-    return row.model_dump(mode="json", exclude={"user_id"})
+    return row.model_dump(mode="json", exclude={"user_id", "audio_path"})
