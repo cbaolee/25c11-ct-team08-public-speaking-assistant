@@ -1,10 +1,10 @@
-"""Hợp đồng JSON kết quả đánh giá v2 (ADR-004), model Pydantic.
+"""JSON contract of the v2 evaluation result (ADR-004), as Pydantic models.
 
-Chép nguyên văn schema ADR-004: không thêm default, validator hay
-``extra="forbid"`` (phase3_decision §3.2, §5 #7, §9). Các khối ``dict`` giữ là
-``dict``. Trường ``X | None`` không có default là trường BẮT BUỘC truyền
-(có thể truyền ``None``). Ngoại lệ duy nhất: ``AlignmentItem.homophone = False``
-vì chính ADR-004 viết như vậy.
+Copied word for word from the ADR-004 schema: no defaults, validators or
+``extra="forbid"`` (phase3_decision §3.2, §5 #7, §9). ``dict`` blocks stay
+``dict``. A ``X | None`` field without a default MUST be passed
+(``None`` is allowed). The only exception: ``AlignmentItem.homophone = False``
+because ADR-004 itself says so.
 """
 
 from typing import Literal
@@ -14,15 +14,15 @@ from pydantic import BaseModel
 
 class AlignmentItem(BaseModel):
     status: Literal["equal", "near_miss", "sub", "del", "ins"]
-    ref_index: int | None  # None nếu ins
-    hyp_index: int | None  # None nếu del
-    ref_word: str | None  # token gốc, giữ dấu câu
+    ref_index: int | None  # None for ins
+    hyp_index: int | None  # None for del
+    ref_word: str | None  # original token, punctuation kept
     hyp_word: str | None
-    start_s: float | None  # None nếu del; không nội suy
-    end_s: float | None  # UI tua tới end_s của item có mốc liền trước
-    sentence_index: int  # ins: câu của ref gần nhất phía trước
+    start_s: float | None  # None for del; never interpolated
+    end_s: float | None  # the UI seeks to end_s of the nearest earlier item with timings
+    sentence_index: int  # ins: sentence of the nearest earlier ref
     homophone: bool = False
-    # Filler KHÔNG nằm trong alignment.
+    # Fillers are NOT in alignment.
 
 
 class PauseItem(BaseModel):
@@ -43,7 +43,7 @@ class FillerItem(BaseModel):
 class SentenceItem(BaseModel):
     index: int
     ref_text: str
-    ref_start: int  # ref_index, nửa mở [ref_start, ref_end)
+    ref_start: int  # ref_index, half-open [ref_start, ref_end)
     ref_end: int
     hyp_text: str | None
     cosine: float | None
@@ -60,7 +60,7 @@ class EvaluationResultV2(BaseModel):
     schema_version: Literal["2.1"]
     status: Literal["ok", "insufficient_audio"]
     reason: Literal["low_voiced_ratio", "empty_transcript"] | None
-    overall: float | None  # null nếu bất kỳ thành phần nào null (§8)
+    overall: float | None  # null when any component is null (§8)
     label: Literal["Excellent", "Good", "Need improvements", "Need practice more"] | None
     components: dict  # {accuracy, fluency, pronunciation, semantic: float|None}
     subscores: dict  # {f_wpm, f_pause, f_filler, p_clarity, p_pitch: float|None}
@@ -75,7 +75,7 @@ class EvaluationResultV2(BaseModel):
     pauses: list[PauseItem]
     fillers: list[FillerItem]
     sentences: list[SentenceItem]
-    stt: dict | None  # {provider, model}; None nếu bị loại trước STT
+    stt: dict | None  # {provider, model}; None when rejected before STT
     flags: list[str]  # no_baseline, baseline_pause_unreliable, filler_from_vad_only, no_f0, cmu_oov
     warnings: list[str]
     display_only: dict  # {loudness_db: Series|None, loudness_ref_db: float|None}
@@ -84,10 +84,10 @@ class EvaluationResultV2(BaseModel):
 
 
 class BaselineResponse(BaseModel):
-    """Phản hồi `/api/baseline` (ADR-004 D12): một dạng JSON cho cả ok và insufficient_audio.
+    """`/api/baseline` response (ADR-004 D12): one JSON shape for both ok and insufficient_audio.
 
-    TỰ CHỌN: `profile` để dạng dict (cùng nguyên tắc với các khối dict ở trên);
-    ADR chỉ ghi `profile | null`.
+    OUR CHOICE: `profile` stays a dict (same rule as the dict blocks above);
+    the ADR only says `profile | null`.
     """
 
     schema_version: Literal["2.0"]

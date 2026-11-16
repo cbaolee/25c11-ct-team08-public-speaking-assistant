@@ -24,7 +24,7 @@ def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -
         "Content-Type": "audio/wav"
     }
 
-    # Đọc file audio từ master.path
+    # Read the audio file from master.path
     with open(master.path, "rb") as f:
         audio_data = f.read()
 
@@ -68,7 +68,7 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     }
 
     with open(master.path, "rb") as f:
-        # Truyền tên file từ master.path.name
+        # Send the file name from master.path.name
         files = {"audio": (master.path.name, f, "audio/wav")}
         response = requests.post(url, headers=headers, files=files, timeout=STT_TIMEOUT)
 

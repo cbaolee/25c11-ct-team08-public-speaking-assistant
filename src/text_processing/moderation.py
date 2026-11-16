@@ -32,7 +32,7 @@ from .contracts import ModerationDecision, ScriptGenerationError
 
 logger = logging.getLogger(__name__)
 
-# Starter list, cần Security duyệt. Layer 1 is a HARD block (whole-word match on NFKC +
+# Starter list, to be reviewed by Security. Layer 1 is a HARD block (whole-word match on NFKC +
 # casefold text; invisible characters handled). Topic words (violence, sex...) are left out on
 # purpose. Known false positives (see tests): quoted slurs, "bitch" = female dog, lectures that
 # quote an injection phrase; they stay blocked (a Layer 1 block is final, Layer 2 never overrides
@@ -79,23 +79,25 @@ DEFAULT_BLOCKED_TERMS: tuple[str, ...] = (
     "đéo",
 )
 
-# Chọn tạm, chưa đo.
+# Picked for now, not measured.
 DEFAULT_CACHE_MAX_ENTRIES = 1024
-# Chọn tạm, chưa đo.
+# Picked for now, not measured.
 DEFAULT_CACHE_TTL_S = 3600.0
-# Chọn tạm, chưa đo; dựa trên giới hạn upstream: PDF <= 25 MiB và <= 10 trang
-# (parser.py:30,62,70), không có giới hạn độ dài text trích, raw_text hay topic (chưa có route
-# text nào), nên 1M ký tự = bội số rộng của ~10 trang dày đặc. Đây là chặn theo KÍCH THƯỚC sau
-# chuẩn hoá (chi phí regex/RAM), KHÔNG phải kết luận về nội dung; tầng upload/Lớp 2 nên có
-# giới hạn riêng.
+# Picked for now, not measured; based on the upstream limits: PDF <= 25 MiB and <= 10 pages
+# (parser.py:30,62,70), no limit on extracted text, raw_text or topic length (no text route
+# yet), so 1M characters = a wide multiple of ~10 dense pages. This is a SIZE cap after
+# normalization (regex/RAM cost), NOT a judgement about the content; the upload layer/Layer 2 should
+# have their own limits.
 DEFAULT_MAX_NORMALIZED_CHARS = 1_000_000
 INPUT_TOO_LARGE_REASON = "input_too_large_after_normalization"
 
-# Giả định chưa kiểm với Ollama thật: tag model và việc /api/chat tự áp template Llama Guard.
+# Not checked against a real Ollama: the model tag, and that /api/chat applies the
+# Llama Guard template.
 DEFAULT_LLAMA_GUARD_MODEL = "llama-guard3:1b"
-# Chọn tạm, chưa đo. Là timeout MỖI thao tác httpx (connect/read/write/pool), không phải tổng.
+# Picked for now, not measured. Timeout PER httpx operation (connect/read/write/pool).
 DEFAULT_OLLAMA_TIMEOUT_S = 10.0
-# Chọn tạm, chưa đo: ~4000 ký tự/đoạn, tối đa 8 đoạn (~32k ký tự) cho mỗi text lên Lớp 2.
+# Picked for now, not measured: ~4000 characters per chunk, at most 8 chunks (~32k
+# characters) per text sent to Layer 2.
 DEFAULT_LAYER2_MAX_CHARS = 4000
 DEFAULT_LAYER2_MAX_CALLS = 8
 LAYER2_UNSAFE_REASON = "Input flagged by safety classifier."
