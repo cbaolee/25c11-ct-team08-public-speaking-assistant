@@ -3,7 +3,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-# Import cấu hình thực tế của bạn
+# Shared settings and limits
 from src.app.config import (
     MIN_PAUSE_S,
     allowed_formats,
@@ -70,7 +70,7 @@ from src.audio_processing.vad import (
     find_pauses,
 )
 
-# Ngưỡng ngập ngừng khi chưa có baseline (scoring_framework §5.2, chốt 06/11 = 0.7 s).
+# Hesitation threshold when there is no baseline (scoring_framework §5.2, agreed 06/11 = 0.7 s).
 DEFAULT_HESITATION_THRESHOLD_S = 0.7
 
 _COMPONENT_KEYS = ("accuracy", "fluency", "pronunciation", "semantic")
@@ -88,7 +88,7 @@ def _voiced_ratio(segments: list[SpeechSegment], duration_s: float) -> float:
 
 
 def _merge_flags(*groups: list[str]) -> list[str]:
-    """Gộp cờ giữ thứ tự xuất hiện, bỏ trùng."""
+    """Merge flags, keep first-seen order, drop duplicates."""
     return list(dict.fromkeys(f for group in groups for f in group))
 
 
@@ -108,7 +108,7 @@ def _insufficient(
     stt: dict | None,
     flags: list[str],
 ) -> EvaluationResultV2:
-    """Kết quả không chấm (ADR-004 D1): mọi điểm null, danh sách rỗng, KHÔNG điền 0."""
+    """Unscored result (ADR-004 D1): every score null, empty lists, NEVER 0."""
     return EvaluationResultV2(
         schema_version="2.1", status="insufficient_audio", reason=reason,  # type: ignore[arg-type]
         overall=None, label=None,
@@ -136,7 +136,7 @@ def evaluate_session(
     vad_params: Any,
     encode: Encoder | None = None,
 ) -> EvaluationResultV2:
-    """Ráp toàn bộ luồng chấm điểm thành EvaluationResultV2 (ADR-004)."""
+    """Run the whole scoring flow into an EvaluationResultV2 (ADR-004)."""
     with tempfile.TemporaryDirectory() as temp_dir:
         workdir = Path(temp_dir)
 
@@ -154,7 +154,7 @@ def evaluate_session(
             timeout_s=decode_timeout_s
         )
 
-        # (a) VAD + kiểm tra tỉ lệ tiếng nói. Loại trước STT: không tốn request.
+        # (a) VAD + speech ratio check. Rejected before STT: no request is spent.
         segments = detect_speech(master, params=vad_params)
         voiced_ratio = _voiced_ratio(segments, master.duration_s)
         try:
@@ -163,8 +163,8 @@ def evaluate_session(
             return _insufficient("low_voiced_ratio", master=master, voiced_ratio=voiced_ratio,
                                  baseline=baseline, stt=None, flags=[])
 
-        # (b) STT. transcribe ném InsufficientAudio khi bản chép rỗng (khi đó không biết
-        # provider/model nên stt = None, TỰ CHỌN).
+        # (b) STT. transcribe raises InsufficientAudio on an empty transcript (provider/model
+        # are then unknown, so stt = None, OUR CHOICE).
         try:
             stt = transcribe(master, settings=settings)
         except InsufficientAudio:
@@ -175,18 +175,18 @@ def evaluate_session(
             return _insufficient("empty_transcript", master=master, voiced_ratio=voiced_ratio,
                                  baseline=baseline, stt=stt_block, flags=stt.flags)
 
-        # (c) MỘT lần align, dùng chung cho A, P_clarity, pause, filler và S.
+        # (c) ONE alignment, shared by A, P_clarity, pauses, fillers and S.
         result = align(script, stt.words)
         acc = accuracy_scores(result)
         ref_tokens = script.split()
 
-        # (d) Pause: ngưỡng cá nhân từ baseline, không có thì 0.7 s.
+        # (d) Pauses: personal threshold from the baseline, 0.7 s without one.
         threshold = (baseline.hesitation_threshold_s if baseline is not None
                      else DEFAULT_HESITATION_THRESHOLD_S)
         pauses = find_pauses(segments, min_pause_s=MIN_PAUSE_S)
         classified = classify_pauses(pauses, result.items, script, hesitation_threshold_s=threshold)
 
-        # (e) Fluency: WPM và H cùng mẫu số speech_span; R dùng chung cho hiển thị và chấm.
+        # (e) Fluency: WPM and H share the speech_span denominator; R serves display and score.
         n_words, span_s = speech_span(stt.words)
         wpm = compute_wpm(n_words, span_s)
         hes_count, forgot_count, h = hesitations_per_min(classified, span_s)
@@ -203,10 +203,10 @@ def evaluate_session(
         sentences = score_sentences(build_sentence_pairs(script, result.items), encode=encode)
         semantic = score_semantic(sentences)
 
-        # (h) Tổng
+        # (h) Total
         overall = compute_overall(acc.accuracy, fluency, pronunciation, semantic)
 
-        # (i) Cờ chất lượng dữ liệu
+        # (i) Data quality flags
         flags = _merge_flags(stt.flags, result.flags, acc.flags, pitch.flags,
                              baseline.flags if baseline is not None else ["no_baseline"])
 
@@ -254,8 +254,8 @@ def analyze_baseline(
     vad_params: Any
 ) -> dict:
     """
-    Dành riêng cho việc phân tích file ghi âm giọng baseline mẫu.
-    Trả một dạng JSON duy nhất (ADR-004 D12):
+    Only for analysing the baseline voice sample.
+    Returns one JSON shape (ADR-004 D12):
     {schema_version, status, reason, profile | None, flags}.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -301,7 +301,7 @@ def analyze_baseline(
                 "reason": "low_voiced_ratio", "profile": None, "flags": [],
             }
 
-        pauses = find_pauses(segments, min_pause_s=0.35)
+        pauses = find_pauses(segments, min_pause_s=MIN_PAUSE_S)
         pause_profile = compute_baseline_pause_profile(pauses)
 
         f0_profile = compute_baseline_f0(master)

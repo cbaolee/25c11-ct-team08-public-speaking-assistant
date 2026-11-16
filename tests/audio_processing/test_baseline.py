@@ -96,3 +96,28 @@ def test_mean_loudness_db_ignores_nan_and_inf():
 def test_mean_loudness_db_empty_or_all_invalid_is_none():
     assert mean_loudness_db([]) is None
     assert mean_loudness_db([math.nan, math.inf]) is None
+
+
+def test_build_baseline_profile_uses_min_pause_s_from_config(monkeypatch):
+    # Baseline and Evaluate must cut pauses at the same length (MIN_PAUSE_S), not a copy of 0.35
+    from src.app.config import MIN_PAUSE_S
+    from src.audio_processing import baseline as baseline_module
+
+    seen: dict = {}
+
+    class _StopError(Exception):
+        pass
+
+    def fake_find_pauses(segments, *, min_pause_s):
+        seen["min_pause_s"] = min_pause_s
+        raise _StopError
+
+    monkeypatch.setattr(baseline_module, "detect_speech", lambda master, params: [])
+    monkeypatch.setattr(baseline_module, "check_audio_quality", lambda segments, duration: None)
+    monkeypatch.setattr(baseline_module, "find_pauses", fake_find_pauses)
+    master = type("Master", (), {"duration_s": 30.0})()
+    try:
+        baseline_module.build_baseline_profile(master, vad_params=None)
+    except _StopError:
+        pass
+    assert seen["min_pause_s"] == MIN_PAUSE_S
