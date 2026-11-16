@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { mapResult, displayRound, pickBaselineProfile } = require('../../src/web/static/js/evaluate_client.js');
+const { mapResult, displayRound, pickBaselineProfile, expandCompact } = require('../../src/web/static/js/evaluate_client.js');
 
 const load = n => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', n), 'utf8'));
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -145,4 +145,35 @@ test('pickBaselineProfile: insufficient / null profile / bad threshold / garbage
   assert.equal(pickBaselineProfile({ status: 'ok', profile: { hesitation_threshold_s: null, flags: [] } }), null);
   assert.equal(pickBaselineProfile(null), null);
   assert.equal(pickBaselineProfile({ status: 'insufficient_audio', profile: { hesitation_threshold_s: 0.7, flags: [] } }), null);
+});
+
+test('expandCompact: words from the script, mistakes marked, sentences split, no timings', () => {
+  const summary = { status: 'ok', overall: 80, components: { accuracy: 90 }, audio: { duration_s: 12, voiced_ratio: 0.8 } };
+  const mistakes = [
+    { type: 'alignment', status: 'sub', ref_index: 1, ref_word: 'quick', hyp_word: 'quack', sentence_index: 0 },
+    { type: 'alignment', status: 'del', ref_index: 4, ref_word: 'very', hyp_word: null, sentence_index: 1 },
+    { type: 'filler', after_ref_index: 2, text: 'um', source: 'stt', start_s: 1.0, end_s: 1.2 },
+    { type: 'pause', kind: 'hesitation', after_ref_index: 2, start_s: 1.2, end_s: 2.4 }
+  ];
+  const script = 'The quick fox. It is very fast!';
+  const json = expandCompact(summary, mistakes, script);
+  assert.equal(json.alignment.length, 7);
+  assert.deepEqual(json.sentences.map(x => x.ref_text), ['The quick fox.', 'It is very fast!']);
+  assert.deepEqual(json.alignment.map(a => a.sentence_index), [0, 0, 0, 1, 1, 1, 1]);
+  assert.equal(json.overall, 80);                                   // summary fields kept
+
+  const { an, sc } = mapResult(json, script);
+  assert.deepEqual(an.words.map(w => w.status), ['ok', 'wrong', 'ok', 'ok', 'missing', 'ok', 'ok']);
+  assert.ok(an.words.every(w => w.start === null && w.end === null));
+  assert.equal(an.words[2].fillerAfter, true);
+  assert.equal(an.words[2].pauseAfter.kind, 'hesitation');
+  assert.equal(sc.overall, 80);
+  assert.equal(an.dur, 12);
+});
+
+test('expandCompact: empty mistakes and empty script do not crash', () => {
+  const json = expandCompact({ status: 'ok' }, null, '');
+  assert.deepEqual(json.alignment, []);
+  assert.deepEqual(json.sentences, []);
+  assert.doesNotThrow(() => mapResult(json, ''));
 });

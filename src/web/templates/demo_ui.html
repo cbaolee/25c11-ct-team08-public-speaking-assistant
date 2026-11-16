@@ -221,7 +221,7 @@ body.app-view .btn.back:hover:not(:disabled) { background: var(--surface); borde
 /* ---------- forms ---------- */
 label, .lbl { display: block; font: 600 14px var(--sans); margin: 16px 0 6px; color: var(--ink); }
 label small, .lbl small { font-weight: 400; color: var(--muted); }
-input[type=text], input[type=password], input[type=number], select, textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); font: 400 16px var(--sans); background: var(--surface); color: var(--ink); }
+input[type=text], input[type=email], input[type=password], input[type=number], select, textarea { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); font: 400 16px var(--sans); background: var(--surface); color: var(--ink); }
 textarea { resize: vertical; line-height: 1.5; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent-line); outline-offset: 0; border-color: var(--accent); }
 input[aria-invalid="true"], select[aria-invalid="true"] { border-color: var(--bad); background: #FFF7F7; }
@@ -558,7 +558,7 @@ table.t tr:last-child td { border-bottom: 0; }
 .l-auth h2 { margin: 8px 0 4px; color: #fff; font-size: clamp(28px, 3vw, 34px); line-height: 1.1; }
 .l-auth p.note { font: 400 17px/1.45 var(--serif); color: #C9D0DB; }
 .l-auth label { color: #E6EAF1; }
-.l-auth input[type=text], .l-auth input[type=password] { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .26); color: #fff; }
+.l-auth input[type=text], .l-auth input[type=email], .l-auth input[type=password] { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .26); color: #fff; }
 .l-auth input:focus-visible { border-color: #8FB0FF; outline: 3px solid rgba(143, 176, 255, .35); }
 .l-auth input[aria-invalid="true"] { border-color: #FCA5A5; background: rgba(252, 165, 165, .08); }
 .l-auth .ferr { color: #FCA5A5; }
@@ -739,7 +739,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
     <form id="authForm" novalidate>
       <div class="pill ok" id="loginHint" role="status" hidden></div>
       <label for="auUser" data-t="auth.username"></label>
-      <input type="text" id="auUser" autocomplete="username" autocapitalize="none" spellcheck="false">
+      <input type="email" id="auUser" autocomplete="email" autocapitalize="none" spellcheck="false">
       <label for="auPass" data-t="auth.password"></label>
       <div class="pwwrap">
         <input type="password" id="auPass" autocomplete="current-password">
@@ -1020,7 +1020,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
   <h2 id="mpassTitle" data-t="pass.title"></h2>
   <p class="note" data-t="pass.sub"></p>
   <label for="mpUser" data-t="pass.username"></label>
-  <input type="text" id="mpUser" autocomplete="username">
+  <input type="email" id="mpUser" autocomplete="username" readonly>
   <label for="mpNew" data-t="pass.newPass"></label>
   <input type="password" id="mpNew" autocomplete="new-password">
   <label for="mpNew2" data-t="pass.newPass2"></label>
@@ -1117,7 +1117,7 @@ const USER_NAME = 'Nguyen Van A';
 const SHOW_DEMO_LABELS = false;   // false = hide every "Sample data" / "Demo only" label (clean demo). true = show them again
 const USE_SIM = false;   // demo mode off: always call the real APIs. simulate()/score() stay only until the UI refactor (2.1) removes them
 const SEED_SAMPLE_DATA = false;     // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
-const ALWAYS_ASK_BASELINE = true; // true = the baseline window opens on EVERY log in (demo). Real app: only when the account has no baseline yet.
+const ALWAYS_ASK_BASELINE = false; // true = the baseline window opens on EVERY log in (demo). false: only when GET /api/baseline returns null.
 const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
 const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
 
@@ -1152,10 +1152,13 @@ const TEXT = {
 
   auth: {
     tabLogin: 'Log in', tabSignup: 'Sign up', btnLogin: 'Log in', btnSignup: 'Create account',
-    username: 'Username', password: 'Password', show: 'Show', hide: 'Hide',
-    errEmpty: 'Enter a username and a password.',
+    username: 'Email', password: 'Password', show: 'Show', hide: 'Hide',
+    errEmpty: 'Enter your email and a password.', errEmail: 'Enter a valid email address.',
+    errWeak: 'Use a password with at least 8 characters.', errLogin: 'Wrong email or password.',
+    errServer: 'Could not reach the account service. Please try again.',
+    expired: 'Your session has ended. Please log in again.',
     okSignup: 'Account created. Please log in.', okSignupOff: 'Account created. Recording is off: you can turn it on in Permissions after you log in.', okLogin: 'Signed in.',
-    errTaken: 'That username is already taken. Log in instead.', password2: 'Repeat password', errMismatch: 'The two passwords do not match.', errRepeat: 'Repeat your password.', hintSignedUp: 'Account created. Log in to continue.'
+    errTaken: 'An account with this email already exists. Log in instead.', password2: 'Repeat password', errMismatch: 'The two passwords do not match.', errRepeat: 'Repeat your password.', hintSignedUp: 'Account created. Log in to continue.'
   },
 
   home: {
@@ -1246,7 +1249,14 @@ const TEXT = {
     step2: 'Step 2 of 2', step2Text: 'Transcribing and measuring pace, pauses and pitch...',
     queue: 'Waiting in line', queueText: 'Many people are practising right now. Starting in {n} s...',
     errTitle: 'We could not transcribe your recording', errMsg: 'Nothing was scored or saved. Check your connection and try again.', retry: 'Try again',
-    saved: 'Saved to History.',
+    saved: 'Saved to History.', notSaved: 'Could not save to History. Your report is shown below.',
+    errBaselineRequired: 'Record your baseline voice first, then try again.',
+    errBaselineUnavailable: 'Your baseline could not be loaded right now. Nothing was scored. Please try again.',
+    errBaselineNotSaved: 'Your baseline was analysed but could not be saved. Please record it again.',
+    errScriptNotFound: 'This script no longer exists. Choose another text and try again.',
+    errScriptEmpty: 'The practice text is empty. Choose or write a text first.',
+    errScriptTooLong: 'The practice text is too long. Please use a shorter text.',
+    errScriptStorage: 'Saved scripts are not available right now. Please try again.',
     errTooLong: 'This recording is longer than the allowed limit. Please choose a shorter one.',
     errTooLarge: 'This file is too large. Please choose a smaller one.',
     errNoStream: 'No audio was found in this file. Please check the file and try again.',
@@ -1297,6 +1307,7 @@ const TEXT = {
     adv_clarity: 'Words heard as close matches: {v}. Click the yellow words to review them.',
     adv_pitch: 'Pitch range {v} st. Under 4 st sounds monotone. Aim for 6 or more.',
     adv_semantic: 'Sentences that drifted from the script: {v}. Check the red words in them.',
+    compactNote: 'older session: scores and marked words only, no audio or charts',
     areaWpm: 'pace', areaPause: 'pauses', areaFiller: 'filler words', areaAccuracy: 'accuracy', areaClarity: 'clarity', areaPitch: 'pitch variation', areaSemantic: 'meaning match'
   },
 
@@ -1306,7 +1317,9 @@ const TEXT = {
     open: 'Open report', delete: 'Delete',
     delT: 'Delete this recording?', delD: 'The audio and its report will be removed. This cannot be undone.', delOk: 'Delete recording',
     delAllT: 'Delete all recordings?', delAllD: 'All audio and reports will be removed. This cannot be undone.', delAllOk: 'Delete all',
-    deleted: 'Recording deleted.', deletedAll: 'All recordings deleted.'
+    deleted: 'Recording deleted.', deletedAll: 'All recordings deleted.',
+    untitled: 'Practice session', loadErr: 'Could not load your history. Reload the page to try again.',
+    openErr: 'Could not open this report. Please try again.', delErr: 'Could not delete. Please try again.'
   },
 
   profile: {
@@ -1331,9 +1344,9 @@ const TEXT = {
     accent: 'Target accent', accents: ['American English', 'British English'],
     topics: 'Script topics', topicsHint: '(choose at least one)',
     errAge: 'Enter an age between 1 and 120, or leave it empty.', errAccent: 'Choose one accent.', errTopics: 'Choose at least one topic.',
-    saved: 'Details saved.'
+    saved: 'Details saved.', saveErr: 'Could not save your details. Please try again.'
   },
-  pass: { title: 'Change password', sub: 'Update your login details.', username: 'Username', newPass: 'New password', newPass2: 'Repeat new password', errEmpty: 'Fill in all three fields.', errMismatch: 'The two passwords do not match.', ok: 'Login details updated.' },
+  pass: { title: 'Change password', sub: 'Choose a new password for your account.', username: 'Email', newPass: 'New password', newPass2: 'Repeat new password', errEmpty: 'Fill in both password fields.', errMismatch: 'The two passwords do not match.', ok: 'Password changed.' },
   audio: {
     title: 'Audio settings', sub: 'Choose your microphone and volume.', mic: 'Microphone',
     mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
@@ -1612,7 +1625,7 @@ function adviceList(sc, limit, below) {
     { key: 'accuracy', v: sc.A, area: 'areaAccuracy', val: sc.sub + sc.del },
     { key: 'clarity', v: sc.Pclar, area: 'areaClarity', val: sc.near },
     { key: 'pitch', v: sc.Ppitch, area: 'areaPitch', val: fx(sc.Rst, 1) },
-    { key: 'semantic', v: sc.S, area: 'areaSemantic', val: sc.nSent - sc.cosOk }
+    { key: 'semantic', v: sc.S, area: 'areaSemantic', val: sc.nSent == null ? T('common.na') : sc.nSent - sc.cosOk }
   ];
   return items.filter(x => x.v != null && x.v < (below == null ? 85 : below)).sort((a, b) => a.v - b.v).slice(0, limit)
     .map(x => ({ key: x.key, v: x.v, area: T('report.' + x.area), text: T('report.adv_' + x.key, { v: x.val }) }));
@@ -1844,7 +1857,7 @@ const S = {
   sessions: [], cur: null, nextId: 1,
   play: { t: 0, on: false, iv: null },
   ev: null, modal: [], confirmCb: null, afterConsent: null, onDeny: null, pmFirst: false,
-  signupDraft: null, stepBack: false, gate: null, grec: null, follow: null, acctKey: null
+  signupDraft: null, stepBack: false, gate: null, grec: null, follow: null, auth: null
 };
 const pad2 = n => String(Math.floor(n)).padStart(2, '0');
 const fmtClock = s => pad2(s / 60) + ':' + pad2(s % 60);
@@ -2282,9 +2295,50 @@ function setupSelects() {
   window.addEventListener('resize', () => { if (openCsel) openCsel.close(); });
 }
 
-/* ---------- auth ---------- */
-const ACCOUNTS = {};   // SIM: in-memory account registry, lost on reload. Real app: Supabase Auth + a `profiles` row.
-const acctKey = u => u.trim().toLowerCase();
+/* ---------- API calls + login session ----------
+   The tokens from POST /api/auth/login are kept in localStorage, so F5 keeps the person logged in.
+   api() adds `Authorization: Bearer`, and on a 401 swaps the refresh token for a new session once. */
+const AUTH_KEY = 'psa.auth';
+const MIN_PASSWORD = 8;   // same rule as the backend (src/app/auth.py)
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const AUTH_ERR = { email_taken: 'auth.errTaken', invalid_email: 'auth.errEmail', weak_password: 'auth.errWeak', invalid_credentials: 'auth.errLogin' };
+function loadAuth() {
+  try { const a = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); return a && a.access_token ? a : null; } catch (e) { return null; }
+}
+function storeAuth(a) {
+  S.auth = a;
+  try { if (a) localStorage.setItem(AUTH_KEY, JSON.stringify(a)); else localStorage.removeItem(AUTH_KEY); } catch (e) { /* private mode: login lasts until reload */ }
+}
+let authRefresh = null;
+function refreshAuth() {   // resolves true (new tokens), false (session over); rejects when the server cannot be reached
+  if (!S.auth || !S.auth.refresh_token) return Promise.resolve(false);
+  if (!authRefresh) {
+    authRefresh = fetch('/api/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: S.auth.refresh_token }) })
+      .then(r => r.ok ? r.json().then(j => { storeAuth(j); return true; }) : (r.status === 401 ? false : Promise.reject(new Error('auth'))))
+      .finally(() => { authRefresh = null; });
+  }
+  return authRefresh;
+}
+function api(url, opts) {
+  const o = Object.assign({}, opts || {}), json = o.json;
+  delete o.json;
+  if (json !== undefined) o.body = JSON.stringify(json);
+  const send = () => {
+    const h = Object.assign({}, o.headers || {});
+    if (S.auth) h.Authorization = 'Bearer ' + S.auth.access_token;
+    if (json !== undefined) h['Content-Type'] = 'application/json';
+    return fetch(url, Object.assign({}, o, { headers: h }));
+  };
+  return send().then(res => {
+    if (res.status !== 401 || !S.auth) return res;
+    return refreshAuth().then(ok => { if (ok) return send(); sessionEnded(); return res; }, () => res);
+  });
+}
+const readJson = res => res.json().catch(() => null).then(j => ({ res, ok: res.ok, status: res.status, j }));
+function sessionEnded() {
+  storeAuth(null);
+  if (S.user) { logout(true); toast(T('auth.expired'), true); }
+}
 function fillSignupForm(reset) {
   const sel = $('#suGender');
   if (!reset && sel.options.length) return;
@@ -2369,12 +2423,28 @@ function enterApp(fresh) {
   renderAccount(); showView('app'); fillTopicSelect(); resetChat();
   go('home', { silent: !fresh });
 }
-function saveAccount() {
-  if (!S.user) return;
-  const k = acctKey(S.user.name);
-  if (S.acctKey && S.acctKey !== k) delete ACCOUNTS[S.acctKey];
-  ACCOUNTS[k] = { name: S.user.name, profile: S.profile, consent: S.consent, baseline: S.baseline, avatar: S.avatar, sessions: S.sessions };
-  S.acctKey = k;
+/* GET /api/profile -> S.user / S.profile / S.consent (the profile row is made at sign up). */
+function applyProfile(p) {
+  S.user = { id: p.id, email: p.email, name: p.display_name || (p.email || '').split('@')[0] || 'you' };
+  S.profile = { gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent, topics: p.topics || [] };
+  S.consent = !!p.consent_recording;
+}
+/* After log in, and on page load when tokens are stored: profile -> app -> baseline (F1) + history (F2). */
+function startSession(fresh) {
+  return api('/api/profile').then(readJson).then(({ ok, status, j }) => {
+    if (!ok) {
+      if (status === 401) return;                       // sessionEnded() already ran
+      if (status === 404) storeAuth(null);              // account without a profile row: cannot continue
+      if (fresh) showErr($('#auErr'), (j && j.message) || T('auth.errServer')); else toast(T('auth.errServer'), true);
+      return;
+    }
+    applyProfile(j);
+    S.sessions = []; S.baseline = null; S.savedScripts = null;
+    enterApp(fresh);
+    if (fresh) toast(T('auth.okLogin'));
+    loadBaseline(true);
+    loadHistory();
+  }).catch(() => { if (fresh) showErr($('#auErr'), T('auth.errServer')); else toast(T('auth.errServer'), true); });
 }
 function readSignupProfile() {
   const age = $('#suAge').value.trim(), acc = $('input[name=suAccent]:checked'), tops = $$('input[name=suTopic]:checked').map(i => i.value);
@@ -2389,57 +2459,84 @@ function readSignupProfile() {
 }
 function onAuthSubmit(e) {
   e.preventDefault();
-  const u = $('#auUser').value.trim(), p = $('#auPass').value, err = $('#auErr');
+  if (S.authBusy) return;
+  const u = $('#auUser').value.trim().toLowerCase(), p = $('#auPass').value, err = $('#auErr');
   $('#auUser').setAttribute('aria-invalid', String(!u)); $('#auPass').setAttribute('aria-invalid', String(!p));
   if (!u || !p) { showErr(err, T('auth.errEmpty')); (!u ? $('#auUser') : $('#auPass')).focus(); return; }
+  if (!EMAIL_RE.test(u)) { showErr(err, T('auth.errEmail')); $('#auUser').setAttribute('aria-invalid', 'true'); $('#auUser').focus(); return; }
   clearErr(err);
   if (S.authMode === 'up') {
     const p2 = $('#auPass2').value;
+    if (p.length < MIN_PASSWORD) { showErr(err, T('auth.errWeak')); $('#auPass').setAttribute('aria-invalid', 'true'); $('#auPass').focus(); return; }
     $('#auPass2').setAttribute('aria-invalid', String(!p2 || p2 !== p));
     if (!p2) { showErr(err, T('auth.errRepeat')); $('#auPass2').focus(); return; }
     if (p2 !== p) { showErr(err, T('auth.errMismatch')); $('#auPass').setAttribute('aria-invalid', 'true'); $('#auPass2').focus(); return; }
-    if (ACCOUNTS[acctKey(u)]) { showErr(err, T('auth.errTaken')); $('#auUser').setAttribute('aria-invalid', 'true'); $('#auUser').focus(); return; }
     const prof = readSignupProfile();
     if (!prof) return;
     // Step 2 of sign up: ask for recording permission. The account is created when the person answers.
-    S.signupDraft = { name: u, profile: prof };
+    S.signupDraft = { email: u, password: p, profile: prof };
     S.consent = false;
     S.afterConsent = () => finishSignup(true);
     S.onDeny = () => finishSignup(false);
     openModal('mConsent', { lock: true, focus: '#mcAllow' });
     return;
   }
-  loginAs(u);
+  logIn(u, p);
 }
+function setAuthBusy(on) { S.authBusy = on; $('#auBtn').disabled = on; }
+/* POST /api/auth/signup: creates the account and its profiles row (with the consent answer). */
 function finishSignup(consent) {
   const d = S.signupDraft; S.signupDraft = null;
   if (!d) return;
   S.consent = false;                  // nobody is logged in yet; the answer is stored on the account
-  ACCOUNTS[acctKey(d.name)] = { name: d.name, profile: d.profile, consent, baseline: null, avatar: null, sessions: [] };
-  $('#auPass').value = ''; $('#auPass').removeAttribute('aria-invalid'); $('#auUser').removeAttribute('aria-invalid');
-  fillSignupForm(true);
-  setAuthMode('in');
-  $('#auUser').value = d.name;
-  $('#loginHint').textContent = T('auth.hintSignedUp'); $('#loginHint').hidden = false;
-  toast(T(consent ? 'auth.okSignup' : 'auth.okSignupOff'));
-  $('#auPass').focus();
+  const err = $('#auErr');
+  setAuthBusy(true);
+  api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: consent } })
+    .then(readJson).then(({ ok, j }) => {
+      setAuthBusy(false);
+      const code = j && j.error_code;
+      if (!ok) {
+        showErr(err, AUTH_ERR[code] ? T(AUTH_ERR[code]) : (j && j.message) || T('auth.errServer'));
+        if (code === 'email_taken' || code === 'invalid_email') { $('#auUser').setAttribute('aria-invalid', 'true'); $('#auUser').focus(); }
+        return;
+      }
+      $('#auPass').value = ''; $('#auPass').removeAttribute('aria-invalid'); $('#auUser').removeAttribute('aria-invalid');
+      fillSignupForm(true);
+      setAuthMode('in');
+      $('#auUser').value = d.email;
+      $('#loginHint').textContent = T('auth.hintSignedUp'); $('#loginHint').hidden = false;
+      toast(T(consent ? 'auth.okSignup' : 'auth.okSignupOff'));
+      $('#auPass').focus();
+    }).catch(() => { setAuthBusy(false); showErr(err, T('auth.errServer')); });
 }
-function loginAs(u) {
-  const a = ACCOUNTS[acctKey(u)];
-  $('#auPass').value = '';
-  if (a) {
-    S.user = { name: a.name }; S.profile = a.profile; S.consent = a.consent; S.baseline = a.baseline; S.avatar = a.avatar; S.sessions = a.sessions;
-  } else {                            // unknown name: sample account with history, so the charts have something to show
-    S.user = { name: u };
-    seedDemo();
-    S.profile = { gender: PREFILL.gender, age: PREFILL.age, accent: PREFILL.accent, topics: PREFILL.topics.slice() };
-    S.baseline = { ts: Date.now() - 14 * 864e5 }; S.consent = true; S.avatar = null;
-  }
-  if (a && SEED_SAMPLE_DATA && !S.sessions.length) { seedDemo(); a.sessions = S.sessions; }   // new account: show the sample history until real sessions exist
-  S.acctKey = acctKey(S.user.name);
-  enterApp(true);
-  toast(T('auth.okLogin'));
-  if (ALWAYS_ASK_BASELINE || !S.baseline) openBaselineGate();
+/* POST /api/auth/login, keep the tokens, then load the profile and enter the app. */
+function logIn(email, password) {
+  const err = $('#auErr');
+  setAuthBusy(true);
+  fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+    .then(readJson).then(({ ok, j }) => {
+      if (!ok) {
+        setAuthBusy(false);
+        const code = j && j.error_code;
+        showErr(err, AUTH_ERR[code] ? T(AUTH_ERR[code]) : (j && j.message) || T('auth.errServer'));
+        $('#auPass').setAttribute('aria-invalid', 'true'); $('#auPass').focus();
+        return;
+      }
+      $('#auPass').value = '';
+      storeAuth(j);
+      return startSession(true).finally(() => setAuthBusy(false));
+    }).catch(() => { setAuthBusy(false); showErr(err, T('auth.errServer')); });
+}
+/* F1: the server decides if the Baseline Gate opens (GET /api/baseline returns null = no baseline yet). */
+function loadBaseline(openGate) {
+  const user = S.user;
+  return api('/api/baseline').then(readJson).then(({ ok, status, j }) => {
+    if (S.user !== user || status === 401) return;
+    if (!ok) { toast(T('eval.errBaselineUnavailable'), true); return; }
+    S.baseline = j ? { ts: Date.parse(j.recorded_at) || Date.now(), profile: j } : null;
+    if (S.screen === 'home' || S.screen === 'profile') RENDER[S.screen]();
+    if (openGate && (ALWAYS_ASK_BASELINE || !S.baseline)) openBaselineGate();
+  }).catch(() => { if (S.user === user) toast(T('eval.errNet'), true); });
 }
 
 /* POST the baseline recording to /api/baseline. cb({profile}) on success, cb({msg}) on any failure (nothing is saved on failure). */
@@ -2449,7 +2546,7 @@ function postBaseline(rec, cb) {
   const ctrl = new AbortController();
   let timedOut = false;
   const tm = setTimeout(() => { timedOut = true; ctrl.abort(); }, 60000);
-  fetch('/api/baseline', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
+  api('/api/baseline', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
     clearTimeout(tm);
     if (res.ok && j && j.status === 'insufficient_audio') { cb({ msg: T('profile.errInsufficient') }); return; }
     if (res.ok && j && j.status === 'ok') { const pr = EvaluateClient.pickBaselineProfile(j); cb(pr ? { profile: pr } : { msg: T('eval.errServer') }); return; }
@@ -2505,7 +2602,9 @@ function onGateAgree() {
     renderGate(0);
   });
 }
-function logout() {
+function logout(expired) {
+  if (!expired && S.auth) api('/api/auth/logout', { method: 'POST' }).catch(() => {});   // best effort: revoke on the server
+  storeAuth(null);
   hideTip(); stopPlayback();
   [S.rec, S.brec, S.grec].forEach(r => { if (r) r.cancel(); });
   if (audioTestStop) { audioTestStop(); audioTestStop = null; }
@@ -2513,8 +2612,7 @@ function logout() {
   S.rec = S.brec = S.grec = null; S.bbusy = null; S.follow = null; S.gate = null; S.afterConsent = null; S.onDeny = null;
   if (S.ev) { S.ev.timers.forEach(clearTimeout); S.ev = null; }
   S.modal.slice().forEach(id => closeModal(id, false));
-  saveAccount();
-  S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.cur = null; S.baseline = null; S.consent = false; S.avatar = null; S.acctKey = null;
+  S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.cur = null; S.baseline = null; S.consent = false; S.avatar = null; S.savedScripts = null;
   renderAccount(); setStageAuth(false); showView('landing'); window.scrollTo(0, 0);
 }
 
@@ -2529,7 +2627,7 @@ function deltaPill(pd, signed) {
 function dayCounts() {
   const days = [], today = new Date(); today.setHours(0, 0, 0, 0);
   for (let i = 13; i >= 0; i--) { const d = new Date(today); d.setDate(d.getDate() - i); days.push({ d, min: 0, key: d.toDateString() }); }
-  S.sessions.forEach(s => { const k = new Date(s.ts).toDateString(), row = days.find(x => x.key === k); if (row) row.min += s.dur / 60; });
+  S.sessions.forEach(s => { const k = new Date(s.ts).toDateString(), row = days.find(x => x.key === k); if (row) row.min += (s.dur || 0) / 60; });
   const set = new Set(days.filter(x => x.min > 0).map(x => x.key));
   let streak = 0, i = days.length - 1;
   if (!set.has(days[i].key)) i--;
@@ -2584,10 +2682,80 @@ RENDER.home = function () {
   renderHistory();
 };
 
+/* ---------- History from the server (F2): GET /api/sessions, /api/sessions/{id}, DELETE ---------- */
+const HISTORY_MAX_PAGES = 5;          // 5 pages x 20 = the newest 100 sessions on Home and History
+const DETAIL_TTL_MS = 5 * 60 * 1000;  // signed audio URLs last signed_url_ttl_s (600 s): reload the detail before that
+const numOrNull = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+/* One /api/sessions item -> the session object Home and History draw. The full report (an) loads on open. */
+function sessionFromSummary(it) {
+  const c = it.components || {};
+  return {
+    id: it.id, ts: Date.parse(it.created_at), title: it.topic || T('history.untitled'), topicKey: null,
+    sc: { status: it.status, overall: it.overall, label: it.label, flags: null, warnings: [],
+      A: numOrNull(c.accuracy), F: numOrNull(c.fluency), P: numOrNull(c.pronunciation), S: numOrNull(c.semantic),
+      wpm: numOrNull(it.wpm), Rst: numOrNull(it.pitch_range_st), Pclar: numOrNull(it.p_clarity) },
+    an: null, dur: numOrNull(it.audio_duration_s) || 0, accent: null, compact: !!it.is_compact, remote: true, demo: false
+  };
+}
+function loadHistory() {
+  const user = S.user, items = [];
+  const page = (cursor, n) => api('/api/sessions?limit=20' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''))
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error('history ' + r.status)))).then(d => {
+      if (S.user !== user) return null;
+      items.push.apply(items, d.items || []);
+      return d.next_cursor && n + 1 < HISTORY_MAX_PAGES ? page(d.next_cursor, n + 1) : items;
+    });
+  return page(null, 0).then(list => {
+    if (!list || S.user !== user) return;
+    const known = new Set(list.map(x => x.id));
+    S.sessions = list.map(sessionFromSummary).concat(S.sessions.filter(s => !known.has(s.id)));   // keep sessions saved while loading
+    if (S.screen === 'home') RENDER.home();
+    const last = scored().slice(-1)[0];   // Home's "next step" advice needs the latest full scores
+    if (last && !last.an) loadSessionDetail(last).then(() => { if (S.user === user && S.screen === 'home') RENDER.home(); }).catch(() => {});
+  }).catch(() => { if (S.user === user) toast(T('history.loadErr'), true); });
+}
+/* GET /api/sessions/{id}: full result (+ signed audio URL), or a compact one rebuilt from its mistakes. */
+function loadSessionDetail(s) {
+  if (s.an && (s.fresh || (s.detailAt && Date.now() - s.detailAt < DETAIL_TTL_MS))) return Promise.resolve(s);
+  return api('/api/sessions/' + encodeURIComponent(s.id)).then(r => (r.ok ? r.json() : Promise.reject(new Error('session ' + r.status)))).then(d => {
+    const json = d.is_compact ? EvaluateClient.expandCompact(d.result, d.mistakes, d.script_snapshot) : d.result;
+    const m = EvaluateClient.mapResult(json, d.script_snapshot);
+    if (d.is_compact) { m.sc.nSent = null; m.sc.cosOk = null; }   // sentence checks are not kept in compact sessions
+    Object.assign(s, { an: m.an, sc: m.sc, dur: m.an.dur != null ? m.an.dur : s.dur, accent: d.accent || null, compact: !!d.is_compact,
+      audioUrl: d.media_available && d.audio_url ? d.audio_url : null, detailAt: Date.now() });
+    if (d.topic) s.title = d.topic;
+    return s;
+  });
+}
+function deleteSession(id) {
+  return api('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => {
+    if (!r.ok && r.status !== 404) throw new Error('delete ' + r.status);   // 404: already gone
+    S.sessions.filter(x => x.id === id).forEach(revokeAudio);
+    S.sessions = S.sessions.filter(x => x.id !== id);
+    if (S.cur && S.cur.id === id) S.cur = null;
+  });
+}
+
 /* ---------- Script (Generate Script) ---------- */
 const CAT_LABELS = Object.assign({}, TOPICS, { free: 'Free topic (LLM)' });
 const topicLabel = k => CAT_LABELS[k] || TOPICS[k] || k;
-const apiHdr = json => Object.assign({ 'X-User-Id': S.acctKey || 'anonymous' }, json ? { 'Content-Type': 'application/json' } : {});
+/* GeneratedScript.source ("template" / "llm") -> the scripts.source value the API stores. */
+const SCRIPT_SOURCE = { template: 'generated_template', llm: 'generated_llm' };
+const SCRIPT_DURATIONS = [5, 10, 15, 20];
+/* POST /api/scripts. Saving the same text again returns the same id (the server dedupes by content hash). */
+function saveScript(sc) {
+  if (sc.savedId) return Promise.resolve({ id: sc.savedId });
+  const d = +sc.duration_min;
+  return api('/api/scripts', { method: 'POST', json: {
+    title: (sc.title || 'Script').slice(0, 200), body: sc.text, source: SCRIPT_SOURCE[sc.source] || 'written',
+    duration_min: SCRIPT_DURATIONS.indexOf(d) >= 0 ? d : null, topic: sc.title ? sc.title.slice(0, 200) : null,
+    category: sc.topic || null, template_id: sc.template_id || null, models_used: sc.models_used || [], citations: sc.citations || []
+  } }).then(readJson).then(({ ok, j }) => {
+    if (!ok) throw Object.assign(new Error('save'), { code: j && j.error_code, msg: j && j.message });
+    sc.savedId = j.id;
+    return j;
+  });
+}
 function syncTplSelect() {
   const cat = $('#chatTopic').value, tplSel = $('#chatTpl'), durSel = $('#chatDur');
   if (!tplSel || !durSel) return;
@@ -2680,7 +2848,7 @@ function generateScript(req, again) {
       ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note">' + esc(msg || T('eval.errServer')) + '</p><div class="acts"><button class="btn btn-sm" type="button" data-a="again">' + esc(T('script.regenerate')) + '</button></div>';
       ai._script = { req }; revealBubble(ai);
     };
-    const poll = id => fetch('/api/generate-script/' + id, { headers: apiHdr() }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+    const poll = id => api('/api/generate-script/' + id).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
       if (!ok || !j || j.status === 'failed') { failJob(j && j.error_code, j && j.message); return; }
       if (j.status !== 'completed') {
         status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
@@ -2702,10 +2870,11 @@ function generateScript(req, again) {
       $$('.ptxt', ai).forEach((el, i) => { el.textContent = paras[i]; });
       $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
       $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
-      ai._script = { title, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'free'), req };
+      ai._script = { title, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
+        template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], req };
       S.chatBusy = false; $('#chatSend').disabled = false; revealBubble(ai);
     }).catch(() => failJob('net', T('eval.errNet')));
-    fetch('/api/generate-script', { method: 'POST', headers: apiHdr(), body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+    api('/api/generate-script', { method: 'POST', body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
       if (!ok || !j || !j.job_id) { failJob(j && j.error_code, j && j.message); return; }
       poll(j.job_id);
     }).catch(() => failJob('net', T('eval.errNet')));
@@ -2773,14 +2942,11 @@ function onChatAction(e) {
   const a = b.getAttribute('data-a');
   if (a === 'practice') {
     const lbl = sc.title || TOPICS[sc.topic] || sc.topic;
-    S.texts.mine = { title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic };
-    S.src = 'mine'; go('practice');
+    const practise = id => { S.texts.mine = { id: id || null, title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic }; S.src = 'mine'; go('practice'); };
+    saveScript(sc).then(j => practise(j.id), () => practise(null));   // saved so the session links to it (C2); unsaved still works
   } else if (a === 'save') {
-    fetch('/api/scripts', { method: 'POST', headers: apiHdr(true), body: JSON.stringify({ title: sc.title || 'Script', script: sc.text, duration_min: sc.duration_min || 5, source: sc.source || 'free' }) })
-      .then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
-        if (!ok) { toast((j && j.message) || T('eval.errServer'), true); return; }
-        toast('Script saved.'); loadSavedScripts(j.id);
-      }).catch(() => toast(T('eval.errNet'), true));
+    saveScript(sc).then(j => { toast('Script saved.'); loadSavedScripts(j.id); })
+      .catch(e => toast((e && e.msg) || (e && e.code ? T('eval.errServer') : T('eval.errNet')), true));
   } else if (a === 'copy') {
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(sc.text).then(() => toast(T('script.copied')), () => toast(T('script.copyFail'), true));
     else toast(T('script.copyFail'), true);
@@ -2909,22 +3075,28 @@ function pickSample() {
   S.texts.sample = { title: T('practice.sampleTitle', { title: label }), short: label, text, topic: null };
   renderPractice();
 }
+/* Saved scripts (Practice > Mine): GET /api/scripts lists summaries; the text comes from GET /api/scripts/{id}. */
+function pickSavedScript(id) {
+  return api('/api/scripts/' + encodeURIComponent(id)).then(r => (r.ok ? r.json() : null)).then(s => {
+    if (!s) return;
+    S.texts.mine = { id: s.id, title: T('practice.fromScript', { title: s.title }), short: s.title, text: s.body, topic: s.category || null };
+    S.stepBack = false;
+    if (S.screen === 'practice') renderPractice();
+  }).catch(() => {});
+}
 function loadSavedScripts(pickId) {
-  if (USE_SIM) return;
-  fetch('/api/scripts', { headers: apiHdr() }).then(r => r.ok ? r.json() : null).then(d => {
-    const list = (d && d.scripts) || [], wrap = $('#mineSaved'), sel = $('#mineSel');
+  if (USE_SIM || !S.user) return;
+  api('/api/scripts?limit=20').then(r => r.ok ? r.json() : null).then(d => {
+    const list = (d && d.items) || [], wrap = $('#mineSaved'), sel = $('#mineSel');
     S.savedScripts = list;
     if (!wrap || !sel) return;
     wrap.hidden = !list.length;
     if (!list.length) return;
-    const curId = pickId || sel.value || list[0].id;
+    const curId = pickId || (S.texts.mine && S.texts.mine.id) || sel.value || list[0].id;
     sel.innerHTML = list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.title + ' (' + s.word_count + 'w)') + '</option>').join('');
     const chosen = list.find(s => s.id === curId) || list[0];
     sel.value = chosen.id;
-    if (pickId || !S.texts.mine) {
-      S.texts.mine = { id: chosen.id, title: T('practice.fromScript', { title: chosen.title }), short: chosen.title, text: chosen.script, topic: 'free' };
-      if (S.screen === 'practice') renderPractice();
-    }
+    if (pickId || !S.texts.mine) pickSavedScript(chosen.id);
   }).catch(() => {});
 }
 function renderPractice() {
@@ -2990,12 +3162,13 @@ function useOwn() {
     renderPractice();
   };
   if (USE_SIM) { applyOwn(); return; }
-  fetch('/api/scripts', { method: 'POST', headers: apiHdr(true), body: JSON.stringify({ title: T('practice.ownTitle'), script: v, duration_min: 5, source: 'own' }) })
-    .then(r => r.json().then(j => ({ status: r.status, ok: r.ok, j }))).then(({ status, ok, j }) => {
-      if (status === 422 && j && j.error_code === 'content_rejected') { openModal('mSafety'); return; }
-      if (!ok) { showErr(err, (j && j.message) || T('eval.errServer')); return; }
-      applyOwn(); loadSavedScripts();
-    }).catch(() => applyOwn());
+  saveScript({ title: T('practice.ownTitle'), text: v, source: 'written' }).then(j => {
+    applyOwn(); S.texts.own.id = j.id; loadSavedScripts();
+  }).catch(e => {
+    if (e && e.code === 'content_rejected') { openModal('mSafety'); return; }
+    if (e && e.code) { showErr(err, e.msg || T('eval.errServer')); return; }
+    applyOwn();   // network error: practise without saving
+  });
 }
 /* ---- follow-along (SIM): the highlight moves by TIME, assuming SPEAKING_WPM_FOR_ESTIMATE.
    Following the real voice later needs streaming STT or a local VAD: that is a new ADR ([CAN CHOT]), not part of this demo. ---- */
@@ -3101,25 +3274,29 @@ function finishEval(scn, txt) {
 
 /* ---- real evaluation: POST /api/evaluate (USE_SIM = false). S.audio is kept until a scored result is saved, so Retry re-sends the same audio. ---- */
 const EXT_BY_MIME = { 'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a' };
-const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', stt_unavailable: 'errStt', no_audio_stream: 'errNoStream', unsupported_format: 'errFormat', corrupt: 'errCorrupt', invalid_baseline: 'errBaseline' };
+const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', stt_unavailable: 'errStt', no_audio_stream: 'errNoStream', unsupported_format: 'errFormat', corrupt: 'errCorrupt', invalid_baseline: 'errBaseline',
+  baseline_required: 'errBaselineRequired', baseline_unavailable: 'errBaselineUnavailable', baseline_not_saved: 'errBaselineNotSaved',
+  script_not_found: 'errScriptNotFound', invalid_script_id: 'errScriptNotFound', script_storage_unavailable: 'errScriptStorage', script_empty: 'errScriptEmpty', script_too_long: 'errScriptTooLong' };
 function showEvalError(msg) { $('#meMsg').textContent = msg; openModal('mError', { focus: '#meRetry' }); }
 function runEvalReal(txt) {
   const au = S.audio, blob = au.blob || au.file;
   if (!blob) return;
   const fname = au.kind === 'file' ? au.name : 'recording' + (EXT_BY_MIME[(au.mime || '').split(';')[0]] || '.webm');
   const fd = new FormData();
-  fd.append('audio', blob, fname); fd.append('script', txt.text);
-  const bp = S.baseline && S.baseline.profile;   // demo accounts have S.baseline = {ts} with no profile -> nothing sent -> backend flags no_baseline
-  if (bp) fd.append('baseline_profile', JSON.stringify({ median_pause_s: bp.median_pause_s, hesitation_threshold_s: bp.hesitation_threshold_s, median_f0_hz: bp.median_f0_hz, mean_loudness_db: bp.mean_loudness_db, flags: bp.flags }));
+  fd.append('audio', blob, fname); fd.append('script', txt.text);   // the server reads the baseline itself
+  if (txt.id) fd.append('script_id', txt.id);
+  if (txt.short) fd.append('topic', txt.short);
   const ctrl = new AbortController(), ev = S.ev = { timers: [], ctrl, timedOut: false };
   ev.timers.push(setTimeout(() => { ev.timedOut = true; ctrl.abort(); }, 120000));
   $('#ovStep').textContent = T('eval.step1'); $('#ovText').textContent = T('eval.step1Text');
   openModal('mOverlay', { lock: true, focus: '#ovCancel' });
   const end = () => { ev.timers.forEach(clearTimeout); S.ev = null; closeModal('mOverlay', false); };
-  fetch('/api/evaluate', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
+  api('/api/evaluate', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
     if (S.ev !== ev) return;                       // cancelled by the user meanwhile
     end();
     if (res.ok && j && j.status) { finishEvalReal(j, txt); return; }
+    if (res.status === 401) return;                // logged out by sessionEnded()
+    if (j && j.error_code === 'baseline_required') { S.baseline = null; toast(T('eval.errBaselineRequired'), true); openBaselineGate(); return; }
     if (j && j.error_code) { showEvalError(EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer'))); return; }
     showEvalError(T('eval.errServer'));
   })).catch(() => {
@@ -3129,11 +3306,12 @@ function runEvalReal(txt) {
 }
 function finishEvalReal(j, txt) {
   const m = EvaluateClient.mapResult(j, txt.text), base = { ts: Date.now(), title: txt.short, topicKey: txt.topic, an: m.an, sc: m.sc, dur: m.an.dur, accent: S.profile ? S.profile.accent : null, demo: false, raw: j };
-  if (m.sc.status !== 'ok') { S.audio = null; S.cur = Object.assign({ id: S.nextId++ }, base); go('report'); return; }   // insufficient_audio: shown, never saved
-  const ses = Object.assign({ id: S.nextId++, audioUrl: URL.createObjectURL(S.audio.blob || S.audio.file) }, base);
-  S.audio = null; S.sessions.push(ses); S.cur = ses;
+  if (m.sc.status !== 'ok') { S.audio = null; S.cur = Object.assign({ id: 'local-' + S.nextId++ }, base); go('report'); return; }   // insufficient_audio: shown, not in History
+  const ses = Object.assign({ id: j.saved && j.session_id ? j.session_id : 'local-' + S.nextId++, audioUrl: URL.createObjectURL(S.audio.blob || S.audio.file), fresh: true, remote: !!j.saved }, base);
+  S.audio = null; S.cur = ses;
+  if (j.saved) S.sessions.push(ses);   // D-06: only saved sessions are in History (they come back after F5)
   go('report');
-  toast(T('eval.saved'));
+  toast(T(j.saved ? 'eval.saved' : 'eval.notSaved'), !j.saved);
 }
 
 /* ---------- Report ---------- */
@@ -3231,7 +3409,8 @@ RENDER.report = function () {
   const s = S.cur;
   if (!s) { go('home'); return; }
   const sc = s.sc, an = s.an;
-  $('#repMeta').textContent = T('report.meta', { title: s.title, accent: s.accent ? T('report.accentPart', { accent: s.accent }) : '' });
+  $('#repMeta').textContent = T('report.meta', { title: s.title, accent: s.accent ? T('report.accentPart', { accent: s.accent }) : '' }) + (s.compact ? ' · ' + T('report.compactNote') : '');
+  $('#player').hidden = !!s.remote && !s.audioUrl;   // compact session or audio file not available
   const bad = sc.status !== 'ok';
   $('#repState').hidden = !bad; $('#repMain').hidden = bad;
   hideTip();
@@ -3421,7 +3600,8 @@ function bindPlayerAudio(s) {
 function revokeAudio(s) {
   if (!s || !s.audioUrl) return;
   if (PA && PA._url === s.audioUrl) { PA.pause(); PA._url = null; PA.removeAttribute('src'); PA.load(); }
-  URL.revokeObjectURL(s.audioUrl); s.audioUrl = null;
+  if (s.audioUrl.startsWith('blob:')) URL.revokeObjectURL(s.audioUrl);   // signed URLs from the server are not ours to revoke
+  s.audioUrl = null;
 }
 function stopPlayback() { if (S.play.iv) clearInterval(S.play.iv); S.play.iv = null; S.play.on = false; if (PA && !PA.paused) PA.pause(); if ($('#playBtn')) updatePlayer(); }
 function updatePlayer() {
@@ -3466,7 +3646,10 @@ function renderHistory() {
     return '<tr><td>' + esc(fmtDayLong(s.ts)) + '</td><td>' + esc(s.title) + '</td><td class="num">' + fmtTime(s.dur) + '</td><td class="num">' + esc(sh(s.sc.overall)) + '</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn btn-ghost btn-sm" type="button" data-open="' + s.id + '" aria-label="' + esc(T('history.open') + ': ' + lab) + '">' + esc(T('history.open')) + '</button><button class="btn btn-danger-ghost btn-sm" type="button" data-del="' + s.id + '" aria-label="' + esc(T('history.delete') + ': ' + lab) + '">' + esc(T('history.delete')) + '</button></div></td></tr>';
   }).join('');
 }
-function openReport(id) { const s = S.sessions.find(x => x.id === id); if (s) { S.cur = s; go('report'); } }
+function openReport(id) {
+  const s = S.sessions.find(x => x.id === id); if (!s) return;
+  loadSessionDetail(s).then(() => { S.cur = s; go('report'); }).catch(() => toast(T('history.openErr'), true));
+}
 
 /* ---------- Profile ---------- */
 RENDER.profile = function () {
@@ -3542,22 +3725,40 @@ function saveProfileModal() {
   if (!okAge) { $('#mpAge').focus(); return; }
   if (!acc) { $('input[name=pmAccent]').focus(); return; }
   if (!tops.length) { $('input[name=pmTopic]').focus(); return; }
-  S.profile = { gender: $('#mpGender').value || null, age: n, accent: acc.value, topics: tops };
-  closeModal('mProfile'); toast(T('pm.saved')); fillTopicSelect();
-  if (RENDER[S.screen]) RENDER[S.screen]();
+  const next = { gender: $('#mpGender').value || null, age: n, accent: acc.value, topics: tops };
+  $('#mpSave').disabled = true;
+  api('/api/profile', { method: 'PATCH', json: { gender: next.gender, age: next.age, target_accent: next.accent, topics: next.topics } })
+    .then(r => {
+      $('#mpSave').disabled = false;
+      if (!r.ok) { if (r.status !== 401) toast(T('pm.saveErr'), true); return; }
+      S.profile = next;
+      closeModal('mProfile'); toast(T('pm.saved')); fillTopicSelect();
+      if (RENDER[S.screen]) RENDER[S.screen]();
+    }).catch(() => { $('#mpSave').disabled = false; toast(T('pm.saveErr'), true); });
+}
+/* Keep profiles.consent_recording in step with the Consent Modal and Permissions. */
+function saveConsent(on) {
+  if (!S.user) return;   // during sign up the answer goes with POST /api/auth/signup
+  api('/api/profile', { method: 'PATCH', json: { consent_recording: on } }).then(r => { if (!r.ok && r.status !== 401) toast(T('pm.saveErr'), true); }).catch(() => toast(T('pm.saveErr'), true));
 }
 
 /* ---------- other modals ---------- */
 function openPassModal() {
-  $('#mpUser').value = S.user.name; $('#mpNew').value = ''; $('#mpNew2').value = ''; clearErr($('#mpErr'));
-  openModal('mPass');
+  $('#mpUser').value = S.user.email || ''; $('#mpNew').value = ''; $('#mpNew2').value = ''; clearErr($('#mpErr'));
+  openModal('mPass', { focus: '#mpNew' });
 }
 function savePass() {
-  const u = $('#mpUser').value.trim(), a = $('#mpNew').value, b = $('#mpNew2').value, err = $('#mpErr');
-  if (!u || !a || !b) { showErr(err, T('pass.errEmpty')); return; }
+  const a = $('#mpNew').value, b = $('#mpNew2').value, err = $('#mpErr');
+  if (!a || !b) { showErr(err, T('pass.errEmpty')); return; }
+  if (a.length < MIN_PASSWORD) { showErr(err, T('auth.errWeak')); $('#mpNew').focus(); return; }
   if (a !== b) { showErr(err, T('pass.errMismatch')); $('#mpNew2').focus(); return; }
-  S.user.name = u; renderAccount(); closeModal('mPass'); toast(T('pass.ok'));
-  if (RENDER[S.screen]) RENDER[S.screen]();
+  $('#passSave').disabled = true;
+  api('/api/auth/password', { method: 'PUT', json: { password: a } }).then(readJson).then(({ ok, status, j }) => {
+    $('#passSave').disabled = false;
+    if (status === 401) return;
+    if (!ok) { showErr(err, j && j.error_code === 'weak_password' ? T('auth.errWeak') : T('auth.errServer')); return; }
+    closeModal('mPass'); toast(T('pass.ok'));
+  }).catch(() => { $('#passSave').disabled = false; showErr(err, T('auth.errServer')); });
 }
 let audioTestStop = null;
 function openAudioModal() {
@@ -3593,11 +3794,13 @@ function init() {
       return;
     }
     if (e.target.closest('[data-back]')) { go(S.from || 'home'); return; }
-    const o = e.target.closest('[data-open]'); if (o) { openReport(+o.getAttribute('data-open')); return; }
+    const o = e.target.closest('[data-open]'); if (o) { openReport(o.getAttribute('data-open')); return; }
     const d = e.target.closest('[data-del]');
     if (d) {
-      const id = +d.getAttribute('data-del');
-      confirmBox(T('history.delT'), T('history.delD'), T('history.delOk'), () => { S.sessions.filter(x => x.id === id).forEach(revokeAudio); S.sessions = S.sessions.filter(x => x.id !== id); if (S.cur && S.cur.id === id) S.cur = null; RENDER.home(); toast(T('history.deleted')); focusHeading(); });
+      const id = d.getAttribute('data-del');
+      confirmBox(T('history.delT'), T('history.delD'), T('history.delOk'), () => {
+        deleteSession(id).then(() => { RENDER.home(); toast(T('history.deleted')); focusHeading(); }, () => toast(T('history.delErr'), true));
+      });
       return;
     }
     const c = e.target.closest('[data-close]'); if (c) { const m = c.closest('.mbg'); if (m) closeModal(m.id); return; }
@@ -3673,13 +3876,10 @@ function init() {
   // practice
   $$('[data-src]').forEach(b => { b.onclick = () => setSrc(b.getAttribute('data-src')); });
   $('#goScript').onclick = () => go('script');
-  $('#mineSel').onchange = () => {
-    const s = (S.savedScripts || []).find(x => x.id === $('#mineSel').value);
-    if (s) { S.texts.mine = { id: s.id, title: T('practice.fromScript', { title: s.title }), short: s.title, text: s.script, topic: 'free' }; S.stepBack = false; renderPractice(); }
-  };
+  $('#mineSel').onchange = () => { const id = $('#mineSel').value; if (id) pickSavedScript(id); };
   $('#mineDel').onclick = () => {
     const id = $('#mineSel').value; if (!id) return;
-    fetch('/api/scripts/' + id, { method: 'DELETE', headers: apiHdr() }).then(r => {
+    api('/api/scripts/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => {
       if (r.ok) { if (S.texts.mine && S.texts.mine.id === id) S.texts.mine = null; toast('Script deleted.'); loadSavedScripts(); renderPractice(); }
     }).catch(() => {});
   };
@@ -3706,7 +3906,11 @@ function init() {
   $('#seek').addEventListener('input', e => seekTo(+e.target.value / 10, false));
 
   // history (bottom of Home) / profile
-  $('#delAll').onclick = () => confirmBox(T('history.delAllT'), T('history.delAllD'), T('history.delAllOk'), () => { S.sessions.forEach(revokeAudio); S.sessions = []; S.cur = null; RENDER.home(); toast(T('history.deletedAll')); focusHeading(); });
+  $('#delAll').onclick = () => confirmBox(T('history.delAllT'), T('history.delAllD'), T('history.delAllOk'), () => {
+    const ids = S.sessions.map(x => x.id);   // one DELETE per session, one after another
+    ids.reduce((p, id) => p.then(() => deleteSession(id)), Promise.resolve())
+      .then(() => { RENDER.home(); toast(T('history.deletedAll')); focusHeading(); }, () => { RENDER.home(); toast(T('history.delErr'), true); });
+  });
   $('#mcfOk').onclick = () => { const cb = S.confirmCb; S.confirmCb = null; closeModal('mConfirm'); if (cb) cb(); };
   $('#editInfo').onclick = () => openProfileModal(false);
   $('#avChange').onclick = () => $('#avFile').click();
@@ -3740,19 +3944,21 @@ function init() {
   // modals
   $('#mpSave').onclick = saveProfileModal;
   $('#mpCancel').onclick = () => closeModal('mProfile');
-  $('#mcAllow').onclick = () => { S.consent = true; S.onDeny = null; closeModal('mConsent'); toast(T('consent.toastOn')); const cb = S.afterConsent; S.afterConsent = null; if (cb) cb(); };
+  $('#mcAllow').onclick = () => { S.consent = true; saveConsent(true); S.onDeny = null; closeModal('mConsent'); toast(T('consent.toastOn')); const cb = S.afterConsent; S.afterConsent = null; if (cb) cb(); };
   $('#mcDeny').onclick = () => { S.afterConsent = null; const cb = S.onDeny; S.onDeny = null; closeModal('mConsent'); if (cb) cb(); else toast(T('consent.toastDenied')); };
   $('#passSave').onclick = savePass;
   $('#auIn').addEventListener('input', e => { $('#auInV').textContent = e.target.value; });
   $('#auOut').addEventListener('input', e => { $('#auOutV').textContent = e.target.value; });
   $('#auTest').onclick = testMic;
   $('#audioSave').onclick = () => { closeModal('mAudio'); toast(T('audio.ok')); };
-  $('#permSave').onclick = () => { S.consent = $('#pmChk').checked; closeModal('mPerm'); toast(T(S.consent ? 'consent.toastOn' : 'consent.toastOff')); };
+  $('#permSave').onclick = () => { const on = $('#pmChk').checked, changed = on !== S.consent; S.consent = on; if (changed) saveConsent(on); closeModal('mPerm'); toast(T(S.consent ? 'consent.toastOn' : 'consent.toastOff')); };
 
   window.addEventListener('resize', () => { syncHeader(); syncStage(); moveNavPill(false); moveSegPills(false); moveSegPills(false, $('#lAuth')); });
   window.addEventListener('scroll', () => { syncHero(); kickFollow(); }, { passive: true });
   if (window.ResizeObserver) new ResizeObserver(syncStage).observe($('#lStage'));
   showView('landing'); renderAccount();
+  S.auth = loadAuth();
+  if (S.auth) startSession(false);
 }
 init();
 

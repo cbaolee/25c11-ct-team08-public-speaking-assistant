@@ -110,7 +110,36 @@
     };
   }
 
-  const api = { mapResult, displayRound, pickBaselineProfile };
+  /* A compacted (older) session keeps its scores and `mistakes` (src/app/db/session_helpers.py
+     compact_session) but no alignment, sentences or timings. Rebuild what mapResult needs from the
+     saved script: every script.split() token is one word (ref_index = its position, as on the
+     backend), marked with its saved mistake when it has one. Sentence breaks follow end punctuation,
+     a close copy of text_norm.split_sentences. Timings stay null, so nothing is drawn on a time axis. */
+  const SENTENCE_END = /[.!?]["'\u201d\u2019)\]]*$/;
+  function expandCompact(result, mistakes, scriptText) {
+    const tokens = String(scriptText || '').split(/\s+/).filter(Boolean), list = mistakes || [];
+    const byRef = {};
+    list.forEach(m => { if (m.type === 'alignment' && m.ref_index != null) byRef[m.ref_index] = m; });
+    const sentences = [];
+    let start = 0;
+    const alignment = tokens.map((tok, k) => {
+      const m = byRef[k];
+      const item = { ref_index: k, ref_word: tok, hyp_word: m ? nn(m.hyp_word) : tok, status: m ? m.status : 'equal',
+        sentence_index: sentences.length, start_s: null, end_s: null };
+      if (SENTENCE_END.test(tok) || k === tokens.length - 1) {
+        sentences.push({ ref_text: tokens.slice(start, k + 1).join(' '), cosine: null, passed: null });
+        start = k + 1;
+      }
+      return item;
+    });
+    const pauses = list.filter(m => m.type === 'pause')
+      .map(m => ({ start_s: m.start_s, end_s: m.end_s, after_ref_index: m.after_ref_index, kind: m.kind }));
+    const fillers = list.filter(m => m.type === 'filler')
+      .map(m => ({ after_ref_index: m.after_ref_index, start_s: m.start_s, end_s: m.end_s, text: m.text, source: m.source }));
+    return Object.assign({}, result, { alignment, sentences, pauses, fillers });
+  }
+
+  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact };
   root.EvaluateClient = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
