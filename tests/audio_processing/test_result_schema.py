@@ -22,7 +22,7 @@ def _alignment_kwargs(**over):
 
 def _result_kwargs(**over):
     base = dict(
-        schema_version="2.0",
+        schema_version="2.1",
         status="ok",
         reason=None,
         overall=88.0,

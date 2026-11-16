@@ -1,17 +1,13 @@
 import math
 import statistics
 from collections.abc import Sequence
-import numpy as np
-import parselmouth
 from typing import Any
 
-from src.audio_processing.contracts import (
-    Pause,
-    MasterAudio,
-    BaselineProfile,
-    InsufficientAudio
-)
-from src.audio_processing.vad import detect_speech, find_pauses, check_audio_quality
+import numpy as np
+import parselmouth
+
+from src.audio_processing.contracts import BaselineProfile, MasterAudio, Pause
+from src.audio_processing.vad import check_audio_quality, detect_speech, find_pauses
 
 
 def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
@@ -43,7 +39,7 @@ def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
     # Tính ngưỡng và chặn biên trong khoảng [0.7, 1.2]
     threshold = 2.0 * median_pause_s
     hesitation_threshold_s = max(0.7, min(1.2, threshold))
-    
+
     return {
         "median_pause_s": median_pause_s,
         "hesitation_threshold_s": hesitation_threshold_s,
@@ -57,22 +53,22 @@ def compute_baseline_f0(master: MasterAudio) -> dict:
     """
     flags = []
     median_f0_hz = None
-    
+
     try:
         snd = parselmouth.Sound(str(master.path))
         pitch = snd.to_pitch()
         pitch_values = pitch.selected_array['frequency']
-        
+
         # Chỉ lấy các frames có âm thanh (voiced), frequency > 0
         voiced_f0 = pitch_values[pitch_values > 0]
-        
+
         if len(voiced_f0) > 0:
             median_f0_hz = float(np.median(voiced_f0))
         else:
             flags.append("no_f0")
     except Exception:
         flags.append("no_f0")
-        
+
     return {
         "median_f0_hz": median_f0_hz,
         "flags": flags
@@ -129,22 +125,22 @@ def build_baseline_profile(master: MasterAudio, vad_params: Any) -> BaselineProf
     """
     # 1. Phát hiện tiếng nói (Sử dụng keyword argument params=vad_params)
     segments = detect_speech(master, params=vad_params)
-    
+
     # 2. Kiểm tra chất lượng (ném ngoại lệ InsufficientAudio nếu tiếng nói < 30%)
     check_audio_quality(segments, master.duration_s)
-    
+
     # 3. Phân tích khoảng lặng (Sử dụng keyword argument min_pause_s=0.35)
     pauses = find_pauses(segments, min_pause_s=0.35)
     pause_profile = compute_baseline_pause_profile(pauses)
-    
+
     # 4. Phân tích cao độ giọng
     f0_profile = compute_baseline_f0(master)
-    
+
     loudness = mean_loudness_db(extract_loudness_db(master))
 
     # 5. Gộp flags
     combined_flags = pause_profile["flags"] + f0_profile["flags"]
-    
+
     return BaselineProfile(
         median_pause_s=pause_profile["median_pause_s"],
         hesitation_threshold_s=pause_profile["hesitation_threshold_s"],

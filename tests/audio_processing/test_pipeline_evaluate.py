@@ -7,12 +7,16 @@ Mọi số liệu là số tính tay (ghi ở từng test), không phải số �
 
 import json
 from pathlib import Path
+from uuid import uuid4
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
+from src.app.config import settings
+from src.app.db.factory import build_memory_repos, get_repos
+from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing import pipeline, scoring
 from src.audio_processing.contracts import (
     BaselineProfile,
@@ -105,7 +109,7 @@ def test_ok_full_hand_calculation(run):
     # round-trip JSON
     assert EvaluationResultV2.model_validate_json(r.model_dump_json()) == r
     assert set(r.model_dump()) == ALL_KEYS
-    assert r.schema_version == "2.0"
+    assert r.schema_version == "2.1"
     # A = 100 (4/4 equal), P_clarity = 100 (không near-miss)
     assert r.components["accuracy"] == 100.0
     assert r.subscores["p_clarity"] == 100.0
@@ -265,7 +269,7 @@ def test_stt_flags_are_merged_in_order_without_duplicates(run):
 
 def _minimal_result() -> EvaluationResultV2:
     return EvaluationResultV2(
-        schema_version="2.0", status="insufficient_audio", reason="low_voiced_ratio",
+        schema_version="2.1", status="insufficient_audio", reason="low_voiced_ratio",
         overall=None, label=None, components={}, subscores={}, accuracy_detail={},
         fluency_detail={}, pitch_detail={}, audio={"duration_s": 1.0, "voiced_ratio": 0.0},
         baseline=None, alignment=[], pauses=[], fillers=[], sentences=[], stt=None,
@@ -274,12 +278,22 @@ def _minimal_result() -> EvaluationResultV2:
     )
 
 
+@pytest.fixture(autouse=True)
+def _signed_in_user():
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=uuid4())
+    main.app.dependency_overrides[get_repos] = build_memory_repos
+    yield
+    main.app.dependency_overrides.clear()
+
+
 def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
     def fake(audio_path, script, baseline, *, vad_params):
         captured["baseline"] = baseline
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
+    # Chỉ kiểm dạng JSON trả về; baseline (bắt buộc) được test ở tests/test_api_evaluate.py
+    monkeypatch.setattr(settings, "baseline_required", False)
     data = {"script": "Hello."}
     if baseline_profile is not None:
         data["baseline_profile"] = baseline_profile
@@ -292,31 +306,8 @@ def test_api_evaluate_returns_v2_json(monkeypatch):
     cap: dict = {}
     r = _post_eval(monkeypatch, None, cap)
     assert r.status_code == 200
-    assert EvaluationResultV2.model_validate(r.json()).schema_version == "2.0"
+    assert EvaluationResultV2.model_validate(r.json()).schema_version == "2.1"
     assert cap["baseline"] is None
-
-
-def test_api_evaluate_baseline_without_loudness_ok(monkeypatch):
-    cap: dict = {}
-    body = {"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 120.0,
-            "flags": []}  # thiếu mean_loudness_db
-    r = _post_eval(monkeypatch, json.dumps(body), cap)
-    assert r.status_code == 200
-    assert cap["baseline"].mean_loudness_db is None
-    assert cap["baseline"].hesitation_threshold_s == 1.0
-
-
-@pytest.mark.parametrize("bad", [
-    '{"median_pause_s": 0.5, "bogus": 1}',   # thiếu trường + thừa trường
-    '{"median_pause_s": 0.5, "hesitation_threshold_s": "abc", "median_f0_hz": 1.0, "flags": []}',
-    '{"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 1.0, "flags": "x"}',
-    "[1, 2]",
-    "not json",
-])
-def test_api_evaluate_bad_baseline_is_422(monkeypatch, bad):
-    r = _post_eval(monkeypatch, bad, {})
-    assert r.status_code == 422
-    assert r.json()["error_code"] == "invalid_baseline"
 
 
 # ---- Bổ sung (review bước 10): số dưới đây là số tự tính tay, không phải số đo ----

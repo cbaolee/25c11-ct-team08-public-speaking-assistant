@@ -10,14 +10,15 @@ import parselmouth
 
 from src.audio_processing.alignment import AlignedItem, AlignmentResult
 from src.audio_processing.contracts import (
-    WordTimestamp,
+    BaselineProfile,
     ClassifiedPause,
+    MasterAudio,
     PauseKind,
     SpeechSegment,
-    MasterAudio,
-    BaselineProfile
+    WordTimestamp,
 )
 from src.audio_processing.text_norm import is_filler, split_sentences
+
 
 def clamp(x: float) -> float:
     """Ép kết quả về khoảng 0.0 - 100.0[cite: 1, 2]."""
