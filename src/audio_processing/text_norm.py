@@ -1,4 +1,4 @@
-"""Chuẩn hoá văn bản dùng chung cho scoring và vad (ADR-005 P12, ADR-004 D2/D19/D20)."""
+"""Text normalization shared by scoring and vad (ADR-005 P12, ADR-004 D2/D19/D20)."""
 
 import re
 import unicodedata
@@ -17,8 +17,8 @@ FILLER_WORDS: frozenset[str] = frozenset(
 
 _CURLY_APOSTROPHES = str.maketrans({"’": "'", "‘": "'"})
 _NUMBER_RE = re.compile(r"\d+(\.\d+)?")
-_THOUSANDS_RE = re.compile(r"\d{1,3}(,\d{3})+(\.\d+)?")  # phẩy nghìn hợp lệ
-_SPLIT_RE = re.compile(r"[^\w']|_")  # mọi ký tự không phải chữ, số hoặc '
+_THOUSANDS_RE = re.compile(r"\d{1,3}(,\d{3})+(\.\d+)?")  # valid thousands commas
+_SPLIT_RE = re.compile(r"[^\w']|_")  # any character that is not a letter, digit or '
 _NUM2WORDS_ERRORS = (OverflowError, ValueError, KeyError, InvalidOperation)
 PAUSE_PUNCT: frozenset[str] = frozenset(".,;:?!")
 SENTENCE_END: frozenset[str] = frozenset(".!?")
@@ -27,18 +27,18 @@ _CLOSERS = "\"'”’)]}"
 
 @dataclass(frozen=True)
 class RefToken:
-    """Một token gốc của kịch bản (theo script.split()) cùng các token con đã chuẩn hoá."""
+    """One original script token (from script.split()) with its normalized sub-tokens."""
 
-    ref_index: int  # vị trí trong script.split()
-    raw: str  # token gốc, giữ nguyên dấu câu
-    raw_key: str  # dạng gốc để so khớp trước khi bung (ADR-005 P12 ý 2)
-    subtokens: tuple[str, ...]  # token con đã chuẩn hoá; () nếu token chỉ có dấu câu
+    ref_index: int  # position in script.split()
+    raw: str  # original token, punctuation kept
+    raw_key: str  # original form used for matching before expansion (ADR-005 P12 point 2)
+    subtokens: tuple[str, ...]  # normalized sub-tokens; () for a punctuation-only token
 
 
 def _trim_edges(text: str) -> tuple[str, str, str]:
-    """Cắt hai đầu tuyến tính O(n): trả (đầu bị cắt, lõi, đuôi bị cắt).
+    """Trim both ends in linear O(n): return (trimmed head, core, trimmed tail).
 
-    Ký tự "không phải chữ/số" = not str.isalnum() (cùng tập với regex cũ: non-word hoặc gạch dưới).
+    "Not a letter/digit" = not str.isalnum() (same set as the old regex: non-word or underscore).
     """
     start, end = 0, len(text)
     while start < end and not text[start].isalnum():
@@ -49,7 +49,7 @@ def _trim_edges(text: str) -> tuple[str, str, str]:
 
 
 def _clean(text: str) -> str:
-    """Cắt hai đầu; giữ ' bên trong; ' cuối chỉ giữ khi ngay trước là 's'."""
+    """Trim both ends; keep inner '; a final ' is kept only right after 's'."""
     _, core, tail = _trim_edges(text)
     if core.endswith("s") and tail.startswith("'"):
         core += "'"
@@ -61,15 +61,15 @@ def _prepare(token: str) -> str:
 
 
 def make_raw_key(token: str) -> str:
-    """NFC, đổi nháy cong thành ', lowercase, bỏ ký tự không phải chữ/số ở hai đầu.
+    """NFC, curly quotes to ', lowercase, drop non-letter/digit characters at both ends.
 
-    Giữ ' bên trong; ' ở cuối chỉ giữ khi ngay trước nó là 's'.
+    Keep inner '; a final ' is kept only when the character before it is 's'.
     """
     return _clean(_prepare(token))
 
 
 def _number_pieces(digits: str) -> list[str]:
-    """Số (đã bỏ phẩy nghìn) thành chữ; lỗi num2words thì giữ chữ số."""
+    """Number (thousands commas removed) to words; if num2words fails, keep the digits."""
     try:
         return [num2words(digits)]
     except _NUM2WORDS_ERRORS:
@@ -77,12 +77,12 @@ def _number_pieces(digits: str) -> list[str]:
 
 
 def _convert_part(part: str) -> list[str]:
-    """Một phần (sau contractions) -> các mảnh; số hợp lệ qua num2words."""
+    """One part (after contractions) -> pieces; valid numbers go through num2words."""
     if _THOUSANDS_RE.fullmatch(part):
         return _number_pieces(part.replace(",", ""))
     if _NUMBER_RE.fullmatch(part):
         return _number_pieces(part)
-    # Không phải số nguyên khối: tách trước ("1,2,3" -> "1","2","3"), rồi đổi từng mảnh số
+    # Not one whole number: split first ("1,2,3" -> "1","2","3"), then convert each number piece
     out: list[str] = []
     for piece in _SPLIT_RE.split(part):
         out.extend(_number_pieces(piece) if _NUMBER_RE.fullmatch(piece) else [piece])
@@ -90,17 +90,17 @@ def _convert_part(part: str) -> list[str]:
 
 
 def _finish(parts: list[str]) -> tuple[str, ...]:
-    """Tách mọi mảnh tại ký tự không phải chữ/số/', cắt ' ở hai đầu từng token con, bỏ rỗng."""
+    """Split pieces at non letter/digit/' characters, trim ' at both ends, drop empties."""
     subs = (_clean(p) for part in parts for p in _SPLIT_RE.split(part))
     return tuple(p for p in subs if p)
 
 
 def _money_or_percent(text: str) -> tuple[str, ...] | None:
-    """Luật A: '$<số>' và '<số>%' (giữ $ đầu, % cuối khi cắt dấu câu). None nếu không khớp."""
+    """Rule A: '$<number>' and '<number>%' (leading $ / trailing % kept). None if no match."""
     head, core, tail = _trim_edges(text)
     is_money = head.endswith("$")
     is_percent = tail.startswith("%")
-    if is_money == is_percent:  # không có, hoặc cả hai ($50%): xử lý như token thường
+    if is_money == is_percent:  # neither, or both ($50%): handle as a normal token
         return None
     if not (_THOUSANDS_RE.fullmatch(core) or _NUMBER_RE.fullmatch(core)):
         return None
@@ -114,7 +114,7 @@ def _money_or_percent(text: str) -> tuple[str, ...] | None:
 
 
 def normalize_token(token: str) -> tuple[str, ...]:
-    """raw_key -> contractions.fix -> lowercase lại -> số thành chữ -> tách token con."""
+    """raw_key -> contractions.fix -> lowercase -> numbers to words -> split into sub-tokens."""
     money = _money_or_percent(_prepare(token))
     if money is not None:
         return money
@@ -128,7 +128,7 @@ def normalize_token(token: str) -> tuple[str, ...]:
 
 
 def normalize_script(script: str) -> list[RefToken]:
-    """Mỗi token của script.split() thành một RefToken; N_ref = len(kết quả) (D2)."""
+    """Each script.split() token becomes one RefToken; N_ref = len(result) (D2)."""
     return [
         RefToken(i, raw, make_raw_key(raw), normalize_token(raw))
         for i, raw in enumerate(script.split())
@@ -136,12 +136,12 @@ def normalize_script(script: str) -> list[RefToken]:
 
 
 def indexed_subtokens(tokens: list[RefToken]) -> list[tuple[int, str]]:
-    """Phẳng hoá thành [(ref_index, subtoken), ...] theo thứ tự."""
+    """Flatten to [(ref_index, subtoken), ...] in order."""
     return [(t.ref_index, sub) for t in tokens for sub in t.subtokens]
 
 
 def trailing_punct(raw: str) -> str:
-    """Bỏ ký tự đóng (" ' ” ’ ) ] }) ở cuối, rồi trả các ký tự cuối liên tiếp thuộc PAUSE_PUNCT."""
+    """Drop closing characters (" ' ” ’ ) ] }) at the end, return the trailing PAUSE_PUNCT run."""
     end = len(raw)
     while end > 0 and raw[end - 1] in _CLOSERS:
         end -= 1
@@ -152,9 +152,10 @@ def trailing_punct(raw: str) -> str:
 
 
 def split_sentences(script: str) -> list[tuple[int, int, str]]:
-    """Tách câu theo D19 + luật B. Trả [(ref_start, ref_end, text)], khoảng nửa mở.
+    """Split sentences by D19 + rule B. Returns [(ref_start, ref_end, text)], half-open ranges.
 
-    Câu chỉ đóng khi có ít nhất một token có subtoken; token chỉ dấu câu gộp vào câu trước.
+    A sentence closes only when one of its tokens has sub-tokens; punctuation-only tokens join
+    the previous sentence.
     """
     words = script.split()
     spans: list[tuple[int, int]] = []
@@ -170,7 +171,7 @@ def split_sentences(script: str) -> list[tuple[int, int, str]]:
         elif spans:
             spans[-1] = (spans[-1][0], i + 1)
         else:
-            continue  # chưa có câu trước: tiếp tục gom vào câu đang mở
+            continue  # no previous sentence yet: keep adding to the open one
         start = i + 1
         has_word = False
     if start < len(words):
@@ -182,5 +183,5 @@ def split_sentences(script: str) -> list[tuple[int, int, str]]:
 
 
 def is_filler(token: str) -> bool:
-    """True nếu make_raw_key(token) thuộc FILLER_WORDS (chỉ áp phía hyp)."""
+    """True if make_raw_key(token) is in FILLER_WORDS (hyp side only)."""
     return make_raw_key(token) in FILLER_WORDS
