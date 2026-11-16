@@ -1,11 +1,13 @@
-"""WP-B4 & WP-B5 (Member 3): 8-Stage Script Generation Pipeline, Cache, Jobs, and Script Store."""
+"""WP-B4 & WP-B5 (Member 3): 8-Stage Script Generation Pipeline, Cache, and Jobs.
+
+Saved scripts live in the `scripts` table (`/api/scripts*` in src/app/main.py), not here.
+"""
 
 import hashlib
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
 
 from .contracts import (
     DocumentChunk,
@@ -33,7 +35,6 @@ class ScriptGenerationPipeline:
         template_engine: TemplateEngine | None = None,
         llm_generator: ScriptGenerator | None = None,
         max_cache_size: int = 64,
-        max_scripts_per_user: int = 50,
     ) -> None:
         if template_store is None:
             store = TemplateStore()
@@ -45,10 +46,8 @@ class ScriptGenerationPipeline:
         self.template_engine = template_engine or TemplateEngine()
         self.llm_generator = llm_generator or ScriptGenerator()
         self.max_cache_size = max_cache_size
-        self.max_scripts_per_user = max_scripts_per_user
         self._jobs: dict[str, ScriptJobState] = {}
         self._cache: OrderedDict[str, GeneratedScript] = OrderedDict()
-        self._saved_scripts: dict[str, dict[str, Any]] = {}
 
     def create_job(self, user_id: str = "anonymous") -> ScriptJobState:
         """Create and register a new background job state in memory (Brief §5.5)."""
@@ -204,58 +203,3 @@ class ScriptGenerationPipeline:
             if cleanup_pdf and request.pdf_path:
                 Path(request.pdf_path).unlink(missing_ok=True)
         return job
-
-    def save_script(
-        self,
-        user_id: str,
-        title: str,
-        script: str,
-        duration_min: int | None = None,
-        source: str = "user",
-    ) -> dict[str, Any]:
-        """Moderate and save a script under `user_id` with per-user cap (D-08, Brief §5.8)."""
-        clean_title = sanitize_text(title).strip() or "Untitled Script"
-        clean_script = sanitize_text(script).strip()
-        if not clean_script:
-            raise ScriptGenerationError("output_invalid", "Script text must not be empty.", 422)
-        self.moderator.assert_safe(f"{clean_title}\n{clean_script}", user_id=user_id)
-        user_items = [s for s in self._saved_scripts.values() if s["user_id"] == user_id]
-        if len(user_items) >= self.max_scripts_per_user:
-            raise ScriptGenerationError(
-                "rate_limited",
-                f"Maximum saved scripts limit ({self.max_scripts_per_user}) reached.",
-                status_code=429,
-            )
-        script_id = str(uuid.uuid4())
-        entry: dict[str, Any] = {
-            "id": script_id,
-            "user_id": user_id,
-            "title": clean_title,
-            "script": clean_script,
-            "word_count": len(clean_script.split()),
-            "duration_min": duration_min,
-            "source": source,
-        }
-        self._saved_scripts[script_id] = entry
-        return dict(entry)
-
-    def list_scripts(self, user_id: str) -> list[dict[str, Any]]:
-        """List saved scripts belonging exclusively to `user_id`."""
-        return [dict(s) for s in self._saved_scripts.values() if s["user_id"] == user_id]
-
-    def get_script(self, script_id: str, user_id: str) -> dict[str, Any] | None:
-        """Return saved script if owned by `user_id`, else None."""
-        item = self._saved_scripts.get(script_id)
-        if item and item["user_id"] == user_id:
-            return dict(item)
-        return None
-
-    def delete_script(self, script_id: str, user_id: str) -> bool:
-        """Delete saved script if owned by `user_id`."""
-        item = self._saved_scripts.get(script_id)
-        if item and item["user_id"] == user_id:
-            del self._saved_scripts[script_id]
-            return True
-        return False
-
-

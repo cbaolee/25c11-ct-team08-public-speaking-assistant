@@ -260,3 +260,107 @@ def test_save_insert_failure_removes_uploaded_files(monkeypatch, tmp_path):
             user_id=uuid4(), script="Hello.", result=_ok_result(), source_audio_path=upload
         )
     assert repos.files._state.files == {}
+
+
+# ---------- C2: script_id, topic and accent are saved with the session ----------
+
+
+def _post_with(monkeypatch, data: dict, saved: dict):
+    def fake_save(**kwargs):
+        saved.update(kwargs)
+        return str(uuid4())
+
+    def fake(audio_path, script, baseline, *, vad_params):
+        return _minimal_result()
+
+    monkeypatch.setattr(main, "evaluate_session", fake)
+    monkeypatch.setattr(main, "_save_result_to_history", fake_save)
+    return TestClient(main.app).post(
+        "/api/evaluate",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
+        data={"script": "Hello.", **data},
+    )
+
+
+def _store_script(repos, user_id, topic: str | None = "Keystone species"):
+    from src.app.db.models import NewScript
+
+    return repos.scripts.create_script(
+        user_id,
+        NewScript(title="T", body="Hello.", word_count=1, source="written",
+                  content_hash=f"h-{uuid4()}", topic=topic),
+    )
+
+
+def _store_profile(repos, user_id, accent: str = "British"):
+    from src.app.db.models import ProfileUpsert
+
+    repos.profiles.upsert_profile(user_id, ProfileUpsert(target_accent=accent))
+
+
+def test_evaluate_saves_own_script_id_and_its_topic(monkeypatch, repos):
+    script = _store_script(repos, USER_A)
+    saved: dict = {}
+    r = _post_with(monkeypatch, {"script_id": str(script.id)}, saved)
+    assert r.status_code == 200
+    assert saved["script_id"] == script.id
+    assert saved["topic"] == "Keystone species"  # from the script when no topic is sent
+
+
+def test_evaluate_topic_from_form_wins(monkeypatch, repos):
+    script = _store_script(repos, USER_A)
+    saved: dict = {}
+    _post_with(monkeypatch, {"script_id": str(script.id), "topic": "  My title  "}, saved)
+    assert saved["topic"] == "My title"
+
+
+def test_evaluate_without_script_id_saves_null_script(monkeypatch):
+    saved: dict = {}
+    _post_with(monkeypatch, {"topic": "Free text"}, saved)
+    assert saved["script_id"] is None
+    assert saved["topic"] == "Free text"
+
+
+def test_evaluate_other_users_script_returns_404_and_does_not_score(monkeypatch, repos):
+    other_script = _store_script(repos, USER_B)
+    saved: dict = {}
+    r = _post_with(monkeypatch, {"script_id": str(other_script.id)}, saved)
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "script_not_found"
+    assert saved == {}
+
+
+def test_evaluate_invalid_script_id_returns_422(monkeypatch):
+    saved: dict = {}
+    r = _post_with(monkeypatch, {"script_id": "not-a-uuid"}, saved)
+    assert r.status_code == 422
+    assert r.json()["error_code"] == "invalid_script_id"
+
+
+def test_evaluate_saves_accent_from_profile(monkeypatch, repos):
+    _store_profile(repos, USER_A, accent="British")
+    saved: dict = {}
+    _post_with(monkeypatch, {}, saved)
+    assert saved["accent"] == "British"
+
+
+def test_evaluate_profile_read_error_still_saves_without_accent(monkeypatch, repos):
+    def broken(user_id):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.profiles, "get_profile", broken)
+    saved: dict = {}
+    r = _post_with(monkeypatch, {}, saved)
+    assert r.status_code == 200
+    assert saved["accent"] is None
+
+
+def test_save_result_stores_script_topic_and_accent_on_row(monkeypatch, repos):
+    script = _store_script(repos, USER_A)
+    result = _minimal_result()
+    session_id = main._save_result_to_history(
+        repos=repos, user_id=USER_A, script="Hello.", result=result, source_audio_path=None,
+        script_id=script.id, topic="Keystone species", accent="British",
+    )
+    row = repos.sessions.get_session(USER_A, UUID(session_id))
+    assert (row.script_id, row.topic, row.accent) == (script.id, "Keystone species", "British")
