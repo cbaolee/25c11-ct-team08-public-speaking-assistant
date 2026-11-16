@@ -1,7 +1,6 @@
 """Baseline endpoints: analyse a voice sample, keep it as the user's current baseline."""
 
 import logging
-import shutil
 import tempfile
 from pathlib import Path
 from typing import Annotated
@@ -11,11 +10,12 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
-from src.app.config import settings
+from src.app.config import max_upload_bytes, settings
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import BaselineRow, NewBaseline, StorageError, build_object_path
 from src.app.db.session_helpers import AudioEncodingError, encode_opus
 from src.app.deps import CurrentUser, get_current_user
+from src.app.uploads import safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import BaselineProfile, InsufficientAudio, VadParams
 from src.audio_processing.pipeline import analyze_baseline
 from src.audio_processing.result_schema import BaselineResponse
@@ -71,9 +71,8 @@ async def create_baseline(
     """Analyse a baseline recording; when the status is ok, store it as the current baseline."""
     with tempfile.TemporaryDirectory() as temp_dir:
         work_dir = Path(temp_dir)
-        audio_path = work_dir / (audio.filename or "baseline.wav")
-        with open(audio_path, "wb") as buffer:
-            shutil.copyfileobj(audio.file, buffer)
+        audio_path = safe_upload_path(work_dir, audio.filename, stem="baseline")
+        save_upload_limited(audio, audio_path, max_bytes=max_upload_bytes)
 
         try:
             # D12: one JSON shape {schema_version, status, reason, profile, flags}

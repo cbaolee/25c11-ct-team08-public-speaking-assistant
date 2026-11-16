@@ -2,6 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 max_audio_seconds = 1320
 max_upload_bytes = 100 * 1024 * 1024
+# Whole request body (file + form fields). Larger bodies get 413 before they are read.
+max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
 
 decode_timeout_s = 60

@@ -1,6 +1,5 @@
 import json
 import logging
-import shutil
 import tempfile
 from pathlib import Path
 from time import perf_counter
@@ -14,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from src.app.config import settings
+from src.app.config import max_request_bytes, max_upload_bytes, settings
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
     NewSession,
@@ -31,6 +30,7 @@ from src.app.db.session_helpers import (
 )
 from src.app.deps import CurrentUser, get_current_user
 from src.app.routes import baselines
+from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, VadParams
 from src.audio_processing.pipeline import evaluate_session
 from src.text_processing.contracts import (
@@ -43,6 +43,7 @@ from src.text_processing.pipeline import ScriptGenerationPipeline
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 app = FastAPI()
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
 logger = logging.getLogger(__name__)
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
@@ -387,9 +388,8 @@ async def evaluate_endpoint(
     baseline = baselines.to_baseline_profile(baseline_row) if baseline_row else None
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        audio_path = Path(temp_dir) / (audio.filename or "uploaded.wav")
-        with open(audio_path, "wb") as buffer:
-            shutil.copyfileobj(audio.file, buffer)
+        audio_path = safe_upload_path(Path(temp_dir), audio.filename)
+        save_upload_limited(audio, audio_path, max_bytes=max_upload_bytes)
 
         result = evaluate_session(
             audio_path=audio_path,
@@ -469,10 +469,10 @@ async def generate_script_endpoint(
     user_id = _resolve_user_id(request)
     pdf_path: str | None = None
     if pdf is not None and pdf.filename:
-        suffix = Path(pdf.filename).suffix or ".pdf"
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-            shutil.copyfileobj(pdf.file, tmp_file)
+        # Fixed ".pdf" suffix; the parser checks the %PDF- signature and the 25 MB limit.
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
             pdf_path = tmp_file.name
+        save_upload_limited(pdf, Path(pdf_path), max_bytes=max_upload_bytes)
 
     req = ScriptGenerationRequest(
         topic=topic,
