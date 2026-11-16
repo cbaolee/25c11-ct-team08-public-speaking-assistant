@@ -75,7 +75,7 @@ Database and storage variables:
 | `APP_ENV` | Yes | `dev` locally. Any other value disables the temporary dev user. |
 | `SUPABASE_URL` | No | Project URL from *Project Settings → API*. Empty in `dev` = in-memory storage, data is lost on restart. |
 | `SUPABASE_SERVICE_KEY` | With `SUPABASE_URL` | Server-side key (`service_role` / `secret`). Full database access: keep it private. |
-| `DEV_USER_ID` | No | UUID of your test user on `psc-dev`. Empty = the shared test account. Temporary until real auth is merged. |
+| `DEV_USER_ID` | Integration tests | UUID of a first test user, only read by integration tests. The app itself uses real log in (`/api/auth/*`). |
 | `DEV2_USER_ID` | Integration tests | UUID of a second test user, only read by integration tests. |
 
 Optional settings with defaults in `src/app/config.py`: `BASELINE_REQUIRED` (`true`), `RETENTION_FULL_SESSIONS` (`10`), `SIGNED_URL_TTL_S` (`600`), and the bucket names `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET`.
