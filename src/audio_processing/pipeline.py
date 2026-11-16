@@ -7,6 +7,8 @@ from typing import Any
 from src.app.config import (
     MIN_PAUSE_S,
     allowed_formats,
+    baseline_max_seconds,
+    baseline_min_seconds,
     decode_timeout_s,
     duration_cap_margin_s,
     max_audio_seconds,
@@ -22,6 +24,7 @@ from src.audio_processing.baseline import (
     mean_loudness_db,
 )
 from src.audio_processing.contracts import (
+    AudioRejected,
     BaselineProfile,
     InsufficientAudio,
     MasterAudio,
@@ -258,20 +261,36 @@ def analyze_baseline(
     with tempfile.TemporaryDirectory() as temp_dir:
         workdir = Path(temp_dir)
 
-        probe(
-            audio_path,
-            max_seconds=max_audio_seconds,
-            max_bytes=max_upload_bytes,
-            allowed_formats=frozenset(allowed_formats)
-        )
-
-        master = decode_to_master(
-            audio_path,
-            workdir=workdir,
-            max_seconds=max_audio_seconds,
-            cap_margin_s=duration_cap_margin_s,
-            timeout_s=decode_timeout_s
-        )
+        # Baseline length limits: probe/decode refuse > baseline_max_seconds (MediaRecorder
+        # WebM often has no duration header, so decode is the reliable check).
+        try:
+            probe(
+                audio_path,
+                max_seconds=baseline_max_seconds,
+                max_bytes=max_upload_bytes,
+                allowed_formats=frozenset(allowed_formats)
+            )
+            master = decode_to_master(
+                audio_path,
+                workdir=workdir,
+                max_seconds=baseline_max_seconds,
+                cap_margin_s=duration_cap_margin_s,
+                timeout_s=decode_timeout_s
+            )
+        except AudioRejected as exc:
+            if exc.code == "too_long":
+                raise AudioRejected(
+                    "too_long",
+                    f"The baseline recording must be at most {baseline_max_seconds} seconds "
+                    "long. Please record it again.",
+                ) from exc
+            raise
+        if master.duration_s < baseline_min_seconds:
+            raise AudioRejected(
+                "too_short",
+                f"The baseline recording must be at least {baseline_min_seconds} seconds "
+                "long. Please record it again.",
+            )
 
         segments = detect_speech(master, params=vad_params)
         try:

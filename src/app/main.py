@@ -13,7 +13,13 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
 
-from src.app.config import max_request_bytes, max_upload_bytes, settings
+from src.app.config import (
+    max_request_bytes,
+    max_script_chars,
+    max_script_words,
+    max_upload_bytes,
+    settings,
+)
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
     NewSession,
@@ -365,6 +371,24 @@ async def delete_session(
     return {"deleted": deleted}
 
 
+def _validate_script(script: str) -> JSONResponse | None:
+    """422 for an empty script or one longer than can be read within the audio limit."""
+    if not script.strip():
+        return JSONResponse(
+            status_code=422,
+            content={"error_code": "script_empty",
+                     "message": "The practice text is empty. Choose or write a text first."},
+        )
+    if len(script) > max_script_chars or len(script.split()) > max_script_words:
+        return JSONResponse(
+            status_code=422,
+            content={"error_code": "script_too_long",
+                     "message": f"The practice text is too long (maximum {max_script_words} "
+                                "words). Please use a shorter text."},
+        )
+    return None
+
+
 @app.post("/api/evaluate")
 async def evaluate_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -380,6 +404,10 @@ async def evaluate_endpoint(
     is accepted but ignored (the old UI still sends it). When settings.baseline_required is
     on and the user has no baseline, return 409.
     """
+    script_error = _validate_script(script)
+    if script_error is not None:
+        return script_error
+
     # Default VAD settings
     vad_params = VadParams()
 

@@ -1,6 +1,14 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 max_audio_seconds = 1320
+# Baseline recording: the UI records 30 s; refuse anything outside [10 s, 60 s].
+baseline_min_seconds = 10
+baseline_max_seconds = 60
+# Practice script limit. 1320 s of audio at 175 WPM (the "too fast" warning) is 3850 words, so
+# a longer script cannot be read inside the audio limit. 4000 leaves a small margin above that and
+# above the 20-minute target (2340-3260 words). The character cap stops a few huge "words".
+max_script_words = 4000
+max_script_chars = 40_000
 max_upload_bytes = 100 * 1024 * 1024
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024

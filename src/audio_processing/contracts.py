@@ -16,7 +16,7 @@ class AudioProbe:
 
 
 class AudioRejectedError(Exception):
-    # code: "too_long" | "too_large" | "no_audio_stream"
+    # code: "too_long" | "too_short" | "too_large" | "no_audio_stream"
     #       | "unsupported_format" | "corrupt"
     def __init__(self, code: str, message: str):
         super().__init__(message)
