@@ -141,4 +141,6 @@ def _extract_pdf_pages(
     if maybe_recover_page_text is not None:
         for item in pages:
             item["text"] = maybe_recover_page_text(pdf_path, item["page"], item["text"], ocr_runner)
+    if not any(ch.isalnum() for item in pages for ch in (item["text"] or "")):
+        raise DocumentParserError("no_text_layer", "PDF has no extractable text (scanned?).")
     return pages
