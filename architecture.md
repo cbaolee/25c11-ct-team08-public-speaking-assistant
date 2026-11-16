@@ -27,14 +27,14 @@ flowchart LR
     API -->|repository layer| Store[("Supabase Storage")]
 ```
 
-| Part | Technology | Responsibility |
-| --- | --- | --- |
-| Frontend | HTML, Tailwind CSS | UI served by FastAPI from `src/web/` |
-| Backend | Python 3.12, FastAPI | HTTP API, request validation, orchestration |
-| Evaluate / Baseline Pipeline | FFmpeg, Silero VAD, jiwer | Score a recording, analyse a voice baseline |
-| Script Pipeline | PyMuPDF4LLM, Groq | Generate an MC script from user content |
-| Database | Supabase PostgreSQL | Profiles, baselines, scripts, session results |
-| Object storage | Supabase Storage | Audio recordings and chart series |
+| Part                         | Technology                | Responsibility                                |
+| ---------------------------- | ------------------------- | --------------------------------------------- |
+| Frontend                     | HTML, Tailwind CSS        | UI served by FastAPI from `src/web/`          |
+| Backend                      | Python 3.12, FastAPI      | HTTP API, request validation, orchestration   |
+| Evaluate / Baseline Pipeline | FFmpeg, Silero VAD, jiwer | Score a recording, analyse a voice baseline   |
+| Script Pipeline              | PyMuPDF4LLM, Groq         | Generate an MC script from user content       |
+| Database                     | Supabase PostgreSQL       | Profiles, baselines, scripts, session results |
+| Object storage               | Supabase Storage          | Audio recordings and chart series             |
 
 ## 2. Code map
 
@@ -68,25 +68,25 @@ tests/db/                 Repository and helper tests
 
 ### Endpoints backed by the database
 
-| Method and path | Purpose |
-| --- | --- |
-| `POST /api/baseline` | Analyse a voice sample; on `ok`, store it as the current baseline |
-| `GET /api/baseline` | Current baseline, or `null` |
-| `POST /api/evaluate` | Score a recording against the stored baseline, then save the session |
-| `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor` |
-| `GET /api/sessions/{id}` | One session: full result and signed audio URL, or compact summary |
-| `DELETE /api/sessions/{id}` | Delete the session files, then the row |
+| Method and path                    | Purpose                                                              |
+| ---------------------------------- | -------------------------------------------------------------------- |
+| `POST /api/baseline`               | Analyse a voice sample; on `ok`, store it as the current baseline    |
+| `GET /api/baseline`                | Current baseline, or `null`                                          |
+| `POST /api/evaluate`               | Score a recording against the stored baseline, then save the session |
+| `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor`          |
+| `GET /api/sessions/{id}`           | One session: full result and signed audio URL, or compact summary    |
+| `DELETE /api/sessions/{id}`        | Delete the session files, then the row                               |
 
 Error bodies used by these endpoints:
 
-| Status | Body | When |
-| --- | --- | --- |
-| 401 | `{"detail": "not_authenticated"}` | No valid current user |
-| 409 | `{"error_code": "baseline_required", ...}` | Evaluate without a baseline |
-| 503 | `{"error_code": "baseline_not_saved" \| "baseline_unavailable", ...}` | Baseline could not be saved / loaded |
-| 404 | `{"error": "session_not_found"}` | Unknown session or another user's session |
-| 400 | `{"error": "invalid_cursor"}` | Malformed cursor |
-| 503 | `{"error": "session_storage_unavailable"}` | Database or storage error in session endpoints |
+| Status | Body                                                                  | When                                           |
+| ------ | --------------------------------------------------------------------- | ---------------------------------------------- |
+| 401    | `{"detail": "not_authenticated"}`                                     | No valid current user                          |
+| 409    | `{"error_code": "baseline_required", ...}`                            | Evaluate without a baseline                    |
+| 503    | `{"error_code": "baseline_not_saved" \| "baseline_unavailable", ...}` | Baseline could not be saved / loaded           |
+| 404    | `{"error": "session_not_found"}`                                      | Unknown session or another user's session      |
+| 400    | `{"error": "invalid_cursor"}`                                         | Malformed cursor                               |
+| 503    | `{"error": "session_storage_unavailable"}`                            | Database or storage error in session endpoints |
 
 ## 4. Database and storage
 
@@ -120,20 +120,20 @@ erDiagram
     BASELINES |o--o{ SESSIONS : "baseline_id (set null)"
 ```
 
-| Table | Holds | Notable rules |
-| --- | --- | --- |
-| `profiles` | One row per user | `id` = `auth.users.id`; deleting it cascades to all child rows |
-| `baselines` | Voice baseline measures | One `is_current` row per user (unique partial index) |
-| `scripts` | Scripts owned by the user | `source`: `generated_template`, `generated_llm`, `written` |
-| `sessions` | Practice results | Score columns + `result` JSON + `script_snapshot`; `is_compact`, `mistakes` for old sessions |
+| Table       | Holds                     | Notable rules                                                                                |
+| ----------- | ------------------------- | -------------------------------------------------------------------------------------------- |
+| `profiles`  | One row per user          | `id` = `auth.users.id`; deleting it cascades to all child rows                               |
+| `baselines` | Voice baseline measures   | One `is_current` row per user (unique partial index)                                         |
+| `scripts`   | Scripts owned by the user | `source`: `generated_template`, `generated_llm`, `written`                                   |
+| `sessions`  | Practice results          | Score columns + `result` JSON + `script_snapshot`; `is_compact`, `mistakes` for old sessions |
 
 ### 4.3 Object storage
 
-| Bucket | Content | Path |
-| --- | --- | --- |
-| `audio` | Practice recording (Opus/WebM, 32 kbps) | `{user_id}/{session_id}.webm` |
-| `series` | Pitch and loudness series split from `result` | `{user_id}/{session_id}.series.json` |
-| `baselines` | Baseline recording | `{user_id}/{baseline_id}.webm` |
+| Bucket      | Content                                       | Path                                 |
+| ----------- | --------------------------------------------- | ------------------------------------ |
+| `audio`     | Practice recording (Opus/WebM, 32 kbps)       | `{user_id}/{session_id}.webm`        |
+| `series`    | Pitch and loudness series split from `result` | `{user_id}/{session_id}.series.json` |
+| `baselines` | Baseline recording                            | `{user_id}/{baseline_id}.webm`       |
 
 All buckets are private. The browser plays audio through a signed URL that expires after `SIGNED_URL_TTL_S` seconds.
 
@@ -141,12 +141,12 @@ All buckets are private. The browser plays audio through a signed URL that expir
 
 After each saved session, full sessions beyond the newest `RETENTION_FULL_SESSIONS` (10) are compacted: their audio and series files are deleted, then the row keeps only a summary `result`, the score columns, `script_snapshot` and `mistakes`. If file deletion fails, the row is left full and the next save retries it.
 
-| Measured size (5-minute recording) | Bytes | Source |
-| --- | --- | --- |
-| Full `result` (300 s) | 1,353,556 | PR 8, `octet_length(result::text)` |
-| Compact `result` | 1,356 | PR 9 |
-| Compact `mistakes` | 74,320 | PR 9 |
-| Whole compact row | 742,714 | PR 9 |
+| Measured size (5-minute recording) | Bytes     | Source                             |
+| ---------------------------------- | --------- | ---------------------------------- |
+| Full `result` (300 s)              | 1,353,556 | PR 8, `octet_length(result::text)` |
+| Compact `result`                   | 1,356     | PR 9                               |
+| Compact `mistakes`                 | 74,320    | PR 9                               |
+| Whole compact row                  | 742,714   | PR 9                               |
 
 ## 5. Main flows
 
@@ -195,27 +195,27 @@ sequenceDiagram
 
 ## 6. Security
 
-| Layer | Mechanism |
-| --- | --- |
-| Identity | `get_current_user` in `src/app/deps.py`. Currently a dev stub (`APP_ENV=dev` only, `TODO(auth)`); the Auth team replaces its body with real token checks without changing its signature. |
-| Application | The backend uses the service key, which bypasses RLS, so every query filters by `user_id` in code. Other users' rows return 404. |
-| Database | RLS on all four tables: owner-only policies (`auth.uid()`). Tables are granted to `authenticated` and `service_role`, not `anon`. |
-| Storage | Private buckets; policies restrict each user to the folder `{user_id}/`. |
-| Secrets | Keys only in `.env` (git-ignored); `.env.example` lists names without values. |
+| Layer       | Mechanism                                                                                                                                                                                |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Identity    | `get_current_user` in `src/app/deps.py`. Currently a dev stub (`APP_ENV=dev` only, `TODO(auth)`); the Auth team replaces its body with real token checks without changing its signature. |
+| Application | The backend uses the service key, which bypasses RLS, so every query filters by `user_id` in code. Other users' rows return 404.                                                         |
+| Database    | RLS on all four tables: owner-only policies (`auth.uid()`). Tables are granted to `authenticated` and `service_role`, not `anon`.                                                        |
+| Storage     | Private buckets; policies restrict each user to the folder `{user_id}/`.                                                                                                                 |
+| Secrets     | Keys only in `.env` (git-ignored); `.env.example` lists names without values.                                                                                                            |
 
 ## 7. Configuration
 
 Settings are read from `.env` by `src/app/config.py`. Database and storage settings:
 
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| `APP_ENV` | `dev` | Enables the dev user and in-memory repos |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` | empty | Use Supabase when the URL is set |
-| `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET` | `audio`, `series`, `baselines` | Bucket names |
-| `RETENTION_FULL_SESSIONS` | `10` | Full sessions kept per user |
-| `SIGNED_URL_TTL_S` | `600` | Signed audio URL lifetime |
-| `BASELINE_REQUIRED` | `true` | Reject evaluation without a baseline |
-| `DEV_USER_ID` | empty | Dev user; empty = shared test account (temporary) |
+| Setting                                             | Default                        | Meaning                                         |
+| --------------------------------------------------- | ------------------------------ | ----------------------------------------------- |
+| `APP_ENV`                                           | `dev`                          | Enables the dev user and in-memory repos        |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`              | empty                          | Use Supabase when the URL is set                |
+| `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET` | `audio`, `series`, `baselines` | Bucket names                                    |
+| `RETENTION_FULL_SESSIONS`                           | `10`                           | Full sessions kept per user                     |
+| `SIGNED_URL_TTL_S`                                  | `600`                          | Signed audio URL lifetime                       |
+| `BASELINE_REQUIRED`                                 | `true`                         | Reject evaluation without a baseline            |
+| `DEV_USER_ID`                                       | empty                          | First test user, read only by integration tests |
 
 ## 8. Testing
 
@@ -224,7 +224,7 @@ Settings are read from `.env` by `src/app/config.py`. Database and storage setti
 
 ## 9. Decision records
 
-| ADR | Title |
-| --- | --- |
+| ADR                            | Title                                                             |
+| ------------------------------ | ----------------------------------------------------------------- |
 | [ADR-001](docs/adr/ADR-001.md) | Data model for profiles, baselines, scripts and practice sessions |
-| [ADR-002](docs/adr/ADR-002.md) | Report save status in the `/api/evaluate` response (schema 2.1) |
+| [ADR-002](docs/adr/ADR-002.md) | Report save status in the `/api/evaluate` response (schema 2.1)   |
