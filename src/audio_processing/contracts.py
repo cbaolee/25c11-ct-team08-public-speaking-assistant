@@ -102,6 +102,14 @@ class InsufficientAudioError(Exception):
 InsufficientAudio = InsufficientAudioError
 
 
+class SttUnavailableError(Exception):
+    """Every STT provider failed (network, timeout, HTTP error, bad response)."""
+    pass
+
+
+SttUnavailable = SttUnavailableError
+
+
 @dataclass(frozen=True)
 class VadParams:
     """Các tham số cấu hình cho Silero VAD."""

@@ -11,6 +11,11 @@ duration_cap_margin_s = 10
 
 MIN_PAUSE_S = 0.35
 
+# STT HTTP timeouts (seconds): time to connect, and longest wait between two reads of the
+# response. Starting values, not measured; tune after timing long (20 min) recordings.
+stt_connect_timeout_s = 5
+stt_read_timeout_s = 120
+
 
 class Settings(BaseSettings):
     groq_api_key: str = ""

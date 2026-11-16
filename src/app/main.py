@@ -31,7 +31,7 @@ from src.app.db.session_helpers import (
 from src.app.deps import CurrentUser, get_current_user
 from src.app.routes import baselines
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
-from src.audio_processing.contracts import AudioRejected, VadParams
+from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.pipeline import evaluate_session
 from src.text_processing.contracts import (
     CATEGORY_SLUG_MAP,
@@ -88,6 +88,19 @@ async def audio_rejected_handler(request: Request, exc: AudioRejected):
     return JSONResponse(
         status_code=422,
         content={"error_code": exc.code, "message": exc.message}
+    )
+
+
+@app.exception_handler(SttUnavailable)
+async def stt_unavailable_handler(request: Request, exc: SttUnavailable):
+    """503 when every STT provider failed, so the UI can show a clear message."""
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error_code": "stt_unavailable",
+            "message": "The speech recognition service is not available right now. "
+                       "Please try again in a few minutes.",
+        },
     )
 
 

@@ -1254,6 +1254,7 @@ const TEXT = {
     errCorrupt: 'This audio could not be read. It may be damaged; try another file or record again.',
     errBaseline: 'Your saved baseline could not be used. Please record it again in Profile.',
     errNet: 'Could not reach the server. Nothing was scored or saved. Check your connection and try again.',
+    errStt: 'Speech recognition is not available right now. Nothing was scored or saved. Please try again in a few minutes.',
     errServer: 'The server could not score this recording. Nothing was scored or saved. Please try again.',
     errTimeout: 'The analysis took too long and was stopped. Nothing was scored or saved. Please try again.',
     insEmpty: 'We could not recognise any words in this recording. Please record again in a quieter place, closer to the microphone.',
@@ -2452,7 +2453,7 @@ function postBaseline(rec, cb) {
     clearTimeout(tm);
     if (res.ok && j && j.status === 'insufficient_audio') { cb({ msg: T('profile.errInsufficient') }); return; }
     if (res.ok && j && j.status === 'ok') { const pr = EvaluateClient.pickBaselineProfile(j); cb(pr ? { profile: pr } : { msg: T('eval.errServer') }); return; }
-    if (res.status === 422 && j && j.error_code) { cb({ msg: EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer')) }); return; }
+    if (j && j.error_code) { cb({ msg: EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer')) }); return; }
     cb({ msg: T('eval.errServer') });
   })).catch(() => { clearTimeout(tm); cb({ msg: T(timedOut ? 'eval.errTimeout' : 'eval.errNet') }); });
 }
@@ -3100,7 +3101,7 @@ function finishEval(scn, txt) {
 
 /* ---- real evaluation: POST /api/evaluate (USE_SIM = false). S.audio is kept until a scored result is saved, so Retry re-sends the same audio. ---- */
 const EXT_BY_MIME = { 'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a' };
-const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', no_audio_stream: 'errNoStream', unsupported_format: 'errFormat', corrupt: 'errCorrupt', invalid_baseline: 'errBaseline' };
+const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', stt_unavailable: 'errStt', no_audio_stream: 'errNoStream', unsupported_format: 'errFormat', corrupt: 'errCorrupt', invalid_baseline: 'errBaseline' };
 function showEvalError(msg) { $('#meMsg').textContent = msg; openModal('mError', { focus: '#meRetry' }); }
 function runEvalReal(txt) {
   const au = S.audio, blob = au.blob || au.file;
@@ -3119,7 +3120,7 @@ function runEvalReal(txt) {
     if (S.ev !== ev) return;                       // cancelled by the user meanwhile
     end();
     if (res.ok && j && j.status) { finishEvalReal(j, txt); return; }
-    if (res.status === 422 && j && j.error_code) { showEvalError(EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer'))); return; }
+    if (j && j.error_code) { showEvalError(EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer'))); return; }
     showEvalError(T('eval.errServer'));
   })).catch(() => {
     if (S.ev !== ev) return;                       // user cancel -> no error

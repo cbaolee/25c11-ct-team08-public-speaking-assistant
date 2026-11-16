@@ -3,9 +3,19 @@ from typing import Any
 
 import requests
 
-from src.audio_processing.contracts import InsufficientAudio, MasterAudio, SttResult, WordTimestamp
+from src.app.config import stt_connect_timeout_s, stt_read_timeout_s
+from src.audio_processing.contracts import (
+    InsufficientAudio,
+    MasterAudio,
+    SttResult,
+    SttUnavailable,
+    WordTimestamp,
+)
 
 logger = logging.getLogger(__name__)
+
+# (connect, read): without a timeout a hung provider blocks the request forever.
+STT_TIMEOUT = (stt_connect_timeout_s, stt_read_timeout_s)
 
 def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -> SttResult:
     url = f"https://api.deepgram.com/v1/listen?model={model}&filler_words=true&punctuate=true&utterances=false"
@@ -18,7 +28,7 @@ def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -
     with open(master.path, "rb") as f:
         audio_data = f.read()
 
-    response = requests.post(url, headers=headers, data=audio_data)
+    response = requests.post(url, headers=headers, data=audio_data, timeout=STT_TIMEOUT)
     response.raise_for_status()
 
     data = response.json()
@@ -60,7 +70,7 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     with open(master.path, "rb") as f:
         # Truyền tên file từ master.path.name
         files = {"audio": (master.path.name, f, "audio/wav")}
-        response = requests.post(url, headers=headers, files=files)
+        response = requests.post(url, headers=headers, files=files, timeout=STT_TIMEOUT)
 
     response.raise_for_status()
     data = response.json()
@@ -90,12 +100,27 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     )
 
 def transcribe(master: MasterAudio, *, settings: Any) -> SttResult:
+    """Deepgram first, Gladia as fallback.
+
+    An empty transcript (InsufficientAudio) is an answer about the audio, not a provider
+    failure, so it is raised at once without calling the fallback. When both providers fail,
+    raise SttUnavailable (the API answers 503 stt_unavailable).
+    """
     try:
         result = call_deepgram(master, api_key=settings.deepgram_api_key)
         logger.info("Transcribed using Deepgram")
         return result
+    except InsufficientAudio:
+        raise
     except Exception as e:
-        logger.warning(f"Deepgram failed: {e}. Falling back to Gladia.")
+        logger.warning("Deepgram failed: %s. Falling back to Gladia.", e)
+
+    try:
         result = call_gladia(master, api_key=settings.gladia_api_key)
         logger.info("Transcribed using Gladia")
         return result
+    except InsufficientAudio:
+        raise
+    except Exception as e:
+        logger.error("Gladia failed too: %s", e)
+        raise SttUnavailable("Deepgram and Gladia both failed") from e

@@ -2,9 +2,10 @@ from dataclasses import dataclass
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
-from src.audio_processing.contracts import InsufficientAudio, MasterAudio
-from src.audio_processing.stt import call_deepgram, call_gladia, transcribe
+from src.audio_processing.contracts import InsufficientAudio, MasterAudio, SttUnavailable
+from src.audio_processing.stt import STT_TIMEOUT, call_deepgram, call_gladia, transcribe
 
 
 @dataclass
@@ -130,3 +131,68 @@ def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
 
     assert result.provider == "gladia"
     assert result.transcript == "fallback success"
+
+
+def test_every_stt_call_has_a_timeout(monkeypatch, mock_master):
+    """Without `timeout`, a hung provider would block the request forever."""
+    seen: list = []
+
+    def mock_post(url, *args, **kwargs):
+        seen.append(kwargs.get("timeout"))
+        resp = MagicMock()
+        resp.raise_for_status.side_effect = requests.ConnectionError("down")
+        return resp
+
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
+    with pytest.raises(SttUnavailable):
+        transcribe(mock_master, settings=MockSettings())
+    assert seen == [STT_TIMEOUT, STT_TIMEOUT]
+    assert all(t is not None for t in seen)
+
+
+def test_empty_deepgram_transcript_does_not_call_gladia(monkeypatch, mock_master):
+    """Silence is an answer about the audio, not a Deepgram failure: no fallback call."""
+    urls: list[str] = []
+
+    def mock_post(url, *args, **kwargs):
+        urls.append(url)
+        resp = MagicMock()
+        resp.json.return_value = {
+            "results": {"channels": [{"alternatives": [{"transcript": " ", "words": []}]}]}
+        }
+        return resp
+
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
+    with pytest.raises(InsufficientAudio):
+        transcribe(mock_master, settings=MockSettings())
+    assert len(urls) == 1 and "deepgram" in urls[0]
+
+
+def test_both_providers_fail_raises_stt_unavailable(monkeypatch, mock_master):
+    def mock_post(url, *args, **kwargs):
+        resp = MagicMock()
+        resp.raise_for_status.side_effect = requests.HTTPError("500")
+        return resp
+
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
+    with pytest.raises(SttUnavailable):
+        transcribe(mock_master, settings=MockSettings())
+
+
+def test_evaluate_returns_503_stt_unavailable(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from src.app import main
+
+    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+        raise SttUnavailable("both down")
+
+    monkeypatch.setattr(main.settings, "baseline_required", False)
+    monkeypatch.setattr(main, "evaluate_session", fake_evaluate)
+    r = TestClient(main.app).post(
+        "/api/evaluate",
+        files={"audio": ("a.wav", b"RIFF", "audio/wav")},
+        data={"script": "Hello."},
+    )
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "stt_unavailable"
