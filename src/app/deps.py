@@ -1,30 +1,50 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
-from src.app.config import settings
+from src.app.auth import AuthProvider, AuthUnavailableError, get_auth
 
-# TODO(auth): remove with the temporary stub below. UUID of the shared test account.
-DEV_FALLBACK_USER_ID = "197a710c-4982-48d5-bcf5-b6cf03e61dce"
+_bearer = HTTPBearer(auto_error=False)
 
 
 class CurrentUser(BaseModel):
     id: UUID
+    email: str | None = None
 
 
-def get_current_user() -> CurrentUser:
-    """Temporary stub. TODO(auth): the Auth team replaces this body with real token checks.
+def _not_authenticated() -> HTTPException:
+    return HTTPException(
+        status_code=401, detail="not_authenticated", headers={"WWW-Authenticate": "Bearer"}
+    )
+
+
+def get_bearer_token(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> str:
+    """The raw access token from `Authorization: Bearer <token>`; 401 when it is missing."""
+    if credentials is None or not credentials.credentials:
+        raise _not_authenticated()
+    return credentials.credentials
+
+
+def get_current_user(
+    token: Annotated[str, Depends(get_bearer_token)],
+    auth: Annotated[AuthProvider, Depends(get_auth)],
+) -> CurrentUser:
+    """The logged-in user, from a verified access token.
 
     Endpoints must get the user only through this dependency:
-    `user: CurrentUser = Depends(get_current_user)`.
-    Only works when APP_ENV=dev. Uses DEV_USER_ID from .env when set,
-    otherwise the fixed test account DEV_FALLBACK_USER_ID.
+    `user: CurrentUser = Depends(get_current_user)`. `user_id` never comes from the
+    request body or query. 401 `not_authenticated` for a missing, invalid or expired
+    token; 503 `auth_unavailable` when the account service cannot be reached.
     """
-    if settings.app_env != "dev":
-        raise HTTPException(status_code=401, detail="not_authenticated")
     try:
-        user_id = UUID(settings.dev_user_id or DEV_FALLBACK_USER_ID)
-    except ValueError as err:
-        raise HTTPException(status_code=401, detail="not_authenticated") from err
-    return CurrentUser(id=user_id)
+        token_user = auth.verify_token(token)
+    except AuthUnavailableError as err:
+        raise HTTPException(status_code=503, detail="auth_unavailable") from err
+    if token_user is None:
+        raise _not_authenticated()
+    return CurrentUser(id=token_user.id, email=token_user.email)
