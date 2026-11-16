@@ -52,3 +52,21 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
+
+
+def missing_required_settings(s: Settings) -> list[str]:
+    """Names of the required environment variables that are empty.
+
+    STT (Deepgram primary, Gladia fallback) and Groq (script generation) are always required.
+    Supabase is required outside dev; in dev, no SUPABASE_URL means the in-memory repositories,
+    but a URL without its service key is a mistake.
+    """
+    required = {
+        "DEEPGRAM_API_KEY": s.deepgram_api_key,
+        "GLADIA_API_KEY": s.gladia_api_key,
+        "GROQ_API_KEY": s.groq_api_key,
+    }
+    if s.app_env != "dev" or s.supabase_url:
+        required["SUPABASE_URL"] = s.supabase_url
+        required["SUPABASE_SERVICE_KEY"] = s.supabase_service_key
+    return [name for name, value in required.items() if not value.strip()]

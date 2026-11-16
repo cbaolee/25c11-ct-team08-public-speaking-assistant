@@ -1,6 +1,7 @@
 import json
 import logging
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 from typing import Annotated, Any
@@ -18,6 +19,7 @@ from src.app.config import (
     max_script_chars,
     max_script_words,
     max_upload_bytes,
+    missing_required_settings,
     settings,
 )
 from src.app.db.factory import Repos, get_repos
@@ -48,9 +50,21 @@ from src.text_processing.pipeline import ScriptGenerationPipeline
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
-app = FastAPI()
-app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Refuse to start when a required key is missing (fail at startup, not mid-demo)."""
+    missing = missing_required_settings(settings)
+    if missing:
+        logger.critical("Missing required settings in .env: %s", ", ".join(missing))
+        raise RuntimeError("Missing required settings in .env: " + ", ".join(missing))
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
 app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
 app.include_router(baselines.router)
