@@ -48,3 +48,40 @@ def test_analyze_baseline_runs_in_worker_thread(monkeypatch):
     )
     assert r.status_code == 422
     assert seen["loop"] is False
+
+
+def _record_upload_thread(module, monkeypatch) -> dict[str, bool]:
+    seen: dict[str, bool] = {}
+    real_save = module.save_upload_limited
+
+    def recording_save(*args, **kwargs):
+        seen["loop"] = _on_event_loop()
+        return real_save(*args, **kwargs)
+
+    monkeypatch.setattr(module, "save_upload_limited", recording_save)
+    return seen
+
+
+def test_evaluate_upload_copy_runs_in_worker_thread(monkeypatch):
+    seen = _record_upload_thread(main, monkeypatch)
+
+    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+        raise AudioRejected("corrupt", "stop here")
+
+    monkeypatch.setattr(main.settings, "baseline_required", False)
+    monkeypatch.setattr(main, "evaluate_session", fake_evaluate)
+    TestClient(main.app).post(
+        "/api/evaluate", files={"audio": ("a.wav", b"RIFF", "audio/wav")}, data={"script": "Hi."}
+    )
+    assert seen["loop"] is False
+
+
+def test_baseline_upload_copy_runs_in_worker_thread(monkeypatch):
+    seen = _record_upload_thread(baselines, monkeypatch)
+
+    def fake_analyze(audio_path, *, vad_params):
+        raise AudioRejected("corrupt", "stop here")
+
+    monkeypatch.setattr(baselines, "analyze_baseline", fake_analyze)
+    TestClient(main.app).post("/api/baseline", files={"audio": ("b.webm", b"x", "audio/webm")})
+    assert seen["loop"] is False

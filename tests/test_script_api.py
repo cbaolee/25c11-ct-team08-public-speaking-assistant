@@ -1,5 +1,6 @@
 """Integration tests for WP-B5 8-stage pipeline, cache, jobs, and FastAPI endpoints (#19)."""
 
+import asyncio
 import io
 import json
 from pathlib import Path
@@ -12,6 +13,7 @@ from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
+from src.app.config import settings
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import StorageError
 from src.app.deps import CurrentUser, get_current_user
@@ -27,12 +29,8 @@ from src.text_processing.template_store import TemplateStore
 
 
 def _run_coro(coro: Any) -> Any:
-    """Step a non-blocking endpoint coroutine to completion without socketpair event loop."""
-    try:
-        coro.send(None)
-    except StopIteration as stop:
-        return stop.value
-    raise RuntimeError("Coroutine yielded unexpectedly")
+    """Run an endpoint coroutine to completion (it may await run_in_threadpool)."""
+    return asyncio.run(coro)
 
 
 def _user(name: str = "anonymous") -> CurrentUser:
@@ -84,7 +82,7 @@ def _build_test_pipeline() -> tuple[ScriptGenerationPipeline, MagicMock]:
 
 @pytest.fixture()
 def setup_pipeline(monkeypatch: pytest.MonkeyPatch) -> tuple[ScriptGenerationPipeline, MagicMock]:
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.setattr(settings, "groq_api_key", "")
     pipeline, llm_mock = _build_test_pipeline()
     monkeypatch.setattr(app_main, "_script_pipeline", pipeline)
     return pipeline, llm_mock
