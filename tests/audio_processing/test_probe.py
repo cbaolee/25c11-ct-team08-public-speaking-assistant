@@ -200,10 +200,16 @@ def mp3_with_cover_art(tmp_path: Path) -> Path:
     return out
 
 
-@pytest.mark.parametrize("fixture_name", ["mp4_with_video", "mkv_with_video", "mp3_with_cover_art"])
+@pytest.mark.parametrize("fixture_name", ["mp4_with_video", "mkv_with_video"])
 def test_file_with_video_or_image_is_rejected(fixture_name, request):
     path = request.getfixturevalue(fixture_name)
     allowed = ALLOWED | {"mp3"}
     with pytest.raises(AudioRejected) as info:
         probe(path, **{**LIMITS, "allowed_formats": allowed})
     assert _code(info) == "unsupported_format"
+
+
+def test_mp3_with_cover_art_is_accepted(mp3_with_cover_art):
+    # The cover picture is a video stream with disposition.attached_pic = 1, not real video (L1)
+    result = probe(mp3_with_cover_art, **{**LIMITS, "allowed_formats": ALLOWED | {"mp3"}})
+    assert result.duration_s == pytest.approx(1.0, abs=0.2)

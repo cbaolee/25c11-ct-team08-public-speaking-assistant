@@ -6,17 +6,18 @@ from typing import Any
 import numpy as np
 import parselmouth
 
+from src.app.config import MIN_PAUSE_S
 from src.audio_processing.contracts import BaselineProfile, MasterAudio, Pause
 from src.audio_processing.vad import check_audio_quality, detect_speech, find_pauses
 
 
 def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
     """
-    Trích xuất trung vị khoảng lặng và ngưỡng ngập ngừng từ file baseline.
-    Sử dụng start_s và end_s để tính độ dài.
+    Get the median pause and the hesitation threshold from the baseline recording.
+    Pause lengths come from start_s and end_s.
     """
-    # D13: < 5 khoảng lặng (kể cả 0) -> ngưỡng cố định 0.7 s, cờ unreliable,
-    # KHÔNG gắn no_baseline (cờ đó chỉ dành cho người dùng chưa có baseline).
+    # D13: < 5 pauses (including 0) -> fixed threshold 0.7 s and the unreliable flag,
+    # NOT no_baseline (that flag is only for users who have no baseline yet).
     if not pauses:
         return {
             "median_pause_s": None,
@@ -36,7 +37,7 @@ def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
 
     flags = []
 
-    # Tính ngưỡng và chặn biên trong khoảng [0.7, 1.2]
+    # Threshold, clamped to [0.7, 1.2]
     threshold = 2.0 * median_pause_s
     hesitation_threshold_s = max(0.7, min(1.2, threshold))
 
@@ -49,7 +50,7 @@ def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
 
 def compute_baseline_f0(master: MasterAudio) -> dict:
     """
-    Tính trung vị cao độ F0 (Hz) của baseline bằng Parselmouth.
+    Median pitch F0 (Hz) of the baseline, measured with Parselmouth.
     """
     flags = []
     median_f0_hz = None
@@ -59,7 +60,7 @@ def compute_baseline_f0(master: MasterAudio) -> dict:
         pitch = snd.to_pitch()
         pitch_values = pitch.selected_array['frequency']
 
-        # Chỉ lấy các frames có âm thanh (voiced), frequency > 0
+        # Keep only voiced frames (frequency > 0)
         voiced_f0 = pitch_values[pitch_values > 0]
 
         if len(voiced_f0) > 0:
@@ -76,7 +77,7 @@ def compute_baseline_f0(master: MasterAudio) -> dict:
 
 
 def mean_loudness_db(values: Sequence[float]) -> float | None:
-    """Trung bình dB, bỏ NaN và ±inf; rỗng hoặc không còn giá trị hợp lệ -> None (D12)."""
+    """Mean dB without NaN and ±inf; empty or no valid value left -> None (D12)."""
     valid = [float(v) for v in values if math.isfinite(v)]
     if not valid:
         return None
@@ -85,8 +86,8 @@ def mean_loudness_db(values: Sequence[float]) -> float | None:
 
 def extract_loudness_db(master: MasterAudio) -> list[float]:
     """
-    Lấy mẫu độ to (dB) mỗi 0.5 s bằng Parselmouth `to_intensity()` (tham số mặc định),
-    đúng cách pipeline.evaluate_session đang đo loudness. Lỗi -> list rỗng.
+    Loudness samples (dB) every 0.5 s with Parselmouth `to_intensity()` (default settings),
+    the same way pipeline.evaluate_session measures loudness. Any error -> empty list.
     """
     try:
         snd = parselmouth.Sound(str(master.path))
@@ -102,9 +103,9 @@ def extract_loudness_db(master: MasterAudio) -> list[float]:
 
 
 def loudness_series(master: MasterAudio, step_s: float = 0.1) -> dict | None:
-    """Series độ to (dB) theo thời gian, lấy tại TÂM ô t = (i + 0.5) * step (ADR-004 D10).
+    """Loudness Series (dB), sampled at the CENTRE of each cell t = (i + 0.5) * step (ADR-004 D10).
 
-    Dùng to_intensity() mặc định; giá trị không hữu hạn/None -> None; mọi exception -> None.
+    Uses the default to_intensity(); non-finite/None values -> None; any exception -> None.
     """
     try:
         snd = parselmouth.Sound(str(master.path))
@@ -121,24 +122,24 @@ def loudness_series(master: MasterAudio, step_s: float = 0.1) -> dict | None:
 
 def build_baseline_profile(master: MasterAudio, vad_params: Any) -> BaselineProfile:
     """
-    Orchestrator phân tích toàn bộ audio baseline và trả về BaselineProfile.
+    Run the whole baseline analysis and return a BaselineProfile.
     """
-    # 1. Phát hiện tiếng nói (Sử dụng keyword argument params=vad_params)
+    # 1. Detect speech (keyword argument params=vad_params)
     segments = detect_speech(master, params=vad_params)
 
-    # 2. Kiểm tra chất lượng (ném ngoại lệ InsufficientAudio nếu tiếng nói < 30%)
+    # 2. Quality check (raises InsufficientAudio when speech is < 30%)
     check_audio_quality(segments, master.duration_s)
 
-    # 3. Phân tích khoảng lặng (Sử dụng keyword argument min_pause_s=0.35)
-    pauses = find_pauses(segments, min_pause_s=0.35)
+    # 3. Pauses: same minimum length as the Evaluate Pipeline, so both compare like with like
+    pauses = find_pauses(segments, min_pause_s=MIN_PAUSE_S)
     pause_profile = compute_baseline_pause_profile(pauses)
 
-    # 4. Phân tích cao độ giọng
+    # 4. Pitch analysis
     f0_profile = compute_baseline_f0(master)
 
     loudness = mean_loudness_db(extract_loudness_db(master))
 
-    # 5. Gộp flags
+    # 5. Merge flags
     combined_flags = pause_profile["flags"] + f0_profile["flags"]
 
     return BaselineProfile(

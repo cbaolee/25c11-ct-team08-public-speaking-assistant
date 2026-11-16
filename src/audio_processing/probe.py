@@ -72,8 +72,10 @@ def probe(path: Path, *, max_seconds: float, max_bytes: int,
             "This file contains multiple audio tracks, which is not supported yet.",
         )
 
+    # Cover art in MP3/M4A is a one-picture "video" stream marked attached_pic: it is not video.
     has_video = any(
         stream.get("codec_type") == "video"
+        and (stream.get("disposition") or {}).get("attached_pic") != 1
         for stream in ffprobe_result.get("streams", [])
     )
     if has_video:
