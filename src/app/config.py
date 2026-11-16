@@ -10,6 +10,8 @@ baseline_max_seconds = 60
 max_script_words = 4000
 max_script_chars = 40_000
 max_upload_bytes = 100 * 1024 * 1024
+# Saved scripts per user (D-08). POST /api/scripts returns 429 rate_limited above this.
+max_saved_scripts = 50
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
@@ -45,8 +47,6 @@ class Settings(BaseSettings):
     retention_full_sessions: int = 10
     signed_url_ttl_s: int = 600
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
-
-    dev_user_id: str = ""  # TODO(auth): remove when real auth is merged
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
