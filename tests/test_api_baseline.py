@@ -82,8 +82,10 @@ def test_create_baseline_ok_saves_current(monkeypatch, repos):
     assert body["hesitation_threshold_s"] == 1.0
     assert body["is_current"] is True
     assert "user_id" not in body
-    assert body["audio_path"] == f"{USER_A}/{body['id']}.webm"
-    assert repos.files.download_file(USER_A, settings.baselines_bucket, body["audio_path"])
+    assert "audio_path" not in body  # internal bucket path stays on the server
+    row = repos.baselines.get_current_baseline(USER_A)
+    assert row.audio_path == f"{USER_A}/{body['id']}.webm"
+    assert repos.files.download_file(USER_A, settings.baselines_bucket, row.audio_path)
 
 
 def test_create_baseline_webm_upload_from_ui_is_saved(monkeypatch, repos):
@@ -121,14 +123,14 @@ def test_create_baseline_insufficient_exception_saves_nothing(monkeypatch, repos
 
 def test_create_baseline_replaces_old_and_deletes_old_audio(monkeypatch, repos):
     _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile(0.8)))
-    old = _get().json()
+    old = repos.baselines.get_current_baseline(USER_A)
     _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile(1.1)))
-    new = _get().json()
-    assert new["id"] != old["id"]
-    assert new["hesitation_threshold_s"] == 1.1
+    new = repos.baselines.get_current_baseline(USER_A)
+    assert new.id != old.id
+    assert _get().json()["hesitation_threshold_s"] == 1.1
     with pytest.raises(StorageError):
-        repos.files.download_file(USER_A, settings.baselines_bucket, old["audio_path"])
-    assert repos.files.download_file(USER_A, settings.baselines_bucket, new["audio_path"])
+        repos.files.download_file(USER_A, settings.baselines_bucket, old.audio_path)
+    assert repos.files.download_file(USER_A, settings.baselines_bucket, new.audio_path)
 
 
 def test_create_baseline_storage_error_returns_503(monkeypatch, repos):
@@ -162,3 +164,13 @@ def test_get_baseline_other_user_returns_null(monkeypatch, repos, current):
     _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile()))
     current["id"] = USER_B
     assert _get().json() is None
+
+
+def test_get_baseline_storage_error_returns_503(monkeypatch, repos):
+    def broken(*args, **kwargs):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.baselines, "get_current_baseline", broken)
+    r = _get()
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "baseline_unavailable"
