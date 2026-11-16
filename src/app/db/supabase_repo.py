@@ -13,6 +13,7 @@ from storage3.exceptions import StorageApiError
 from supabase import Client
 
 from src.app.db.models import (
+    SESSION_METRIC_PATHS,
     BaselineRow,
     ConflictError,
     NewBaseline,
@@ -35,7 +36,14 @@ UNIQUE_VIOLATION = "23505"
 MAX_BEYOND_ROWS = 1000
 
 SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,created_at"
-SESSION_SUMMARY_COLUMNS = "id,created_at,topic,status,overall,label,components,is_compact"
+# PostgREST JSON paths ("alias:result->section->key") read the chart numbers inside result
+SESSION_SUMMARY_COLUMNS = ",".join(
+    [
+        "id,created_at,topic,status,overall,label,components,is_compact,script_id",
+        "audio_duration_s",
+        *(f"{name}:result->{a}->{b}" for name, (a, b) in SESSION_METRIC_PATHS.items()),
+    ]
+)
 
 
 def _execute(query):
@@ -212,6 +220,12 @@ class SupabaseScriptRepo:
         query = self._table().select(SCRIPT_SUMMARY_COLUMNS).eq("user_id", str(user_id))
         resp = _execute(_newest_page(query, limit, cursor))
         return [ScriptSummary.model_validate(row) for row in resp.data]
+
+    def count_scripts(self, user_id: UUID) -> int:
+        resp = _execute(
+            self._table().select("id", count="exact", head=True).eq("user_id", str(user_id))
+        )
+        return resp.count or 0
 
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         # sessions.script_id is set to null by "on delete set null".

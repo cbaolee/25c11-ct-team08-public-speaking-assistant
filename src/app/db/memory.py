@@ -20,6 +20,7 @@ from src.app.db.models import (
     StorageError,
     build_object_path,
     decode_cursor,
+    read_session_metric,
 )
 
 
@@ -55,6 +56,14 @@ def _after_cursor(rows, cursor: str | None):
         for row in rows
         if (row.created_at, str(row.id)) < cursor_key
     ]
+
+
+def _session_summary(row: SessionRow) -> SessionSummary:
+    metrics = {
+        name: read_session_metric(row.result, name)
+        for name in ("wpm", "pitch_range_st", "p_clarity")
+    }
+    return SessionSummary.model_validate({**row.model_dump(), **metrics})
 
 
 class MemoryProfileRepo:
@@ -210,6 +219,9 @@ class MemoryScriptRepo:
             for row in rows[:limit]
         ]
 
+    def count_scripts(self, user_id: UUID) -> int:
+        return sum(1 for row in self._state.scripts.values() if row.user_id == user_id)
+
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         row = self._state.scripts.get(script_id)
         if row is None or row.user_id != user_id:
@@ -254,10 +266,7 @@ class MemorySessionRepo:
             row for row in self._state.sessions.values() if row.user_id == user_id
         )
         rows = _after_cursor(rows, cursor)
-        return [
-            SessionSummary.model_validate(row.model_dump())
-            for row in rows[:limit]
-        ]
+        return [_session_summary(row) for row in rows[:limit]]
 
     def list_score_history(self, user_id: UUID, limit: int) -> list[ScorePoint]:
         _validate_limit(limit)
