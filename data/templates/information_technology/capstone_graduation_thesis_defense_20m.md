@@ -47,7 +47,7 @@ When I compared these approaches, I focused on a few criteria that matter most f
 
 From this comparison, I identified the following gap in existing work. {{ argument_research_gap }}
 
-This gap is the starting point of my thesis. In other words, my work doesn't try to replace all existing approaches. It tries to address one specific weakness, in one specific context, and to evaluate carefully whether my approach actually improves on it.
+This gap is the starting point of my thesis. My position is that {{ argument_research_gap_significance }}.
 
 Part three: the proposed approach.
 
@@ -83,8 +83,6 @@ I'd also like to mention how I ensured the quality of the implementation. {{ arg
 
 Now, I'd like to show you a short demonstration of the system, so you can see how it works in practice.
 
-[Live demonstration, about three minutes. Suggested order: the main scenario from start to finish, then the feature that best shows the thesis's contribution, then one difficult or edge case. Prepare a recorded video as a backup in case of technical problems.]
-
 Thank you. As you can see, the system supports the full scenario I described in the problem statement. Now, of course, a working demonstration shows that the system functions. It doesn't yet show that it's better, or how well it performs. For that, we need systematic experiments, which brings me to the next part.
 
 Part five: experiments and results.
@@ -109,7 +107,7 @@ What matters is what these results mean, not just the numbers.
 
 {{ argument_results_interpretation }}
 
-I also wanted to understand which parts of my approach contribute most to the results. So I ran an additional experiment, removing or changing one component at a time and observing the effect. This is sometimes called an ablation study.
+I also wanted to understand which parts of my approach contribute most to the results. In my view, {{ argument_ablation_insight }}.
 
 {{ argument_ablation_or_component_analysis }}
 
@@ -129,7 +127,7 @@ Second, I'd like to discuss the validity of the results, which means: how much c
 
 The main risk is an unfair comparison, for example a flawed baseline or test data overlapping with development data. To reduce it, {{ argument_internal_validity_measures }} Beyond that, my experiments used specific data in a specific environment, so the conclusions hold within the scope I defined, and I've avoided claiming more than the evidence supports.
 
-Being aware of these limitations doesn't weaken the contributions of the thesis. Rather, it defines precisely where the results are reliable, and it points directly to the most valuable future work.
+Being aware of these limitations doesn't weaken the contributions of the thesis. My position is that {{ argument_limitations_strengthen_thesis }}.
 
 Part seven: conclusion and future work.
 
@@ -155,48 +153,24 @@ For comments that I've already addressed, the changes are included in the revise
 
 I'm now ready to answer the committee's questions.
 
-[Committee questions. The following prepared answers cover questions that committees frequently ask. Use them as needed, adapting them to the exact question. Answer briefly and directly first, then explain. If you don't know an answer, say so plainly, and explain how you would find out.]
-
-[If asked: "What is your main contribution, in one sentence?"]
-
 In one sentence: {{ argument_one_sentence_contribution }}
-
-[If asked: "Why didn't you use a different method or technology?"]
 
 That's a very good question. When choosing my approach, I considered several alternatives, including {{ argument_alternatives_considered }} I chose my approach mainly because it best fit the objectives and constraints of this problem. That said, I think the alternative you mention would be an interesting direction to compare in future work, and I'd be happy to hear your thoughts on it.
 
-[If asked: "How do you know your results are reliable?"]
-
-I tried to ensure reliability in three ways. First, all methods were compared under the same conditions, on the same data, with the same metrics. Second, I repeated experiments where results could vary, and reported averages. And third, I analyzed not only the overall numbers, but also individual components and failure cases. However, as I mentioned in the validity discussion, the results are limited to the data and environment I tested, so I would be careful about generalizing them further without additional experiments.
-
-[If asked: "Can this be applied in practice?"]
+I tried to ensure reliability in three ways. Even so, I believe {{ argument_reliability_of_results_view }}.
 
 {{ argument_practical_application_answer }}
 
-[If asked: "What was the most difficult part of your thesis?"]
-
 {{ argument_hardest_part_answer }}
-
-[If asked: "Which parts did you build yourself, and which parts come from existing libraries or prior work?"]
 
 It's important to be precise about this. {{ argument_own_work_vs_existing }} All the existing libraries, datasets, and prior methods I used are cited in the thesis, and the comparison in the results chapter is between my contributions and those existing methods, under the same conditions.
 
-[If asked: "How would your system perform at a much larger scale?"]
-
 In the current experiments, the system was tested at the scale I described in the setup. At a much larger scale, I'd expect the main pressure points to be {{ argument_scalability_bottlenecks }} I haven't tested at that scale, so I can't claim it would work without changes. But the design separates the components clearly, so the parts most likely to become bottlenecks could be optimized or replaced without redesigning the whole system. Testing at a larger scale is one of the first things I'd do in future work.
-
-[If asked: "Are there any ethical, privacy, or security concerns with your work?"]
 
 {{ argument_ethics_privacy_answer }} More generally, I believe any system that processes real users' data should collect only what it needs, protect what it stores, and be transparent with users about how their data is used. Those principles guided my choices, and they would need even more attention in a real deployment.
 
-[If asked: "If you started this thesis again, what would you do differently?"]
-
 {{ argument_do_differently_answer }} Looking back, I think the most valuable lesson is to evaluate early and often. The earlier I tested my ideas against real data, the faster I learned what actually worked.
 
-[If asked a question you cannot answer:]
-
 That's a question I haven't studied in enough depth to give you a confident answer. My understanding is limited to what I've explained, but I think it's an important point, and I'll look into it further. Could I ask what direction you would suggest?
-
-[After the final question:]
 
 Thank you very much to all members of the committee for your questions and valuable feedback. I'll carefully consider all your comments to improve my thesis. And once again, thank you to my supervisor, my family, and my friends for their support throughout this journey.

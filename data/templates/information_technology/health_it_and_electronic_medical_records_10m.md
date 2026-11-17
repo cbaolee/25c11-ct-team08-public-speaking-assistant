@@ -21,7 +21,7 @@ So, why does this matter? The benefits fall into four main areas.
 
 The first is access to information. Authorized doctors and nurses can see a patient's information instantly, from different departments, and in some systems, from different hospitals. No more lost files, illegible handwriting, or waiting for records to be carried across the building.
 
-The second is patient safety. Electronic systems can help prevent errors. For example, when a doctor prescribes a medication electronically, the system can automatically check it against the patient's allergies and other medications, and display a warning if there's a dangerous interaction or an unusual dose. Handwritten prescriptions that pharmacists can't read become a thing of the past.
+The second is patient safety. In my view, {{ argument_ehr_patient_safety }}.
 
 The third is efficiency. Duplicate tests can be avoided when previous results are available. Administrative work, like billing and insurance claims, can be automated. And patients can spend less time waiting and repeating the same information.
 
@@ -37,7 +37,7 @@ Patient portals and health apps let patients book appointments, view test result
 
 And artificial intelligence is increasingly used to support doctors, for example, by helping to detect signs of disease in medical images. But it's important to stress the word "support." In responsible healthcare, AI assists clinicians. It doesn't replace their judgment.
 
-Now, here's a challenge that's less visible but extremely important: interoperability. That means the ability of different systems to exchange and understand each other's data. A hospital may use one system, a clinic another, and a laboratory a third. If they can't communicate, the patient's information is still stuck in separate islands, just digital islands instead of paper ones.
+Now, here's a challenge that's less visible but extremely important: interoperability. I would argue that {{ argument_interoperability_priority }}.
 
 To solve this, the healthcare industry uses data standards. One widely adopted modern standard is called FHIR, pronounced "fire," which stands for Fast Healthcare Interoperability Resources. It's developed by a standards organization called HL7, and it defines common ways to structure and exchange health data using modern web technologies. Standards like this are what allow different systems to finally speak the same language.
 
@@ -47,7 +47,7 @@ Of course, the journey isn't easy. The main challenges come next.
 
 The first is privacy and security. Health data is among the most sensitive personal information there is, and it's a valuable target for criminals. Around the world, hospitals have been hit by ransomware attacks that locked their systems and forced them to delay operations and divert ambulances. Protecting health data requires strong access controls, encryption, regular backups, staff training, and careful logging of who views which records.
 
-The second is the burden on healthcare workers. Poorly designed systems can force doctors and nurses to spend hours clicking through screens and typing notes, taking time away from patients. Many studies have linked heavy documentation work to stress and burnout among clinicians. So good health IT is not just about functionality. It must be designed around how clinicians actually work.
+The second is the burden on healthcare workers. My position is that {{ argument_clinician_burden_design }}.
 
 The third is cost and infrastructure. Implementing electronic records requires investment in software, hardware, network connections, and, above all, training. This can be especially challenging for smaller hospitals and clinics.
 

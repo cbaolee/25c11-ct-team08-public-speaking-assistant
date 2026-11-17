@@ -27,11 +27,11 @@ So, which one is right for you? Three questions can help.
 
 First, what kind of problems excite you? If you enjoy puzzles, logic, and asking "how can I make this smarter or faster?", Computer Science may suit you. If you enjoy making things work in the real world, setting things up, fixing problems, and helping people use technology, Information Technology may be a better fit.
 
-Second, how do you feel about mathematics? You don't need to be a math genius for Computer Science, but you should be comfortable with it and willing to work hard on it. If math really isn't your thing, an IT program may be a more comfortable path.
+Second, how do you feel about mathematics? My honest view is that {{ argument_math_and_cs_choice }}.
 
 And third, what kind of work do you imagine yourself doing in five years? Writing complex code? Doing research in AI? Protecting a company from cyberattacks? Running the cloud systems for a large business? Working backward from that picture often makes the choice clearer.
 
-One practical tip before I finish. The names of programs can be confusing, because different universities use them differently. In some universities, "Information Technology" is the name of a broad faculty that includes Computer Science, Software Engineering, Information Systems, and other majors. In others, it's a specific major. So don't decide based only on the name. Look at the actual curriculum: which courses are required, how much math there is, and what recent graduates are doing now.
+One practical tip before I finish. In my opinion, {{ argument_curriculum_over_program_name }}.
 
 {{ argument_local_program_note }}
 

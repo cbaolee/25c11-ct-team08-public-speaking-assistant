@@ -17,7 +17,7 @@ Blockers: I do have one. {{ argument_blocker_description }} Right now, I can't m
 
 Oh, and one quick heads-up for the team. {{ argument_team_heads_up }} Just wanted to mention it now so nobody's surprised later.
 
-And a quick check on the sprint as a whole: from my side, the tasks I own are on track, except for the blocked part I just mentioned. If the blocker isn't sorted out by tomorrow, that piece might slip by a day or two, and I'll flag it here first thing so we can decide together whether to adjust the scope.
+And a quick check on the sprint as a whole: from my side, the tasks I own are on track, except for the blocked part I just mentioned. Honestly, my view is that {{ argument_sprint_risk_view }}.
 
 That's me done, then: yesterday's task is done and waiting for review, today I'm focusing on {{ argument_today_main_task }}, and I have one blocker that I'll take offline with {{ argument_blocker_owner_name }} right after this.
 

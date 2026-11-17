@@ -9,13 +9,13 @@ Today's topic is digital transformation for small businesses. I know that phrase
 
 My goal today is practical. By the end of this session, I'd like you to leave with a clear understanding of what digital transformation really means for a small business, a simple roadmap of where to start, and a list of mistakes to avoid.
 
-What does the phrase actually mean? Digital transformation is not just buying software or putting your business on Facebook. It's using digital tools to change how your business works: how you find customers, how you sell, how you run your daily operations, and how you make decisions. The technology is only a tool. The real goal is a business that's more efficient, closer to its customers, and more resilient.
+What does the phrase actually mean? In my view, {{ argument_transformation_vs_digitization }}.
 
 A simple way to tell the difference: if you print a paper form, fill it in by hand, then scan it and email it, you've used digital tools, but you haven't transformed anything. If the customer fills in an online form, the data goes straight into your system, and you get a notification on your phone, that's transformation. The work itself has changed.
 
 So why does this matter now?
 
-Because customers have changed. Most of your customers search online before they buy, even for a local shop or restaurant. They expect to pay by phone, to order without calling, and to get quick answers to their messages. And many of your competitors are already meeting those expectations.
+Because customers have changed. I would argue that {{ argument_customers_drive_change }}.
 
 But there's also good news. The tools have become dramatically cheaper and easier. Ten or fifteen years ago, a small business that wanted an online store or a proper accounting system needed to hire developers and buy servers. Today, many of those tools are available as online services, with monthly subscriptions, free trials, and setup that takes hours instead of months.
 
@@ -69,7 +69,7 @@ Once the earlier steps are in place, you'll have something very valuable: data. 
 
 You don't need to be a data scientist to use it. Start with a few simple questions every month. Which products or services make the most profit, not just the most sales? Which days and hours are busiest? Where do new customers come from? Which marketing activities actually bring in customers? A few simple answers can help you decide what to stock, when to schedule staff, and where to spend your marketing budget.
 
-And alongside all six steps, there's one thing you must not forget: basic cybersecurity. As your business becomes more digital, protect it. Use strong, unique passwords, turn on two-factor authentication for important accounts, especially email, banking, and social media, keep backups of important data, and train your staff to recognize scam messages. Small businesses are frequent targets precisely because attackers expect them to be less protected.
+And alongside all six steps, there's one thing you must not forget: basic cybersecurity. My position is that {{ argument_small_business_cybersecurity }}.
 
 Now, an illustrative example of how this can look. Imagine a small family bakery that, a few years ago, only accepted cash, took orders by phone, and tracked everything in a notebook. They started small: first a free business profile on maps and a page on one social network, with photos of their daily bread. Then they added QR code payments. Next, they started taking orders for birthday cakes through a simple online form. Finally, they began using a basic sales app on a tablet, which showed them that their best-selling items on weekends were completely different from weekdays. They adjusted their baking schedule accordingly, reduced waste, and freed up time for the owner to focus on new recipes. None of these steps was expensive or complicated. Together, they changed the business.
 
@@ -85,7 +85,7 @@ Fourth, measure the results. Before you start, write down a simple number: how l
 
 And fifth, don't try to copy big companies. You don't need complex enterprise systems. Simple, affordable tools that fit your size are usually the best choice.
 
-And a warning about the most common mistakes. Buying too many tools that don't connect with each other. Starting with technology instead of a real business problem. Skipping training. Ignoring security until something goes wrong. And giving up too early, because almost every change feels slower for the first few weeks, before it becomes faster.
+And a warning about the most common mistakes. In my opinion, {{ argument_common_transformation_mistakes }}.
 
 {{ argument_local_support_resources }}
 

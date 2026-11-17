@@ -7,7 +7,7 @@ Good {{ argument_time_of_day }}, everyone. Today's paper is "{{ argument_paper_t
 
 {{ argument_why_this_paper }}
 
-My goal today is not only to summarize what the paper says, but to help you understand why the authors made their choices, how convincing their evidence is, and what we can learn from it for our own work. So I'll present the paper in the order we usually read a paper critically: the problem, the key idea, the method, the experiments, and then my own critical assessment. At the end, I'll propose a few questions for our discussion.
+My goal today is not only to summarize what the paper says, but to help you understand why the authors made their choices, how convincing their evidence is, and what we can learn from it for our own work. In my view, {{ argument_why_critical_reading_matters }}.
 
 Let's begin with the problem.
 
@@ -69,15 +69,15 @@ Baselines: are they strong and fairly tuned? It's easy to look good against a we
 
 Leakage: is there any risk of data leakage? If information from the test data influences the training or the design choices, even indirectly, for example by repeatedly adjusting the method while looking at test results, the reported performance will be too optimistic.
 
-Noise: are the differences meaningful, or could they be noise? A small improvement from a single run may disappear with a different random seed. Results reported over several runs, with variation or confidence intervals, are much more convincing.
+Noise: are the differences meaningful, or could they be noise? In my experience, {{ argument_noise_vs_real_improvement }}.
 
 Benchmarks: do they reflect the real problem? A method can perform very well on a standard benchmark and still struggle with real-world data that is messier, larger, or distributed differently.
 
-And negative results: are they reported? Papers that show where their method fails are often more trustworthy than papers that only show successes, because they help readers understand the true boundaries of the method.
+And negative results: are they reported? I would argue that {{ argument_negative_results_value }}.
 
 Keeping these five questions in mind, let's now assess this paper.
 
-This brings us to what I think is the most important part of a seminar presentation: the critical assessment. Reading a paper well doesn't mean accepting everything it claims. It also doesn't mean looking only for weaknesses. It means asking, as fairly as possible: what has really been shown, and what hasn't?
+This brings us to what I think is the most important part of a seminar presentation: the critical assessment. My position is that {{ argument_critical_assessment_view }}.
 
 First, the strengths.
 

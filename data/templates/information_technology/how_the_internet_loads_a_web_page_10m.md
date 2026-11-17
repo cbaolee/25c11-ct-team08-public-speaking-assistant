@@ -11,7 +11,7 @@ Step one: finding the address.
 
 Computers on the internet don't find each other by names. They use numbers called IP addresses, a bit like phone numbers. A name such as {{ argument_example_website_address }} is easy for humans to remember, but your computer needs the number behind it.
 
-That's the job of the Domain Name System, or DNS. You can think of DNS as the phone book of the internet. Your browser first checks whether it has looked up this name recently, because it keeps a small memory, called a cache. If not, it asks your operating system, and then a DNS resolver, usually run by your internet provider. If the resolver doesn't know either, it asks a chain of servers: first a root server, then the server responsible for the ending, like dot com, and finally the server that is in charge of that specific domain. That last one replies with the IP address.
+That's the job of the Domain Name System, or DNS. In my view, {{ argument_dns_as_hidden_backbone }}.
 
 This whole lookup often takes only tens of milliseconds, and the answer is cached so the next visit is even faster.
 
@@ -49,7 +49,7 @@ If all of this happened from scratch every time, the web would feel painfully sl
 
 The first is caching. Your browser stores copies of files like logos and stylesheets, so on your next visit, it doesn't need to download them again.
 
-The second is the Content Delivery Network, or CDN. Big websites copy their files to servers all around the world, so when you visit, the content comes from a server near you, perhaps in your own city, rather than from the other side of the planet. Distance matters, because even at the speed of light, data takes time to travel.
+The second is the Content Delivery Network, or CDN. I would argue that {{ argument_cdn_value }}.
 
 And modern versions of HTTP allow many files to be sent over the same connection at once, instead of waiting in line.
 
@@ -59,6 +59,6 @@ Lay the whole journey end to end, and it looks like this. You type an address. D
 
 All of that, in about a second.
 
-There's a quiet lesson hidden in all this. The things that feel effortless in technology are usually the result of many layers of careful engineering working together. So the next time a page takes a little too long to load, you'll know there are many places along the journey where it could be waiting, and perhaps you'll be a bit more patient with it.
+There's a quiet lesson hidden in all this. My belief is that {{ argument_layers_of_engineering_lesson }}.
 
 That's the end of the line. If you'd like to revisit any stop along the way, now's the time.

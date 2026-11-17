@@ -9,7 +9,7 @@ DevOps was born to fix that. Good {{ argument_time_of_day }}, everyone. My name 
 
 The term became popular around two thousand nine, when a group of engineers, including Patrick Debois, organized the first DevOpsDays conference in Belgium. The core idea is simple: instead of developers and operations working as separate teams with a wall between them, they work together, share responsibility, and automate as much as possible, so software can be delivered quickly, safely, and reliably.
 
-So, first, an important point: DevOps is not just a job title or a set of tools. It's a culture and a set of practices. But in many companies, there is a role called DevOps engineer, or related titles like platform engineer, cloud engineer, or site reliability engineer. These people build and maintain the systems that allow development teams to build, test, release, and run software smoothly.
+So, first, an important point: DevOps is not just a job title or a set of tools. In my view, {{ argument_devops_as_culture }}.
 
 How do we know if DevOps is working? A widely used set of measures comes from the DORA research program, often called the four key metrics. Deployment frequency: how often you release to production. Lead time for changes: how long it takes for a code change to reach production. Change failure rate: what percentage of releases cause problems. And time to restore service: how quickly you recover when something goes wrong. High-performing teams deploy often, quickly, safely, and recover fast. Everything in today's roadmap helps improve those four numbers.
 
@@ -55,13 +55,13 @@ Stage six: monitoring, observability, and reliability. About two months, and ong
 
 Once systems are running, you need to know whether they're healthy. Learn the three pillars of observability: metrics, which are numbers over time, like CPU usage or request rate; logs, which are records of events; and traces, which follow a single request as it travels through many services. Tools like Prometheus for metrics and Grafana for dashboards are very common.
 
-Then learn the ideas behind site reliability engineering, an approach developed at Google. One key idea is the service level objective, or SLO: a clear target for reliability, for example, "ninety-nine point nine percent of requests should succeed within three hundred milliseconds." Another is the error budget: if your target is ninety-nine point nine percent, then you're allowed a small amount of failure, and as long as you stay within that budget, the team can keep releasing new features. If you exceed it, the focus shifts to reliability. This turns endless arguments between speed and stability into a shared, measurable agreement.
+Then learn the ideas behind site reliability engineering, an approach developed at Google. I would argue that {{ argument_sre_error_budget_value }}.
 
 And learn how to handle incidents: alerting the right people, communicating clearly, restoring service quickly, and afterwards, holding a blameless review to learn and prevent the problem from happening again.
 
 Stage seven: security, or DevSecOps. Ongoing.
 
-Security must be part of the pipeline, not an afterthought. Learn to manage secrets properly, never storing passwords or keys in code. Scan dependencies and container images for known vulnerabilities. Apply the principle of least privilege, so every person and every system only has the access it truly needs. And keep systems patched and up to date.
+Security must be part of the pipeline, not an afterthought. My position is that {{ argument_security_in_pipeline }}.
 
 To tie all of this together, follow a single code change through a well-run DevOps setup.
 
@@ -95,7 +95,7 @@ Now, a practical tip for learning. One of the best ways to build DevOps skills i
 
 How do you show employers what you can do? Build a portfolio project that demonstrates the full journey. For example: take a simple web application with a database, containerize it with Docker, create the cloud infrastructure with Terraform, set up a CI/CD pipeline with automated tests, deploy it to Kubernetes or a simpler managed service, add monitoring and alerts, and document everything in a clear README with an architecture diagram. Then, deliberately break something, and write a short incident report describing how you detected and fixed it. That shows real operational thinking.
 
-Certifications can also help in this field, more than in some other areas of IT, because they show familiarity with specific platforms. Popular examples include cloud provider certifications from AWS, Azure, and Google Cloud, and Kubernetes certifications from the Cloud Native Computing Foundation. They're not a replacement for hands-on skills, but combined with real projects, they can strengthen your CV.
+Certifications can also help in this field, more than in some other areas of IT, because they show familiarity with specific platforms. Honestly, I think {{ argument_devops_certifications_value }}.
 
 {{ argument_local_job_market_note }}
 

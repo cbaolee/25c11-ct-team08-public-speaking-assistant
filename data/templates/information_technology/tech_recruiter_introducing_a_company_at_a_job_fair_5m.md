@@ -17,9 +17,9 @@ For students and fresh graduates, we currently have these opportunities. {{ argu
 
 And what new team members can expect. {{ argument_onboarding_and_growth }}
 
-So, who are we looking for? It's less about grades and more about a few qualities. We look for people who have built something on their own or in a team, whether it's a class project, a personal app, or a hackathon entry, and who can explain it clearly. We look for curiosity: people who ask "why" and enjoy figuring things out. And we look for good teammates: people who communicate openly, accept feedback, and help others.
+So, who are we looking for? It's less about grades and more about a few qualities. We believe that {{ argument_qualities_over_grades }}.
 
-A quick tip that applies to any company here today, not just us. When you talk to a recruiter or engineer at a booth, don't just ask "Are you hiring?" Ask something specific, like "What does a typical week look like for a junior developer on your team?" or "What's the hardest technical problem your team solved recently?" You'll learn much more, and you'll be remembered.
+A quick tip that applies to any company here today, not just us. In my view, {{ argument_better_booth_conversations }}.
 
 Our application process is simple. {{ argument_application_process }}
 

@@ -5,7 +5,7 @@ duration_min: 5
 ---
 Two universities can look almost identical in a brochure, and still give you four very different years. Hello everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's look at a choice many students and parents struggle with when deciding where to study IT: a public university or a private one?
 
-I want to say upfront: I'm not here to tell you that one type is better than the other. There are excellent and weak schools in both groups. What I'd like to do is give you a fair comparison and a practical checklist, so you can make the choice that fits your situation.
+I want to say upfront: I'm not here to tell you that one type is better than the other. In my view, {{ argument_fit_over_school_type }}.
 
 Let's start with public universities.
 
@@ -19,7 +19,7 @@ Private universities work differently. They are funded mainly by tuition fees an
 
 Their main strengths often include modern facilities and campuses, smaller classes in some programs, and curricula that are frequently updated to match industry trends. Many private universities have strong links with companies, offering internships, company projects, and sometimes direct recruitment. And admission requirements can be more flexible.
 
-But there are challenges, too. Tuition fees are usually significantly higher, so it's important to think about the total cost over four years, not just the first year. Quality varies a lot between institutions. Some private universities are excellent, while others are still building their reputation and academic depth.
+But there are challenges, too. Tuition fees are usually significantly higher, so it's important to think about the total cost over four years, not just the first year. My honest view is that {{ argument_total_cost_consideration }}.
 
 So how should you decide? Instead of focusing on "public" or "private," I'd suggest looking at six practical factors for each specific school.
 

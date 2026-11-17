@@ -33,6 +33,6 @@ In four lines. The problem: {{ argument_problem_short_name }}. What you'll notic
 
 I'll send a short written summary of this after the meeting, so you have it for reference. And I'll give you an update by {{ argument_next_update_time }}, or earlier if anything changes.
 
-Is there anything I explained that wasn't clear? Please ask, even if it feels basic. If one person is wondering about something, others usually are too.
+Is there anything I explained that wasn't clear? My honest view is that {{ argument_why_plain_explanations_matter }}.
 
 We know this isn't ideal, and we're doing everything we can to get it sorted out quickly and safely. Thank you for your patience.

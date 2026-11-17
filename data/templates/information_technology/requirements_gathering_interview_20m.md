@@ -35,13 +35,13 @@ Can you tell me about a specific time recently when this caused a real problem? 
 
 I see. And what did you do to work around it?
 
-That's a really important point. Just to dig a little deeper: why do you think that happens? Is it the tool, the process, missing information, or something else?
+That's a really important point. Just to dig a little deeper: why do you think that happens? I ask because, in my experience, {{ argument_why_root_causes_matter }}.
 
 If you could wave a magic wand and fix just one thing about how this works today, what would it be?
 
 That's very clear.
 
-Now, let's look ahead. How would you know that the new system has been a success? Is there something you could measure, like time saved, fewer errors, or happier customers?
+Now, let's look ahead. How would you know that the new system has been a success? I ask because I believe {{ argument_defining_success_early }}.
 
 Who else will use this system, besides you? Are there other teams, managers, or customers who will interact with it? And are their needs different from yours in any way?
 
@@ -53,7 +53,7 @@ Does the system need to connect with any other systems or tools you're already u
 
 Who should be allowed to see or change which information? Is there anything that's confidential, or covered by legal or company rules?
 
-Thank you. Now, an important question about priorities. Realistically, we probably won't be able to build everything at once. So I'd like to understand what matters most.
+Thank you. Now, an important question about priorities. My view is that {{ argument_why_prioritization_matters }}.
 
 Of everything we've discussed, which things are absolutely essential, meaning the system would be useless without them? Which things would be really valuable, but could wait for a later version? And which things would just be nice to have?
 
@@ -61,7 +61,7 @@ That's really helpful. It'll make a big difference when we plan the first releas
 
 Just a few final questions.
 
-Are there any special cases or exceptions that happen only occasionally, but that the system would still need to handle? Sometimes these are the things that cause the most trouble later.
+Are there any special cases or exceptions that happen only occasionally, but that the system would still need to handle? In my experience, {{ argument_edge_cases_matter }}.
 
 Is there anything I haven't asked about that you think I should know?
 

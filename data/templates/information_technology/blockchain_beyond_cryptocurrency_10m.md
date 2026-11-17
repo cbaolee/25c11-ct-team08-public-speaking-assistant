@@ -35,19 +35,19 @@ And there are many other experiments, in healthcare records, energy trading, and
 
 A balanced view also means facing the limitations, and this is where many blockchain projects have gone wrong.
 
-The first limitation is that a blockchain can only guarantee that data hasn't been changed after it was recorded. It cannot guarantee that the data was true in the first place. If someone enters "organic" for a product that isn't organic, the blockchain will faithfully store that lie forever. Connecting blockchains to reliable real-world information remains a hard problem, often called the oracle problem.
+The first limitation is that a blockchain can only guarantee that data hasn't been changed after it was recorded. It cannot guarantee that the data was true in the first place. That is why I am skeptical of many claims: {{ argument_garbage_in_blockchain }}.
 
 The second is performance and cost. Because every transaction must be agreed on and copied across many computers, blockchains are usually much slower and more expensive than a normal database.
 
 The third is privacy. Many blockchains are transparent by design, and records are very hard to delete. That's in tension with privacy laws that give people the right to have their personal data erased.
 
-And the fourth is adoption. A shared ledger is only valuable if many organizations agree to join and use it. A notable example is TradeLens, a shipping platform built by the logistics company Maersk and IBM. It had strong technology, but not enough of the industry joined, and it was shut down in twenty twenty-three.
+And the fourth is adoption. In my opinion, {{ argument_blockchain_adoption_barrier }}.
 
 How, then, do we decide whether blockchain is the right tool? Three simple questions settle most cases.
 
 Do multiple parties need to share and update the same data? Do these parties not fully trust each other, or prefer not to rely on a single central organization to manage it? And is a tamper-evident history genuinely important?
 
-If the answer to all three is yes, blockchain might be worth exploring. But if one trusted organization can simply run a database, then a regular database will almost always be faster, cheaper, and easier. Engineers even have a saying for it: "If you can solve it with a database, use a database."
+If the answer to all three is yes, blockchain might be worth exploring. But if one trusted organization can simply run a database, then a regular database will almost always be faster, cheaper, and easier. My view is that {{ argument_when_not_to_use_blockchain }}.
 
 {{ argument_audience_industry_example }}
 

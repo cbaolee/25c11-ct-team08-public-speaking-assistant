@@ -15,7 +15,7 @@ Imagine you've built a web application on your laptop. It runs perfectly. Then y
 
 The application itself didn't change. What changed was the environment around it: the operating system, the language runtime, the libraries, the settings. And setting up that environment by hand, again and again, on every machine, is slow and full of mistakes.
 
-Containers solve this by packaging the application together with everything it needs to run. Not just the code, but the runtime, the libraries, the configuration, all bundled into one unit. If it runs in a container on your laptop, it will run the same way in a container on your teammate's laptop, on a test server, or in the cloud.
+Containers solve this by packaging the application together with everything it needs to run. In my view, {{ argument_why_containers_won }}.
 
 The name itself comes from an analogy: shipping containers. For centuries, loading a cargo ship was slow and messy. Every item, sacks of coffee, barrels of oil, boxes of machinery, had a different shape and had to be handled differently. Then, in the nineteen fifties, the standard steel shipping container was introduced. Suddenly, it didn't matter what was inside. Every container had the same size and the same corners, so any ship, truck, or crane in the world could handle it. Global trade became dramatically faster and cheaper.
 
@@ -33,7 +33,7 @@ That doesn't mean virtual machines are obsolete. They provide stronger isolation
 
 So where does Docker fit in?
 
-Containers as a concept existed before Docker, using features built into the Linux kernel. But they were complicated to use. Docker, released in twenty thirteen, made containers simple and accessible to everyday developers, and it quickly became the standard tool. Today, when people say "containers," they very often mean Docker, although other tools follow the same open standards.
+Containers as a concept existed before Docker, using features built into the Linux kernel. I would argue that {{ argument_docker_made_containers_usable }}.
 
 Four key concepts will come up every day: images, containers, Dockerfiles, and registries.
 
@@ -75,7 +75,7 @@ There are two more ideas you'll need almost immediately: ports and volumes.
 
 By default, a container is isolated, including its network. If your web app inside the container listens on port five thousand, your browser can't reach it until you connect a port on your machine to that port in the container. That's called port mapping. With the dash p option, you can say, for example, "connect port eight thousand on my laptop to port five thousand in the container."
 
-Volumes are about data. Containers are designed to be disposable: you can delete one and start a fresh one at any time. But that means any data saved inside the container disappears when it's removed. For things that must survive, like a database's files, we use volumes, which store data outside the container. A good rule to remember: treat containers as temporary, and keep important data in volumes.
+Volumes are about data. My advice rests on one belief: {{ argument_disposable_containers_mindset }}.
 
 Real applications usually need more than one container. A typical web app might need the application itself, a database, and perhaps a cache. Starting them one by one with long commands quickly becomes painful. That's where Docker Compose comes in. With one configuration file, usually named compose dot yaml, you describe all your services, their ports, volumes, and how they connect. Then a single command, docker compose up, starts the whole system. For local development, this is incredibly convenient: a new team member can clone the project, run one command, and have everything working in minutes.
 
@@ -85,7 +85,7 @@ Why have containers caught on so fast?
 
 Consistency: the same image runs the same way everywhere. Speed: containers start in seconds. Efficiency: they use far fewer resources than virtual machines, so you can run many more on the same hardware. Isolation: each application has its own dependencies, so two apps needing different versions of the same library can live happily side by side. And easier onboarding and deployment, because the environment is defined in code, not in someone's memory.
 
-Containers do come with a few things to watch out for. Because containers share the host's kernel, isolation is weaker than with virtual machines, so security still matters. Use official or trusted base images, keep them updated, and avoid running applications as the root user inside containers. Also, never put passwords or API keys directly into a Dockerfile, because anyone with the image can read them. And keep your images small, starting from slim base images, because smaller images build faster, download faster, and have fewer potential vulnerabilities.
+Containers do come with a few things to watch out for. My view is that {{ argument_container_security_caution }}.
 
 Two small habits will also save you trouble. First, use a file called dot dockerignore, which works like dot gitignore, to keep things like local logs, test data, and secret files out of your image. Second, be careful with the tag "latest." It sounds safe, but it simply means "whatever version was published most recently," so the same Dockerfile can quietly build a different image next month. Pinning a specific version, like Python three point twelve, makes your builds predictable, and predictability is the whole reason we use containers in the first place.
 

@@ -25,7 +25,7 @@ Remember the problem we just talked about? {{ argument_feature_one_problem_remin
 
 And that's it. What used to take {{ argument_feature_one_time_before }} now takes {{ argument_feature_one_time_after }}.
 
-Pretty nice, right?
+In my view, {{ argument_why_feature_one_matters }}.
 
 Now, the second feature: {{ argument_feature_two_name }}.
 
@@ -41,7 +41,7 @@ So, let's step back for a second. In just a few minutes, we've {{ argument_demo_
 
 Now, of course, you don't have to take my word for it. Let me tell you about one of our customers, {{ argument_customer_name }}. {{ argument_customer_story }} In their own words, {{ argument_customer_quote }}
 
-By now, a few questions are probably forming. These are the ones we hear most often.
+We believe that {{ argument_why_customers_choose_us }}. These are the questions we hear most often.
 
 "Is it difficult to set up?" {{ argument_setup_answer }}
 

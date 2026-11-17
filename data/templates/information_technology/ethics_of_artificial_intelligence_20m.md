@@ -15,7 +15,7 @@ Let's begin with the first case: fairness.
 
 In 2018, Reuters reported that Amazon had stopped using an experimental AI recruiting tool. The tool had been trained on resumes submitted to the company over about ten years, most of which came from men, reflecting the gender imbalance in the tech industry. As a result, the system learned to prefer male candidates. According to the report, it penalized resumes that included the word "women's," as in "women's chess club captain." The engineers tried to correct this, but they couldn't be confident that the system wouldn't find other ways to discriminate, and the project was abandoned.
 
-Notice what happened here. Nobody programmed the system to discriminate. The bias came from historical data, which reflected historical inequality. And the AI did exactly what it was designed to do: learn patterns from the past. The problem is that the past isn't always a pattern we want to repeat.
+Notice what happened here. In my view, {{ argument_bias_from_history }}.
 
 A second, related example comes from research. In 2018, researchers Joy Buolamwini and Timnit Gebru published a study called "Gender Shades," which evaluated commercial facial analysis systems from several major companies. They found that the systems were much less accurate at classifying the gender of darker-skinned women than of lighter-skinned men. The main reason was that the data used to build and test these systems didn't represent everyone equally. After the study was published, several of the companies improved their systems, which shows that measuring a problem openly can actually lead to change.
 
@@ -27,7 +27,7 @@ In the United States, some courts have used risk assessment tools to help estima
 
 But there was a second problem. The tool was proprietary, so defendants couldn't fully examine how their score was calculated. Imagine being told that a computer considers you "high risk," and that this affects your freedom, but that you can't know why.
 
-What this case teaches: when AI influences important decisions about people's lives, those people deserve an explanation they can understand, and a way to challenge the decision. And choosing what "fair" means isn't a purely technical decision. It's a value judgment that should be made openly, by the people responsible, not hidden inside a model.
+What this case teaches: when AI influences important decisions about people's lives, those people deserve an explanation they can understand, and a way to challenge the decision. I would argue that {{ argument_right_to_explanation }}.
 
 The third case is about accountability and the danger of automated decisions at scale.
 
@@ -41,7 +41,7 @@ The fourth case is about safety.
 
 In March 2018, in Tempe, Arizona, a self-driving test vehicle operated by Uber struck and killed a pedestrian, Elaine Herzberg, who was crossing the road with her bicycle at night. The investigation by the US National Transportation Safety Board found a combination of failures: the system detected her several seconds before the crash, but repeatedly failed to classify her correctly, partly because it hadn't been designed to expect a pedestrian crossing outside a crosswalk. Emergency braking by the system had been disabled during testing, and the human safety driver, who was supposed to intervene, was not watching the road.
 
-Put simply, AI systems can fail in situations their designers didn't anticipate, and the real world is full of such situations. Safety requires testing for rare and unexpected cases, multiple layers of protection, and honest thinking about how humans actually behave when they're asked to supervise automation. People are not good at staying alert when a machine does the work most of the time.
+Put simply, AI systems can fail in situations their designers didn't anticipate, and the real world is full of such situations. My position is that {{ argument_safety_in_unexpected_situations }}.
 
 And the fifth case is about truth and manipulation.
 
@@ -103,15 +103,13 @@ About the data: the system would likely use grades, attendance, and perhaps back
 
 During testing: does the model perform equally well for different groups of students? How many students does it wrongly flag as high risk, and how many does it miss?
 
-At deployment: this is where the most important ethical decisions are made. Is a "high risk" label used to offer extra support, or could it be used to discourage students, or affect scholarships? Do students know about the system? Can they see why they were flagged? Can an advisor ignore the prediction when they know the student better?
+At deployment: this is where the most important ethical decisions are made. I believe that {{ argument_deployment_ethics_choices }}.
 
 And after launch: is the university checking whether the support actually helps, and whether some groups are being flagged unfairly?
 
 Notice that most of the hardest questions aren't about the algorithm at all. They're about how it's used, who it affects, and who decides. The same model can be helpful or harmful, depending on those choices.
 
 Now, I'd like you to try this yourself for a moment.
-
-[Reflection exercise, about one minute. Ask the audience to think of an AI system they use or are building, such as a recommendation feed, a chatbot, a grading tool, or a face unlock feature, and to choose two questions from the checklist that they can't confidently answer. Optionally, invite one or two people to share.]
 
 If you found questions you couldn't answer, that's completely normal. It doesn't mean the system is unethical. It means there's something worth finding out.
 

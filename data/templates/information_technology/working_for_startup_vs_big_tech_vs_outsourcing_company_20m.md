@@ -5,7 +5,7 @@ duration_min: 20
 ---
 "Startups are where you really learn." "Big tech is the only place with real engineering." "Outsourcing is just for beginners." If you're an IT student, you've probably heard all three, often from people who've only ever worked in one of them. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'd like to help you with a decision that almost every student and junior developer faces sooner or later: startup, big tech, or outsourcing company?
 
-Each of those statements contains a little truth, and a lot of exaggeration. The reality is that each type of company is a different environment, with its own strengths, weaknesses, and hidden costs. And the best choice depends far more on you, and on the specific company, than on the category.
+Each of those statements contains a little truth, and a lot of exaggeration. In my view, {{ argument_no_universal_best_company }}.
 
 The plan for today: first, I'll describe what each type of company actually is, and what a typical working day might look like there. Then, I'll compare them across seven dimensions that matter for your career. After that, I'll bust a few common myths, give you the questions to ask in an interview to see what a company is really like, and finish with a simple way to decide based on where you are right now.
 
@@ -31,7 +31,7 @@ Now let's compare them carefully, across seven dimensions.
 
 Dimension one: learning and mentorship.
 
-In big tech, learning tends to be deep and structured. You're surrounded by experienced engineers, code review standards are high, and there's usually documentation, onboarding programs, and internal training. You learn how software is built properly at scale: testing, monitoring, design reviews, and reliability. The downside is that you may work on a narrow piece of a large system for a long time.
+In big tech, learning tends to be deep and structured. I would argue that {{ argument_big_tech_learning_view }}.
 
 In a startup, learning is broad and fast. You touch everything, and you learn by doing, often by making mistakes in production. But mentorship can be thin. If the team is small and everyone is busy, nobody may have time to review your code carefully or explain why something is a bad idea. A startup with strong senior engineers can be an incredible school. A startup without them can teach you bad habits very efficiently.
 
@@ -85,7 +85,7 @@ This varies more between individual companies, and even between teams, than betw
 
 A few myths deserve debunking.
 
-Myth one: "Outsourcing experience isn't real engineering." Not true. Many outsourcing teams build complex, critical systems for banks, healthcare providers, and logistics companies. What matters is the specific project and team. A developer who spent three years building a payment system for an international client, with high quality standards, has real, valuable experience. A developer who spent three years doing repetitive small tasks without growth has less. That's true in every type of company.
+Myth one: "Outsourcing experience isn't real engineering." Not true. My position is that {{ argument_outsourcing_is_real_engineering }}.
 
 Myth two: "You'll learn the most at a startup." Sometimes yes, sometimes no. You'll learn the most where you face challenging problems and have people to learn from. A startup with no senior engineers might teach you speed, but not good engineering.
 
@@ -115,7 +115,7 @@ The skills that transfer everywhere are the same: strong fundamentals, clear com
 
 So, finally, how do you decide? Instead of asking "Which type of company is best?", ask "What do I need most at this stage of my career?"
 
-If you're a fresh graduate and your top priority is building strong engineering fundamentals, a place with good mentorship and code review matters most. That might be a big tech company, a well-run outsourcing company, or a startup with experienced engineers. The mentorship matters more than the logo.
+If you're a fresh graduate and your top priority is building strong engineering fundamentals, a place with good mentorship and code review matters most. I believe that {{ argument_fresh_graduate_priority }}.
 
 If you want to grow your English, communication, and exposure to different industries, a good outsourcing company can be an excellent choice.
 

@@ -21,9 +21,9 @@ To make this concrete, let's follow a single, ordinary day, and look at the data
 
 You wake up and check your phone. Your social media app records the time you open it, and, if you've allowed it, your location. You scroll for ten minutes. The app notices that you paused for several seconds on a video about running shoes, but scrolled quickly past a political post. On the bus, you read a news article on a website that contains tracking tools from several advertising companies, which can link that visit to your other activity. At lunch, you search for a nearby restaurant, and your map app records where you went. In the evening, you see an ad for exactly the running shoes you paused on that morning, on a completely different website.
 
-None of these individual actions feels like "sharing information." You didn't post anything about running shoes. But together, these small signals create a detailed picture of your interests, routines, and even where you live and work. And this happens every day, for billions of people.
+None of these individual actions feels like "sharing information." You didn't post anything about running shoes. But together, these small signals create a detailed picture of your interests, routines, and even where you live and work. I find this troubling because {{ argument_aggregated_signals_risk }}.
 
-Why do they do this? For most free platforms, the main business model is advertising. And the more precisely they can target ads, the more valuable their advertising becomes. There's a well-known saying: "If you're not paying for the product, you're the product." It's a simplification, but it captures something real.
+Why do they do this? In my opinion, {{ argument_advertising_business_model }}.
 
 Now, you might be thinking: "So what? I have nothing to hide." Three reasons show why privacy matters anyway.
 
@@ -35,7 +35,7 @@ And third, permanence. What you post today may still exist in ten or twenty year
 
 So, privacy isn't about having something to hide. It's about having control over your own information, and deciding who knows what about you.
 
-Now, the good news: you're not powerless. Laws and regulations are increasingly giving people rights over their data. The best-known example is the European Union's General Data Protection Regulation, the GDPR, which has applied since 2018. It gives people rights such as accessing the data companies hold about them, correcting it, deleting it in many cases, and objecting to certain uses, and it can impose very large fines on companies that break the rules. Many other countries have since adopted similar laws.
+Now, the good news: you're not powerless. My view is that {{ argument_privacy_rights_matter }}.
 
 {{ argument_local_law_note }}
 

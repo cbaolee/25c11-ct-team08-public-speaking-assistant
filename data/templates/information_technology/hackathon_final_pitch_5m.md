@@ -15,8 +15,6 @@ So in the last {{ argument_hackathon_hours }} hours, we built {{ argument_produc
 
 Watch it work.
 
-[Live demo, about one minute. Show only the single most important user flow, from start to result. Have a recorded video ready as a backup.]
-
 That's the whole flow: {{ argument_demo_recap }}
 
 Under the hood, {{ argument_technical_highlight }} The hardest part was {{ argument_hardest_technical_part }}, and we solved it by keeping the first version deliberately simple: one core flow, done properly, instead of ten features that half work.
@@ -27,7 +25,7 @@ Why does this matter? {{ argument_impact_statement }}
 
 We also want to be honest about what isn't ready yet. {{ argument_current_limitations }} None of these are hard blockers, but they're the first things we'd fix, and we'd measure success by {{ argument_success_metric }}, not just by how many people sign up.
 
-And this isn't just a hackathon idea. If we continue after today, our next steps are {{ argument_next_steps }} In the first month, we'd put the prototype in front of real users every week, keep only the features they actually use, and rebuild the parts we rushed during the hackathon, especially error handling and security. We know a demo that works for three minutes on stage is very different from a product people can rely on every day, and that gap is exactly what we want to close next.
+And this isn't just a hackathon idea. If we continue after today, our next steps are {{ argument_next_steps }} We believe this deserves to continue because {{ argument_why_this_should_continue }}.
 
 We're a team of {{ argument_team_size }}: {{ argument_team_members_roles }}
 

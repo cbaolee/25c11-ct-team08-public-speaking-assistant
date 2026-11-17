@@ -17,11 +17,11 @@ What matters most to us is who this could help. {{ argument_target_beneficiaries
 
 Getting here wasn't easy. {{ argument_journey_challenge }} There were moments when we weren't sure we'd finish. What kept us going was a shared belief in the problem we were trying to solve, and the fact that every time one of us was stuck, someone else on the team stepped in.
 
-We learned three things along the way that we'll carry into every project after this one. First, talk to real users early, because our best ideas came from their feedback, not from our whiteboard. Second, finish something small before building something big; the version we're proud of today started as a very rough demo that barely worked. And third, a good team is not a group of people who never disagree. It's a group of people who disagree honestly, decide quickly, and then support the decision together.
+We learned three things along the way that we'll carry into every project after this one. Above all, we have come to believe that {{ argument_lessons_from_competition }}.
 
 We also couldn't have done this without the people who supported us. {{ argument_thank_you_list }}
 
-I also want to recognize the other teams. We had the chance to see many of your projects, and some of them were incredible. We learned a lot from you, and we know this result could easily have gone another way. Congratulations to all of you.
+I also want to recognize the other teams. We had the chance to see many of your projects, and some of them were incredible. We are convinced that {{ argument_value_of_peer_teams }}.
 
 For us, this award isn't really the end. It's encouragement to keep going. {{ argument_next_steps }}
 
