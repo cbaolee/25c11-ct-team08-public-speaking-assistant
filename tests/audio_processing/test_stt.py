@@ -15,20 +15,20 @@ class MockSettings:
 
 @pytest.fixture
 def mock_master(tmp_path):
-    # Tạo một file wav giả để tránh FileNotFoundError khi with open(...)
+    # Create a fake wav file to avoid FileNotFoundError on with open(...)
     fake_audio = tmp_path / "dummy.wav"
     fake_audio.write_text("fake audio content")
 
-    # Khởi tạo MasterAudio với đầy đủ các tham số path, duration_s và warnings
+    # Build MasterAudio with all of path, duration_s and warnings
     return MasterAudio(
-        path=fake_audio,       # Giữ nguyên object Path (tmp_path tạo ra Path)
-        duration_s=10.0,       # Thời lượng giả định
-        warnings=[]            # Danh sách cảnh báo rỗng
+        path=fake_audio,       # Keep the Path object (tmp_path gives a Path)
+        duration_s=10.0,       # Assumed duration
+        warnings=[]            # Empty warning list
     )
 
 
 def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
-    """Kiểm tra Deepgram trả về SttResult được parse đúng timestamps[cite: 1]."""
+    """Check a Deepgram SttResult is parsed with correct timestamps[cite: 1]."""
     def mock_post(*args, **kwargs):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -58,7 +58,7 @@ def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
         }
         return mock_resp
 
-    # Monkeypatch hàm requests.post trong module stt
+    # Monkeypatch requests.post in the stt module
     monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
 
     result = call_deepgram(mock_master, api_key="test_key")
@@ -73,7 +73,7 @@ def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
 
 
 def test_empty_transcript_raises_insufficient_audio(monkeypatch, mock_master):
-    """Kiểm tra nếu STT trả transcript rỗng sẽ raise InsufficientAudio[cite: 1]."""
+    """Check an empty STT transcript raises InsufficientAudio[cite: 1]."""
     def mock_post(*args, **kwargs):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -90,7 +90,7 @@ def test_empty_transcript_raises_insufficient_audio(monkeypatch, mock_master):
 
 
 def test_gladia_adds_filler_flag(monkeypatch, mock_master):
-    """Kiểm tra Gladia tự động thêm cờ 'filler_from_vad_only'[cite: 1]."""
+    """Check Gladia automatically adds the 'filler_from_vad_only' flag[cite: 1]."""
     def mock_post(*args, **kwargs):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
@@ -110,14 +110,14 @@ def test_gladia_adds_filler_flag(monkeypatch, mock_master):
 
 
 def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
-    """Kiểm tra tính năng router: fallback qua Gladia khi Deepgram lỗi[cite: 1]."""
+    """Check the router: fall back to Gladia when Deepgram fails[cite: 1]."""
     def mock_post(url, *args, **kwargs):
         mock_resp = MagicMock()
         if "deepgram" in url:
-            # Gây lỗi cho Deepgram
+            # Make Deepgram fail
             mock_resp.raise_for_status.side_effect = Exception("Deepgram Error")
         else:
-            # Trả kết quả tốt cho Gladia
+            # Return a good result for Gladia
             mock_resp.json.return_value = {
                 "prediction": "fallback success",
                 "prediction_raw": {"words": []}

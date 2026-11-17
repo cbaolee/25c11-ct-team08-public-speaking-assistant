@@ -1,8 +1,8 @@
-"""Test ráp evaluate_session -> EvaluationResultV2 (ADR-004, bước 10c Pha 3).
+"""Test assembling evaluate_session -> EvaluationResultV2 (ADR-004, step 10c Phase 3).
 
-Không đọc audio thật, không gọi mạng, không tải model: probe / decode_to_master /
-detect_speech / transcribe / scoring._extract_f0 bị monkeypatch, encoder là hàm giả.
-Mọi số liệu là số tính tay (ghi ở từng test), không phải số đo.
+No real audio, no network, no model download: probe / decode_to_master /
+detect_speech / transcribe / scoring._extract_f0 are monkeypatched, encoder is a fake.
+Every number is hand-computed (noted in each test), not measured.
 """
 
 import json
@@ -30,17 +30,17 @@ from src.audio_processing.contracts import (
 from src.audio_processing.result_schema import EvaluationResultV2
 
 SCRIPT = "Good morning my friends."
-# F0 giả: cặp (time_s, Hz) trải trong duration 2.2 s. f0_ref = median Hz = 100
+# Fake F0: (time_s, Hz) pairs spread over a 2.2 s duration. f0_ref = median Hz = 100
 # -> ST = [0, 0, 0, 12]; P90 (numpy linear) = 8.4, P10 = 0 -> R_st = 8.4 >= 6 -> P_pitch = 100.
-# Thời gian chọn giữa ô 0.1 s: ô 0, 5, 10, 15 (không nằm sát biên ô).
+# Times picked mid-cell of 0.1 s: cells 0, 5, 10, 15 (not near cell edges).
 F0 = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 200.0)]
-# Series độ to giả cố định (22 ô = ceil(2.2 / 0.1)), có cả None.
+# Fixed fake loudness series (22 cells = ceil(2.2 / 0.1)), includes None.
 LOUDNESS = {"start_s": 0.0, "step_s": 0.1,
             "values": [None] + [60.0 + i * 0.5 for i in range(20)] + [None]}
 
 
 def fake_encode(texts):
-    # Mọi câu cùng một vector -> cosine = 1.0 -> câu nào có hyp cũng passed.
+    # Every sentence gets the same vector -> cosine = 1.0 -> any sentence with hyp passes.
     return np.array([[1.0, 0.0] for _ in texts])
 
 
@@ -58,7 +58,7 @@ PAUSE_WORDS = [w("Good", 0.0, 0.4), w("morning", 0.5, 0.9), w("my", 1.8, 2.2),
 
 @pytest.fixture
 def run(monkeypatch, tmp_path: Path):
-    """Dựng môi trường giả rồi gọi evaluate_session. Trả hàm run(...) -> EvaluationResultV2."""
+    """Build a fake environment then call evaluate_session. Returns run(...) -> EvaluationResultV2."""
 
     def _run(
         *,
@@ -110,26 +110,26 @@ def test_ok_full_hand_calculation(run):
     assert EvaluationResultV2.model_validate_json(r.model_dump_json()) == r
     assert set(r.model_dump()) == ALL_KEYS
     assert r.schema_version == "2.1"
-    # A = 100 (4/4 equal), P_clarity = 100 (không near-miss)
+    # A = 100 (4/4 equal), P_clarity = 100 (no near-miss)
     assert r.components["accuracy"] == 100.0
     assert r.subscores["p_clarity"] == 100.0
-    # span = 2.0 - 0.0 = 2 s, 4 từ -> WPM 120 -> f_wpm = 100 - 2.5 * 10 = 75
+    # span = 2.0 - 0.0 = 2 s, 4 words -> WPM 120 -> f_wpm = 100 - 2.5 * 10 = 75
     assert r.fluency_detail["wpm"] == pytest.approx(120.0)
     assert r.subscores["f_wpm"] == pytest.approx(75.0)
-    # không pause, không filler -> 100, 100; F = (75 + 100 + 100) / 3
+    # no pause, no filler -> 100, 100; F = (75 + 100 + 100) / 3
     assert r.subscores["f_pause"] == 100.0 and r.subscores["f_filler"] == 100.0
     assert r.components["fluency"] == pytest.approx(275.0 / 3.0)
     # pitch: R_st = 8.4 -> 100; P = 0.5 * 100 + 0.5 * 100
     assert r.pitch_detail["range_semitones"] == pytest.approx(8.4)
     assert r.pitch_detail["f0_ref_hz"] == pytest.approx(100.0)
     assert r.pitch_detail["f0_ref_source"] == "session"
-    # contour_st: 22 ô, khung ở ô 0, 5, 10 (ST 0) và ô 15 (ST 12 = 12*log2(200/100)); còn lại None
+    # contour_st: 22 cells, frames in cells 0, 5, 10 (ST 0) and cell 15 (ST 12 = 12*log2(200/100)); rest None
     cs = r.pitch_detail["contour_st"]
     assert cs["start_s"] == 0.0 and cs["step_s"] == 0.1 and len(cs["values"]) == 22
     assert [i for i, v in enumerate(cs["values"]) if v is not None] == [0, 5, 10, 15]
     assert cs["values"][0] == pytest.approx(0.0) and cs["values"][15] == pytest.approx(12.0)
     assert r.subscores["p_pitch"] == 100.0 and r.components["pronunciation"] == 100.0
-    # S: một câu, cosine 1.0 -> 100
+    # S: one sentence, cosine 1.0 -> 100
     assert r.components["semantic"] == 100.0
     assert len(r.sentences) == 1 and r.sentences[0].passed is True
     # Overall = 0.4*100 + 0.3*(275/3) + 0.2*100 + 0.1*100 = 97.5
@@ -150,14 +150,14 @@ def test_ok_full_hand_calculation(run):
 def test_baseline_merged_and_used(run):
     base = BaselineProfile(median_pause_s=0.4, hesitation_threshold_s=0.9, median_f0_hz=100.0,
                            mean_loudness_db=62.5, flags=["baseline_pause_unreliable"])
-    # khoảng lặng 0.95 -> 1.75 (dài 0.8 s) sau "morning" (không dấu câu): PAUSE_SEGS/PAUSE_WORDS
+    # silence 0.95 -> 1.75 (0.8 s long) after "morning" (no punctuation): PAUSE_SEGS/PAUSE_WORDS
     r = run(baseline=base, segments=PAUSE_SEGS, words=PAUSE_WORDS, duration=3.0)
-    assert r.flags == ["baseline_pause_unreliable"]  # không có no_baseline
+    assert r.flags == ["baseline_pause_unreliable"]  # no no_baseline
     assert r.pitch_detail["f0_ref_source"] == "baseline"
     assert r.display_only["loudness_ref_db"] == 62.5
     assert r.fluency_detail["pause_threshold_s"] == 0.9
     assert r.baseline == {"used": True, "median_pause_s": 0.4, "hesitation_threshold_s": 0.9}
-    # 0.8 s < ngưỡng 0.9 -> natural, không phải hesitation
+    # 0.8 s < threshold 0.9 -> natural, not hesitation
     assert [p.kind for p in r.pauses] == ["natural"]
     assert r.pauses[0].after_ref_index == 1
     assert r.fluency_detail["hesitation_count"] == 0
@@ -175,7 +175,7 @@ def test_default_threshold_without_baseline_makes_hesitation(run):
 
 
 def test_insufficient_low_voiced_ratio(run):
-    # stt_exc=AssertionError: nếu pipeline lỡ gọi STT thì test đỏ (STT bị loại trước đó).
+    # stt_exc=AssertionError: if the pipeline wrongly calls STT the test fails (STT is ruled out earlier).
     r = run(segments=(SpeechSegment(0.0, 1.0),), duration=10.0,
             stt_exc=AssertionError("STT không được gọi khi voiced thấp"))  # 10% voiced
     assert r.status == "insufficient_audio" and r.reason == "low_voiced_ratio"
@@ -210,7 +210,7 @@ def test_empty_transcript(run, words):
 def test_empty_transcript_from_stt_exception(run):
     r = run(stt_exc=InsufficientAudio("STT returned empty transcript"))
     assert r.status == "insufficient_audio" and r.reason == "empty_transcript"
-    assert r.stt is None  # TỰ CHỌN: provider/model không có khi transcribe ném lỗi
+    assert r.stt is None  # OPTIONAL: no provider/model when transcribe raises
 
 
 def test_under_two_words_gives_null_fluency_and_overall(run):
@@ -221,7 +221,7 @@ def test_under_two_words_gives_null_fluency_and_overall(run):
     assert r.components["fluency"] is None
     assert r.overall is None and r.label is None
     assert r.fluency_detail["wpm"] is None and r.fluency_detail["hesitations_per_min"] is None
-    # các thành phần khác vẫn chấm: "world" bị del -> A = 50
+    # other components still scored: "world" is del -> A = 50
     assert r.components["accuracy"] == 50.0
 
 
@@ -231,7 +231,7 @@ def test_no_f0(run):
     assert "no_f0" in r.flags
     assert r.pitch_detail["f0_ref_hz"] is None and r.pitch_detail["range_semitones"] is None
     assert r.overall is None and r.label is None
-    assert r.components["accuracy"] == 100.0  # thành phần khác không bị ảnh hưởng
+    assert r.components["accuracy"] == 100.0  # other components unaffected
 
 
 def test_stt_filler_listed_but_not_in_alignment(run):
@@ -241,14 +241,14 @@ def test_stt_filler_listed_but_not_in_alignment(run):
     assert len(r.fillers) == 1
     f = r.fillers[0]
     assert (f.source, f.text, f.start_s, f.end_s) == ("stt", "um", 0.45, 0.55)
-    assert f.after_ref_index == 0  # từ nghe được ngay trước: "Good"
+    assert f.after_ref_index == 0  # word heard right before: "Good"
     assert all(it.hyp_word != "um" for it in r.alignment)
     assert r.accuracy_detail["n_ins"] == 0
-    # 4 từ thật, 1 filler -> R = 25% -> F_filler = clamp(100 * (10 - 25) / 8) = 0
+    # 4 real words, 1 filler -> R = 25% -> F_filler = clamp(100 * (10 - 25) / 8) = 0
     assert r.fluency_detail["filler_count"] == 1
     assert r.fluency_detail["filler_pct"] == pytest.approx(25.0)
     assert r.subscores["f_filler"] == 0.0
-    assert r.fluency_detail["wpm"] == pytest.approx(120.0)  # filler không tính vào WPM (D4)
+    assert r.fluency_detail["wpm"] == pytest.approx(120.0)  # filler not counted in WPM (D4)
 
 
 def test_vad_only_filler(run):
@@ -256,7 +256,7 @@ def test_vad_only_filler(run):
     assert [(f.source, f.text, f.start_s, f.after_ref_index) for f in r.fillers] == [
         ("vad", None, 2.6, 3)
     ]
-    # pause 2.0 -> 2.6 nằm sau "friends." (có dấu câu) -> punctuation
+    # pause 2.0 -> 2.6 comes after "friends." (has punctuation) -> punctuation
     assert [p.kind for p in r.pauses] == ["punctuation"]
 
 
@@ -292,7 +292,7 @@ def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
-    # Chỉ kiểm dạng JSON trả về; baseline (bắt buộc) được test ở tests/test_api_evaluate.py
+    # Only checks the returned JSON shape; baseline (required) is tested in tests/test_api_evaluate.py
     monkeypatch.setattr(settings, "baseline_required", False)
     data = {"script": "Hello."}
     if baseline_profile is not None:
@@ -310,7 +310,7 @@ def test_api_evaluate_returns_v2_json(monkeypatch):
     assert cap["baseline"] is None
 
 
-# ---- Bổ sung (review bước 10): số dưới đây là số tự tính tay, không phải số đo ----
+# ---- Added (review step 10): numbers below are hand-computed, not measured ----
 
 def test_align_called_once(run, monkeypatch):
     calls = []
@@ -326,23 +326,23 @@ def test_align_called_once(run, monkeypatch):
 
 
 def test_non_trivial_encoder_second_sentence_fails(run, monkeypatch):
-    # Hai câu: "Good morning." / "See you." Nói đủ cả hai, 4 từ trong 2.0 s (WPM 120, f_wpm 75).
+    # Two sentences: "Good morning." / "See you." Both spoken, 4 words in 2.0 s (WPM 120, f_wpm 75).
     words = [w("Good", 0.0, 0.4), w("morning.", 0.5, 0.9), w("See", 1.0, 1.4), w("you.", 1.5, 2.0)]
     calls = []
 
     def encode(texts):
-        # Lần gọi 1 = các câu ref, lần 2 = các câu hyp (xem score_sentences).
+        # Call 1 = ref sentences, call 2 = hyp sentences (see score_sentences).
         calls.append(list(texts))
         if len(calls) == 1:
             return np.array([[1.0, 0.0]] * len(texts))
-        # hyp câu 1: cùng hướng ref (cosine 1.0). hyp câu 2: [0.6, 0.8] -> cosine 0.6 < 0.82.
+        # hyp sentence 1: same direction as ref (cosine 1.0). hyp sentence 2: [0.6, 0.8] -> cosine 0.6 < 0.82.
         return np.array([[1.0, 0.0], [0.6, 0.8]])
 
     r = _run_with_encoder(run, monkeypatch, words=words, script="Good morning. See you.",
                           encode=encode)
     assert [s.passed for s in r.sentences] == [True, False]
     assert r.sentences[1].cosine == pytest.approx(0.6)
-    # hyp_text lấy từ alignment: các hyp_word của câu (đã chuẩn hoá, lấy từ STT)
+    # hyp_text comes from alignment: the sentence's hyp_words (normalized, from STT)
     assert r.sentences[0].hyp_text == calls[1][0]
     assert r.sentences[1].hyp_text == calls[1][1]
     assert r.sentences[1].hyp_text.lower().replace(".", "") == "see you"
@@ -352,7 +352,7 @@ def test_non_trivial_encoder_second_sentence_fails(run, monkeypatch):
 
 
 def _run_with_encoder(run, monkeypatch, *, words, script, encode):
-    # fixture `run` cố định encode=fake_encode; bọc evaluate_session để thay encoder cho test này.
+    # fixture `run` fixes encode=fake_encode; wrap evaluate_session to swap the encoder for this test.
     orig = pipeline.evaluate_session
 
     def patched(audio, scr, baseline, *, vad_params, encode=None):  # noqa: ARG001
@@ -364,8 +364,8 @@ def _run_with_encoder(run, monkeypatch, *, words, script, encode):
 
 
 def test_near_miss_at_pipeline_level(run):
-    # "friends" vs "friend": CMU F R EH N D Z vs F R EH N D -> Lev = 1, max dài 6 -> sim = 5/6
-    # = 0.833 thuộc [0.65, 0.90] -> near_miss. A không trừ near-miss -> 100.
+    # "friends" vs "friend": CMU F R EH N D Z vs F R EH N D -> Lev = 1, max length 6 -> sim = 5/6
+    # = 0.833 in [0.65, 0.90] -> near_miss. A does not deduct near-miss -> 100.
     # P_clarity = clamp(100 * (1 - 5 * 1/4)) = clamp(-25) = 0. P = 0.5*0 + 0.5*100 = 50.
     words = [w("My", 0.0, 0.4), w("friend", 0.5, 0.9), w("are", 1.0, 1.4), w("here.", 1.5, 2.0)]
     r = run(words=words, script="My friends are here.")
@@ -378,7 +378,7 @@ def test_near_miss_at_pipeline_level(run):
     assert r.overall == pytest.approx(87.5)
 
 
-# ---- Bước E1: contour_st, loudness_db, warnings (số tự tính tay, không phải số đo) ----
+# ---- Step E1: contour_st, loudness_db, warnings (hand-computed, not measured) ----
 
 def test_loudness_series_passed_through(run):
     custom = {"start_s": 0.0, "step_s": 0.1, "values": [70.0] * 22}
@@ -397,12 +397,12 @@ def test_contour_none_and_no_f0_flag_when_no_f0(run):
 
 
 def test_warnings_empty_in_default_fixture(run):
-    # WPM 120 (ngưỡng cảnh báo 110/175), filler 0 %, R_st 8.4 >= 4 -> không cảnh báo
+    # WPM 120 (warning thresholds 110/175), filler 0 %, R_st 8.4 >= 4 -> no warning
     assert run().warnings == []
 
 
 def test_warning_wpm_slow(run):
-    # 4 từ, span 0.0 -> 2.2 = 2.2 s -> WPM = 4 / (2.2/60) = 109.09 < 110
+    # 4 words, span 0.0 -> 2.2 = 2.2 s -> WPM = 4 / (2.2/60) = 109.09 < 110
     words = [w("Good", 0.0, 0.4), w("morning", 0.6, 1.0),
              w("my", 1.2, 1.6), w("friends.", 1.8, 2.2)]
     r = run(words=words)
@@ -420,14 +420,14 @@ def test_warning_wpm_fast(run):
 
 
 def test_warning_filler_high(run):
-    # Cùng dữ liệu test_stt_filler_listed...: R = 1/4 = 25 % >= 4; WPM 120; R_st 8.4
+    # Same data as test_stt_filler_listed...: R = 1/4 = 25 % >= 4; WPM 120; R_st 8.4
     words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
              w("my", 1.1, 1.5), w("friends.", 1.6, 2.0)]
     assert run(words=words).warnings == ["filler_high"]
 
 
 def test_warning_monotone(run):
-    # F0 phẳng: mọi ST = 0 -> R_st = 0 < 4 -> monotone. WPM 120, không filler.
+    # Flat F0: every ST = 0 -> R_st = 0 < 4 -> monotone. WPM 120, no filler.
     flat = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 100.0)]
     r = run(f0=flat)
     assert r.pitch_detail["range_semitones"] == pytest.approx(0.0)
@@ -435,7 +435,7 @@ def test_warning_monotone(run):
 
 
 def test_warnings_order_slow_filler_monotone(run):
-    # span 2.2 s, 4 từ thật = 109.09 WPM (slow) + 1 filler (25 %) + F0 phẳng
+    # span 2.2 s, 4 real words = 109.09 WPM (slow) + 1 filler (25 %) + flat F0
     words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
              w("my", 1.2, 1.6), w("friends.", 1.8, 2.2)]
     flat = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 100.0)]

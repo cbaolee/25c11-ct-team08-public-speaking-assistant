@@ -20,13 +20,13 @@ def test_check_audio_quality_empty_segments_raises_insufficient_audio():
         check_audio_quality(segments=[], duration_s=10.0)
 
 def test_check_audio_quality_below_30_percent_raises_insufficient_audio():
-    # 2.5s tiếng nói trên tổng 10.0s (25%) -> Raise
+    # 2.5s of speech out of 10.0s total (25%) -> Raise
     segments = [SpeechSegment(start_s=0.0, end_s=2.5)]
     with pytest.raises(InsufficientAudio, match="Speech < 30%"):
         check_audio_quality(segments=segments, duration_s=10.0)
 
 def test_check_audio_quality_above_30_percent_passes():
-    # 3.5s tiếng nói trên tổng 10.0s (35%) -> Pass
+    # 3.5s of speech out of 10.0s total (35%) -> Pass
     segments = [SpeechSegment(start_s=0.0, end_s=3.5)]
     try:
         check_audio_quality(segments=segments, duration_s=10.0)
@@ -37,11 +37,11 @@ def test_check_audio_quality_above_30_percent_passes():
 # ==========================================
 # TESTS CHO HÀM classify_pauses (ADR-004 D6, phase3 #2/#11/#12/#16/#21)
 # ==========================================
-# Mọi mốc thời gian dưới đây là số tự đặt cho test, KHÔNG phải số đo.
+# Every timestamp below is made up for the test, NOT a measurement.
 
 
 def _no_pron(word: str) -> list[list[str]]:
-    # Stub CMU: không gọi từ điển thật; khớp chỉ theo chuỗi bằng nhau.
+    # CMU stub: no real dictionary; matches only on equal strings.
     return []
 
 
@@ -58,14 +58,14 @@ def _kind(script, spoken, pause, **kw):
 
 
 def test_empty_pauses_returns_empty():
-    # Giữ ý nghĩa cũ; đổi cách gọi sang items (chữ ký mới).
+    # Same meaning as before; call switched to items (new signature).
     script = "Hello world"
     items = _items(script, [("hello", 0.0, 0.5)])
     assert classify_pauses([], items, script, hesitation_threshold_s=0.7) == []
 
 
 def test_pause_at_period_is_punctuation():
-    # Cũ: is_rhetorical (RHETORICAL -> PUNCTUATION theo D6).
+    # Old: is_rhetorical (RHETORICAL -> PUNCTUATION per D6).
     r = _kind("Hello world. How are you?", [("world", 0.5, 1.0)], Pause(1.0, 1.8))
     assert r.kind == PauseKind.PUNCTUATION
     assert r.after_ref_index == 1
@@ -88,7 +88,7 @@ def test_pause_above_threshold_mid_sentence_is_hesitation():
 
 
 def test_punctuation_pause_not_hesitation_even_if_long():
-    # Cũ: rhetorical_not_counted_as_hesitation. Pause 2.5 s tại "." vẫn là punctuation (#11).
+    # Old: rhetorical_not_counted_as_hesitation. A 2.5 s pause at "." is still punctuation (#11).
     r = _kind("Hello world. How are you?", [("world", 0.5, 1.0)], Pause(1.0, 3.5))
     assert r.kind == PauseKind.PUNCTUATION
 
@@ -99,7 +99,7 @@ def test_natural_pause_is_returned_not_dropped():
 
 
 def test_word_with_and_without_punct_is_distinguished():
-    # Lỗi 1.9.2 #26: "now" vừa có vừa không có dấu phẩy.
+    # Bug 1.9.2 #26: "now" both with and without a comma.
     script = "go now, go now please"
     spoken = [("go", 0.0, 0.3), ("now", 0.3, 0.6), ("go", 2.0, 2.3), ("now", 2.3, 2.6),
               ("please", 3.4, 3.8)]
@@ -110,7 +110,7 @@ def test_word_with_and_without_punct_is_distinguished():
 
 
 def test_boundary_hesitation_threshold_inclusive_exact():
-    # 0.5 và 1.0 biểu diễn chính xác trong float nên biên đúng tuyệt đối.
+    # 0.5 and 1.0 are exact in float, so the boundaries are exact.
     kw = dict(hesitation_threshold_s=0.5, forgot_word_s=1.0)
     sp = [("world", 0.0, 1.0)]
     s = "Hello world and welcome."
@@ -123,9 +123,9 @@ def test_boundary_hesitation_threshold_inclusive_exact():
 def test_boundary_default_values_0_7_and_1_2():
     s = "Hello world and welcome."
     sp = [("world", 0.0, 1.0)]
-    assert _kind(s, sp, Pause(1.0, 1.7)).kind == PauseKind.HESITATION   # đúng 0.7
+    assert _kind(s, sp, Pause(1.0, 1.7)).kind == PauseKind.HESITATION   # exactly 0.7
     assert _kind(s, sp, Pause(1.0, 1.69)).kind == PauseKind.NATURAL     # 0.69
-    assert _kind(s, sp, Pause(1.0, 2.2)).kind == PauseKind.FORGOT_WORD  # đúng 1.2
+    assert _kind(s, sp, Pause(1.0, 2.2)).kind == PauseKind.FORGOT_WORD  # exactly 1.2
 
 
 def test_exactly_1_2s_at_comma_is_punctuation():
@@ -134,8 +134,8 @@ def test_exactly_1_2s_at_comma_is_punctuation():
 
 
 def test_word_before_pause_is_ins_uses_previous_ref():
-    # Script "a, b c": nói "a x b" (x là ins, không có ref_index). Pause sau x:
-    # after_ref_index = ref phía trước (a = 0), dấu phẩy của "a," -> punctuation (phase3 #2).
+    # Script "a, b c": says "a x b" (x is ins, no ref_index). Pause after x:
+    # after_ref_index = the ref before (a = 0), comma of "a," -> punctuation (phase3 #2).
     script = "a, b c"
     items = _items(script, [("a", 0.0, 0.5), ("x", 0.5, 1.0), ("b", 2.0, 2.5)])
     ins = [i for i in items if i.status == "ins"]
@@ -162,7 +162,7 @@ def test_pause_before_any_word_has_none_ref_index():
 
 
 def test_del_item_is_never_chosen_as_preceding_word():
-    # "b," bị bỏ (del, không có thời gian). Từ nghe được ngay trước pause là "a" (không dấu).
+    # "b," is dropped (del, no timing). The word heard right before the pause is "a" (no punct).
     script = "a b, c"
     items = _items(script, [("a", 0.0, 0.5), ("c", 0.6, 1.0)])
     assert any(i.status == "del" for i in items)
@@ -181,17 +181,17 @@ def test_all_pauses_returned_in_input_order():
 
 
 # ==========================================
-# Lỗi float ở biên 0.7 s / 1.2 s (review 3.8, lỗi 1)
+# Float error at the 0.7 s / 1.2 s boundaries (review 3.8, bug 1)
 # ==========================================
 
 def test_float_boundary_0_68_to_1_38_is_hesitation():
-    # 1.38 - 0.68 = 0.6999999999999998 trong float nhưng danh nghĩa là 0.7.
+    # 1.38 - 0.68 = 0.6999999999999998 in float but nominally 0.7.
     s = "Hello world and welcome."
     assert _kind(s, [("world", 0.0, 0.68)], Pause(0.68, 1.38)).kind == PauseKind.HESITATION
 
 
 def test_float_boundary_0_68_to_1_88_is_forgot_word():
-    # 1.88 - 0.68 = 1.1999999999999997 trong float nhưng danh nghĩa là 1.2.
+    # 1.88 - 0.68 = 1.1999999999999997 in float but nominally 1.2.
     s = "Hello world and welcome."
     assert _kind(s, [("world", 0.0, 0.68)], Pause(0.68, 1.88)).kind == PauseKind.FORGOT_WORD
 
@@ -214,7 +214,7 @@ def test_float_boundary_sweep_no_misclassification():
 
 
 # ==========================================
-# Token chỉ có dấu câu chặn ins tìm ref (review 3.8, lỗi 2)
+# Punctuation-only tokens block ins from finding a ref (review 3.8, bug 2)
 # ==========================================
 
 def _item(status, ref_index, hyp_index, ref_word, hyp_word, start_s, end_s):
@@ -236,7 +236,7 @@ def test_ins_after_punct_only_token_skips_to_real_ref():
 
 
 def test_ins_after_del_uses_del_ref_index():
-    # Ghim hành vi hiện tại (phase3 #2): del có từ thật nên vẫn được chọn.
+    # Pin current behaviour (phase3 #2): del has a real word so it is still chosen.
     script = "a b, c"
     items = [
         _item("equal", 0, 0, "a", "a", 0.0, 0.5),
@@ -249,11 +249,11 @@ def test_ins_after_del_uses_del_ref_index():
 
 
 # ==========================================
-# Dung sai đồng bộ VAD/STT (WORD_PAUSE_TOLERANCE_S = 0.1)
+# VAD/STT sync tolerance (WORD_PAUSE_TOLERANCE_S = 0.1)
 # ==========================================
 
 def test_stt_end_slightly_after_pause_start_still_counts_as_preceding_word():
-    # "world" kết thúc 1.00 nhưng VAD báo pause bắt đầu 0.97 (lệch 0.03 s, trong dung sai).
+    # "world" ends at 1.00 but VAD says the pause starts at 0.97 (off by 0.03 s, within tolerance).
     r = _kind("Hello world. How are you", [("hello", 0.0, 0.4), ("world", 0.5, 1.0)],
               Pause(0.97, 1.8))
     assert r.kind == PauseKind.PUNCTUATION
@@ -261,8 +261,8 @@ def test_stt_end_slightly_after_pause_start_still_counts_as_preceding_word():
 
 
 def test_stt_end_beyond_tolerance_falls_back_to_previous_word():
-    # Pause bắt đầu 0.85, "world" end 1.00 (lệch 0.15 s > 0.1): "world" bị loại,
-    # từ trước pause là "hello" (không dấu câu) -> HESITATION, after_ref_index == 0.
+    # Pause starts at 0.85, "world" ends at 1.00 (off by 0.15 s > 0.1): "world" is dropped,
+    # the word before the pause is "hello" (no punctuation) -> HESITATION, after_ref_index == 0.
     r = _kind("Hello world. How are you", [("hello", 0.0, 0.4), ("world", 0.5, 1.0)],
               Pause(0.85, 1.8))
     assert r.after_ref_index == 0

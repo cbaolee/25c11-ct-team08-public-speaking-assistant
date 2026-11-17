@@ -1,15 +1,15 @@
 """Test cho compute_overall / get_label (scoring_framework.md §3, §11, §12).
 
-Các số liệu bên dưới là ví dụ tính tay tự đặt ở scoring_framework.md §12,
-không phải số đo từ dữ liệu thật.
+The numbers below are made-up hand-computed examples from scoring_framework.md §12,
+not measured from real data.
 
-§12 ghi F = 89.17 là số đã làm tròn; test dùng giá trị chính xác
-(100 + 80 + 87.5) / 3 = 89.1667, Overall vẫn 89.85.
+§12 lists F = 89.17 as a rounded number; the test uses the exact value
+(100 + 80 + 87.5) / 3 = 89.1667, Overall is still 89.85.
 
-Mục 3.9 (Pha 3): compute_overall / get_label xử lý None; nhãn tính trên điểm
-làm tròn half-up 1 chữ số (phase3_decision #14), nên các biên nhãn ở đây tránh
-84.99/49.99 (làm tròn thành 85.0/50.0); có test riêng cho ca đó bên dưới.
-Mọi số bên dưới là số tính tay, không phải số đo.
+Item 3.9 (Phase 3): compute_overall / get_label handle None; the label uses the score
+rounded half-up to 1 decimal (phase3_decision #14), so label boundaries here avoid
+84.99/49.99 (rounded to 85.0/50.0); a separate test below covers that case.
+Every number below is hand-computed, not measured.
 """
 
 import json
@@ -75,7 +75,7 @@ def test_overall_weights_independent(a, f, p, s, expected):
     [(5, 75.0), (6, 100.0), (2, 0.0), (1, 0.0), (8, 100.0), (None, None)],
 )
 def test_pitch_score_from_range(r_st, expected):
-    # §6.2: 25 * (5 - 2) = 75. Số tính tay, không phải số đo.
+    # §6.2: 25 * (5 - 2) = 75. Hand-computed, not measured.
     assert scoring.pitch_score_from_range(r_st) == expected
 
 
@@ -84,14 +84,14 @@ def _f0_from_st(st_values, f0_ref=100.0):
 
 
 def test_pitch_range_st_hand_computed():
-    # ST = 0..10 (11 mẫu). Phân vị linear: P90 ở chỉ số 0.9*10 = 9 -> 9;
-    # P10 ở chỉ số 1 -> 1. R_st = 9 - 1 = 8 (tính tay).
+    # ST = 0..10 (11 samples). Linear percentile: P90 at index 0.9*10 = 9 -> 9;
+    # P10 at index 1 -> 1. R_st = 9 - 1 = 8 (hand-computed).
     f0 = _f0_from_st(range(11))
     assert scoring.pitch_range_st(f0, 100.0) == pytest.approx(8.0)
 
 
 def test_pitch_range_st_step_0625():
-    # ST = k * 0.625, k = 0..10: P90 = 5.625, P10 = 0.625 -> R_st = 5.0 (tính tay).
+    # ST = k * 0.625, k = 0..10: P90 = 5.625, P10 = 0.625 -> R_st = 5.0 (hand-computed).
     f0 = _f0_from_st([k * 0.625 for k in range(11)])
     assert scoring.pitch_range_st(f0, 100.0) == pytest.approx(5.0)
 
@@ -120,7 +120,7 @@ def _fake_master(duration_s=2.2):
 
 
 def _track(hz_values, step=0.01):
-    """Danh sách Hz -> track [(time_s, hz)] cách đều 0.01 s (hợp đồng mới của _extract_f0)."""
+    """Hz list -> track [(time_s, hz)] spaced 0.01 s apart (new _extract_f0 contract)."""
     return [(step * (i + 1), float(hz)) for i, hz in enumerate(hz_values)]
 
 
@@ -130,7 +130,7 @@ def test_score_pitch_with_baseline(monkeypatch):
     res = scoring.score_pitch(_fake_master(), _baseline(120.0))
     assert res.f0_ref_source == "baseline"
     assert res.f0_ref_hz == 120.0
-    assert res.range_semitones == pytest.approx(5.0)  # R_st không đổi khi đổi F0_ref
+    assert res.range_semitones == pytest.approx(5.0)  # R_st unchanged when F0_ref changes
     assert res.score == pytest.approx(75.0)
     assert res.flags == []
 
@@ -140,10 +140,10 @@ def test_score_pitch_without_baseline_uses_session_median(monkeypatch):
     monkeypatch.setattr(scoring, "_extract_f0", lambda master: f0)
     res = scoring.score_pitch(_fake_master(), None)
     assert res.f0_ref_source == "session"
-    # 11 mẫu: median là phần tử thứ 6 (k = 5) -> ST 3.125
+    # 11 samples: the median is the 6th element (k = 5) -> ST 3.125
     assert res.f0_ref_hz == pytest.approx(100.0 * 2 ** (3.125 / 12))
     assert res.score == pytest.approx(75.0)
-    assert "no_baseline" not in res.flags  # cờ do pipeline gắn
+    assert "no_baseline" not in res.flags  # flag set by the pipeline
 
 
 def test_score_pitch_baseline_f0_none_falls_back_to_session(monkeypatch):
@@ -176,7 +176,7 @@ def test_score_pitch_returns_contour_when_voiced(monkeypatch):
     track = _track(_f0_from_st([k * 0.625 for k in range(11)]))
     monkeypatch.setattr(scoring, "_extract_f0", lambda master: track)
     res = scoring.score_pitch(_fake_master(0.3), _baseline(120.0))
-    # duration 0.3 -> 3 ô; khung t = 0.01..0.11 nằm ở ô0 và ô1, ô2 không có khung
+    # duration 0.3 -> 3 cells; frames t = 0.01..0.11 are in cell0 and cell1, cell2 has none
     assert res.contour_st is not None
     assert res.contour_st["start_s"] == 0.0 and res.contour_st["step_s"] == 0.1
     assert len(res.contour_st["values"]) == 3
@@ -185,7 +185,7 @@ def test_score_pitch_returns_contour_when_voiced(monkeypatch):
 
 
 def test_score_pitch_contour_uses_same_f0_ref(monkeypatch):
-    # f0_ref = baseline 100; khung (0.05, 200) -> 12 * log2(200 / 100) = 12 (tính tay)
+    # f0_ref = baseline 100; frame (0.05, 200) -> 12 * log2(200 / 100) = 12 (hand-computed)
     monkeypatch.setattr(scoring, "_extract_f0", lambda master: [(0.05, 200.0)])
     res = scoring.score_pitch(_fake_master(0.1), _baseline(100.0))
     assert res.contour_st["values"] == [pytest.approx(12.0)]
@@ -226,8 +226,8 @@ def test_pitch_result_contour_default_none():
 
 
 def test_f0_contour_st_hand_computed():
-    # f0_ref = 100. Ô0 [0, 0.1): khung 100 và 200 -> median 150 -> 12 * log2(1.5).
-    # Ô1, ô2: không khung -> None.
+    # f0_ref = 100. Cell0 [0, 0.1): frames 100 and 200 -> median 150 -> 12 * log2(1.5).
+    # Cell1, cell2: no frames -> None.
     res = scoring.f0_contour_st([(0.01, 100.0), (0.05, 200.0)], 100.0, 0.3)
     assert res["start_s"] == 0.0 and res["step_s"] == 0.1
     assert len(res["values"]) == 3
@@ -236,7 +236,7 @@ def test_f0_contour_st_hand_computed():
 
 
 def test_f0_contour_st_length_is_float_safe():
-    # 2.2 / 0.1 = 22.000000000000004 -> ceil thô ra 23; hợp đồng: 22
+    # 2.2 / 0.1 = 22.000000000000004 -> raw ceil gives 23; contract: 22
     res = scoring.f0_contour_st([(0.05, 100.0)], 100.0, 2.2)
     assert len(res["values"]) == 22
 
@@ -252,7 +252,7 @@ def test_f0_contour_st_unvoiced_cells_are_none():
 
 
 def test_f0_contour_st_cell_boundary_half_open():
-    # step 0.5 (đúng nhị phân): t = 0.5 thuộc ô1 [0.5, 1.0), không thuộc ô0.
+    # step 0.5 (exact binary): t = 0.5 is in cell1 [0.5, 1.0), not cell0.
     res = scoring.f0_contour_st([(0.5, 200.0)], 100.0, 1.0, step_s=0.5)
     assert res["values"] == [None, pytest.approx(12.0)]
 
@@ -261,11 +261,11 @@ def test_f0_contour_st_ignores_out_of_range_and_bad_frames():
     track = [
         (-0.01, 400.0),        # t < 0
         (0.3, 400.0),          # t >= n * step (n = 3)
-        (0.01, math.nan),      # hz không hữu hạn
+        (0.01, math.nan),      # non-finite hz
         (0.02, math.inf),
         (0.03, 0.0),           # hz <= 0
         (0.04, -50.0),
-        (0.05, 100.0),         # khung duy nhất hợp lệ -> ST 0
+        (0.05, 100.0),         # only valid frame -> ST 0
     ]
     res = scoring.f0_contour_st(track, 100.0, 0.3)
     assert res["values"] == [pytest.approx(0.0), None, None]
@@ -300,13 +300,13 @@ def test_compute_warnings_each_code():
 
 
 def test_compute_warnings_boundaries():
-    assert scoring.compute_warnings(110.0, None, None) == []  # 110 không slow
+    assert scoring.compute_warnings(110.0, None, None) == []  # 110 is not slow
     assert scoring.compute_warnings(109.99, None, None) == ["wpm_slow"]
-    assert scoring.compute_warnings(175.0, None, None) == []  # 175 không fast
+    assert scoring.compute_warnings(175.0, None, None) == []  # 175 is not fast
     assert scoring.compute_warnings(175.01, None, None) == ["wpm_fast"]
-    assert scoring.compute_warnings(None, 4.0, None) == ["filler_high"]  # 4.0 là high
+    assert scoring.compute_warnings(None, 4.0, None) == ["filler_high"]  # 4.0 is high
     assert scoring.compute_warnings(None, 3.99, None) == []
-    assert scoring.compute_warnings(None, None, 4.0) == []  # 4.0 không monotone
+    assert scoring.compute_warnings(None, None, 4.0) == []  # 4.0 is not monotone
 
 
 def test_compute_warnings_all_none_is_empty():
@@ -353,7 +353,7 @@ def test_compute_overall_zero_is_not_none():
 
 
 def test_s12_total_rounds_to_899_excellent():
-    # §12 dùng F = 89.17 (đã làm tròn); thử cả F chính xác (100+80+87.5)/3.
+    # §12 uses F = 89.17 (rounded); also try the exact F (100+80+87.5)/3.
     p = scoring.combine_pronunciation(90.0, 75.0)
     for f in (89.17, (100.0 + 80.0 + 87.5) / 3):
         total = compute_overall(S12_A, f, p, S12_S)
@@ -362,7 +362,7 @@ def test_s12_total_rounds_to_899_excellent():
 
 
 def test_display_round_89_85_half_up():
-    # float 89.85 thực chất là 89.8499999...: round() cho 89.8, Decimal(str) cho 89.9
+    # float 89.85 is really 89.8499999...: round() gives 89.8, Decimal(str) gives 89.9
     assert round(89.85, 1) == 89.8
     assert scoring.display_round(89.85) == Decimal("89.9")
 
@@ -375,8 +375,8 @@ def test_display_round_misc():
 
 
 def test_display_round_float_noise_overall_85():
-    # 0.4*83.5 + 0.3*98.5 + 0.2*70 + 0.1*80 = 33.4 + 29.55 + 14 + 8 = 84.95 chính xác,
-    # nhưng float cho 84.94999999999999 -> trước khi sửa ra 84.9 / "Good".
+    # 0.4*83.5 + 0.3*98.5 + 0.2*70 + 0.1*80 = 33.4 + 29.55 + 14 + 8 = 84.95 exactly,
+    # but float gives 84.94999999999999 -> before the fix it was 84.9 / "Good".
     total = compute_overall(83.5, 98.5, 70, 80)
     assert scoring.display_round(total) == Decimal("85.0")
     assert get_label(total) == "Excellent"
@@ -387,7 +387,7 @@ def test_display_round_float_noise_overall_85():
     [(83.5, "85.0"), (88.5, "87.0"), (93.5, "89.0")],
 )
 def test_display_round_reviewer_three_combos(a, expected):
-    # F = 98.5, P = 70, S = 80. Tính tay: 0.4a + 29.55 + 14 + 8
+    # F = 98.5, P = 70, S = 80. Hand-computed: 0.4a + 29.55 + 14 + 8
     # a=83.5 -> 84.95 -> 85.0; a=88.5 -> 86.95 -> 87.0; a=93.5 -> 88.95 -> 89.0
     total = compute_overall(a, 98.5, 70, 80)
     assert scoring.display_round(total) == Decimal(expected)
@@ -398,7 +398,7 @@ def test_display_round_below_half_not_pushed_up():
 
 
 def test_display_round_scan_x_x5():
-    # Mọi x.x5 từ 0.05 đến 99.95: half-up trên số thập phân chính xác = (n+1)/10.
+    # Every x.x5 from 0.05 to 99.95: half-up on the exact decimal = (n+1)/10.
     for n in range(0, 1000):  # x = (10n + 5)/100 = n/10 + 0.05
         x = (10 * n + 5) / 100
         expected = (Decimal(n) + 1) / 10
@@ -424,8 +424,8 @@ def test_get_label_uses_rounded_value(overall, expected):
     assert get_label(overall) == expected
 
 
-# ---------- Mục 3.6 Pha 3: score_accuracy, score_clarity, accuracy_scores ----------
-# Mọi số bên dưới là số tính tay (scoring_framework.md §12 và tự đặt), không phải số đo.
+# ---------- Item 3.6 Phase 3: score_accuracy, score_clarity, accuracy_scores ----------
+# Every number below is hand-computed (scoring_framework.md §12 and made up), not measured.
 
 import dataclasses  # noqa: E402
 
@@ -503,13 +503,13 @@ def test_accuracy_scores_empty_script_flag():
 
 
 def test_near_miss_not_in_accuracy():
-    # "think"->"sink" là near_miss: A không trừ (100); clarity = 100*(1 - 5*1/3) < 0 -> 0.
+    # "think"->"sink" is near_miss: A does not deduct (100); clarity = 100*(1 - 5*1/3) < 0 -> 0.
     res = accuracy_scores(_align("I think so", "I", "sink", "so"))
     assert res.accuracy_detail["n_near_miss"] == 1
     assert res.accuracy_detail["n_sub"] == 0
     assert res.accuracy == pytest.approx(100.0)
     assert res.clarity == 0.0
-    # "I", "so" không có trong stub -> OOV -> cờ cmu_oov (ADR-005).
+    # "I", "so" are not in the stub -> OOV -> cmu_oov flag (ADR-005).
     assert "cmu_oov" in res.flags
 
 
@@ -520,7 +520,7 @@ def test_no_oov_flag_when_all_words_known():
 
 
 def test_adr005_consequence_sub_040_near_miss_050():
-    # ADR-005 "Hệ quả": N_ref = 100, F = 100, S = 100, P_pitch = 100 cố định.
+    # ADR-005 "Consequences": N_ref = 100, F = 100, S = 100, P_pitch = 100 fixed.
     # Baseline: A = 100, clarity = 100 -> P = 100 -> Overall = 100.
     def overall(n_sub, n_nm):
         a = score_accuracy(100, n_sub, 0, 0)
@@ -554,7 +554,7 @@ def test_accuracy_detail_has_seven_keys_matching_counts():
         "n_ref", "n_sub", "n_del", "n_ins", "n_near_miss", "n_homophone", "n_oov",
     }
     assert res.accuracy_detail == result.counts
-    assert res.accuracy_detail is not result.counts  # bản sao
+    assert res.accuracy_detail is not result.counts  # a copy
     res.accuracy_detail["n_ref"] = 999
     assert result.counts["n_ref"] == 4
 
@@ -574,11 +574,11 @@ def test_accuracy_scores_is_frozen_and_flags_copied():
     [
         ("the cat sat on mat", "the dog sat mat"),  # 1 sub + 1 del
         ("a b c", "a b x c y"),  # 2 ins
-        ("one two three four", "one two three four"),  # 0 lỗi
+        ("one two three four", "one two three four"),  # 0 errors
     ],
 )
 def test_matches_jiwer_when_no_homophone_or_near_miss(ref, hyp):
-    # Mỗi token chuẩn hoá ra đúng một token con nên N_ref khớp jiwer.
+    # Each token normalizes to exactly one sub-token so N_ref matches jiwer.
     res = accuracy_scores(_align(ref, *hyp.split()))
     d = res.accuracy_detail
     assert d["n_near_miss"] == 0 and d["n_homophone"] == 0
@@ -586,9 +586,9 @@ def test_matches_jiwer_when_no_homophone_or_near_miss(ref, hyp):
     assert ours == pytest.approx(1 - jiwer.wer(ref, hyp))
 
 
-# ---------- Mục 3.7 Pha 3: speech_span, WPM, H, filler, compute_fluency ----------
-# Mọi số bên dưới là số tính tay (scoring_framework.md §12 và tự đặt), không phải số đo.
-# Import đặt ở cấp module; test gọi hàm qua `scoring.<tên>` nên thiếu hàm thì đỏ vì AttributeError.
+# ---------- Item 3.7 Phase 3: speech_span, WPM, H, filler, compute_fluency ----------
+# Every number below is hand-computed (scoring_framework.md §12 and made up), not measured.
+# Import at module level; tests call `scoring.<name>` so a missing function fails with AttributeError.
 
 from src.audio_processing.contracts import (  # noqa: E402
     ClassifiedPause,
@@ -607,7 +607,7 @@ def _cp(kind: PauseKind) -> ClassifiedPause:
 
 
 def test_s12_f_components():
-    # §12: tốc độ 142 -> 100; H = 2 -> 80; R = 3% -> 87.5.
+    # §12: rate 142 -> 100; H = 2 -> 80; R = 3% -> 87.5.
     assert scoring.score_wpm(142) == pytest.approx(100.0)
     assert scoring.score_wpm(120) == pytest.approx(75.0)  # 100 - 2.5 * 10
     assert scoring.score_hesitation(2) == pytest.approx(80.0)
@@ -624,7 +624,7 @@ def test_s12_compute_fluency():
 )
 def test_score_wpm_boundaries(wpm, expected):
     # 110: 100 - 2.5*20 = 50. 175: 100 - 2.5*15 = 62.5. 200: 100 - 100 = 0.
-    # Dòng dưới: 300 -> 100 - 2.5*140 = -250 (âm) -> clamp về 0.
+    # Line below: 300 -> 100 - 2.5*140 = -250 (negative) -> clamped to 0.
     assert scoring.score_wpm(wpm) == expected
     assert scoring.score_wpm(300) == 0.0
 
@@ -639,14 +639,14 @@ def test_score_hesitation_boundaries():
 
 def test_score_filler_boundaries():
     assert scoring.score_filler(2) == 100.0
-    assert scoring.score_filler(0) == 100.0  # clamp trên
+    assert scoring.score_filler(0) == 100.0  # upper clamp
     assert scoring.score_filler(10) == 0.0
-    assert scoring.score_filler(15) == 0.0  # clamp dưới
+    assert scoring.score_filler(15) == 0.0  # lower clamp
     assert scoring.score_filler(None) is None
 
 
 def test_speech_span_basic():
-    # 3 từ thật: start đầu = 1.0, end cuối = 3.5 -> span 2.5
+    # 3 real words: first start = 1.0, last end = 3.5 -> span 2.5
     words = [_w("a", 1.0, 1.5), _w("b", 2.0, 2.5), _w("c", 3.0, 3.5)]
     assert scoring.speech_span(words) == (3, pytest.approx(2.5))
 
@@ -654,12 +654,12 @@ def test_speech_span_basic():
 def test_speech_span_ignores_filler_at_edges_and_middle():
     base = [_w("a", 1.0, 1.5), _w("b", 2.0, 2.5), _w("c", 3.0, 3.5)]
     with_um = [
-        _w("um", 0.0, 0.5),  # đầu, ngoài khoảng từ thật
+        _w("um", 0.0, 0.5),  # start, outside the real-word range
         base[0],
-        _w("Um,", 1.6, 1.9),  # giữa (có hoa/dấu câu: is_filler dùng make_raw_key)
+        _w("Um,", 1.6, 1.9),  # middle (case/punct: is_filler uses make_raw_key)
         base[1],
         base[2],
-        _w("uh", 4.0, 4.5),  # cuối
+        _w("uh", 4.0, 4.5),  # end
     ]
     assert scoring.speech_span(with_um) == scoring.speech_span(base)
     assert scoring.speech_span(with_um) == (3, pytest.approx(2.5))
@@ -668,12 +668,12 @@ def test_speech_span_ignores_filler_at_edges_and_middle():
 def test_speech_span_under_two_words_is_none():
     assert scoring.speech_span([]) == (0, None)
     assert scoring.speech_span([_w("hi", 0.0, 0.5)]) == (1, None)
-    # 2 từ nhưng một là filler -> 1 từ thật
+    # 2 words but one is a filler -> 1 real word
     assert scoring.speech_span([_w("hi", 0.0, 0.5), _w("um", 1.0, 1.5)]) == (1, None)
 
 
 def test_speech_span_nonpositive_span_is_none():
-    # 2 từ thật nhưng end cuối <= start đầu (dữ liệu lỗi) -> span None
+    # 2 real words but last end <= first start (bad data) -> span None
     assert scoring.speech_span([_w("a", 1.0, 1.2), _w("b", 0.5, 1.0)]) == (2, None)
 
 
@@ -698,7 +698,7 @@ def test_hesitations_per_min_counts_forgot_word_and_ignores_others():
 
 
 def test_hesitations_per_min_uses_span_not_file_duration():
-    # Cùng 3 lần, span 30 s -> H = 6 (không phụ thuộc thời lượng file)
+    # Same 3 times, span 30 s -> H = 6 (independent of file length)
     cps = [_cp(PauseKind.HESITATION)] * 3
     assert scoring.hesitations_per_min(cps, 30.0)[2] == pytest.approx(6.0)
 
@@ -711,7 +711,7 @@ def test_hesitations_per_min_span_none():
 @pytest.mark.parametrize("span", [0.0, -1.0])
 def test_nonpositive_span_gives_none(span):
     assert scoring.compute_wpm(5, span) is None
-    # số đếm vẫn trả, chỉ H là None
+    # counts are still returned, only H is None
     assert scoring.hesitations_per_min([_cp(PauseKind.FORGOT_WORD)], span) == (1, 1, None)
 
 
@@ -740,7 +740,7 @@ def test_compute_fluency_zero_is_not_none():
 def test_count_fillers_vad_segment_without_words():
     words = [_w("hello", 0.0, 1.0), _w("world", 4.0, 5.0)]
     segs = [SpeechSegment(0.0, 1.0), SpeechSegment(6.0, 6.5)]
-    # đoạn (0,1) trùng "hello"; đoạn (6,6.5) không trùng từ nào -> n_vad = 1
+    # segment (0,1) overlaps "hello"; segment (6,6.5) overlaps no word -> n_vad = 1
     assert scoring.count_fillers(words, segs) == (0, 1)
 
 
@@ -752,18 +752,18 @@ def test_count_fillers_segment_on_stt_filler_not_double_counted():
 
 def test_count_fillers_segment_on_real_word_not_counted():
     words = [_w("hello", 0.0, 1.0), _w("world", 1.5, 2.5)]
-    # đoạn dài phủ cả hai từ thật -> không đếm
+    # long segment covering both real words -> not counted
     assert scoring.count_fillers(words, [SpeechSegment(0.0, 3.0)]) == (0, 0)
 
 
 def test_count_fillers_touching_boundary_is_not_overlap():
-    # đoạn bắt đầu đúng lúc từ kết thúc: bất đẳng thức chặt -> không chồng lấn -> đếm
+    # segment starts exactly when the word ends: strict inequality -> no overlap -> counted
     words = [_w("hello", 0.0, 1.0)]
     assert scoring.count_fillers(words, [SpeechSegment(1.0, 1.5)]) == (0, 1)
 
 
 def test_count_fillers_each_segment_counted_once():
-    # 2 đoạn rời nhau, không từ nào -> 2 (mỗi đoạn một lần)
+    # 2 separate segments, no words -> 2 (once per segment)
     segs = [SpeechSegment(0.0, 0.5), SpeechSegment(1.0, 1.5)]
     assert scoring.count_fillers([], segs) == (0, 2)
 
@@ -779,7 +779,7 @@ def test_find_fillers_lists_stt_and_vad_sorted_by_time():
 
 
 def test_filler_pct_shared_r_s12():
-    # 3 filler / 100 từ -> R = 3 -> điểm 87.5 (cùng một R cho hiển thị và chấm, D5)
+    # 3 fillers / 100 words -> R = 3 -> score 87.5 (same R for display and scoring, D5)
     r = scoring.filler_pct(3, 100)
     assert r == pytest.approx(3.0)
     assert scoring.score_filler(r) == pytest.approx(87.5)
@@ -797,14 +797,14 @@ def test_you_know_and_like_are_not_fillers():
     assert not is_filler("you know")
     assert not is_filler("basically")
     assert not is_filler("literally")
-    # và speech_span coi chúng là từ thật
+    # and speech_span treats them as real words
     words = [_w("like", 0.0, 0.5), _w("basically", 1.0, 1.5)]
     assert scoring.speech_span(words) == (2, pytest.approx(1.5))
 
 
 # ---------------------------------------------------------------------------
-# Mục 3.10: S theo alignment (ADR-004 D8, phase3 #1/#2/#3). Số tính tay, không phải số đo.
-# Test không tải model: luôn truyền encode giả.
+# Item 3.10: S by alignment (ADR-004 D8, phase3 #1/#2/#3). Hand-computed, not measured.
+# Tests load no model: always pass a fake encode.
 # ---------------------------------------------------------------------------
 import numpy as np  # noqa: E402
 
@@ -829,7 +829,7 @@ def _forbidden_encoder(_texts):
 
 
 def _cos_case(c: float):
-    """Cặp vector 2 chiều có cosine đúng bằng c (tính tay)."""
+    """2-D vector pair whose cosine is exactly c (hand-computed)."""
     return {"R": [1.0, 0.0], "H": [c, math.sqrt(1 - c * c)]}
 
 
@@ -867,7 +867,7 @@ def test_build_pairs_two_sentences_full_hyp():
 
 def test_build_pairs_ins_goes_to_preceding_sentence():
     script = "Hello world. How are you?"
-    # "well" chen sau "world" (cuối câu 1) -> thuộc câu 1 (phase3 #2)
+    # "well" inserted after "world" (end of sentence 1) -> belongs to sentence 1 (phase3 #2)
     res = align(script, _words("hello", "world", "well", "how", "are", "you"), pron=_no_pron)
     pairs = scoring.build_sentence_pairs(script, res.items)
     assert pairs[0][4] == "hello world well"
@@ -890,7 +890,7 @@ def test_build_pairs_all_deleted_sentence_is_none_and_counts_in_denominator():
 
 
 def test_build_pairs_shared_hyp_word_not_duplicated():
-    # "it's" của STT bung thành "it is" khớp hai ref -> hyp_word "it's" chỉ xuất hiện một lần
+    # STT "it's" expands to "it is" matching two refs -> hyp_word "it's" appears only once
     script = "It is fine."
     res = align(script, _words("it's", "fine"), pron=_no_pron)
     pairs = scoring.build_sentence_pairs(script, res.items)
@@ -929,10 +929,10 @@ def test_zero_norm_vector_gives_none_cosine():
 
 
 # ---------------------------------------------------------------------------
-# Review 3.10: cosine thô (ADR-004 D1) và ghim hành vi alignment -> câu.
+# Review 3.10: raw cosine (ADR-004 D1) and pin alignment -> sentence behaviour.
 # ---------------------------------------------------------------------------
 def test_cosine_raw_not_rounded_below_threshold():
-    c = 0.8199996  # round(c, 6) = 0.82 sẽ sai thành passed
+    c = 0.8199996  # round(c, 6) = 0.82 would wrongly pass
     res = scoring.score_sentences([(0, 0, 2, "R", "H")], encode=_table_encoder(_cos_case(c)))
     assert res[0].cosine == pytest.approx(c, abs=1e-12)
     assert res[0].passed is False
@@ -944,14 +944,14 @@ def test_cosine_exactly_threshold_passes():
 
 
 def test_cosine_within_epsilon_below_threshold_passes():
-    c = 0.82 - 1e-12  # nằm trong epsilon 1e-9 (chỉ hấp thụ nhiễu float64)
+    c = 0.82 - 1e-12  # within epsilon 1e-9 (only absorbs float64 noise)
     res = scoring.score_sentences([(0, 0, 2, "R", "H")], encode=_table_encoder(_cos_case(c)))
     assert res[0].passed is True
 
 
 def test_known_limit_word_order_with_interleaved_ins():
-    # Giới hạn đã biết, ảnh hưởng nhỏ tới cosine; muốn sửa thì AlignedItem cần lưu
-    # danh sách hyp_index. Đúng ra phải là "a twenty x one b".
+    # Known limit, small effect on cosine; fixing it needs AlignedItem to store
+    # a list of hyp_index. It should really be "a twenty x one b".
     script = "A 21 b."
     res = align(script, _words("a", "twenty", "x", "one", "b"), pron=_no_pron)
     pairs = scoring.build_sentence_pairs(script, res.items)
@@ -981,7 +981,7 @@ def test_pairs_punctuation_only_token_stays_in_sentence_span():
 
 
 def test_pairs_expanded_hyp_word_shared_across_two_sentences():
-    # Hệ quả chấp nhận của D8: "it's" bung thành "it is" dùng chung cho hai ref ở hai câu.
+    # Accepted consequence of D8: "it's" expands to "it is" shared by two refs in two sentences.
     script = "Say it. Is fine."
     res = align(script, _words("say", "it's", "fine"), pron=_no_pron)
     pairs = scoring.build_sentence_pairs(script, res.items)

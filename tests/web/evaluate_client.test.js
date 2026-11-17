@@ -1,5 +1,5 @@
 'use strict';
-// Dữ liệu fixture là TỔNG HỢP (tests/fixtures/README.md), không phải kết quả đo.
+// Fixture data is SYNTHETIC (tests/fixtures/README.md), not measured results.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

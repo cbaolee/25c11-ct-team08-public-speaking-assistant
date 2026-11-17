@@ -1,6 +1,6 @@
 """Test baseline.loudness_series (E1).
 
-Audio là sóng sin tổng hợp ghi vào tmp_path, không phải dữ liệu thật.
+Audio is a synthetic sine wave written to tmp_path, not real data.
 """
 
 import math
@@ -27,7 +27,7 @@ def test_loudness_series_shape_and_values(tmp_path):
     res = baseline.loudness_series(_sine_master(tmp_path, 2.2))
     assert res is not None
     assert res["start_s"] == 0.0 and res["step_s"] == 0.1
-    # ceil(round(2.2 / 0.1, 9)) = 22, không phải 23 (sai số dấu phẩy động)
+    # ceil(round(2.2 / 0.1, 9)) = 22, not 23 (floating-point error)
     assert len(res["values"]) == 22
     floats = [v for v in res["values"] if v is not None]
     assert len(floats) >= 1
@@ -62,7 +62,7 @@ def test_loudness_series_exception_gives_whole_series_none(tmp_path, monkeypatch
 
 
 def test_existing_loudness_helpers_unchanged(tmp_path):
-    # extract_loudness_db vẫn lấy mẫu mỗi 0.5 s: 1.0 s -> tối đa 2 mẫu hữu hạn
+    # extract_loudness_db still samples every 0.5 s: 1.0 s -> at most 2 finite samples
     vals = baseline.extract_loudness_db(_sine_master(tmp_path, 1.0))
     assert len(vals) <= 2 and all(math.isfinite(v) for v in vals)
     assert baseline.mean_loudness_db([60.0, math.nan, 70.0]) == pytest.approx(65.0)

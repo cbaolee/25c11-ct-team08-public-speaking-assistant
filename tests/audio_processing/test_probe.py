@@ -45,7 +45,7 @@ def ok_wav(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def nodur_webm(tmp_path: Path) -> Path:
-    # Ghi ra pipe (không seek được) để header không có duration, giống MediaRecorder.
+    # Write to a pipe (not seekable) so the header has no duration, like MediaRecorder.
     if not _has_encoder("libopus"):
         pytest.skip("libopus encoder not available")
     out = tmp_path / "nodur.webm"
@@ -91,7 +91,7 @@ def empty_file(tmp_path: Path) -> Path:
     return out
 
 
-# ---------- trường hợp hợp lệ ----------
+# ---------- valid cases ----------
 
 def test_valid_wav_returns_probe(ok_wav):
     result = probe(ok_wav, **LIMITS)

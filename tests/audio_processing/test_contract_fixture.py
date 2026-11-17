@@ -1,11 +1,11 @@
-"""Fixture hợp đồng EvaluationResultV2 (ADR-004, C4).
+"""EvaluationResultV2 contract fixture (ADR-004, C4).
 
-DỮ LIỆU TỔNG HỢP, KHÔNG PHẢI KẾT QUẢ ĐO. STT, VAD, F0 và độ to đều là giả (fixture
-`run` của test_pipeline_evaluate.py); không có audio thật, không có số đo.
+SYNTHETIC DATA, NOT MEASURED RESULTS. STT, VAD, F0 and loudness are all fake (fixture
+`run` from test_pipeline_evaluate.py); no real audio, no measurements.
 
-Test so sánh JSON thật do evaluate_session sinh ra với file trong tests/fixtures/.
-Đặt UPDATE_FIXTURES=1 để ghi lại file. Các file này cũng là đầu vào của test JS
-(mapResult) nên đổi hợp đồng thì phải sinh lại và xem diff.
+The test compares the real JSON produced by evaluate_session with the file in tests/fixtures/.
+Set UPDATE_FIXTURES=1 to rewrite the files. These files are also input to the JS test
+(mapResult), so a contract change means regenerating them and reviewing the diff.
 """
 
 import json
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-# Tái dùng fixture `run` (không đổi hành vi test cũ). pytest nạp test_pipeline_evaluate
-# ở chế độ prepend nên import theo tên module trần.
+# Reuse the `run` fixture (old test behaviour unchanged). pytest loads test_pipeline_evaluate
+# in prepend mode, so import by the bare module name.
 from test_pipeline_evaluate import (  # noqa: F401
     LOUDNESS,
     SpeechSegment,
@@ -26,16 +26,16 @@ from test_pipeline_evaluate import (  # noqa: F401
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 
-# ---- ca ok_mixed (số tự đặt, không phải số đo) ----
+# ---- ok_mixed case (made-up numbers, not measurements) ----
 MIXED_SCRIPT = "Good morning my friends are here today."
 MIXED_WORDS = [
     w("Good", 0.0, 0.4), w("morning", 0.5, 0.9),
     w("um", 0.95, 1.1),                      # filler STT
     w("friend", 1.2, 2.0),                   # "my" del; friends -> friend: near_miss
-    w("are", 2.8, 3.1),                      # sau khoảng lặng 0.8 s: hesitation
+    w("are", 2.8, 3.1),                      # after a 0.8 s silence: hesitation
     w("cat", 3.2, 3.6),                      # "here" -> "cat": sub
-    w("today", 5.4, 5.8),                    # sau khoảng lặng 1.7 s giữa câu: forgot_word
-    w("really", 5.9, 6.3),                   # từ thừa cuối: ins
+    w("today", 5.4, 5.8),                    # after a 1.7 s mid-sentence silence: forgot_word
+    w("really", 5.9, 6.3),                   # extra trailing word: ins
 ]
 MIXED_SEGS = (SpeechSegment(0.0, 2.0), SpeechSegment(2.8, 3.7), SpeechSegment(5.4, 6.4))
 MIXED_F0 = [(0.05, 100.0), (0.55, 110.0), (1.25, 130.0), (2.85, 90.0), (3.25, 200.0),
@@ -56,7 +56,7 @@ CASES = {
 
 
 def compare(actual, expected, path="$"):
-    """So sánh đệ quy; trả danh sách mô tả chỗ lệch (rỗng = khớp)."""
+    """Recursive compare; return a list of mismatch descriptions (empty = match)."""
     if isinstance(expected, dict):
         if not isinstance(actual, dict) or set(actual) != set(expected):
             return [f"{path}: khoá lệch"]
@@ -113,11 +113,11 @@ def test_comparator_detects_drift():
     base = {"a": [1.0, {"b": None}], "c": "x", "d": True}
     assert compare(json.loads(json.dumps(base)), base) == []
     for mutate in (
-        lambda d: d["a"].__setitem__(0, 1.0001),      # float lệch
-        lambda d: d["a"][1].__setitem__("b", 0.0),    # None -> số
-        lambda d: d.__setitem__("c", "y"),            # chuỗi lệch
-        lambda d: d.__setitem__("e", 1),              # thừa khoá
-        lambda d: d["a"].append(2),                   # độ dài lệch
+        lambda d: d["a"].__setitem__(0, 1.0001),      # float mismatch
+        lambda d: d["a"][1].__setitem__("b", 0.0),    # None -> number
+        lambda d: d.__setitem__("c", "y"),            # string mismatch
+        lambda d: d.__setitem__("e", 1),              # extra key
+        lambda d: d["a"].append(2),                   # length mismatch
         lambda d: d.__setitem__("d", 1),              # bool vs int
     ):
         copy = json.loads(json.dumps(base))

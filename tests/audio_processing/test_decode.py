@@ -33,7 +33,7 @@ def _sine(seconds: int, rate: int) -> str:
 
 
 def _read_wav(path: Path):
-    """Trả về (dữ liệu mẫu thô, tần số lấy mẫu, số kênh)."""
+    """Return (raw sample data, sample rate, channel count)."""
     with wave.open(str(path), "rb") as w:
         return w.readframes(w.getnframes()), w.getframerate(), w.getnchannels()
 
@@ -105,7 +105,7 @@ def test_decode_is_deterministic(webm_48k_stereo, tmp_path):
 
 
 def test_too_long_is_detected_through_duration_cap(wav_16k_mono, workdir):
-    # Nguồn 3 giây, giới hạn 1 giây, trần -t = 2 giây. Master dài 2 giây > 1 giây.
+    # 3-second source, 1-second limit, -t cap = 2 seconds. Master is 2 seconds > 1 second.
     with pytest.raises(AudioRejected) as info:
         decode_to_master(wav_16k_mono, workdir,
                          max_seconds=1, cap_margin_s=1, timeout_s=60)
@@ -116,8 +116,8 @@ def test_truncated_file_is_flagged_not_rejected(webm_48k_stereo, workdir, tmp_pa
     cut = tmp_path / "cut.webm"
     cut.write_bytes(webm_48k_stereo.read_bytes()[:3000])
     result = decode_to_master(cut, workdir, **LIMITS)
-    assert result.warnings                    # có cảnh báo của ffmpeg
-    assert result.duration_s < 3.0            # chỉ giải mã được một phần
+    assert result.warnings                    # ffmpeg reported warnings
+    assert result.duration_s < 3.0            # only partly decoded
 
 
 def test_fake_audio_file_is_corrupt(workdir, tmp_path):
@@ -147,7 +147,7 @@ def test_ffmpeg_timeout_is_corrupt(wav_16k_mono, workdir, monkeypatch):
 
 
 def test_zero_frame_output_is_corrupt(wav_16k_mono, workdir, monkeypatch):
-    # ffmpeg "thành công" nhưng chỉ ghi ra WAV không có khung nào.
+    # ffmpeg "succeeds" but only writes a WAV with no frames.
     def fake_run(command, **kwargs):
         with wave.open(str(workdir / "master.wav"), "wb") as w:
             w.setnchannels(1)
