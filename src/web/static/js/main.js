@@ -26,7 +26,7 @@ import { onAuthSubmit, openAuth, setAuthMode, startSession } from './modals/auth
 import { logout, onGateAgree } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
 import { openProfileModal, saveConsent, saveProfileModal } from './modals/profile_modal.js';
-import { openAudioModal, openPassModal, savePass, testMic } from './modals/settings_modal.js';
+import { openSettings, setupSettings } from './modals/settings_modal.js';
 import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, syncHeader } from './nav.js';
 import { deleteSession, openReport } from './screens/history.js';
 import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing.js';
@@ -127,9 +127,7 @@ export function init() {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.getAttribute('data-act'); closeUserMenu(true);
     if (a === 'profile') go('profile');
-    else if (a === 'audio') openAudioModal();
-    else if (a === 'perm') { $('#pmChk').checked = S.consent; openModal('permissionsModal'); }
-    else if (a === 'pass') openPassModal();
+    else if (a === 'settings') openSettings();
     else if (a === 'logout') logout();
   });
 
@@ -224,12 +222,7 @@ export function init() {
   $('#mpCancel').onclick = () => closeModal('profileModal');
   $('#mcAllow').onclick = () => { S.consent = true; saveConsent(true); S.onDeny = null; closeModal('consentModal'); toast(T('consent.toastOn')); const cb = S.afterConsent; S.afterConsent = null; if (cb) cb(); };
   $('#mcDeny').onclick = () => { S.afterConsent = null; const cb = S.onDeny; S.onDeny = null; closeModal('consentModal'); if (cb) cb(); else toast(T('consent.toastDenied')); };
-  $('#passSave').onclick = savePass;
-  $('#audioInput').addEventListener('input', e => { $('#audioInputValue').textContent = e.target.value; });
-  $('#audioOutput').addEventListener('input', e => { $('#audioOutputValue').textContent = e.target.value; });
-  $('#audioTest').onclick = testMic;
-  $('#audioSave').onclick = () => { closeModal('audioSettingsModal'); toast(T('audio.ok')); };
-  $('#permSave').onclick = () => { const on = $('#pmChk').checked, changed = on !== S.consent; S.consent = on; if (changed) saveConsent(on); closeModal('permissionsModal'); toast(T(S.consent ? 'consent.toastOn' : 'consent.toastOff')); };
+  setupSettings();
 
   window.addEventListener('resize', () => { syncHeader(); syncStage(); moveNavPill(false); moveSegPills(false); moveSegPills(false, $('#lAuth')); });
   window.addEventListener('scroll', () => { syncHero(); kickFollow(); }, { passive: true });

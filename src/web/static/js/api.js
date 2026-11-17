@@ -47,3 +47,9 @@ export function sessionEnded() {
   storeAuth(null);
   if (S.user) { logout(true); toast(T('auth.expired'), true); }
 }
+
+/* Settings > Delete account. Stub: the backend route DELETE /api/auth/account is not built yet
+   (handed over to the Auth group), so today this request fails and the UI shows an error. */
+export function deleteAccount() {
+  return api('/api/auth/account', { method: 'DELETE' });
+}
