@@ -2,9 +2,9 @@ import { api, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
 import { postBaseline } from '../modals/baseline_gate.js';
 import { paintAvatar } from '../nav.js';
-import { requireConsent, startRecorder } from '../recorder.js';
+import { startRecorder } from '../recorder.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { toast } from '../ui.js';
+import { closeModal, openModal, toast } from '../ui.js';
 import { $, esc, fmtDayLong, fmtTime } from '../utils.js';
 
 /* ---------- Profile ---------- */
@@ -15,6 +15,7 @@ RENDER.profile = function () {
     [T('profile.rowName'), S.user.name], [T('profile.rowGender'), p.gender || ns], [T('profile.rowAge'), p.age != null ? p.age : ns],
     [T('profile.rowAccent'), p.accent || ns], [T('profile.rowTopics'), p.topics && p.topics.length ? p.topics.map(k => TOPICS[k]).join(', ') : ns]
   ];
+  $('#pfBaseline').textContent = S.baseline ? T('profile.rowBaselineDone', { date: fmtDayLong(S.baseline.ts) }) : T('profile.none');
   $('#pfSummary').innerHTML = rows.map(r => '<tr><th scope="row">' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>').join('');
   renderBaseline();
 };
@@ -25,8 +26,11 @@ export function renderBaseline(sec, msg) {
   $('#profileBaselineBar').style.width = pct + '%'; $('#profileBaselineBarWrap').setAttribute('aria-valuenow', String(pct));
   const lb = $('#profileBaselineListen');
   lb.hidden = !S.baseline; lb.disabled = rec || !!S.bbusy || !!S.blLoad;
+  // the recorder window cannot be closed while it records or uploads
+  const busy = rec || !!S.bbusy;
+  $('#baselineRecorder')._lock = busy; $('#baselineRecorderClose').disabled = busy; $('#profileBaselineAgain').disabled = busy;
   if (!S.baseline) resetBaselineAudio();
-  $('#profileBaselineStart').innerHTML = rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('profile.stop')) : esc(T(S.baseline ? 'profile.again' : 'profile.start'));
+  $('#profileBaselineStart').innerHTML = rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('profile.stop')) : esc(T('profile.start'));
   const st = $('#profileBaselineStatus');
   if (rec) { st.className = 'pill'; st.textContent = T('profile.recording'); }
   else if (msg) { st.className = 'pill warn'; st.textContent = msg; }
@@ -63,10 +67,18 @@ export function listenBaseline() {
   }).catch(() => { if (!stale()) fail('profile.errListen'); })
     .finally(() => { if (S.blLoad === tok) { S.blLoad = null; lb.disabled = !!S.brec || !!S.bbusy; } });
 }
+/* Profile > Record again: opens the Baseline Recorder. No consent step here: the account already
+   agreed to recording when it recorded its first baseline in the Baseline Gate. */
+export function openBaselineRecorder() {
+  if (S.brec || S.bbusy) return;
+  resetBaselineAudio();
+  renderBaseline(0);
+  openModal('baselineRecorder', { focus: '#profileBaselineStart' });
+}
 export function toggleBaseline() {
   if (S.brec) { S.brec.stop(false); return; }
   if (S.bbusy) return;
-  requireConsent(() => {
+  {
     resetBaselineAudio();   // stop playback and drop any pending URL before the mic opens
     S.brec = startRecorder({
       lvl: $('#profileBaselineLevel'), max: CONFIG.BASELINE_SECONDS, onTick: s => renderBaseline(s),
@@ -82,10 +94,11 @@ export function toggleBaseline() {
           if (!r.profile) { renderBaseline(0, r.msg); return; }   // nothing saved; an older baseline (if any) stays
           resetBaselineAudio();   // old signed URL points at the replaced file
           S.baseline = { ts: Date.now(), profile: r.profile }; renderBaseline(sec); toast(T('profile.toastSaved'));
+          closeModal('baselineRecorder'); if (S.screen === 'profile') RENDER.profile();
         });
       },
       onError: code => { S.brec = null; renderBaseline(0, T('practice.mic' + code.charAt(0).toUpperCase() + code.slice(1))); }
     });
     renderBaseline(0);
-  });
+  }
 }

@@ -53,8 +53,8 @@ exhausted_cooldown_s = 600
 
 [web]
 # Sent to the browser by GET /api/config. No secrets here.
-# Max characters in Practice "Own" text
-own_max_chars = 300
+# Max words in Practice "Own" text
+own_max_words = 1500
 # Length of the baseline recording, in seconds
 baseline_seconds = 30
 # Shortest baseline the UI accepts, in seconds

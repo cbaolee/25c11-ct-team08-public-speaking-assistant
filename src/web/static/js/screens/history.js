@@ -21,6 +21,7 @@ export function sessionFromSummary(it) {
     an: null, dur: numOrNull(it.audio_duration_s) || 0, accent: null, compact: !!it.is_compact, remote: true, demo: false
   };
 }
+/* Resolves when the list and the latest session's full scores are in (Home's hero needs both). */
 export function loadHistory() {
   const user = S.user, items = [];
   const page = (cursor, n) => api('/api/sessions?limit=' + CONFIG.HISTORY_PAGE_SIZE + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''))
@@ -35,7 +36,7 @@ export function loadHistory() {
     S.sessions = list.map(sessionFromSummary).concat(S.sessions.filter(s => !known.has(s.id)));   // keep sessions saved while loading
     if (S.screen === 'home') RENDER.home();
     const last = scored().slice(-1)[0];   // Home's "next step" advice needs the latest full scores
-    if (last && !last.an) loadSessionDetail(last).then(() => { if (S.user === user && S.screen === 'home') RENDER.home(); }).catch(() => {});
+    if (last && !last.an) return loadSessionDetail(last).then(() => { if (S.user === user && S.screen === 'home') RENDER.home(); }).catch(() => {});
   }).catch(() => { if (S.user === user) toast(T('history.loadErr'), true); });
 }
 /* GET /api/sessions/{id}: full result (+ signed audio URL), or a compact one rebuilt from its mistakes. */

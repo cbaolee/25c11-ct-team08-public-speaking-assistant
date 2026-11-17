@@ -12,6 +12,7 @@ import './api.js';
 import './modals/auth_panel.js';
 import './modals/baseline_gate.js';
 import './screens/home.js';
+import { scrollHomeDown } from './screens/home.js';
 import './screens/history.js';
 import './screens/script_studio.js';
 import './recorder.js';
@@ -31,11 +32,11 @@ import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, sy
 import { deleteSession, openReport } from './screens/history.js';
 import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing.js';
 import { cancelEval, goStep, loadFollowWpm, loadSavedScripts, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, pickSavedScript, renderPractice, runEval, selectPickerTab, toggleRecording, updateOwnCount, useOwn } from './screens/practice.js';
-import { listenBaseline, onBaselineAudioError, toggleBaseline } from './screens/profile.js';
+import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
 import { bindTxTips, onTxClick, openPart, seekTo, seekWord, startPlayback, stopPlayback } from './screens/report.js';
 import { onChatAction, renderChatFile, sendChat, syncDurLock, syncTplSelect } from './screens/script_studio.js';
 import { CONFIG, RENDER, S } from './state.js';
-import { closeUserMenu, setupUserMenuHover, toggleUserMenu } from './top_bar.js';
+import { closeUserMenu, onUserButtonClick, setupUserMenuHover } from './top_bar.js';
 import { FOCUSABLE, closeModal, focusHeading, openModal, setupPwEyes, setupSelects, toast, usable } from './ui.js';
 import { $, $$, clearErr, esc, showErr } from './utils.js';
 
@@ -44,7 +45,7 @@ import { $, $$, clearErr, esc, showErr } from './utils.js';
 export function loadConfig() {
   return fetch('/api/config').then(r => (r.ok ? r.json() : null)).then(c => {
     if (!c) return;
-    CONFIG.OWN_MAX_CHARS = c.own_max_chars ?? CONFIG.OWN_MAX_CHARS;
+    CONFIG.OWN_MAX_WORDS = c.own_max_words ?? CONFIG.OWN_MAX_WORDS;
     CONFIG.BASELINE_SECONDS = c.baseline_seconds ?? CONFIG.BASELINE_SECONDS;
     CONFIG.BASELINE_MIN_SECONDS = c.baseline_min_seconds ?? CONFIG.BASELINE_MIN_SECONDS;
     CONFIG.SPEAKING_WPM_FOR_ESTIMATE = c.speaking_wpm_for_estimate ?? CONFIG.SPEAKING_WPM_FOR_ESTIMATE;
@@ -122,7 +123,7 @@ export function init() {
   setupPwEyes();
   setupSelects();
   setupUserMenuHover();
-  $('#userBtn').onclick = toggleUserMenu;
+  $('#userBtn').onclick = onUserButtonClick;
   $('#userMenu').addEventListener('click', e => {
     const b = e.target.closest('[data-act]'); if (!b) return;
     const a = b.getAttribute('data-act'); closeUserMenu(true);
@@ -150,6 +151,7 @@ export function init() {
   // practice
   $$('[data-src]').forEach(b => { b.onclick = () => selectPickerTab(b.getAttribute('data-src')); });
   $('#goScript').onclick = () => go('scriptStudio');
+  $('#homeMore').onclick = scrollHomeDown;
   $('#useScript').onclick = () => goStep(2);
   loadFollowWpm(); paintFollowWpm(); $('#followWpm').addEventListener('input', onFollowWpm);
   $('#mineSel').onchange = () => { const id = $('#mineSel').value; if (id) pickSavedScript(id, true); };
@@ -198,6 +200,7 @@ export function init() {
   };
   $('#avRemove').onclick = () => { S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved')); };
   $('#profileBaselineStart').onclick = toggleBaseline;
+  $('#profileBaselineAgain').onclick = openBaselineRecorder;
   $('#profileBaselineListen').onclick = listenBaseline;
   $('#profileBaselineAudio').addEventListener('error', onBaselineAudioError);
 

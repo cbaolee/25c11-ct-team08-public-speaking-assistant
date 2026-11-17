@@ -5,7 +5,7 @@ import { $$ } from './utils.js';
    data-t="group.key" (HTML) and T('group.key', {vars}) (JS) read from here.
    ===================================================================== */
 export const TEXT = {
-  app: { name: 'Public Speaking Assistant', tagline: 'Read your script aloud. See exactly where to improve.' },
+  app: { loading: 'Loading your practice…', name: 'Public Speaking Assistant', tagline: 'Read your script aloud. See exactly where to improve.' },
   common: { skip: 'Skip to content', back: 'Back', cancel: 'Cancel', save: 'Save', close: 'Close', play: 'Play', pause: 'Pause', delete: 'Delete', na: 'N/A' },
   /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
@@ -36,18 +36,16 @@ export const TEXT = {
   },
 
   home: {
-    welcome: 'Welcome back, {name}', welcomeNew: 'Welcome, {name}',
-    sub: 'Pick up where you left off.',
+    greetMorning: 'Good morning, {name}', greetAfternoon: 'Good afternoon, {name}', greetEvening: 'Good evening, {name}',
+    summaryNew: 'Pick a script, read it aloud and get your first report.',
+    summaryWeek: '{n} sessions this week · latest score {score}', summaryWeekOne: '1 session this week · latest score {score}', summaryIdle: 'No practice this week yet · latest score {score}',
+    ctaFirst: 'Start your first practice', ctaFocus: 'Practise {area}', ctaScript: 'Create a script',
+    more: 'Your progress and history', moreNew: 'Your progress will appear below',
+    later: 'Your charts and practice history will appear here after your first practice.',
+    progressTitle: 'Your progress', detailsTitle: 'Pace, pitch and clarity',
     cScore: 'Score over time', cActivity: 'Practice minutes (last 14 days)', cWpm: 'Speaking pace (WPM)', cPitch: 'Pitch range (semitones)', cClarity: 'Clarity score',
     capScore: 'Latest {v}. Range {lo} to {hi}.', capActivity: 'Practised on {days} of the last {n} days. Current streak: {streak}.',
     capWpm: 'Latest {v} WPM. Target 130 to 160.', capPitch: 'Latest {v} st. Below 4 st sounds monotone.', capClarity: 'Latest {v}. Based on what the recogniser heard, not a pronunciation grade.',
-    nextKicker: 'Next step',
-    nextBaselineT: 'Record your 30-second baseline voice',
-    nextBaselineD: 'Pitch is scored against your own normal voice. Without a baseline, each session is compared to itself.',
-    nextBaselineCta: 'Record baseline',
-    nextFirstCta: 'Start practising',
-    nextWeakT: 'Work on: {area}',
-    nextWeakCta: 'Practise now', nextScriptCta: 'Get a new script',
     latestTitle: 'Latest score',
     deltaUp: '{d} points vs your previous 3 sessions', deltaDown: '{d} points vs your previous 3 sessions', deltaFlat: 'No change vs your previous 3 sessions',
     deltaNeed: 'Progress appears after 6 scored sessions ({n} so far).',
@@ -60,7 +58,7 @@ export const TEXT = {
     title: 'Generate Script', sub: 'Choose a topic, describe your event or attach a PDF. You get an English script you can practise with.',
     feedLabel: 'Conversation', topic: 'Topic', attach: 'Attach a PDF', inputLabel: 'Describe your event or paste material',
     placeholder: 'Describe your event, or paste some material...', send: 'Send',
-    hint: 'PDF only, up to 25 MB and 10 pages, not password-protected. Text up to 3,000 words.',
+    hint: 'The assistant can make mistakes. Read the script and check names, facts and figures before you practise.',
     assistant: 'Script assistant',
     greeting: 'Hi {name}. Pick a topic, then tell me about your event or attach a PDF with the key points.',
     errFile: 'That file cannot be used. Attach a PDF up to 25 MB and 10 pages that is not password-protected.',
@@ -89,7 +87,7 @@ export const TEXT = {
     emptyMineT: 'You have not generated a script yet.', makeScript: 'Generate a script',
     emptySampleT: 'No sample chosen yet.', sampleBtn: 'Show a sample', sampleAnother: 'Show another sample', sampleNote: 'Picked from your topics.',
     emptyOwnT: 'Type your text below, then choose Use this text.',
-    ownLabel: 'Your text', ownUse: 'Use this text', ownCounter: '{n} / {max}', errOwnMax: 'Keep the text under {max} characters.', errOwnEmpty: 'Type some text first.',
+    ownLabel: 'Your text', ownUse: 'Use this text', ownCounter: '{n} / {max} words', errOwnMax: 'Keep the text to {max} words or fewer.', errOwnEmpty: 'Type some text first.',
     fromScript: 'From Generate Script · {title}', sampleTitle: 'Sample · {title}', ownTitle: 'Your own text',
     words: '{n} words · about {t} at a steady pace',
     voiceTitle: 'Your voice', tabRec: 'Record', tabUp: 'Upload',
@@ -201,7 +199,7 @@ export const TEXT = {
   profile: {
     title: 'Profile', sub: 'Your details and your 30-second baseline voice.',
     userInfo: 'Your details', editInfo: 'Edit details', changeAvatar: 'Change photo', removeAvatar: 'Remove photo',
-    rowName: 'Name', rowGender: 'Gender', rowAge: 'Age', rowAccent: 'Target accent', rowTopics: 'Script topics', rowNotSet: 'Not set',
+    rowName: 'Name', rowGender: 'Gender', rowAge: 'Age', rowAccent: 'Target accent', rowTopics: 'Script topics', rowBaseline: 'Baseline voice', rowBaselineDone: 'Recorded on {date}', rowNotSet: 'Not set',
     baselineTitle: 'Baseline voice', baselineNote: 'Read the passage naturally, as in a normal conversation. Your pitch and pauses are compared with this recording.',
     start: 'Start recording', stop: 'Stop recording', again: 'Record again', recording: 'Recording...',
     saved: 'Baseline saved on {date}', none: 'No baseline yet', tooShort: 'Too short: record at least {n} s',

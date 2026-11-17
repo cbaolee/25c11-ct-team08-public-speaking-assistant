@@ -1,6 +1,6 @@
 import { api, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
-import { go } from '../nav.js';
+import { go, paintAvatar } from '../nav.js';
 import { loadSavedScripts } from '../screens/practice.js';
 import { RENDER, S } from '../state.js';
 import { openModal, toast } from '../ui.js';
@@ -54,17 +54,27 @@ export function fillTopicSelect() {
   if (keep && keys.indexOf(keep) >= 0) sel.value = keep;
   syncTplSelect();
 }
+/* Chat-app layout: each message is a row with the sender's picture outside the bubble,
+   the assistant's logo on the left, the user's avatar (photo or initial) on the right. */
 export function addBubble(cls, html) {
-  const feed = $('#chatFeed'), d = document.createElement('div');
+  const feed = $('#chatFeed'), row = document.createElement('div'), d = document.createElement('div');
+  const mine = cls.split(' ').indexOf('me') >= 0;
+  row.className = 'msg-row ' + (mine ? 'me' : 'ai');
+  const pic = document.createElement('span');
+  pic.className = mine ? 'avatar msg-av' : 'msg-av msg-ai';
+  pic.setAttribute('aria-hidden', 'true');
+  if (mine) paintAvatar(pic); else pic.innerHTML = IC.ai;
   d.className = 'bubble ' + cls;
   if (cls === 'ai') d.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + html;
   else d.innerHTML = html;
-  feed.appendChild(d);
+  row.append(pic, d);
+  feed.appendChild(row);
+  d.remove = () => row.remove();   // callers remove the bubble; take its picture with it
   /* Chat-style entry: the feed glides down to the new message while it rises and fades in */
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!calm && d.animate && feed.offsetParent) {
     feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
-    d.animate([{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }],
+    row.animate([{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }],
       { duration: 420, easing: 'cubic-bezier(.2, .7, .3, 1)' });
   } else feed.scrollTop = feed.scrollHeight;
   return d;
