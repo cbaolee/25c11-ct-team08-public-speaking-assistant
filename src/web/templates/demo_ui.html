@@ -630,14 +630,14 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 
 /* ---------- follow-along (Practice) ---------- */
 .prbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; row-gap: 0; align-items: start; margin-top: 14px;
-  grid-template-areas: "seg speed" "pane speed" "note speed" "eval eval" "demo demo"; }
+  grid-template-areas: "seg ." "pane speed" "note speed" "eval eval" "demo demo"; }
+.prbar.is-upload { grid-template-areas: "seg seg" "pane pane" "eval eval" "demo demo"; }   /* Upload tab: no follow-along column, the drop zone spans the panel */
 .prbar > .seg { grid-area: seg; justify-self: start; }
-.prbar .prrec { grid-area: pane; min-width: 0; margin-top: 12px; text-align: center; }   /* Record and Upload panes share one cell */
-.prbar .prrec .row { justify-content: center; }
-.prbar #recNote { grid-area: note; margin-top: 10px; text-align: center; }
+.prbar .prrec { grid-area: pane; min-width: 0; margin-top: 12px; }   /* Record and Upload panes share one cell */
+.prbar #recNote { grid-area: note; margin-top: 10px; }
 .prbar .timer { font-size: 36px; margin: 0 0 10px; }
-.prbar .lvl { margin-bottom: 10px; height: 28px; justify-content: center; }
-.prspeed { grid-area: speed; min-width: 0; }
+.prbar .lvl { margin-bottom: 10px; height: 28px; }
+.prspeed { grid-area: speed; min-width: 0; margin-top: 12px; }
 .prspeed label { margin: 0 0 4px; }
 .prspeed .note { margin-top: 6px; }
 #followWpm { flex: 1 1 auto; min-width: 0; }
@@ -649,6 +649,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 .prdemo { grid-area: demo; margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
 @media (max-width: 760px) {
   .prbar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seg" "pane" "note" "speed" "eval" "demo"; }
+  .prbar.is-upload { grid-template-areas: "seg" "pane" "eval" "demo"; }
   .prspeed { margin-top: 16px; }
 }
 /* Profile baseline: both buttons on one row (same height), messages underneath */
@@ -3203,6 +3204,7 @@ function renderPractice() {
   $('#tabRec').setAttribute('aria-selected', String(rec)); $('#tabUp').setAttribute('aria-selected', String(!rec));
   $('#paneRec').hidden = !rec; $('#paneUp').hidden = rec;
   $('#recNote').hidden = !rec; $('#prSpeed').hidden = !rec;   // follow-along only exists while recording
+  $('#pStep2').classList.toggle('is-upload', !rec);
   // recorder
   $('#recBtn').innerHTML = S.rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('practice.stop')) : esc(T('practice.start'));
   $('#recBtn').disabled = !S.rec && !!au;
