@@ -1,7 +1,9 @@
 from pathlib import Path
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from src.app.constants import CONSTANTS
 
 # The one .env of the project, at the repo root. A fixed path, so the server and the tests
 # read the same file whatever folder the command is started from.
@@ -10,31 +12,34 @@ ENV_FILE = REPO_ROOT / ".env"
 # Supabase shows these API URLs too; SUPABASE_URL must be the project URL without them.
 _SUPABASE_API_SUFFIXES = ("/rest/v1", "/auth/v1", "/storage/v1")
 
-max_audio_seconds = 1320
-# Baseline recording: the UI records 30 s; refuse anything outside [10 s, 60 s].
-baseline_min_seconds = 10
-baseline_max_seconds = 60
-# Practice script limit. 1320 s of audio at 175 WPM (the "too fast" warning) is 3850 words, so
-# a longer script cannot be read inside the audio limit. 4000 leaves a small margin above that and
-# above the 20-minute target (2340-3260 words). The character cap stops a few huge "words".
-max_script_words = 4000
-max_script_chars = 40_000
-max_upload_bytes = 100 * 1024 * 1024
-# Saved scripts per user (D-08). POST /api/scripts returns 429 rate_limited above this.
-max_saved_scripts = 50
+# Tunable values come from app_constants.toml (see that file for what each one means).
+_storage = CONSTANTS["storage"]
+_audio = CONSTANTS["audio"]
+_script = CONSTANTS["script"]
+
+max_audio_seconds = _audio["max_audio_seconds"]
+baseline_min_seconds = _audio["baseline_min_seconds"]
+baseline_max_seconds = _audio["baseline_max_seconds"]
+max_script_words = _script["max_script_words"]
+max_script_chars = _script["max_script_chars"]
+max_upload_bytes = _storage["max_upload_bytes"]
+max_saved_scripts = _storage["max_saved_scripts"]
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
 
-decode_timeout_s = 60
-duration_cap_margin_s = 10
+decode_timeout_s = _audio["decode_timeout_s"]
+duration_cap_margin_s = _audio["duration_cap_margin_s"]
 
-MIN_PAUSE_S = 0.35
+MIN_PAUSE_S = _audio["min_pause_s"]
 
-# STT HTTP timeouts (seconds): time to connect, and longest wait between two reads of the
-# response. Starting values, not measured; tune after timing long (20 min) recordings.
-stt_connect_timeout_s = 5
-stt_read_timeout_s = 120
+stt_connect_timeout_s = _audio["stt_connect_timeout_s"]
+stt_read_timeout_s = _audio["stt_read_timeout_s"]
+
+
+def _from_toml(section: str, key: str):
+    """Default factory: read the value when Settings is built, so .env still wins."""
+    return lambda: CONSTANTS[section][key]
 
 
 class Settings(BaseSettings):
@@ -54,8 +59,8 @@ class Settings(BaseSettings):
     audio_bucket: str = "audio"
     series_bucket: str = "series"
     baselines_bucket: str = "baselines"
-    retention_full_sessions: int = 10
-    signed_url_ttl_s: int = 600
+    retention_full_sessions: int = Field(default_factory=_from_toml("storage", "retention_full_sessions"))
+    signed_url_ttl_s: int = Field(default_factory=_from_toml("storage", "signed_url_ttl_s"))
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")

@@ -1141,12 +1141,12 @@ table.t tr:last-child td { border-bottom: 0; }
 /* =====================================================================
    DEMO SWITCHES
    ===================================================================== */
-const OWN_MAX_CHARS = 300;         // max characters in "write my own text"
-const BASELINE_MIN_SECONDS = 10;   // shortest baseline accepted (the backend also rejects audio with too little speech)
-const BASELINE_SECONDS = 30;       // length of the baseline recording (lower it for quick demos)
-const SPEAKING_WPM_FOR_ESTIMATE = 145;   // midpoint of the 130-160 target, only used for "about 0:25" hints
-const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
-const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
+let   OWN_MAX_CHARS = 300;         // max characters in "write my own text"
+let   BASELINE_MIN_SECONDS = 10;   // shortest baseline accepted (the backend also rejects audio with too little speech)
+let   BASELINE_SECONDS = 30;       // length of the baseline recording (lower it for quick demos)
+let   SPEAKING_WPM_FOR_ESTIMATE = 145;   // midpoint of the 130-160 target, only used for "about 0:25" hints
+let   FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
+let   FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
 
 /* =====================================================================
    ALL TEXT SHOWN ON SCREEN
@@ -2566,7 +2566,8 @@ RENDER.home = function () {
 };
 
 /* ---------- History from the server (F2): GET /api/sessions, /api/sessions/{id}, DELETE ---------- */
-const HISTORY_MAX_PAGES = 5;          // 5 pages x 20 = the newest 100 sessions on Home and History
+let   HISTORY_MAX_PAGES = 5;          // 5 pages x 20 = the newest 100 sessions on Home and History
+let   HISTORY_PAGE_SIZE = 20;         // sessions per /api/sessions page
 const DETAIL_TTL_MS = 5 * 60 * 1000;  // signed audio URLs last signed_url_ttl_s (600 s): reload the detail before that
 const numOrNull = v => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 /* One /api/sessions item -> the session object Home and History draw. The full report (an) loads on open. */
@@ -2582,7 +2583,7 @@ function sessionFromSummary(it) {
 }
 function loadHistory() {
   const user = S.user, items = [];
-  const page = (cursor, n) => api('/api/sessions?limit=20' + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''))
+  const page = (cursor, n) => api('/api/sessions?limit=' + HISTORY_PAGE_SIZE + (cursor ? '&cursor=' + encodeURIComponent(cursor) : ''))
     .then(r => (r.ok ? r.json() : Promise.reject(new Error('history ' + r.status)))).then(d => {
       if (S.user !== user) return null;
       items.push.apply(items, d.items || []);
@@ -2945,7 +2946,7 @@ function pickSavedScript(id, byUser) {   // byUser: picked in the dropdown (back
 }
 function loadSavedScripts(pickId) {
   if (!S.user) return;
-  api('/api/scripts?limit=20').then(r => r.ok ? r.json() : null).then(d => {
+  api('/api/scripts?limit=' + HISTORY_PAGE_SIZE).then(r => r.ok ? r.json() : null).then(d => {
     const list = (d && d.items) || [], wrap = $('#mineSaved'), sel = $('#mineSel');
     S.savedScripts = list;
     if (!wrap || !sel) return;
@@ -3663,6 +3664,20 @@ function testMic() {
 }
 
 /* ---------- init / events ---------- */
+/* Tunable values from app_constants.toml [web] (GET /api/config). The defaults above stay if the call fails. */
+function loadConfig() {
+  return fetch('/api/config').then(r => (r.ok ? r.json() : null)).then(c => {
+    if (!c) return;
+    OWN_MAX_CHARS = c.own_max_chars ?? OWN_MAX_CHARS;
+    BASELINE_SECONDS = c.baseline_seconds ?? BASELINE_SECONDS;
+    BASELINE_MIN_SECONDS = c.baseline_min_seconds ?? BASELINE_MIN_SECONDS;
+    SPEAKING_WPM_FOR_ESTIMATE = c.speaking_wpm_for_estimate ?? SPEAKING_WPM_FOR_ESTIMATE;
+    FOLLOW_LEAD_S = c.follow_lead_s ?? FOLLOW_LEAD_S;
+    FOLLOW_GAP_S = c.follow_gap_s ?? FOLLOW_GAP_S;
+    HISTORY_PAGE_SIZE = c.history_page_size ?? HISTORY_PAGE_SIZE;
+    HISTORY_MAX_PAGES = c.history_max_pages ?? HISTORY_MAX_PAGES;
+  }).catch(() => {});
+}
 function init() {
   applyText();
   document.title = T('app.name');
@@ -3847,7 +3862,7 @@ function init() {
   S.auth = loadAuth();
   if (S.auth) startSession(false);
 }
-init();
+loadConfig().then(init);
 
 </script>
 </body>
