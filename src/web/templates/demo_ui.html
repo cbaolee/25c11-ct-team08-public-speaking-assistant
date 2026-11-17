@@ -981,6 +981,8 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
       <div class="lvl" id="blLvl" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="blBarWrap" data-t-aria="profile.progress"><i id="blBar"></i></div>
       <div class="row" style="margin-top:14px"><button class="btn btn-record" type="button" id="blStart"></button><span class="pill" id="blStatus" role="status"></span></div>
+      <div class="row" style="margin-top:10px"><button class="btn" type="button" id="blListen" data-t="profile.listen" hidden></button><span class="pill warn" id="blListenMsg" role="status" hidden></span></div>
+      <audio id="blAudio" controls preload="none" hidden data-t-aria="profile.listenAria" style="margin-top:10px;width:100%"></audio>
     </div>
   </div>
 </section>
@@ -1330,6 +1332,8 @@ const TEXT = {
     start: 'Start recording', stop: 'Stop recording', again: 'Record again', recording: 'Recording...',
     saved: 'Baseline saved on {date}', none: 'No baseline yet', tooShort: 'Too short: record at least {n} s',
     analysing: 'Analysing your baseline...',
+    listen: 'Listen to my baseline', listenAria: 'Your baseline recording',
+    errListenNone: 'No baseline recording was found.', errListen: 'Could not load your baseline recording. Please try again.',
     errInsufficient: 'We could not hear enough speech in this recording. Please record again, reading the passage aloud.',
     toastSaved: 'Baseline voice saved.', timerSuffix: ' / {t}', progress: 'Baseline recording progress',
     okAvatar: 'Photo updated.', okRemoved: 'Photo removed.', errImage: 'Choose an image file.'
@@ -2605,7 +2609,7 @@ function onGateAgree() {
 function logout(expired) {
   if (!expired && S.auth) api('/api/auth/logout', { method: 'POST' }).catch(() => {});   // best effort: revoke on the server
   storeAuth(null);
-  hideTip(); stopPlayback();
+  hideTip(); stopPlayback(); resetBaselineAudio();   // no signed URL of this user may survive for the next one
   [S.rec, S.brec, S.grec].forEach(r => { if (r) r.cancel(); });
   if (audioTestStop) { audioTestStop(); audioTestStop = null; }
   S.sessions.forEach(revokeAudio); revokeAudio(S.cur);
@@ -3667,6 +3671,9 @@ function renderBaseline(sec, msg) {
   $('#blTimer').textContent = fmtTime(s) + T('profile.timerSuffix', { t: fmtTime(BASELINE_SECONDS) });
   const pct = Math.min(100, Math.round(s / BASELINE_SECONDS * 100));
   $('#blBar').style.width = pct + '%'; $('#blBarWrap').setAttribute('aria-valuenow', String(pct));
+  const lb = $('#blListen');
+  lb.hidden = !S.baseline || USE_SIM; lb.disabled = rec || !!S.bbusy || !!S.blLoad;
+  if (!S.baseline) resetBaselineAudio();
   $('#blStart').innerHTML = rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('profile.stop')) : esc(T(S.baseline ? 'profile.again' : 'profile.start'));
   const st = $('#blStatus');
   if (rec) { st.className = 'pill'; st.textContent = T('profile.recording'); }
@@ -3674,10 +3681,41 @@ function renderBaseline(sec, msg) {
   else if (S.baseline) { st.className = 'pill ok'; st.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg><span></span>'; $('span', st).textContent = T('profile.saved', { date: fmtDayLong(S.baseline.ts) }); }
   else { st.className = 'pill'; st.textContent = T('profile.none'); }
 }
+/* Baseline playback: GET /api/baseline/audio returns a short-lived signed URL; ask again after a new recording or an expired link. */
+function resetBaselineAudio() {
+  const a = $('#blAudio'), m = $('#blListenMsg');
+  if (!a) return;
+  S.blTok = {}; S.blLoad = null;   // a fetch still in flight is now stale and must not set src
+  a.pause(); a.removeAttribute('src'); a.load(); a.hidden = true; m.hidden = true; m.textContent = '';
+}
+function onBaselineAudioError() {   // expired or broken URL: drop it, the next click fetches a new one
+  const a = $('#blAudio');
+  if (!a.getAttribute('src')) return;
+  a.removeAttribute('src'); a.hidden = true;
+  $('#blListenMsg').textContent = T('profile.errListen'); $('#blListenMsg').hidden = false;
+}
+function listenBaseline() {
+  if (S.blLoad || S.brec || S.bbusy || S.grec) return;
+  resetBaselineAudio();
+  const a = $('#blAudio'), m = $('#blListenMsg'), user = S.user, tok = S.blTok, lb = $('#blListen');
+  S.blLoad = tok; lb.disabled = true;
+  const stale = () => S.user !== user || S.blTok !== tok || S.brec || S.bbusy || S.grec;
+  const fail = k => { a.hidden = true; m.textContent = T(k); m.hidden = false; };
+  m.hidden = true;
+  return api('/api/baseline/audio').then(readJson).then(({ ok, status, j }) => {
+    if (stale() || status === 401) return;
+    if (status === 404) { fail('profile.errListenNone'); return; }
+    if (!ok || !j || !j.url) { fail('profile.errListen'); return; }
+    a.src = j.url; a.hidden = false;
+    a.play().catch(() => { /* autoplay blocked: the controls stay visible */ });
+  }).catch(() => { if (!stale()) fail('profile.errListen'); })
+    .finally(() => { if (S.blLoad === tok) { S.blLoad = null; lb.disabled = !!S.brec || !!S.bbusy; } });
+}
 function toggleBaseline() {
   if (S.brec) { S.brec.stop(false); return; }
   if (S.bbusy) return;
   requireConsent(() => {
+    resetBaselineAudio();   // stop playback and drop any pending URL before the mic opens
     S.brec = startRecorder({
       lvl: $('#blLvl'), max: BASELINE_SECONDS, onTick: s => renderBaseline(s),
       onEnd: (sec, auto, rec) => {
@@ -3691,6 +3729,7 @@ function toggleBaseline() {
           if (S.bbusy !== tok || S.user !== user) return;   // logged out meanwhile
           S.bbusy = null;
           if (!r.profile) { renderBaseline(0, r.msg); return; }   // nothing saved; an older baseline (if any) stays
+          resetBaselineAudio();   // old signed URL points at the replaced file
           S.baseline = { ts: Date.now(), profile: r.profile }; renderBaseline(sec); toast(T('profile.toastSaved'));
         });
       },
@@ -3924,6 +3963,8 @@ function init() {
   };
   $('#avRemove').onclick = () => { S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved')); };
   $('#blStart').onclick = toggleBaseline;
+  $('#blListen').onclick = listenBaseline;
+  $('#blAudio').addEventListener('error', onBaselineAudioError);
 
   // baseline window (after log in)
   $('#gAgree').onclick = onGateAgree;

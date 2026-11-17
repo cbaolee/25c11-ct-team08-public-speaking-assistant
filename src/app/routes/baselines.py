@@ -127,3 +127,47 @@ async def get_baseline(
     if row is None:
         return None
     return row.model_dump(mode="json", exclude={"user_id", "audio_path"})
+
+
+def _audio_unavailable() -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"error_code": "baseline_audio_unavailable",
+                 "message": "Could not load the baseline recording"},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/baseline/audio")
+async def get_baseline_audio(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Return a short-lived signed URL for the caller's current baseline recording.
+
+    The baseline is looked up by the authenticated user id only, so one user can never
+    ask for another user's file. `audio_path` and `user_id` never appear in the body.
+    404 `baseline_not_found`: no baseline, or no audio stored for it.
+    503 `baseline_audio_unavailable`: database or storage could not be reached.
+    `Cache-Control: no-store` keeps the URL out of browser/proxy caches.
+    """
+    try:
+        row = await run_in_threadpool(repos.baselines.get_current_baseline, user.id)
+        if row is None or not row.audio_path:
+            return JSONResponse(
+                status_code=404,
+                content={"error_code": "baseline_not_found",
+                         "message": "No baseline recording found"},
+                headers={"Cache-Control": "no-store"},
+            )
+        url = await run_in_threadpool(
+            repos.files.create_signed_url,
+            user.id, settings.baselines_bucket, row.audio_path, settings.signed_url_ttl_s,
+        )
+    except StorageError:
+        logger.exception("Could not create baseline audio URL")
+        return _audio_unavailable()
+    return JSONResponse(
+        content={"url": url, "expires_in": settings.signed_url_ttl_s},
+        headers={"Cache-Control": "no-store"},
+    )

@@ -15,7 +15,7 @@ import src.app.main as main
 import src.app.routes.baselines as baselines
 from src.app.config import settings
 from src.app.db.factory import build_memory_repos, get_repos
-from src.app.db.models import StorageError
+from src.app.db.models import NewBaseline, StorageError
 from src.app.deps import CurrentUser, get_current_user
 from src.audio_processing.contracts import BaselineProfile, InsufficientAudio
 
@@ -174,3 +174,77 @@ def test_get_baseline_storage_error_returns_503(monkeypatch, repos):
     r = _get()
     assert r.status_code == 503
     assert r.json()["error_code"] == "baseline_unavailable"
+
+
+def _get_audio():
+    return TestClient(main.app).get("/api/baseline/audio")
+
+
+def _save(monkeypatch):
+    _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile()))
+
+
+def test_baseline_audio_ok(monkeypatch, repos):
+    _save(monkeypatch)
+    r = _get_audio()
+    assert r.status_code == 200
+    body = r.json()
+    assert set(body) == {"url", "expires_in"}
+    assert body["expires_in"] == settings.signed_url_ttl_s
+    assert body["url"]
+    assert r.headers["cache-control"] == "no-store"
+
+
+def test_baseline_audio_none_returns_404(repos):
+    r = _get_audio()
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "baseline_not_found"
+
+
+def test_baseline_audio_only_own_user(monkeypatch, repos, current):
+    _save(monkeypatch)  # A has a baseline
+    current["id"] = USER_B
+    assert _get_audio().status_code == 404  # B must not reach A's file
+    _save(monkeypatch)  # B saves its own
+    row_b = repos.baselines.get_current_baseline(USER_B)
+    url = _get_audio().json()["url"]
+    assert str(USER_B) in url and str(row_b.id) in url
+    assert str(USER_A) not in url
+
+
+def test_baseline_audio_signing_storage_error_returns_503(monkeypatch, repos):
+    _save(monkeypatch)
+
+    def broken(*args, **kwargs):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.files, "create_signed_url", broken)
+    r = _get_audio()
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "baseline_audio_unavailable"
+
+
+def test_baseline_audio_lookup_storage_error_returns_503(monkeypatch, repos):
+    def broken(*args, **kwargs):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.baselines, "get_current_baseline", broken)
+    r = _get_audio()
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "baseline_audio_unavailable"
+
+
+def test_baseline_audio_response_has_no_internal_keys(monkeypatch, repos):
+    _save(monkeypatch)
+    body = _get_audio().json()
+    assert "audio_path" not in body and "user_id" not in body
+
+
+def test_baseline_audio_row_without_audio_path_returns_404(repos):
+    repos.baselines.replace_current_baseline(
+        USER_A, NewBaseline(id=uuid4(), hesitation_threshold_s=1.0, audio_path=None)
+    )
+    assert repos.baselines.get_current_baseline(USER_A) is not None
+    r = _get_audio()
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "baseline_not_found"
