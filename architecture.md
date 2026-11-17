@@ -206,7 +206,11 @@ sequenceDiagram
 
 ## 7. Configuration
 
-Settings are read from `.env` by `src/app/config.py`. Database and storage settings:
+Settings are read from `.env` by `src/app/config.py`; tunable defaults come from `app_constants.toml`.
+
+API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS` and `GROQ_API_KEYS` each hold one or more comma-separated keys (all required). `src/app/key_pool.py` keeps one `KeyPool` per service: on HTTP 429/402 the key is locked for `exhausted_cooldown_s` and the same request is retried with the next key; on 401/403 the key is locked until restart; other errors move on to the next provider or model. STT tries every Deepgram key, then every Gladia key, then returns `503 stt_unavailable`. Groq (`src/text_processing/groq_pool.py`) tries every key for one model before the fallback model (quota is counted per model), then returns `generation_unavailable`. Logs show only the key position (`key #2`).
+
+Database and storage settings:
 
 | Setting                                             | Default                        | Meaning                                         |
 | --------------------------------------------------- | ------------------------------ | ----------------------------------------------- |

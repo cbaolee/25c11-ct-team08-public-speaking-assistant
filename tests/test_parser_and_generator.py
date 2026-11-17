@@ -51,7 +51,7 @@ def test_validate_pdf_file_rejects_fake_pdf(tmp_path) -> None:
 
 def test_script_generator_fallback_and_citation_check(monkeypatch) -> None:
     """Verify Groq fallback model chain and citation page verification."""
-    monkeypatch.setattr(settings, "groq_api_key", "dummy_key")
+    monkeypatch.setattr(settings, "groq_api_keys", ["dummy_key"])
     gen = ScriptGenerator()
     mock_client, ok_resp = MagicMock(), MagicMock()
     ok_resp.choices = [

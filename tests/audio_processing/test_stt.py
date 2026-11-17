@@ -10,8 +10,8 @@ from src.audio_processing.stt import STT_TIMEOUT, call_deepgram, call_gladia, tr
 
 @dataclass
 class MockSettings:
-    deepgram_api_key: str = "fake_dg_key"
-    gladia_api_key: str = "fake_gl_key"
+    deepgram_api_keys: tuple = ("fake_dg_key",)
+    gladia_api_keys: tuple = ("fake_gl_key",)
 
 @pytest.fixture
 def mock_master(tmp_path):

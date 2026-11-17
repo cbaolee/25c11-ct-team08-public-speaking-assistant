@@ -1,9 +1,11 @@
 import logging
+from collections.abc import Callable
 from typing import Any
 
 import requests
 
 from src.app.config import stt_connect_timeout_s, stt_read_timeout_s
+from src.app.key_pool import get_pool, status_code_of
 from src.audio_processing.contracts import (
     InsufficientAudio,
     MasterAudio,
@@ -99,28 +101,52 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
         flags=["filler_from_vad_only"]
     )
 
+def _try_provider(name: str, call: Callable[[str], SttResult], keys: list[str]) -> SttResult:
+    """Try each usable key of one provider in order.
+
+    429/402 locks the key for a cooldown and 401/403 locks it until restart, then the next
+    key is tried with the same request. Any other failure means the provider itself is down,
+    so the caller moves on to the next provider. Raises KeysExhaustedError when no key is left.
+    """
+    pool = get_pool(name, keys)
+    while True:
+        key = pool.current()
+        try:
+            return call(key)
+        except InsufficientAudio:
+            raise
+        except Exception as e:
+            if not pool.report(key, status_code_of(e)):
+                raise
+            logger.warning("%s failed, trying the next key", pool.label(key))
+
+
 def transcribe(master: MasterAudio, *, settings: Any) -> SttResult:
-    """Deepgram first, Gladia as fallback.
+    """Every Deepgram key first, then every Gladia key.
 
     An empty transcript (InsufficientAudio) is an answer about the audio, not a provider
     failure, so it is raised at once without calling the fallback. When both providers fail,
     raise SttUnavailable (the API answers 503 stt_unavailable).
     """
     try:
-        result = call_deepgram(master, api_key=settings.deepgram_api_key)
+        result = _try_provider(
+            "deepgram", lambda key: call_deepgram(master, api_key=key), settings.deepgram_api_keys
+        )
         logger.info("Transcribed using Deepgram")
         return result
     except InsufficientAudio:
         raise
     except Exception as e:
-        logger.warning("Deepgram failed: %s. Falling back to Gladia.", e)
+        logger.warning("Deepgram failed: %s. Falling back to Gladia.", type(e).__name__)
 
     try:
-        result = call_gladia(master, api_key=settings.gladia_api_key)
+        result = _try_provider(
+            "gladia", lambda key: call_gladia(master, api_key=key), settings.gladia_api_keys
+        )
         logger.info("Transcribed using Gladia")
         return result
     except InsufficientAudio:
         raise
     except Exception as e:
-        logger.error("Gladia failed too: %s", e)
+        logger.error("Gladia failed too: %s", type(e).__name__)
         raise SttUnavailable("Deepgram and Gladia both failed") from e
