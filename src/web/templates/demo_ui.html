@@ -151,7 +151,9 @@ main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 72px; }
 @media (max-width: 720px) { main { padding: 20px 16px 56px; } }
 .screen { display: none; }
 .screen.active { display: block; }
-.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.head h1 { font-size: clamp(24px, 2.4vw, 30px); }
+.head .sub { font-size: 15px; }
 /* After login: every screen sits on the landing stage's dark backdrop (same colours and washes, no mic, no light beam).
    Fixed behind everything, so panels scroll over it. */
 body.app-view { background: #05070D; }
@@ -303,14 +305,14 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 
 /* ---------- chat (Generate Script) ---------- */
 .chat { display: flex; flex-direction: column; gap: 14px; height: clamp(200px, calc(100vh - 480px), 420px); overflow-y: auto;   /* short enough that the topic picker and input stay on screen */ padding: 4px 2px 12px; }
-.bubble { max-width: min(680px, 92%); padding: 14px 16px; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--surface); line-height: 1.6; font-size: 16px; }
+.bubble { max-width: min(680px, 92%); padding: 14px 16px; border-radius: var(--r-panel); border: 1px solid var(--line); background: var(--surface); line-height: 1.6; font-size: 15px; }
 .bubble.me { align-self: flex-end; background: var(--accent-soft); border-color: var(--accent-line); white-space: pre-wrap; }
 .bubble.ai { align-self: flex-start; }
 .bubble.blocked { border-left: 4px solid var(--bad); }
 .bubble.blocked .blk-t { font: 600 22px/1.3 var(--serif); margin: 12px 0 6px; }
 .bubble .who { display: flex; align-items: center; gap: 8px; font: 600 13px var(--sans); color: var(--muted); margin-bottom: 8px; }
 .bubble .who svg { width: 18px; height: 18px; }
-.bubble .para { font: 400 20px/1.6 var(--serif); }
+.bubble .para { font: 400 15px/1.6 var(--serif); }
 .bubble .para + .para { margin-top: 10px; }
 .bubble .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .cite { font: 600 12px var(--sans); background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: var(--r-pill); margin-left: 6px; white-space: nowrap; vertical-align: 2px; }
@@ -319,7 +321,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .fcard { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: var(--r-panel); }
 .fcard svg { width: 28px; height: 28px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .fcard .fc-main { flex: 1; min-width: 0; }
-.fcard .fc-name { font: 600 15px var(--sans); overflow-wrap: anywhere; }
+.fcard .fc-name { font: 600 16px var(--sans); overflow-wrap: anywhere; }
+.fcard .fc-main .note { font-size: 15px; }
 /* Shared reading frame (script reader now; reusable for Practice): large type, airy lines, scrolls on its own */
 .reader { font: 400 1.1875rem/1.75 var(--serif); max-width: 68ch; margin: 0 auto; overflow-y: auto; overscroll-behavior: contain; }
 .reader .para + .para { margin-top: 1em; }
@@ -330,7 +333,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 @keyframes shimmer { to { background-position: -200% 0; } }
 .composer { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
 .composer .row { align-items: flex-end; }
-.composer textarea { min-height: 72px; flex: 1; min-width: 200px; resize: none; }
+.composer textarea { min-height: 68px; flex: 1; min-width: 200px; resize: none; font-size: 15px; }
+#s-script .composer select, #s-script .composer .csel-btn { font-size: 15px; }
+#s-script .composer .btn { min-height: 44px; }
+#s-script .composer .iconbtn { width: 44px; height: 44px; padding: 0; }
 .fchip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 3px 4px 3px 12px; font: 500 14px var(--sans); margin-bottom: 10px; }
 
 /* ---------- report ---------- */
@@ -623,12 +629,31 @@ table.t tr:last-child td { border-bottom: 0; }
 body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #gDemo { display: none !important; }
 
 /* ---------- follow-along (Practice) ---------- */
-.prbar { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; margin-top: 14px; }
-.prbar .prrec { flex: 1 1 320px; min-width: 0; }
-.prbar .prfull { flex: 1 1 100%; margin: 0; }
+.prbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; row-gap: 0; align-items: start; margin-top: 14px;
+  grid-template-areas: "seg speed" "pane speed" "note speed" "eval eval" "demo demo"; }
+.prbar > .seg { grid-area: seg; justify-self: start; }
+.prbar .prrec { grid-area: pane; min-width: 0; margin-top: 12px; text-align: center; }   /* Record and Upload panes share one cell */
+.prbar .prrec .row { justify-content: center; }
+.prbar #recNote { grid-area: note; margin-top: 10px; text-align: center; }
 .prbar .timer { font-size: 36px; margin: 0 0 10px; }
-.prbar .lvl { margin-bottom: 10px; height: 28px; }
+.prbar .lvl { margin-bottom: 10px; height: 28px; justify-content: center; }
+.prspeed { grid-area: speed; min-width: 0; }
 .prspeed label { margin: 0 0 4px; }
+.prspeed .note { margin-top: 6px; }
+#followWpm { flex: 1 1 auto; min-width: 0; }
+#followWpmVal { flex: none; min-width: 84px; text-align: right; white-space: nowrap; }
+.preval { grid-area: eval; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin-top: 18px; }
+.preval-msg { flex: 1 1 240px; min-width: 0; }
+.preval-msg #evalHint:not(:empty) { margin-left: 10px; }
+.preval .btn { margin-left: auto; }
+.prdemo { grid-area: demo; margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
+@media (max-width: 760px) {
+  .prbar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seg" "pane" "note" "speed" "eval" "demo"; }
+  .prspeed { margin-top: 16px; }
+}
+/* Profile baseline: both buttons on one row (same height), messages underneath */
+.blbtns { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin-top: 14px; }
+.blmsgs { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; }
 .reader-wide .sent { border-radius: 4px; padding: 1px 3px; margin: 0 -3px; transition: background .25s, color .25s, box-shadow .25s; }
 .reader-wide.following .sent.done { color: var(--muted); }
 .reader-wide.following .sent.cur { background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--ink); }
@@ -915,18 +940,17 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
         <input type="file" id="fileIn" accept="audio/*" hidden>
         <div class="ferr" id="upErr" role="alert"></div>
       </div>
-      <p class="note prfull" id="recNote" aria-live="polite"></p>
-      <div class="prfull prspeed" id="prSpeed">
+      <p class="note" id="recNote" aria-live="polite"></p>
+      <div class="prspeed" id="prSpeed">
         <label for="followWpm" id="followWpmLbl" data-t="practice.followWpmLabel"></label>
-        <div class="row" style="flex-wrap:nowrap"><input type="range" id="followWpm" min="100" max="180" step="5" value="145"><output class="num" id="followWpmVal" for="followWpm" style="min-width:64px;text-align:right"></output></div>
+        <div class="row" style="flex-wrap:nowrap"><input type="range" id="followWpm" min="100" max="180" step="5" value="145"><output class="num" id="followWpmVal" for="followWpm"></output></div>
         <p class="note" data-t="practice.followNote"></p>
       </div>
-      <div class="prfull row between">
-        <span class="note" id="audioState" aria-live="polite"></span>
+      <div class="preval">
+        <div class="preval-msg"><span class="note" id="audioState" aria-live="polite"></span><span class="note" id="evalHint"></span></div>
         <button class="btn btn-primary" type="button" id="evalBtn" data-t="practice.evaluate" disabled></button>
       </div>
-      <p class="note prfull" id="evalHint"></p>
-      <div class="prfull" style="padding-top:12px;border-top:1px dashed var(--line-strong)">
+      <div class="prdemo">
         <label for="demoScenario" style="margin:0 0 6px"><span class="badge-demo" data-t="demo.only"></span> <span data-t="demo.scenario"></span></label>
         <select id="demoScenario">
           <option value="ok" data-t="demo.sOk"></option>
@@ -998,8 +1022,8 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
       <div class="timer" id="blTimer" role="timer" aria-live="off"></div>
       <div class="lvl" id="blLvl" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
       <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="blBarWrap" data-t-aria="profile.progress"><i id="blBar"></i></div>
-      <div class="row" style="margin-top:14px"><button class="btn btn-record" type="button" id="blStart"></button><span class="pill" id="blStatus" role="status"></span></div>
-      <div class="row" style="margin-top:10px"><button class="btn" type="button" id="blListen" data-t="profile.listen" hidden></button><span class="pill warn" id="blListenMsg" role="status" hidden></span></div>
+      <div class="blbtns"><button class="btn btn-record" type="button" id="blStart"></button><button class="btn" type="button" id="blListen" data-t="profile.listen" hidden></button></div>
+      <div class="blmsgs"><span class="pill" id="blStatus" role="status"></span><span class="pill warn" id="blListenMsg" role="status" hidden></span></div>
       <audio id="blAudio" controls preload="none" hidden data-t-aria="profile.listenAria" style="margin-top:10px;width:100%"></audio>
     </div>
   </div>
