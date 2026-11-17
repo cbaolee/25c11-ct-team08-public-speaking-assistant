@@ -11,7 +11,7 @@ Let's start with the problem.
 
 The assignment asked me to {{ argument_assignment_summary }}
 
-Before writing any code, I spent some time making sure I understood what success would look like. I reread the requirements and separated them into three groups: things that were clearly required, things that were clearly out of scope, and things that were ambiguous. For the ambiguous ones, I couldn't ask a product manager, so I made explicit assumptions and wrote them down in the README.
+Before writing any code, I spent some time making sure I understood what success would look like. In my view, {{ argument_clarifying_requirements_first }}.
 
 The main assumptions I made were these. {{ argument_key_assumptions }} If any of these assumptions differ from what you intended, I'd be very happy to discuss how the design would change, because that's exactly the kind of conversation I'd have with a team in a real project.
 
@@ -23,7 +23,7 @@ For the technology, I used {{ argument_tech_stack }} My reasoning was simple: it
 
 At a high level, the solution is organized like this. {{ argument_architecture_summary }}
 
-I tried to follow one main principle throughout: keep each part responsible for one thing. The code that handles input and output is separated from the core logic, and the core logic doesn't depend on details like the database or the web framework. That makes the important logic easy to test on its own, and easy to change later. For example, if you wanted to replace the storage with a different database, only one part of the code would need to change.
+I tried to follow one main principle throughout: keep each part responsible for one thing. I believe that {{ argument_single_responsibility_value }}.
 
 The most important design decision comes next.
 
@@ -33,21 +33,19 @@ I considered at least one alternative here. {{ argument_alternative_considered }
 
 Time to see it working. I'll keep the demo to about three minutes.
 
-[Live demo, about three minutes. Suggested order: first the main happy path, then one edge case, then one error case, such as invalid input, to show how the system responds.]
-
 So that's the main flow. As you saw, I paid attention not only to the expected case, but also to what happens when things go wrong. Clear error messages and predictable behavior on bad input are what separate code that works in a demo from code that works in production.
 
 Next, testing.
 
 {{ argument_testing_approach }}
 
-My general strategy was to put most of the testing effort on the core logic, because that's where bugs would be most costly and where tests are cheapest to write and run. I wrote tests for the normal cases first, then for the edge cases I listed while reading the requirements, such as empty input, very large input, and duplicate or invalid values. Whenever I found a bug while developing, I first wrote a test that reproduced it, then fixed it, so the bug can't quietly come back.
+My general strategy was to put most of the testing effort on the core logic, because that's where bugs would be most costly and where tests are cheapest to write and run. My reasoning is that {{ argument_testing_strategy_view }}.
 
 All the tests can be run with a single command, which is described in the README, along with instructions for setting up and running the project. I tried to make sure that someone could go from cloning the repository to seeing the application running in just a few minutes, because I think the first five minutes of using someone's code tell you a lot about how they work.
 
 Now, trade-offs, because every solution has them.
 
-The first trade-off was simplicity versus flexibility. I kept the design fairly simple and avoided adding layers or abstractions that the current requirements don't need. The benefit is that the code is easy to read and review. The cost is that some future extensions would require a bit of refactoring. I think that's the right choice at this stage. It's usually easier to add structure when you actually need it than to remove structure you guessed wrong about.
+The first trade-off was simplicity versus flexibility. I would argue that {{ argument_simplicity_vs_flexibility }}.
 
 The second trade-off was completeness versus quality. As I mentioned, I chose to fully finish and test the core requirements rather than partially implement every optional feature.
 

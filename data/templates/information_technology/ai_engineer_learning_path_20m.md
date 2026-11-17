@@ -29,7 +29,7 @@ Level one: programming and software engineering foundations. About two to three 
 
 The main language of AI is Python. Learn it well: data types, functions, classes, modules, error handling, and writing clean, readable code. Then learn the core scientific libraries: NumPy for numerical computing, pandas for working with tables of data, and Matplotlib for basic charts.
 
-But don't stop at Python syntax. Learn the habits of professional software engineering: using Git, writing tests, organizing a project into modules, working in a Linux terminal, and setting up virtual environments so your projects don't conflict with each other. Many people entering AI from a pure math or data background struggle later because their code is hard to maintain. Good engineering habits are a real advantage.
+But don't stop at Python syntax. I would go further and say that {{ argument_engineering_habits_priority }}.
 
 Level two: the mathematics you actually need. About two to three months, and you'll keep returning to it.
 
@@ -41,7 +41,7 @@ Calculus, especially derivatives and the chain rule. Why? Because training a mod
 
 And probability and statistics: distributions, expected values, conditional probability, and how to evaluate results properly. Why? Because models make predictions under uncertainty, and you need to know whether a result is meaningful or just luck.
 
-You don't need to become a mathematician. You need enough understanding to know what's happening inside the models, to read technical explanations, and to debug when something goes wrong. A good approach is to learn the math alongside the code, so every concept is immediately connected to something you can see.
+You don't need to become a mathematician. You need enough understanding to know what's happening inside the models, to read technical explanations, and to debug when something goes wrong. In my opinion, {{ argument_math_depth_for_ai_engineers }}.
 
 Level three: classical machine learning. About two to three months.
 
@@ -69,7 +69,7 @@ Next, learn retrieval-augmented generation, usually called RAG. The idea is simp
 
 Then learn about tool use and agents: systems where the model can call functions, such as searching a database, checking an order status, or running code, and decide what to do next based on the results.
 
-Finally, and this is what separates professionals from hobbyists, learn to evaluate these systems. Language models can produce answers that sound confident but are wrong. So you need test sets of realistic questions, clear criteria for good answers, automated checks where possible, and human review. You also need to think about cost, because every call to a large model costs money, and about latency, because users won't wait thirty seconds for an answer.
+Finally, and this is what separates professionals from hobbyists, learn to evaluate these systems. I believe evaluation deserves this much weight because {{ argument_evaluation_separates_professionals }}.
 
 Since language model applications are where many new AI engineers start, it's worth going a little deeper into how they fail, because knowing the failure modes is what makes you valuable.
 
@@ -105,7 +105,7 @@ Now, a few words on responsible AI, because as an AI engineer, you'll have real 
 
 AI systems can reflect and amplify bias in their training data. They can make mistakes that sound convincing. They can be misused, for example, to generate misinformation or to manipulate people. And they often process sensitive personal data.
 
-So build these habits from the beginning. Ask who could be harmed if your system makes a mistake, and how badly. Test your system on different groups of users, not just the average user. Be transparent with users that they're interacting with AI, and about its limitations. Protect personal data and follow the laws that apply. And keep a human in the loop for high-stakes decisions, such as in healthcare, finance, hiring, or legal matters. Being responsible isn't a limitation on good engineering. It's part of it.
+So build these habits from the beginning. My strong view is that {{ argument_responsible_ai_habits }}.
 
 Your portfolio should show depth and range, and three projects can do it.
 

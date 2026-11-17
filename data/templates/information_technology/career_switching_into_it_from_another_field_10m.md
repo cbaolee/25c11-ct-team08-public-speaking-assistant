@@ -11,7 +11,7 @@ The answer is: it's not too late, it's definitely possible, but it's not easy, a
 
 Let's start with the most important mindset shift: you're not starting from zero.
 
-Career changers often think: "Fresh graduates have four years of IT education. I'm so far behind." But you have things many fresh graduates don't have. You know how a real workplace functions. You've dealt with difficult customers, deadlines, and managers. You can communicate professionally. And you understand a specific industry from the inside. Those are exactly the skills that many IT teams struggle to find.
+Career changers often think: "Fresh graduates have four years of IT education. I would argue the opposite is often true, because {{ argument_career_changer_advantages }}.
 
 The smartest strategy isn't to throw away your past. It's to build a bridge from your past to your new career.
 
@@ -33,7 +33,7 @@ As a career changer, your time is limited. You may have a full-time job, a famil
 
 Choose one target role, and learn the core skills for that role, not everything in IT. Use a structured program, whether it's a reputable online course, a part-time program, or a bootcamp, so you don't waste time deciding what to learn next. And protect regular study time, even if it's only one hour a day on weekdays and a longer session at the weekend. Consistency beats intensity.
 
-Most importantly, build projects that use your previous experience. If you were an accountant, build a dashboard that analyzes expenses. If you were a teacher, build a simple quiz app for students. If you worked in logistics, analyze delivery data. These projects show employers not only that you can do the technical work, but that you bring something unique.
+Most importantly, build projects that use your previous experience. In my view, {{ argument_projects_from_previous_experience }}.
 
 Step three: plan the financial side carefully.
 
@@ -65,7 +65,7 @@ And in month six, they start applying, both internally, to the company's data or
 
 Now, the doubts that almost every career changer faces.
 
-"Am I too old?" Age can be a factor in some companies, and it's fair to admit that. But many companies value maturity, reliability, and professional experience. And IT has many people who started their careers later and built very successful ones.
+"Am I too old?" Age can be a factor in some companies, and it's fair to admit that. But many companies value maturity, reliability, and professional experience. Still, I believe {{ argument_age_and_career_change }}.
 
 "Everyone around me seems smarter and younger." That feeling has a name: imposter syndrome. Almost everyone in IT feels it at some point, including people with twenty years of experience. It doesn't mean you don't belong. It means you're learning.
 

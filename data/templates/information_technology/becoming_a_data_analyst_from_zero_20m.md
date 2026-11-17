@@ -11,13 +11,13 @@ Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background
 
 What does a data analyst actually do? A typical week might include talking with managers to understand their questions, collecting and cleaning data from databases or spreadsheets, analyzing it to find trends and patterns, building charts and dashboards, and presenting findings with clear recommendations. Data analysts work in almost every industry: retail, banking, e-commerce, healthcare, logistics, marketing, and the public sector.
 
-And here's some good news for career changers. Data analysis is one of the most accessible entry points into the tech industry. You don't need a computer science degree. Many successful analysts come from business, economics, finance, marketing, or even teaching. In fact, knowledge of a business area can be a real advantage.
+And here's some good news for career changers. I would argue this is true because {{ argument_data_analysis_accessible_entry }}.
 
 So, what skills do you need? I'd group them into five.
 
 First, spreadsheets. Excel or Google Sheets are still the most widely used analysis tools in the business world. You need to be comfortable with formulas, lookups, cleaning data, and especially pivot tables, which let you summarize large amounts of data in seconds.
 
-Second, SQL. This is the most important technical skill for a data analyst. Most company data lives in databases, and SQL is how you ask questions of those databases. You should be able to select and filter data, join tables, group and aggregate, and eventually use more advanced features like window functions, which let you calculate things like running totals and rankings.
+Second, SQL. This is the most important technical skill for a data analyst. In my view, {{ argument_sql_priority_for_analysts }}.
 
 Third, statistics. Not advanced theory, but solid basics: averages and medians, and when to use which; spread and variation; percentages and growth rates; the idea of sampling; correlation, and why it doesn't prove causation; and the basic logic of comparing two groups, as in A/B testing.
 
@@ -93,7 +93,7 @@ Fourth, presenting numbers without a recommendation. Always answer the question 
 
 And fifth, giving up during the first difficult weeks of SQL. Almost everyone finds joins confusing at first. Keep practicing. One day it suddenly clicks.
 
-And a quick word on AI. AI tools can now write SQL, suggest charts, and summarize data. They can make you much faster, and you should learn to use them. But they can also produce queries that run perfectly and return the wrong answer, for example, by joining tables incorrectly and counting some orders twice. If you understand SQL and statistics yourself, you'll catch these mistakes. If you don't, you'll confidently present wrong numbers to your manager. So learn the fundamentals first, and then let AI make you faster.
+And a quick word on AI. AI tools can now write SQL, suggest charts, and summarize data. My position is that {{ argument_ai_and_analyst_judgment }}.
 
 Four questions that beginners often ask.
 
@@ -101,7 +101,7 @@ Four questions that beginners often ask.
 
 "Power BI or Tableau?" Both are excellent, and the concepts are very similar. Check which one appears more often in job postings where you want to work, and learn that one first. Once you know one well, switching to the other takes weeks, not months.
 
-"Isn't the data analyst market already crowded?" There's certainly more competition for entry-level roles than a few years ago. But there's also a lot of demand for analysts who combine solid technical skills with business understanding and clear communication. The candidates who stand out are those with real, well-explained projects, and often with knowledge of a specific industry.
+"Isn't the data analyst market already crowded?" There's certainly more competition for entry-level roles than a few years ago. But there's also a lot of demand for analysts who combine solid technical skills with business understanding and clear communication. Still, I remain optimistic, because {{ argument_analyst_market_outlook }}.
 
 "What's the difference between a data analyst and a data scientist?" In simple terms, a data analyst mainly answers questions about what happened and why, using SQL, spreadsheets, statistics, and dashboards. A data scientist more often builds predictive models and works with machine learning, which requires deeper mathematics and programming. Many data scientists started as analysts, so the analyst role can be a great first step if you're aiming further.
 

@@ -5,7 +5,7 @@ duration_min: 10
 ---
 Would you build a bridge in two-week sprints, changing the design after every demo? Probably not. Would you build a mobile app by writing every requirement down for six months before writing a single line of code? Probably not either. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and those two questions sit at the heart of one of the oldest debates in software development: Agile versus Waterfall.
 
-If you search online, you'll often find this presented as a battle between the old, slow way and the modern, fast way. Waterfall is the villain, and Agile is the hero. But I'd like to give you a more balanced picture today, because in reality, both approaches have strengths and weaknesses, and the best teams choose based on the situation, not on fashion.
+If you search online, you'll often find this presented as a battle between the old, slow way and the modern, fast way. In my view, that framing misses the point, because {{ argument_agile_waterfall_false_battle }}.
 
 The plan is simple: what each approach actually is and where it came from, a side-by-side comparison, and a practical way to decide which one fits a given project, including the option that many real teams use: a mix of both.
 
@@ -35,7 +35,7 @@ By the late nineteen nineties, many software developers were frustrated with hea
 
 The manifesto is built on four values. In short, they say that the authors value people and interactions more than processes and tools, working software more than comprehensive documentation, collaboration with customers more than contract negotiation, and responding to change more than following a plan. And importantly, the manifesto adds that the things on the right still have value. It's about priorities, not about throwing away plans or documents.
 
-In practice, Agile means working in short cycles, usually one to four weeks, often called iterations or sprints. In each cycle, the team plans a small set of features, builds them, tests them, and shows working software to stakeholders. Feedback from each cycle shapes the next one. The most popular Agile frameworks are Scrum, which uses fixed-length sprints and defined roles like the product owner and Scrum Master, and Kanban, which focuses on visualizing work and limiting how much is in progress at the same time.
+In practice, Agile means working in short cycles, usually one to four weeks, often called iterations or sprints. The real strength of this rhythm, I would argue, is that {{ argument_agile_short_cycle_value }}.
 
 Agile's strengths are, in many ways, the mirror image of Waterfall's weaknesses.
 
@@ -79,7 +79,7 @@ Question three: how available is the customer? Agile needs regular, engaged feed
 
 And question four: what's the team's experience? A team that has never worked in an Agile way will need training and support, otherwise it may end up with the worst of both worlds.
 
-And in reality, many organizations use a hybrid approach. For example, they might do upfront planning, architecture, and budgeting in a more Waterfall-like way, and then build and deliver the software itself in Agile sprints. Or a large company might use Waterfall-style milestones for reporting to management, while individual teams work in Scrum internally. That's not cheating. It's being pragmatic.
+And in reality, many organizations use a hybrid approach. My position is that {{ argument_hybrid_approach_case }}.
 
 {{ argument_context_specific_application }}
 

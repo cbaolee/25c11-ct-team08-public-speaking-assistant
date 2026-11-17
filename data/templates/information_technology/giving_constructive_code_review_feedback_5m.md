@@ -33,6 +33,6 @@ That's the full list: one important change, the {{ argument_main_issue_short_nam
 
 Does all of that sound fair to you? And is anything I said unclear, or do you disagree with any of it? I'd like to hear it if you see it differently.
 
-Great. If it would help, I'm happy to pair with you for half an hour on the main issue, especially if it turns out to be trickier than it looks. Just let me know.
+Great. Before we wrap up, my honest view is that {{ argument_why_respectful_review_matters }}.
 
 Thanks again, {{ argument_colleague_name }}. Really nice work on this one.

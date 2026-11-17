@@ -13,7 +13,7 @@ A user story is a short, simple description of a feature, told from the perspect
 
 Let's use a food delivery app as our example. Here's a user story: "As a hungry customer, I want to filter restaurants by delivery time, so that I can get my food quickly when I'm in a hurry."
 
-Notice the three parts: who, what, and why. The "why," the "so that" part, is the most important, and the one people most often skip. Once the team understands the real need, they can often find a better solution than the one originally asked for.
+Notice the three parts: who, what, and why. In my view, {{ argument_why_the_so_that_matters }}.
 
 There's a well-known idea from Ron Jeffries, one of the founders of Extreme Programming, that a user story has three parts, often called the three Cs: the Card, which is the short written story; the Conversation, where the product owner, developers, and testers clarify the details; and the Confirmation, which is the acceptance criteria. A user story is a promise to have a conversation, not a replacement for one.
 
@@ -27,7 +27,7 @@ Now, the most common mistakes, and how to fix them.
 
 Mistake number one: writing technical tasks as user stories. For example: "As a developer, I want to create a database table for restaurants." That's not a user story. It's a task. Users don't care about database tables. Instead, focus on the user value, and treat the technical work as tasks inside the story.
 
-Mistake number two: stories that are too big. "As a customer, I want to order food" is not a story. It's an entire app. Large stories like this are often called epics, and they need to be split. And a good tip: split by user value, not by technical layer. Don't split into "front end" and "back end." Instead, split by steps in the user's journey: browse restaurants, add items to the cart, pay, and track the order. Each smaller story still delivers something a user can actually use.
+Mistake number two: stories that are too big. I would argue that {{ argument_small_stories_value }}.
 
 And mistake number three: missing the "so that." Without it, the team builds exactly what was asked, even when there's a much better way to solve the real problem.
 

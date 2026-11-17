@@ -11,7 +11,7 @@ Let me explain why, so it doesn't sound like I'm just being cautious.
 
 When the team broke the work down, we estimated it at around {{ argument_realistic_estimate }}. The biggest parts are {{ argument_main_work_items }}. On top of that, {{ argument_hidden_complexity }}, which is the kind of thing that often takes longer than it looks from the outside. And that estimate already assumes things go reasonably smoothly.
 
-Now, we could try to squeeze it into the shorter timeline. But realistically, that would mean cutting corners on testing, working long overtime for several weeks, or both. And that usually leads to more bugs after release, which then take even more time to fix. So we'd end up hitting the date on paper, but with a product that isn't really ready, and a tired team going into the next project. I don't think that's what either of us wants.
+Now, we could try to squeeze it into the shorter timeline. In my honest view, {{ argument_cost_of_unrealistic_deadlines }}.
 
 So instead of just saying no, I'd like to suggest a few options, and see which one fits best with what matters most to you.
 

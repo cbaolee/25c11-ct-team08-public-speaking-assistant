@@ -17,7 +17,7 @@ So, what exactly is ERP?
 
 ERP stands for Enterprise Resource Planning. In simple terms, an ERP system is an integrated software system that manages a company's core business processes, such as finance, purchasing, inventory, production, sales, and human resources, using one shared database.
 
-That phrase, "one shared database," is the key idea. Instead of every department having its own separate data, everyone works from the same information, updated in real time. When the warehouse receives goods, the stock level is immediately visible to sales. When a sale is made, accounting sees it instantly. People often call this a "single source of truth."
+That phrase, "one shared database," is the key idea. In my view, {{ argument_single_source_of_truth }}.
 
 Now, let's look at what's inside an ERP system. Most ERP systems are organized into modules, each covering one area of the business. The most common ones follow.
 
@@ -41,7 +41,7 @@ Master data is the stable, core information that the business relies on again an
 
 Transactional data is the record of business events: a sales order, a purchase order, a goods receipt, an invoice, a payment. Every transaction refers to master data. A sales order, for example, refers to a customer, several products, a warehouse, and prices.
 
-This distinction matters a great deal. If master data is wrong, every transaction that uses it will be wrong too. Imagine a product set up with the wrong unit of measure, boxes instead of pieces, or the wrong price, or linked to the wrong account. That single mistake can silently affect hundreds of orders, stock values, and financial reports. That's why most companies assign clear owners for each type of master data and control who can create or change it.
+This distinction matters a great deal. I would argue that {{ argument_master_data_quality }}.
 
 The second concept is the document flow. In an ERP, business processes are recorded as a chain of linked documents. For example, a quotation becomes a sales order, which leads to a delivery, which leads to an invoice, which is settled by a payment. Each document refers to the one before it. This means you can start from any document and trace the whole story: from an invoice, you can see which delivery it belongs to, which order that delivery fulfilled, and which quotation the customer originally accepted. When an auditor or a manager asks "Why is this number here?", the document flow gives the answer.
 
@@ -81,7 +81,7 @@ And fifth, control and compliance. ERP systems keep detailed records of who did 
 
 Now, let's be realistic. ERP implementations are known for being challenging. They're expensive, they take a long time, and they touch almost every part of the business. Some have gone famously wrong.
 
-One well-known example is the American chocolate maker Hershey. In nineteen ninety-nine, the company launched a new set of integrated systems, including ERP, all at once, shortly before its busiest season, Halloween. Problems with the new system meant that orders couldn't be processed and shipped properly. Even though warehouses were full of chocolate, it couldn't reach stores in time, and the company reported a significant drop in sales and profits that quarter.
+One well-known example is the American chocolate maker Hershey. My reading of this case is that {{ argument_erp_failure_lessons }}.
 
 The lesson wasn't that ERP is bad. The lesson was about how it was implemented: too much changed at once, with not enough testing, at the worst possible time of the year.
 
@@ -91,7 +91,7 @@ First, planning: defining the goals, scope, budget, and team. Strong support fro
 
 Second, process analysis. The team maps how the business works today, often called the "as-is" process, and designs how it should work in the future, the "to-be" process. This is not just an IT exercise. It's a chance to improve the way the business works.
 
-Third, configuration. The ERP system is set up to match the agreed processes. And one of the most important pieces of advice in the ERP world: prefer configuration over customization. Modern ERP systems are built around proven, standard processes. Heavy customization, writing a lot of special code to make the system work exactly like the old way, makes the project more expensive, more risky, and much harder to upgrade later. Often, it's better to adapt the process to the system than the system to every old habit.
+Third, configuration. The ERP system is set up to match the agreed processes. My position is that {{ argument_adopt_standard_processes }}.
 
 Fourth, data migration. Data from old systems, such as customers, suppliers, products, and opening balances, must be cleaned and transferred. This is often underestimated. Bad data in the old system becomes bad data in the new system, only faster.
 

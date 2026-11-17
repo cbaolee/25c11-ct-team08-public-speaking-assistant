@@ -19,7 +19,7 @@ Stage one: define the problem.
 
 This sounds obvious, but it's the stage where many projects go wrong, because a vague goal leads to a model that answers the wrong question.
 
-The first question to ask is: do we even need machine learning? If a simple rule works, say, "customers whose card payment failed are likely to leave," then maybe a rule is enough. Machine learning is worth it when patterns are too complex for simple rules, and when we have enough data to learn them.
+The first question to ask is: do we even need machine learning? In my view, {{ argument_when_ml_is_needed }}.
 
 In our case, churn depends on many interacting factors, listening habits, payment history, customer service contacts, so machine learning makes sense.
 
@@ -63,7 +63,7 @@ The standard answer is to split the data into three parts. The training set, usu
 
 One important detail: for data that changes over time, like ours, we should split by time: train on older months and test on more recent months. Otherwise, we're accidentally letting the model peek into the future.
 
-And that brings us to one of the most dangerous traps in machine learning: data leakage. Data leakage happens when information that wouldn't be available at prediction time sneaks into the training data. Suppose our dataset includes a column called "cancellation reason." The model will learn that whenever this column is filled in, the customer churned, and it will look incredibly accurate. But in real life, we only know the cancellation reason after the customer has already left. That makes the model useless. Whenever a model seems too good to be true, suspect leakage first.
+And that brings us to one of the most dangerous traps in machine learning: data leakage. I would argue that {{ argument_data_leakage_danger }}.
 
 Stage six: build and train models.
 
@@ -97,7 +97,7 @@ A model learns from historical data, and historical data reflects the world as i
 
 In our churn project, that means asking two honest questions. First: could the model treat some groups of customers unfairly? For example, if it rarely offers discounts to older customers, simply because they were underrepresented in the data, that's a problem worth fixing.
 
-And second, a simple but powerful question to ask before any model goes live: "If this model makes a mistake, who could be harmed, and how badly?" For a music discount, the harm is small. For a model that approves loans or screens patients, it can be enormous, and the level of care must match.
+And second, a simple but powerful question to ask before any model goes live: "If this model makes a mistake, who could be harmed, and how badly?" For a music discount, the harm is small. I believe that {{ argument_harm_before_deployment }}.
 
 Stage eight: deploy and monitor.
 
@@ -117,7 +117,7 @@ A few years ago, the American real estate company Zillow ran a business called Z
 
 Then the housing market changed quickly, in ways that the historical data hadn't prepared the models for. The estimates of what houses would be worth in a few months turned out to be too optimistic, and the company ended up owning many homes worth less than it had paid. In November twenty twenty-one, Zillow announced that it was shutting down Zillow Offers, took a write-down of hundreds of millions of dollars on its housing inventory, and cut about a quarter of its workforce.
 
-What can we learn from this? Analysts debated the exact causes, but notice how many of today's stages appear in the story. The model was used for a very high-stakes decision, buying houses, where errors were extremely expensive, so the definition of success and the tolerance for error mattered enormously. The world changed after the model was trained, which is exactly the drift problem we discussed in stage eight. And predictions were acted on at a very large scale, so small errors multiplied quickly. The lesson is not that machine learning failed. The lesson is that a model's limits must be understood and monitored, especially when the stakes are high and the world is changing.
+What can we learn from this? My reading is that {{ argument_zillow_lessons }}.
 
 The whole map, stage by stage.
 

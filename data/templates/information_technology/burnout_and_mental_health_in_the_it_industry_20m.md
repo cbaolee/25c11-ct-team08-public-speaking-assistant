@@ -33,7 +33,7 @@ It's also important to say that burnout is different from mental health conditio
 
 Now, why is the IT industry particularly vulnerable?
 
-Researchers who study burnout have found that it's driven less by individual weakness and more by the conditions of work. Maslach and her colleague Michael Leiter identified six areas where a mismatch between a person and their job increases the risk of burnout: workload, control, reward, community, fairness, and values. Let's look at how each one shows up in tech.
+Researchers who study burnout have found that it's driven less by individual weakness and more by the conditions of work. I find this convincing because {{ argument_burnout_conditions_not_weakness }}.
 
 Workload. Tight deadlines, constantly shifting priorities, and the culture of "crunch" before releases, which is especially notorious in parts of the game industry, can create sustained periods of overwork. And unlike many jobs, software work is never really "finished." There's always another bug, another feature, another improvement.
 
@@ -47,11 +47,9 @@ Fairness. Unclear promotion criteria, unequal distribution of on-call duties or 
 
 And values. Being asked to build features you believe are harmful, or to cut corners on quality or security in ways you're not comfortable with, creates a painful conflict between what you do and what you believe.
 
-On top of these, our industry has some specific pressures. On-call duties, where you might be woken up at three in the morning by an alert. Being "always on" through work chat on your phone. The pressure to constantly learn new technologies to stay relevant, which, as we know, never stops. And impostor syndrome, which is common in tech: the persistent feeling that you're not as competent as others think, and that you'll eventually be "found out," even when there's clear evidence of your ability.
+On top of these, our industry has some specific pressures. My view is that {{ argument_it_specific_pressures }}.
 
 A short, private reflection.
-
-[Self-check, about two minutes. Ask the audience to think silently, without sharing, about the last month, and to rate themselves from one to five on three questions: "How often have I felt exhausted in a way that rest didn't fix?", "How often have I felt detached or cynical about my work?", and "How often have I felt that my work doesn't matter or that I'm not effective?" Remind them that this is not a diagnosis, only a moment of awareness.]
 
 Whatever your answers were, please be kind to yourself. If several of them were high, that's not a sign of weakness. It's useful information, and it's a reason to take action, which is what the rest of this talk is about.
 
@@ -97,7 +95,7 @@ Second, give people control. Let teams make decisions about how they work, and i
 
 Third, recognize invisible work. Publicly appreciate the person who prevented an outage, improved documentation, or helped a colleague, not only the person who shipped the flashy feature.
 
-Fourth, build psychological safety. That means a team climate where people feel safe to admit mistakes, ask questions, and raise concerns without fear of humiliation or punishment. Research at Google, in a project known as Project Aristotle, found psychological safety to be the most important factor distinguishing its most effective teams. Practices like blameless post-incident reviews, which focus on what in the system allowed a mistake to happen rather than on who to blame, are a concrete way to build it.
+Fourth, build psychological safety. I would argue that {{ argument_psychological_safety_value }}.
 
 Fifth, check in regularly, and really listen. In one-on-one meetings, ask not only about tasks, but about how people are doing. And if you notice warning signs, have a private, caring conversation. You might say: "I've noticed you seem more tired lately, and you've been working late a lot. How are you doing? Is there anything I can help with?" You don't need to diagnose anything. Your role is to notice, to care, and to help the person access support.
 
@@ -113,7 +111,7 @@ And for those who are already experiencing burnout, I want to say something abou
 
 Recovery from burnout usually takes longer than people expect. It's not solved by a single long weekend. It often takes weeks or months, and it's rarely a straight line: there will be good days and bad days. It typically involves two things at the same time: rest, to restore your energy, and change, to address the conditions that caused the burnout in the first place. Rest without change often leads straight back to burnout. That change might be a conversation with your manager about workload, a different role or team, new boundaries, or, sometimes, a new job.
 
-A few closing words about stigma. In many workplaces, and in many cultures, talking about mental health is still difficult. People worry that admitting they're struggling will be seen as weakness, or will hurt their career. That silence is part of the problem. Each time someone speaks openly, whether a junior developer or a senior leader, it becomes a little easier for the next person.
+A few closing words about stigma. I believe that {{ argument_breaking_mental_health_stigma }}.
 
 The main points, gathered: burnout is a syndrome caused by chronic workplace stress that hasn't been managed, recognized by the WHO as an occupational phenomenon, with three dimensions: exhaustion, cynicism, and reduced efficacy. Our industry is particularly vulnerable because of workload, lack of control, invisible work, isolation, constant learning pressure, and always-on culture. The warning signs are often gradual, so noticing them early matters. And the solutions exist at every level: individuals protecting their basics and setting boundaries, managers managing workload and building psychological safety, and organizations creating sustainable systems.
 

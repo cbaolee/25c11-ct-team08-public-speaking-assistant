@@ -21,7 +21,7 @@ And fourth, flexibility. Remote work can make it easier to manage family respons
 
 Now, the case for the office.
 
-The biggest advantage is learning, especially for juniors. A lot of learning in software development happens informally: overhearing how a senior engineer debugs a problem, turning around to ask a quick question, or joining a whiteboard discussion. Remotely, juniors often hesitate to "bother" people with a message, and they can stay stuck for much longer. Many managers and researchers have raised concerns that early-career employees are the ones who lose most from fully remote work.
+The biggest advantage is learning, especially for juniors. In my view, {{ argument_office_learning_for_juniors }}.
 
 Collaboration on complex, ambiguous problems matters too. Brainstorming a new architecture, resolving a difficult disagreement, or planning a product from scratch is often faster and richer in person. Video calls work well for structured meetings, but less well for spontaneous, messy, creative discussions.
 
@@ -29,7 +29,7 @@ And then there are relationships and trust. It's easier to build trust with peop
 
 Boundaries and wellbeing round out the list. For some people, working from home blurs the line between work and life. The laptop is always there, and the workday never really ends. Others feel isolated and lonely without the daily social contact of an office.
 
-So what does the evidence say? It's mixed, and it depends a lot on the type of work, the person, and, most importantly, how well the organization manages it. Studies have found productivity benefits in some settings and costs in others. One consistent finding, though, is that many employees value flexibility highly, and that hybrid arrangements, with some days in the office and some at home, can improve retention without clearly harming performance, when they're well organized.
+So what does the evidence say? It's mixed, and it depends a lot on the type of work, the person, and, most importantly, how well the organization manages it. My reading of the evidence is that {{ argument_productivity_evidence_view }}.
 
 {{ argument_local_context_note }}
 
@@ -39,7 +39,7 @@ Imagine two companies, both with a hybrid policy: three days in the office, two 
 
 At the first company, each person chooses their own office days. So, on any given day, half the team is at home. People commute to the office, then spend the day on video calls with colleagues who aren't there, wearing headphones in a noisy open space. Everyone is frustrated, and the office days feel pointless.
 
-At the second company, each team agrees on the same two "anchor days" in the office. Those days are reserved for collaboration: planning, design discussions, pair programming, mentoring, and team lunches. The remote days are protected for deep, focused work, with fewer meetings. Decisions and important discussions are always written down, so nobody misses information because of where they were sitting.
+At the second company, each team agrees on the same two "anchor days" in the office. I would argue that {{ argument_anchor_days_model }}.
 
 Same policy on paper. Very different results. The difference wasn't where people worked. It was whether the organization designed how they worked.
 

@@ -27,7 +27,7 @@ The third is recognition. Some employers, especially large corporations, governm
 
 The fourth is time to grow. Four years gives you time to explore, make mistakes, join clubs and competitions, build friendships and networks, and mature, which is especially valuable if you're starting right after high school.
 
-But a degree has real weaknesses, too. It takes four years, and it costs tuition and living expenses during that time, plus the income you're not earning. Some courses can feel distant from day-to-day industry work, and some curricula don't keep up with the latest tools. And a degree doesn't automatically make you job-ready. Students who only attend classes and pass exams, without building projects or doing internships, often struggle to find their first job.
+But a degree has real weaknesses, too. In my view, {{ argument_degree_weaknesses }}.
 
 Now, let's look at the coding bootcamp.
 
@@ -39,13 +39,13 @@ The third is career support. Good bootcamps help you prepare your portfolio, pra
 
 But bootcamps have significant weaknesses as well.
 
-The biggest one is depth. In a few months, there's simply no time to cover fundamentals like algorithms, data structures, or how systems work in detail. Many bootcamp graduates find that they need to keep studying these on their own, especially when they want to move into more senior or more technical roles.
+The biggest one is depth. I would argue that {{ argument_bootcamp_depth_gap }}.
 
 The second is intensity. Bootcamps are demanding. Learning a whole new field in a few months requires long hours and strong self-discipline, and not everyone keeps up.
 
 The third is that quality varies enormously. Some bootcamps are excellent, with experienced instructors and strong employer networks. Others are mostly marketing. Be very careful with promises like "guaranteed job," and always read the conditions in the small print.
 
-And the fourth is the job market itself. In recent years, competition for entry-level developer jobs has become tougher in many markets. That affects everyone, but candidates without a degree and with only a few months of experience can find it particularly challenging to get past the first screening. A bootcamp can get you ready to compete, but it can't guarantee that the market will be waiting for you.
+And the fourth is the job market itself. My honest view is that {{ argument_entry_level_market_view }}.
 
 Three scenarios make this more concrete.
 
@@ -83,7 +83,7 @@ If you choose a university degree, don't wait until your final year to become jo
 
 If you choose a bootcamp, prepare before day one. Many successful bootcamp students learn the basics of programming for free online before they start, so they can keep up with the pace. During the bootcamp, treat it like a full-time job, and go beyond the minimum on every project. And after you graduate, keep going: continue building projects, study the fundamentals the bootcamp didn't have time for, and stay active in the developer community. The first job search after a bootcamp can take months, and persistence is often what separates the people who make it from those who give up.
 
-One last thought: I'd like to challenge the idea that this is an either-or choice. Increasingly, people combine paths. University students take practical online courses or summer bootcamps. Bootcamp graduates continue with online degrees or self-study in computer science fundamentals. And people already working in IT keep learning through certifications and courses throughout their careers.
+One last thought: I'd like to challenge the idea that this is an either-or choice. I believe that {{ argument_combining_paths }}.
 
 {{ argument_local_context_note }}
 

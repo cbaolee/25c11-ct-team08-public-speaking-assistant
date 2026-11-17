@@ -19,13 +19,13 @@ Let's start with the myths.
 
 Myth number one: "IT means sitting alone in a dark room typing code all day." You've probably seen this in movies: a person in a hoodie, alone, typing very fast on a black screen full of green text. In reality, most IT work is teamwork. Developers spend a lot of time talking with each other, with designers, with customers, and with managers. Communication is one of the most important skills in IT. And most offices have the lights on.
 
-Myth number two: "You have to be a math genius." Math helps, and for some areas, like artificial intelligence or data science, it's really important. But for many IT jobs, what matters most is logical thinking: breaking a big problem into small steps, and thinking clearly about what should happen in each situation. If you can follow a recipe, plan a trip, or figure out the rules of a new game, you're already using that kind of thinking. And it can be trained, just like a muscle.
+Myth number two: "You have to be a math genius." Math helps, and for some areas, like artificial intelligence or data science, it's really important. In my view, {{ argument_math_and_it_myth }}.
 
-Myth number three: "IT is only for boys." Absolutely not. One of the first people in history to write what we'd now call a computer program was a woman, Ada Lovelace, back in the eighteen forties. Today, women work in every area of IT, as developers, designers, data scientists, security experts, and leaders of major technology companies. So if you're a girl interested in technology, this field needs you.
+Myth number three: "IT is only for boys." Absolutely not. One of the first people in history to write what we'd now call a computer program was a woman, Ada Lovelace, back in the eighteen forties. I believe that {{ argument_it_is_for_everyone }}.
 
 Myth number four: "If I love playing games, I'll love working in IT." Maybe! But playing games and making software are very different. Playing is about enjoying the result. Building is about patience, solving problems, and fixing things that don't work. Some gamers become great developers. Others discover they prefer playing. The only way to know is to try building something yourself, and I'll show you how later.
 
-And myth number five: "Artificial intelligence will do all the programming, so there won't be any IT jobs left." AI tools are definitely changing how people work in IT. They can write simple code, explain errors, and save a lot of time. But someone still needs to understand the problem, design the solution, check whether the AI's answer is correct and secure, and decide what to build in the first place. The jobs are changing, but people who understand both technology and real-world problems will still be very much needed. In fact, learning how to work well with AI will be one of the most valuable skills of your generation.
+And myth number five: "Artificial intelligence will do all the programming, so there won't be any IT jobs left." AI tools are definitely changing how people work in IT. I would argue that {{ argument_ai_and_future_it_jobs }}.
 
 So where is IT in your life? Think about your morning. Your alarm went off on your phone. Maybe you checked messages, watched a short video, or paid for breakfast by scanning a QR code. Every one of those moments was built by teams of IT people. Someone designed the screen you tapped. Someone wrote the code that sends your message across the country in less than a second. Someone protects your bank account from hackers. And it's not just apps: hospitals, farms, banks, airlines, and schools all run on software. That's why IT people work in almost every industry.
 
@@ -61,7 +61,7 @@ Third, build something small that you care about. A simple game. A website about
 
 And fourth, join activities: school IT clubs, programming competitions, informatics olympiads, science fairs, or summer coding camps. They're great for learning, making friends with similar interests, and showing universities that you're genuinely motivated.
 
-Now, the challenges, because every career has some, and you deserve to hear them. You never stop learning: technology changes very fast, which is exciting if you love learning, and tiring if you don't. It can be frustrating: sometimes you'll spend hours trying to find one small mistake in your code, so patience is essential. The work involves a lot of screen time, so you have to take care of your health. And getting your first job takes effort: you'll need real projects and good skills, not just a diploma. I'm not telling you this to scare you. I'm telling you so you can make an informed choice.
+Now, the challenges, because every career has some, and you deserve to hear them. My honest view is that {{ argument_it_career_challenges_worth_it }}.
 
 Now, let's have some fun. It's quiz time! I'm going to ask you four quick questions. For each one, choose A, B, C, or D, and remember your answers. Ready?
 

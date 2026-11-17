@@ -9,7 +9,7 @@ Who do you think got the job? Almost every time, it's the second one. Not becaus
 
 Good {{ argument_time_of_day }}, everyone. My name is {{ argument_speaker_name }}, and {{ argument_speaker_background }} That difference is what today is about: the skills that rarely appear in programming courses, but that very often decide who gets hired, who gets promoted, and who becomes the person everyone wants on their team.
 
-The term "soft skills" sometimes makes these abilities sound less important, as if they were optional extras. But in modern software development, where almost everything is built by teams, they're anything but soft. Some people prefer to call them "core skills" or "professional skills," and I think that's more accurate.
+The term "soft skills" sometimes makes these abilities sound less important, as if they were optional extras. I would argue that {{ argument_soft_skills_are_core }}.
 
 Today, I'll share seven soft skills that make developers stand out. For each one, I'll explain what it looks like in practice, and give you one small habit you can start using right away.
 
@@ -41,7 +41,7 @@ Skill four: giving and receiving feedback well.
 
 Code reviews, retrospectives, and one-on-one meetings are all about feedback. Developers who can receive feedback without becoming defensive learn dramatically faster. And developers who can give feedback kindly and clearly help the whole team improve.
 
-When receiving feedback, listen fully, ask for examples if something isn't clear, thank the person, and remember that criticism of your code isn't criticism of you. When giving feedback, be specific, focus on the code or the behavior rather than the person, and explain why something matters. For example, instead of "This is wrong," try: "This might cause a problem when the list is empty. What do you think about adding a check here?"
+When receiving feedback, listen fully, ask for examples if something isn't clear, thank the person, and remember that criticism of your code isn't criticism of you. I believe that {{ argument_feedback_is_not_personal }}.
 
 The habit: the next time someone comments on your work, start your reply with "Thanks, good point," and genuinely consider it before responding.
 
@@ -49,7 +49,7 @@ Skill five: time management and prioritization.
 
 Developers face constant interruptions: messages, meetings, urgent bugs, and questions from colleagues. Those who stand out can protect focused time for deep work, estimate realistically, and prioritize the tasks that matter most rather than the ones that shout the loudest.
 
-And just as importantly, they communicate when things change. If a task is taking longer than expected, they say so early, not on the day of the deadline. Being reliable doesn't mean never being late. It means never surprising people. A good delay message has three parts: what's late and by how much, why, and what you propose. Something like: "The export feature will be about two days late, because the old report code turned out to need a rewrite. I can either ship a basic version on Friday and the full one on Tuesday, or ship everything on Tuesday. Which works better for you?" A message like that turns bad news into a decision the team can make together, and it builds trust instead of eroding it.
+And just as importantly, they communicate when things change. In my view, {{ argument_reliability_through_communication }}.
 
 The habit: at the start of each day, write down the one or two most important things you need to finish, and block time for them before checking every message.
 
@@ -63,7 +63,7 @@ The habit: before starting any significant task, write one sentence describing t
 
 Skill seven: empathy, for users and for teammates.
 
-Empathy means understanding how others think and feel. For users, it means remembering that not everyone uses your app the way you do. Some are older, some have slow internet, some have disabilities, and some are using your app while stressed or in a hurry. Developers with empathy build products that are easier and kinder to use.
+Empathy means understanding how others think and feel. My position is that {{ argument_empathy_in_engineering }}.
 
 For teammates, empathy means understanding that the designer who changed the layout again may be under pressure from a client, or that the junior asking the same question twice may be overwhelmed. Responding with patience instead of frustration builds trust.
 

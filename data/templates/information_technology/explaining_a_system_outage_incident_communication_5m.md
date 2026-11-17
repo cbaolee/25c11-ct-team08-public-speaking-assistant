@@ -25,6 +25,6 @@ If you notice anything unusual in the coming days, please contact {{ argument_su
 
 In brief: the service is fully restored, {{ argument_data_safety_short }}, we understand what caused the problem, and we're taking concrete steps to prevent it from happening again.
 
-Once again, I apologize for the disruption. We take the reliability of our service very seriously, and we'll work hard to earn back your trust.
+Once again, I apologize for the disruption. We believe that {{ argument_rebuilding_trust_commitment }}.
 
 I'll stay for as many questions as you have.

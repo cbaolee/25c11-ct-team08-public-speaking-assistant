@@ -5,7 +5,7 @@ duration_min: 10
 ---
 Software engineering, data science, or cybersecurity: if you're an IT student, there's a good chance you've changed your mind about these three at least once this year. Hi everyone, and thanks for coming. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's make that decision a little easier.
 
-All three are exciting, in demand, and well paid. So it's not really a question of which one is "best." It's a question of which one is best for you. My goal today is to give you a clear picture of each field: what the work really looks like day to day, what you'll study, what skills matter, and what kind of person tends to thrive there. And at the end, I'll give you a few practical ways to test which one suits you, before you commit.
+All three are exciting, in demand, and well paid. So it's not really a question of which one is "best." It's a question of which one is best for you. My view is that {{ argument_fit_over_ranking }}.
 
 Let's start with Software Engineering.
 
@@ -29,7 +29,7 @@ In a Data Science program, you'll study a lot of mathematics and statistics: pro
 
 Data Science suits you if you're curious and enjoy finding patterns, if you're comfortable with math and statistics, and if you like the idea of turning numbers into stories that help people decide. Communication matters more than many people expect. A brilliant analysis is useless if nobody understands it.
 
-The challenges? First, the math is real, so you need to be willing to work on it. Second, a surprising amount of the job is cleaning messy data, not building exciting models. And third, entry-level data science roles can be competitive, so many people start as data analysts and grow from there.
+The challenges? Honestly, I think {{ argument_data_science_reality }}.
 
 The third path is Cybersecurity.
 
@@ -55,7 +55,7 @@ And finally, impact: what kind of impact do you want to have? All three make a d
 
 And the most practical advice: don't decide purely in theory. Try each one. Build a small app or website to get a feel for software engineering. Take a public dataset, for example about movies, football, or air quality, and try to analyze it and find something interesting to get a feel for data science. And try a beginner-friendly cybersecurity challenge, often called a capture-the-flag, or CTF, competition, to get a feel for security. A few weekends of hands-on experience will tell you more than any talk, including this one.
 
-Also, remember that these fields overlap more than you might think. Software engineers need security knowledge. Data scientists need solid programming skills. Security specialists need to understand both software and data. And many people move between these areas during their careers. Your first choice is not a life sentence.
+Also, remember that these fields overlap more than you might think. In my opinion, {{ argument_fields_overlap_view }}.
 
 {{ argument_local_program_note }}
 

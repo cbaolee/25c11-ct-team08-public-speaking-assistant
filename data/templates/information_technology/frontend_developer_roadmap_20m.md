@@ -5,7 +5,7 @@ duration_min: 20
 ---
 Every button you click, every menu you open, and every animation you see on a website was built by someone. That someone is a front-end developer. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'll share a roadmap for becoming one: what to learn, in what order, how long it usually takes, and what mistakes to avoid along the way.
 
-If you search online for "front-end roadmap," you'll probably find giant diagrams with a hundred boxes and arrows. They're useful as references, but for a beginner, they can be overwhelming. You look at them and think: "I'll never learn all of this." So today, I want to do something different. I want to give you a path, not a map: a clear sequence of phases, with what really matters at each phase, and what can safely wait.
+If you search online for "front-end roadmap," you'll probably find giant diagrams with a hundred boxes and arrows. In my view, {{ argument_focused_roadmap_over_giant_diagrams }}.
 
 Let's start with the basics: what does a front-end developer actually do?
 
@@ -45,7 +45,7 @@ My advice: pick one, based on what's most common in job postings where you want 
 
 Those core ideas include components, which are reusable pieces of the interface; props and state, which control how data flows and changes; handling user events; managing forms; routing between pages; and fetching data from APIs. As your applications grow, you'll also learn patterns for managing shared state across many components.
 
-At this phase, I'd also strongly recommend learning TypeScript. TypeScript adds types to JavaScript, which helps catch many mistakes before your code runs and makes large projects much easier to maintain. A growing number of companies use it by default, so it's becoming an expected skill rather than a bonus.
+At this phase, I'd also strongly recommend learning TypeScript. My reasoning is that {{ argument_typescript_value }}.
 
 By the end of phase three, build at least one substantial project with your framework: something with multiple pages, data from an API, forms with validation, and a thoughtful design. For example, a movie search app, a personal finance tracker, or a small online shop interface.
 
@@ -53,7 +53,7 @@ Phase four: become a professional front-end developer. Roughly two to three mont
 
 This is the phase that separates people who can build something that works on their own computer from people who can build something that works well for real users. There are four areas I'd like you to focus on.
 
-The first is accessibility. Accessibility means making sure people with disabilities can use your website, for example, people who use screen readers, people who navigate only with a keyboard, or people with low vision or color blindness. There's an international set of guidelines for this, the Web Content Accessibility Guidelines, known as WCAG. At a minimum, learn to use semantic HTML, add text alternatives for images, make sure everything works with a keyboard, and ensure good color contrast. Accessibility is not only the right thing to do. In many places, it's also a legal requirement.
+The first is accessibility. I would argue that {{ argument_accessibility_as_core_skill }}.
 
 The second is performance. Users leave slow websites. Learn how to optimize images, avoid loading unnecessary code, and measure performance. Google's Core Web Vitals are a useful starting point. They measure how quickly the main content loads, how quickly the page responds to user interaction, and how stable the layout is while loading.
 
@@ -109,7 +109,7 @@ Two questions come up almost every time this topic is discussed.
 
 "Should I learn a CSS framework, like Tailwind or Bootstrap?" Yes, eventually, because many companies use them, and they can make you much faster. But learn plain CSS first. If you understand how layout, spacing, and the cascade work, any CSS framework will make sense in a day. If you don't, the framework will just hide problems you can't fix.
 
-"With AI tools and website builders, is front-end development dying?" Simple websites are indeed easier to create without code than ever before. But complex web applications, such as banking platforms, online stores, internal business tools, and collaborative apps, still need skilled front-end engineers who understand performance, accessibility, security, and maintainability. The bar is rising: there's less demand for people who can only copy layouts, and more demand for people who truly understand how the web works.
+"With AI tools and website builders, is front-end development dying?" Simple websites are indeed easier to create without code than ever before. But complex web applications, such as banking platforms, online stores, internal business tools, and collaborative apps, still need skilled front-end engineers who understand performance, accessibility, security, and maintainability. My view is that {{ argument_future_of_frontend_with_ai }}.
 
 The whole roadmap, compressed.
 

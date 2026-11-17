@@ -33,7 +33,7 @@ Fourth, environments and infrastructure. {{ argument_infrastructure_handover }}
 
 And fifth, knowledge transfer. Over the past {{ argument_knowledge_transfer_period }}, our team held {{ argument_knowledge_transfer_sessions }} with your team. The recordings and materials from these sessions are also included in the documentation.
 
-What's still open deserves full transparency. A good handover isn't one where everything is perfect. It's one where nothing is hidden.
+What's still open deserves full transparency. A good handover isn't one where everything is perfect. In our view, {{ argument_transparency_in_handover }}.
 
 There are currently {{ argument_open_issues_count }} known open issues, none of which are critical. {{ argument_open_issues_summary }} Each of them is documented, with a description, its impact, and a suggested solution, in {{ argument_issue_tracker_location }}.
 
@@ -49,7 +49,7 @@ After the warranty period, {{ argument_post_warranty_arrangement }}
 
 To make the transition clear, from today, {{ argument_client_responsibility_owner }} is responsible for the day-to-day operation of the system, and the first point of contact for your users. Our team becomes second-line support during the warranty period.
 
-The project also taught us a few lessons. We held a retrospective on it, and these were the main points.
+The project also taught us a few lessons. Above all, we believe that {{ argument_project_lessons_view }}.
 
 What went particularly well: {{ argument_what_went_well }}
 

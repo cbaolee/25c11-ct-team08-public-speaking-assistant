@@ -25,7 +25,7 @@ I've spent about {{ argument_time_spent }} on this already, and I'd rather ask n
 
 And you don't need to solve it for me. Even a hint about where to look next would be really helpful. I'd actually prefer to understand the reasoning, so I can handle this kind of problem myself next time.
 
-After we talk, I'll try your suggestion on my own first, and I'll let you know how it went, whether it worked or not. If I'm still stuck after another hour or so, I'll come back with what I learned, rather than disappearing for two days and then asking the same question again.
+After we talk, I'll try your suggestion on my own first, and I'll let you know how it went, whether it worked or not. In my experience, {{ argument_follow_through_builds_credibility }}.
 
 Oh, and once we've figured it out, I'll write a short note about it in our team wiki, so the next person who runs into this doesn't have to bother you with the same question.
 

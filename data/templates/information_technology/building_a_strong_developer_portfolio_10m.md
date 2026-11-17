@@ -17,11 +17,11 @@ At its core, a developer portfolio usually has three parts. A GitHub profile, or
 
 Second, how do you choose your projects?
 
-The most important rule: quality over quantity. Three excellent projects are much better than fifteen small ones that were copied from tutorials. Reviewers see the same tutorial projects again and again: the same to-do list, the same weather app, the same clone of a famous website. Those projects show that you can follow instructions, but not that you can solve problems on your own.
+The most important rule: quality over quantity. Three excellent projects are much better than fifteen small ones that were copied from tutorials. I would add that {{ argument_quality_over_quantity_view }}.
 
 So, aim for projects with these qualities.
 
-They solve a real problem, ideally one you or someone you know actually has. For example, a booking tool for a small business run by a relative, an app that helps your club track attendance, or a tool that automates a boring task in your part-time job. Real problems lead to real decisions, and real decisions give you great stories for interviews.
+They solve a real problem, ideally one you or someone you know actually has. In my opinion, {{ argument_real_problem_projects }}.
 
 They show depth. One project should go beyond the basics: user authentication, a database, handling errors properly, tests, and deployment. This shows that you understand what it takes to build something complete.
 
@@ -65,7 +65,7 @@ Red flag four: never updating. Your portfolio should grow with you. When you bui
 
 And red flag five: hiding teamwork. If you built something with classmates, include it, but be honest and specific about which parts you did. Teamwork is a valuable skill to show.
 
-Finally, connect your portfolio to everything else. Put the link at the top of your CV and your professional profile. Mention specific projects in your cover letters, especially ones related to the company's field. And in interviews, be ready to walk through any project in detail: why you built it, how it works, what went wrong, and what you learned. Many interviews today start with exactly that conversation.
+Finally, connect your portfolio to everything else. My view is that {{ argument_portfolio_as_connected_story }}.
 
 {{ argument_portfolio_example }}
 

@@ -13,7 +13,7 @@ Estimates vary, but many studies place the information and communication technol
 
 {{ argument_local_energy_context }}
 
-Here's the part that matters for us: software decides how much hardware we need, how hard it works, and for how long. For a long time, developers didn't need to think much about this. Hardware kept getting faster and cheaper, so inefficient code was often "good enough." At today's scale, every unnecessary computation, every redundant data transfer, and every idle service running around the clock translates into real electricity, real emissions, and real money.
+Here's the part that matters for us: software decides how much hardware we need, how hard it works, and for how long. I would argue that {{ argument_software_drives_hardware_footprint }}.
 
 My goal is that you leave today not just with facts, but with a clear sense of what you, personally, can change in the code and systems you work on, starting next week.
 
@@ -49,7 +49,7 @@ Imagine a university's online learning platform. Every night, it generates detai
 
 Now imagine a review of this platform with green software in mind. The team generates reports only for courses where an instructor has requested them, and only when data has changed. They keep reports for one academic year, and archive older ones. They encode videos at several quality levels, and stream the one that fits each student's screen and connection. They schedule test servers to turn off at night and on weekends. And they use autoscaling, so that extra capacity is added during exam periods and removed afterward.
 
-No single change is dramatic. But together, they can substantially reduce the computing, storage, and network resources the platform needs. And almost every one of these changes also saves money, and many improve the experience for users, especially those with older phones or weak connections. You'll see that pattern again and again: in software, sustainability and good engineering usually point in the same direction.
+No single change is dramatic. In my view, {{ argument_small_changes_add_up }}.
 
 {{ argument_green_software_example }}
 
@@ -59,7 +59,7 @@ Over the past decade or so, the average web page has become much heavier. Data c
 
 A practical checklist for lighter websites: optimize images, using modern formats, the right dimensions for each screen, and compression. Load images and videos only when they're about to appear on screen, which is called lazy loading. Avoid autoplaying videos. Question every third-party script, because each analytics tool, chat widget, or tracking pixel adds weight. Limit custom fonts to what you really need. Use caching so that returning visitors don't download the same files again. And measure your page weight regularly, so that it doesn't grow quietly over time.
 
-This checklist is the same as a checklist for a fast, accessible website. Faster pages rank better in search engines, convert better, and work better for users with older phones or expensive mobile data. So when you make a website lighter, you're helping the planet, your users, and your business at the same time.
+This checklist is the same as a checklist for a fast, accessible website. My position is that {{ argument_green_equals_good_engineering }}.
 
 A related practice: designing software for longevity. When an app stops supporting older operating system versions, or becomes too heavy to run smoothly on older phones, users are effectively pushed to buy new devices, even when their current ones work perfectly well. Sometimes that's unavoidable, for example for security reasons. But often, it's the result of choices nobody examined: adding a heavy library for a small feature, raising the minimum supported version because it's slightly more convenient, or never testing on older hardware. Software that works well on older and cheaper devices is not only greener. It's fairer, because those devices often belong to users with lower incomes.
 
@@ -67,11 +67,9 @@ No discussion of green software today would be complete without AI. Training lar
 
 The same principles apply. Use the right model for the task: for classification, extraction, or routing, a smaller or specialized model can often perform well, using a fraction of the computation. Start with the smallest model that might work, measure it, and only move to a larger one if needed. Avoid unnecessary calls, by caching common answers and not calling a model for tasks that simple code can do reliably. And measure the energy and cost of AI features, because without measurement, you can't make informed decisions about them.
 
-One important warning before we practice. When a technology becomes more efficient, it often becomes cheaper to use, and so people use more of it. This is called the rebound effect, and it goes back to the economist William Stanley Jevons, who observed in the nineteenth century that more efficient steam engines led to more coal being used, not less. In IT, we see it constantly: as computing, storage, and bandwidth become cheaper, we use vastly more of them. So efficiency improvements are necessary, but on their own, they're not sufficient. We also need to ask whether we need everything we're building, running, and storing.
+One important warning before we practice. I believe that {{ argument_rebound_effect_warning }}.
 
 Now, it's time for you to apply what we've discussed.
-
-[Practical exercise, about three minutes. Ask the audience to think of a system or project they know well, such as a website they built, an application at work, or a student project. Individually or with a neighbor, they should identify two sources of digital waste, using the categories from today: inefficient code, missing caching, oversized or idle infrastructure, data stored without purpose, heavy data transfer, or unnecessary AI calls. For each, they should write one concrete action that would reduce it. Invite two or three people to share one example each.]
 
 I hope you noticed that it wasn't difficult to find waste. Almost every system has some. And reducing it usually saves money, too.
 

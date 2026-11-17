@@ -23,7 +23,7 @@ Concern number two: "Won't artificial intelligence replace programmers?"
 
 AI tools can now write simple code, answer technical questions, and speed up many tasks. That's real, and it is changing how IT people work. Some simple, repetitive tasks will need fewer people.
 
-But let me give you an analogy. When calculators and spreadsheet software became common, many people thought accountants would disappear. Instead, accountants stopped doing so much manual arithmetic and focused more on analysis, advice, and decision-making. Something similar is happening in IT. Someone still needs to understand what the business needs, design the system, check whether the AI's code is correct and secure, connect everything together, and take responsibility when something goes wrong.
+But let me give you an analogy. In my view, {{ argument_ai_will_change_not_end_it_jobs }}.
 
 So the question is not really "Will there be IT jobs?" but "What kind of IT professional will be needed?" The answer is: people with strong fundamentals, good judgment, and the ability to use AI tools well. That's exactly what a good education, and a curious, hard-working student, can provide.
 
@@ -31,7 +31,7 @@ Concern number three: "My child isn't very good at math. Can they still succeed?
 
 It depends on the area, but in most cases, yes.
 
-Some fields, like artificial intelligence, data science, and certain research areas, do require strong mathematics. But many IT roles, such as web development, testing, IT support, user experience design, or business analysis, rely more on logical thinking, attention to detail, and communication than on advanced math.
+Some fields, like artificial intelligence, data science, and certain research areas, do require strong mathematics. My position is that {{ argument_math_fear_overstated }}.
 
 Concern number four: "My daughter wants to study IT. Is it a good field for girls?"
 
@@ -55,7 +55,7 @@ Second, the return on the investment depends largely on how your child uses thos
 
 Concern number seven: "Is IT a stable career? Wouldn't a more traditional, secure job be better?"
 
-The truth is that IT careers are usually less about having one job for life, and more about having skills that are valued in many places. A person with strong IT skills can work in a bank, a hospital, a factory, a startup, a government agency, or a foreign company, and sometimes even remotely. In that sense, IT skills can provide a different kind of security: not the security of one employer, but the security of being useful to many.
+The truth is that IT careers are usually less about having one job for life, and more about having skills that are valued in many places. I would argue that {{ argument_transferable_it_skills }}.
 
 That said, IT people do need to keep learning throughout their careers, because technology changes. A child who enjoys learning will see that as exciting. A child who strongly prefers routine may find it tiring, and that's worth discussing honestly.
 
@@ -63,7 +63,7 @@ And concern number eight: "What if my child is only choosing IT because their fr
 
 This is an important question, and it's worth exploring gently. Following friends or salary trends is not a strong enough reason to spend four years studying something. Students who are genuinely interested tend to work harder, recover from difficulties better, and enjoy their careers more.
 
-So, instead of saying "yes" or "no," try asking open questions. "What part of IT interests you?" "Which job would you like to do?" "Have you tried programming? How did it feel?" And encourage them to test their interest before choosing: a short online course, a summer workshop, a conversation with someone who works in IT, or a visit to a university Open Day.
+So, instead of saying "yes" or "no," try asking open questions. I believe that {{ argument_open_questions_over_verdicts }}.
 
 {{ argument_real_parent_story }}
 
