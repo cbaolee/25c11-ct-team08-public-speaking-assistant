@@ -285,8 +285,8 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .steps li.cur .n { background: var(--accent); color: #fff; }
 
 /* ---------- teleprompter sheet ---------- */
-.sheet { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); padding: 24px 28px; font: 400 clamp(22px, 2.4vw, 28px)/1.62 var(--serif); min-height: 200px; max-height: 50vh; overflow: auto; }
-.sheet.empty { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 12px; font: 400 16px/1.5 var(--sans); color: var(--muted); }
+.reader.reader-wide { position: relative; max-width: none; margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); padding: 24px 28px; font-size: clamp(1.25rem, 2vw, 1.625rem); min-height: 220px; max-height: 58vh; max-height: 58dvh; }
+.reader.reader-wide.empty { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 12px; font: 400 16px/1.5 var(--sans); color: var(--muted); }
 .sheet-title { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 8px; flex-wrap: wrap; }
 
 /* ---------- recorder ---------- */
@@ -623,10 +623,15 @@ table.t tr:last-child td { border-bottom: 0; }
 body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #gDemo { display: none !important; }
 
 /* ---------- follow-along (Practice) ---------- */
-.sheet { position: relative; }
-.sheet .sent { border-radius: 4px; padding: 1px 3px; margin: 0 -3px; transition: background .25s, color .25s, box-shadow .25s; }
-.sheet.following .sent.done { color: var(--muted); }
-.sheet.following .sent.cur { background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--ink); }
+.prbar { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; margin-top: 14px; }
+.prbar .prrec { flex: 1 1 320px; min-width: 0; }
+.prbar .prfull { flex: 1 1 100%; margin: 0; }
+.prbar .timer { font-size: 36px; margin: 0 0 10px; }
+.prbar .lvl { margin-bottom: 10px; height: 28px; }
+.prspeed label { margin: 0 0 4px; }
+.reader-wide .sent { border-radius: 4px; padding: 1px 3px; margin: 0 -3px; transition: background .25s, color .25s, box-shadow .25s; }
+.reader-wide.following .sent.done { color: var(--muted); }
+.reader-wide.following .sent.cur { background: var(--accent-soft); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--ink); }
 .seg button:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ---------- sign up (profile fields live in the same form) ---------- */
@@ -875,17 +880,13 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
     <li id="st2"><button type="button" data-step="2"><span class="n">2</span><span data-t="practice.step2"></span></button></li>
     <li id="st3"><button type="button" data-step="3"><span class="n">3</span><span data-t="practice.step3"></span></button></li>
   </ol>
-  <div class="grid2">
-    <div class="panel">
+  <div class="panel" id="practicePanel">
+    <div id="pStep1">
       <h3 data-t="practice.textTitle"></h3>
       <div class="seg" role="tablist" data-t-aria="practice.textTitle" style="margin-top:12px">
         <button type="button" role="tab" id="srcMine" data-src="mine" data-t="practice.tabMine"></button>
         <button type="button" role="tab" id="srcSample" data-src="sample" data-t="practice.tabSample"></button>
         <button type="button" role="tab" id="srcOwn" data-src="own" data-t="practice.tabOwn"></button>
-      </div>
-      <div style="margin-top:14px">
-        <div class="sheet-title"><strong id="sheetTitle" class="note"></strong><span class="note" id="sheetMeta"></span></div>
-        <div class="sheet" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
       </div>
       <div id="paneMine" class="row" style="margin-top:14px"><button class="btn btn-primary" type="button" id="goScript" data-t="practice.makeScript"></button><span id="mineSaved" class="row" hidden><select id="mineSel" style="width:auto;min-width:200px" aria-label="Saved scripts"></select><button class="btn btn-danger-ghost btn-sm" type="button" id="mineDel" data-t="common.delete"></button></span></div>
       <div id="paneSample" class="row" style="margin-top:14px"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button><span class="note" data-t="practice.sampleNote"></span></div>
@@ -896,33 +897,36 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
         <div class="ferr" id="ownErr" role="alert"></div>
       </div>
     </div>
-    <div class="panel">
-      <h3 data-t="practice.voiceTitle"></h3>
-      <div class="seg" role="tablist" data-t-aria="practice.voiceTitle" style="margin-top:12px">
+    <div id="pStep2" class="prbar" hidden>
+      <div class="seg" role="tablist" data-t-aria="practice.voiceTitle">
         <button type="button" role="tab" id="tabRec" aria-selected="true" data-t="practice.tabRec"></button>
         <button type="button" role="tab" id="tabUp" aria-selected="false" data-t="practice.tabUp"></button>
       </div>
-      <div id="paneRec" style="margin-top:16px">
+      <div id="paneRec" class="prrec">
         <div class="timer" id="recTimer" role="timer" aria-live="off">00:00</div>
         <div class="lvl" id="recLvl" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="row">
           <button class="btn btn-record" type="button" id="recBtn"></button>
           <button class="btn" type="button" id="recClear" data-t="practice.discard" disabled></button>
         </div>
-        <p class="note" id="recNote" style="margin-top:12px" aria-live="polite"></p>
       </div>
-      <div id="paneUp" style="margin-top:16px" hidden>
+      <div id="paneUp" class="prrec" hidden>
         <button class="drop" type="button" id="dropBtn"><span id="dropText"></span></button>
         <input type="file" id="fileIn" accept="audio/*" hidden>
         <div class="ferr" id="upErr" role="alert"></div>
       </div>
-      <hr style="border:0;border-top:1px solid var(--line);margin:20px 0">
-      <div class="row between">
+      <p class="note prfull" id="recNote" aria-live="polite"></p>
+      <div class="prfull prspeed" id="prSpeed">
+        <label for="followWpm" id="followWpmLbl" data-t="practice.followWpmLabel"></label>
+        <div class="row" style="flex-wrap:nowrap"><input type="range" id="followWpm" min="100" max="180" step="5" value="145"><output class="num" id="followWpmVal" for="followWpm" style="min-width:64px;text-align:right"></output></div>
+        <p class="note" data-t="practice.followNote"></p>
+      </div>
+      <div class="prfull row between">
         <span class="note" id="audioState" aria-live="polite"></span>
         <button class="btn btn-primary" type="button" id="evalBtn" data-t="practice.evaluate" disabled></button>
       </div>
-      <p class="note" id="evalHint" style="margin-top:8px"></p>
-      <div style="margin-top:18px;padding-top:14px;border-top:1px dashed var(--line-strong)">
+      <p class="note prfull" id="evalHint"></p>
+      <div class="prfull" style="padding-top:12px;border-top:1px dashed var(--line-strong)">
         <label for="demoScenario" style="margin:0 0 6px"><span class="badge-demo" data-t="demo.only"></span> <span data-t="demo.scenario"></span></label>
         <select id="demoScenario">
           <option value="ok" data-t="demo.sOk"></option>
@@ -932,6 +936,9 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
         </select>
       </div>
     </div>
+    <div class="sheet-title" style="margin-top:14px"><strong id="sheetTitle" class="note"></strong><span class="note" id="sheetMeta"></span></div>
+    <div class="reader reader-wide" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
+    <div id="pStep1Go" class="row between" style="margin-top:14px"><span class="note" id="useHint"></span><button class="btn btn-primary" type="button" id="useScript" data-t="practice.useScript" disabled></button></div>
   </div>
 </section>
 
@@ -1238,6 +1245,9 @@ const TEXT = {
     fromScript: 'From Generate Script · {title}', sampleTitle: 'Sample · {title}', ownTitle: 'Your own text',
     words: '{n} words · about {t} at a steady pace',
     voiceTitle: 'Your voice', tabRec: 'Record', tabUp: 'Upload',
+    useScript: 'Use this script',
+    followWpmLabel: 'Highlight speed (follow-along only, not scored)', followWpmVal: '{n} words per minute', followWpmShort: '{n} wpm',
+    followNote: 'The highlight moves by time (demo), not by your voice. This setting does not change what is sent or your score.',
     start: 'Start recording', stop: 'Stop recording', discard: 'Discard',
     recNote: 'Press Start, read the text aloud, then press Stop.', recording: 'Recording...',
     recordingFollow: 'Recording... Read the text aloud. The highlight follows along.', recFinished: 'Recording finished.',
@@ -1878,7 +1888,7 @@ const S = {
   sessions: [], cur: null, nextId: 1,
   play: { t: 0, on: false, iv: null },
   ev: null, modal: [], confirmCb: null, afterConsent: null, onDeny: null, pmFirst: false,
-  signupDraft: null, stepBack: false, gate: null, grec: null, follow: null, auth: null
+  signupDraft: null, choosing: true, followWpm: 145, gate: null, grec: null, follow: null, auth: null
 };
 const pad2 = n => String(Math.floor(n)).padStart(2, '0');
 const fmtClock = s => pad2(s / 60) + ':' + pad2(s % 60);
@@ -2441,7 +2451,7 @@ function resetChat() {
   S.chatFile = null; renderChatFile(); $('#chatIn').value = ''; clearErr($('#chatErr'));
 }
 function enterApp(fresh) {
-  S.texts = { mine: null, sample: null, own: null }; S.src = 'mine'; S.audio = null; S.cur = null;
+  S.texts = { mine: null, sample: null, own: null }; S.src = 'mine'; S.audio = null; S.cur = null; S.choosing = true;
   renderAccount(); showView('app'); fillTopicSelect(); resetChat();
   go('home', { silent: !fresh });
 }
@@ -2982,7 +2992,7 @@ function onChatAction(e) {
     openReader(sc);
   } else if (a === 'practice') {
     const lbl = sc.title || TOPICS[sc.topic] || sc.topic;
-    const practise = id => { S.texts.mine = { id: id || null, title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic }; S.src = 'mine'; go('practice'); };
+    const practise = id => { S.texts.mine = { id: id || null, title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic }; S.src = 'mine'; S.choosing = false; go('practice'); };
     saveScript(sc).then(j => practise(j.id), () => practise(null));   // saved so the session links to it (C2); unsaved still works
   } else if (a === 'save') {
     saveScript(sc).then(j => { toast('Script saved.'); loadSavedScripts(j.id); })
@@ -3102,26 +3112,25 @@ function requireConsent(cb) {
 function goStep(i) {
   if (S.rec || i >= 3) return;
   const go = () => {
-    S.stepBack = i === 1; S.audio = null; renderPractice();
+    S.choosing = i === 1; S.audio = null; renderPractice();
     const f = i === 1 ? $('[data-src=' + S.src + ']') : (S.voiceTab === 'rec' ? $('#recBtn') : $('#dropBtn'));
     if (f) { f.focus(); if (f.scrollIntoView) f.scrollIntoView({ block: 'nearest' }); }
   };
   if (S.audio) confirmBox(T('practice.stepBackT'), T('practice.stepBackD'), T('practice.discardOk'), go); else go();
 }
-function setSrc(k) { S.src = k; if (S.texts[k]) S.stepBack = false; renderPractice(); }
+function setSrc(k) { S.src = k; S.choosing = true; renderPractice(); }
 function pickSample() {
   const n = S.sampleN % SAMPLE_TEXTS.length, text = SAMPLE_TEXTS[n], label = 'Text ' + (n + 1);
-  S.sampleN++; S.stepBack = false;
+  S.sampleN++; S.choosing = true;
   S.texts.sample = { title: T('practice.sampleTitle', { title: label }), short: label, text, topic: null };
   renderPractice();
 }
 /* Saved scripts (Practice > Mine): GET /api/scripts lists summaries; the text comes from GET /api/scripts/{id}. */
-function pickSavedScript(id) {
+function pickSavedScript(id, byUser) {   // byUser: picked in the dropdown (back to step 1); the automatic first pick must not move the stepper
   return api('/api/scripts/' + encodeURIComponent(id)).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) return;
     S.texts.mine = { id: s.id, title: T('practice.fromScript', { title: s.title }), short: s.title, text: s.body, topic: s.category || null };
-    S.stepBack = false;
-    if (S.screen === 'practice') renderPractice();
+    if (S.screen === 'practice') { if (byUser) S.choosing = true; renderPractice(); }
   }).catch(() => {});
 }
 function loadSavedScripts(pickId) {
@@ -3145,14 +3154,19 @@ function renderPractice() {
     const tab = $('[data-src=' + k + ']'); tab.setAttribute('aria-selected', String(k === S.src));
     $('#pane' + k.charAt(0).toUpperCase() + k.slice(1)).hidden = k !== S.src;
   });
+  const au = S.audio;
+  // stepper: a real sequence. 1 = choose text (until "Use this script"), 2 = record, 3 = review. Finished steps can be clicked to go back.
+  const cur = S.choosing || !txt ? 1 : !au ? 2 : 3, reach = [true, !!txt, !!au];
+  $('#pStep1').hidden = cur !== 1; $('#pStep2').hidden = cur === 1; $('#pStep1Go').hidden = cur !== 1;
+  $('#useScript').disabled = !txt; $('#useHint').textContent = txt ? '' : T('practice.hintNoText');
   const sh = $('#sheet');
   if (txt) {
-    sh.className = 'sheet'; sh.innerHTML = sentHtml(txt.text);
+    sh.className = 'reader reader-wide'; sh.innerHTML = sentHtml(txt.text);
     $('#sheetTitle').textContent = txt.title;
     const n = wordsOf(txt.text);
     $('#sheetMeta').textContent = T('practice.words', { n, t: fmtTime(n / SPEAKING_WPM_FOR_ESTIMATE * 60) });
   } else {
-    sh.className = 'sheet empty'; sh.textContent = T(S.src === 'mine' ? 'practice.emptyMineT' : S.src === 'sample' ? 'practice.emptySampleT' : 'practice.emptyOwnT');
+    sh.className = 'reader reader-wide empty'; sh.textContent = T(S.src === 'mine' ? 'practice.emptyMineT' : S.src === 'sample' ? 'practice.emptySampleT' : 'practice.emptyOwnT');
     $('#sheetTitle').textContent = ''; $('#sheetMeta').textContent = '';
   }
   $('#sampleBtn').textContent = T(S.texts.sample ? 'practice.sampleAnother' : 'practice.sampleBtn');
@@ -3164,8 +3178,8 @@ function renderPractice() {
   const rec = S.voiceTab === 'rec';
   $('#tabRec').setAttribute('aria-selected', String(rec)); $('#tabUp').setAttribute('aria-selected', String(!rec));
   $('#paneRec').hidden = !rec; $('#paneUp').hidden = rec;
+  $('#recNote').hidden = !rec; $('#prSpeed').hidden = !rec;   // follow-along only exists while recording
   // recorder
-  const au = S.audio;
   $('#recBtn').innerHTML = S.rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('practice.stop')) : esc(T('practice.start'));
   $('#recBtn').disabled = !S.rec && !!au;
   $('#recClear').disabled = !au || !!S.rec;
@@ -3176,8 +3190,6 @@ function renderPractice() {
   const ready = !!txt && !!au && !S.rec;
   $('#evalBtn').disabled = !ready;
   $('#evalHint').textContent = ready ? '' : (!txt ? T('practice.hintNoText') : T('practice.hintNoAudio'));
-  // stepper: a real sequence. A finished step (or any step that already has its data) can be clicked to go back.
-  const cur = (S.stepBack && !au) || !txt ? 1 : !au ? 2 : 3, reach = [true, !!txt, !!au];
   [1, 2, 3].forEach(i => {
     const li = $('#st' + i);
     li.className = i < cur ? 'done' : i === cur ? 'cur' : '';
@@ -3185,7 +3197,7 @@ function renderPractice() {
     $('button', li).disabled = !!S.rec || !reach[i - 1] || i === cur;
   });
 }
-RENDER.practice = function () { loadSavedScripts(); renderPractice(); };
+RENDER.practice = function () { loadSavedScripts(); paintFollowWpm(); renderPractice(); };
 function updateOwnCount() {
   const n = $('#ownText').value.length;
   $('#ownCnt').textContent = T('practice.ownCounter', { n, max: OWN_MAX_CHARS });
@@ -3197,7 +3209,7 @@ function useOwn() {
   if (BANNED.some(b => new RegExp('\\b' + b + '\\b', 'i').test(v)) || screenRequest(v)) { openModal('mSafety'); return; }
   clearErr(err); $('#ownText').removeAttribute('aria-invalid');
   const applyOwn = () => {
-    S.stepBack = false;
+    S.choosing = true;
     S.texts.own = { title: T('practice.ownTitle'), short: T('practice.ownTitle'), text: v, topic: null };
     renderPractice();
   };
@@ -3210,22 +3222,41 @@ function useOwn() {
     applyOwn();   // network error: practise without saving
   });
 }
-/* ---- follow-along (SIM): the highlight moves by TIME, assuming SPEAKING_WPM_FOR_ESTIMATE.
+/* ---- follow-along (SIM): the highlight moves by TIME, at S.followWpm (slider, default 145; separate from SPEAKING_WPM_FOR_ESTIMATE).
    Following the real voice later needs streaming STT or a local VAD: that is a new ADR ([CAN CHOT]), not part of this demo. ---- */
 function sentHtml(text) {
   return tokenize(text).sentences.map((s, i) => '<span class="sent" data-si="' + i + '">' + esc(s) + '</span>').join(' ');
 }
-function buildFollow(text) {
-  const { sentences, words } = tokenize(text), per = 60 / SPEAKING_WPM_FOR_ESTIMATE;
-  let t = FOLLOW_LEAD_S;
-  return sentences.map((_, si) => {
-    const n = words.filter(w => w.si === si).length, seg = { start: t, end: t + n * per };
-    t = seg.end + FOLLOW_GAP_S;
-    return seg;
-  });
+function followCounts(text) {
+  const { sentences, words } = tokenize(text);
+  return sentences.map((_, si) => words.filter(w => w.si === si).length);
+}
+function buildFollow(counts) {
+  return EvaluateClient.followSchedule({ wordCounts: counts, wpm: S.followWpm, leadS: FOLLOW_LEAD_S, gapS: FOLLOW_GAP_S });
+}
+/* Highlight speed slider. It only moves the demo highlight: nothing here is sent to /api/* or used by score() (ADR-003 scores 130-160 WPM, unrelated). */
+const FOLLOW_WPM_KEY = 'psc.followWpm';
+function loadFollowWpm() {
+  try { S.followWpm = EvaluateClient.parseFollowWpm(localStorage.getItem(FOLLOW_WPM_KEY)); } catch (e) { S.followWpm = EvaluateClient.FOLLOW_WPM.def; }
+}
+function paintFollowWpm() {
+  const sl = $('#followWpm'); if (!sl) return;
+  sl.value = String(S.followWpm);
+  sl.setAttribute('aria-valuetext', T('practice.followWpmVal', { n: S.followWpm }));
+  $('#followWpmVal').textContent = T('practice.followWpmShort', { n: S.followWpm });
+}
+function onFollowWpm() {
+  S.followWpm = EvaluateClient.parseFollowWpm(Number($('#followWpm').value));
+  try { localStorage.setItem(FOLLOW_WPM_KEY, String(S.followWpm)); } catch (e) { /* private mode: lasts until reload */ }
+  paintFollowWpm();
+  const f = S.follow;
+  if (S.rec && f) {   // keep the current sentence and the part already read; only the rest speeds up or slows down
+    f.segs = EvaluateClient.followRetime(f.segs, f.idx, f.now || 0, { wordCounts: f.counts, wpm: S.followWpm, leadS: FOLLOW_LEAD_S, gapS: FOLLOW_GAP_S });
+  }
 }
 function followTick(s) {
   const f = S.follow; if (!f) return;
+  f.now = s;
   let idx = -1;
   f.segs.forEach((g, i) => { if (s >= g.start) idx = i; });
   if (idx !== f.idx) { f.idx = idx; paintFollow(); }
@@ -3245,8 +3276,9 @@ function toggleRecording() {
   if (S.rec) { S.rec.stop(false); return; }
   requireConsent(() => {
     const txt = S.texts[S.src];
-    S.audio = null; S.stepBack = false;
-    S.follow = txt ? { segs: buildFollow(txt.text), idx: -2 } : null;
+    S.audio = null; S.choosing = false;
+    const counts = txt ? followCounts(txt.text) : null;
+    S.follow = txt ? { counts, segs: buildFollow(counts), idx: -2, now: 0 } : null;
     S.rec = startRecorder({
       lvl: $('#recLvl'), onTick: s => { $('#recTimer').textContent = fmtClock(s); followTick(s); },
       onEnd: (sec, auto, rec) => {
@@ -3268,7 +3300,7 @@ function onAudioFile(e) {
   e.target.value = '';
   if (!f) return;
   if (!(f.type || '').startsWith('audio/') && !/\.(mp3|wav|webm|m4a)$/i.test(f.name)) { showErr(err, T('practice.errAudio')); return; }
-  clearErr(err); S.audio = { kind: 'file', name: f.name, dur: null, file: f, mime: f.type || '' }; S.stepBack = false; renderPractice();
+  clearErr(err); S.audio = { kind: 'file', name: f.name, dur: null, file: f, mime: f.type || '' }; S.choosing = false; renderPractice();
 }
 
 /* ---- evaluation (SIM). Real app: POST audio -> FastAPI -> STT fallback router -> VAD/Parselmouth -> score() ---- */
@@ -3951,7 +3983,9 @@ function init() {
   // practice
   $$('[data-src]').forEach(b => { b.onclick = () => setSrc(b.getAttribute('data-src')); });
   $('#goScript').onclick = () => go('script');
-  $('#mineSel').onchange = () => { const id = $('#mineSel').value; if (id) pickSavedScript(id); };
+  $('#useScript').onclick = () => goStep(2);
+  loadFollowWpm(); paintFollowWpm(); $('#followWpm').addEventListener('input', onFollowWpm);
+  $('#mineSel').onchange = () => { const id = $('#mineSel').value; if (id) pickSavedScript(id, true); };
   $('#mineDel').onclick = () => {
     const id = $('#mineSel').value; if (!id) return;
     api('/api/scripts/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => {

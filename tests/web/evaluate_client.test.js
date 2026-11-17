@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { mapResult, displayRound, pickBaselineProfile, expandCompact } = require('../../src/web/static/js/evaluate_client.js');
+const { mapResult, displayRound, pickBaselineProfile, expandCompact, clampFollowWpm, parseFollowWpm, followSchedule, followRetime } = require('../../src/web/static/js/evaluate_client.js');
 
 const load = n => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', n), 'utf8'));
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -176,4 +176,87 @@ test('expandCompact: empty mistakes and empty script do not crash', () => {
   assert.deepEqual(json.alignment, []);
   assert.deepEqual(json.sentences, []);
   assert.doesNotThrow(() => mapResult(json, ''));
+});
+
+// ---- follow-along schedule (demo highlight, not scored) ----
+const near = (a, b, m) => assert.ok(Math.abs(a - b) < 1e-9, `${m || ''} ${a} != ${b}`);
+
+test('followSchedule: hand-computed (120 wpm = 0.5 s/word, lead 1, gap 0.5)', () => {
+  const r = followSchedule({ wordCounts: [4, 2], wpm: 120, leadS: 1, gapS: 0.5 });
+  assert.deepEqual(r, [{ start: 1, end: 3 }, { start: 3.5, end: 4.5 }]);
+});
+
+test('followSchedule: wpm 145 equals the old buildFollow formula', () => {
+  const counts = [7, 3, 12, 1], per = 60 / 145;
+  let t = 1.0; const old = counts.map(n => { const seg = { start: t, end: t + n * per }; t = seg.end + 0.5; return seg; });
+  assert.deepEqual(followSchedule({ wordCounts: counts, wpm: 145, leadS: 1.0, gapS: 0.5 }), old);
+});
+
+test('followSchedule: 100 wpm lasts 1.8x of 180 wpm (word time only)', () => {
+  const end = w => followSchedule({ wordCounts: [10, 20, 30], wpm: w, leadS: 0, gapS: 0 }).at(-1).end;
+  near(end(180), 20); near(end(100), 36); near(end(100) / end(180), 1.8);
+});
+
+test('followSchedule: empty input and out-of-range wpm', () => {
+  assert.deepEqual(followSchedule({ wordCounts: [], wpm: 145, leadS: 1, gapS: 0.5 }), []);
+  assert.deepEqual(followSchedule({ wpm: 145 }), []);
+  const one = w => followSchedule({ wordCounts: [60], wpm: w, leadS: 0, gapS: 0 })[0].end;
+  near(one(50), 36); near(one(999), 20); near(one(NaN), 60 * 60 / 145); near(one('abc'), 60 * 60 / 145);   // clamp to [100,180], not a number -> 145
+});
+
+test('followSchedule: startIndex/startTime moves the tail, keeps prev', () => {
+  const prev = [{ start: 1, end: 3 }, { start: 3.5, end: 4.5 }];
+  const r = followSchedule({ wordCounts: [4, 2, 6], wpm: 120, leadS: 1, gapS: 0.5, startIndex: 2, startTime: 10, prev });
+  assert.deepEqual(r.slice(0, 2), prev);
+  assert.deepEqual(r[2], { start: 10, end: 13 });
+});
+
+test('followRetime: mid-sentence speed change keeps earlier sentences and read fraction', () => {
+  const o = { wordCounts: [4, 2, 6], leadS: 1, gapS: 0.5 };
+  const segs = followSchedule({ ...o, wpm: 120 });            // [1,3] [3.5,4.5] [5,8]
+  const r = followRetime(segs, 1, 4, { ...o, wpm: 180 });     // halfway through sentence 1 at t=4; 180 wpm = 1/3 s/word
+  assert.deepEqual(r[0], segs[0]);
+  near(r[1].start, 4 - 1 / 3); near(r[1].end, 4 + 1 / 3);     // half of 2/3 s already read, half left
+  near(r[2].start, 4 + 1 / 3 + 0.5); near(r[2].end - r[2].start, 2);
+  assert.ok(r[1].start <= 4 && r[2].start > 4);                // current index stays 1
+});
+
+test('followRetime: still in the lead-in keeps the first start; empty segs', () => {
+  const o = { wordCounts: [4, 2], leadS: 1, gapS: 0.5 };
+  const r = followRetime(followSchedule({ ...o, wpm: 120 }), -1, 0.4, { ...o, wpm: 180 });
+  near(r[0].start, 1); near(r[0].end, 1 + 4 / 3);
+  assert.deepEqual(followRetime([], 0, 1, { ...o, wpm: 120 }), []);
+});
+
+test('clampFollowWpm / parseFollowWpm', () => {
+  assert.equal(clampFollowWpm(100), 100); assert.equal(clampFollowWpm(99), 100); assert.equal(clampFollowWpm(181), 180); assert.equal(clampFollowWpm(null), 145);
+  for (const ok of ['100', '145', '180', 150]) assert.equal(parseFollowWpm(ok), Number(ok));
+  for (const bad of [null, undefined, '', 'abc', '97', '146', '95', '185', '145.5', NaN, 1e9]) assert.equal(parseFollowWpm(bad), 145, String(bad));
+});
+
+test('followRetime: edge cases (gap, last sentence, empty sentence, now past old end)', () => {
+  const o = { wordCounts: [4, 2, 6], leadS: 1, gapS: 0.5 };
+  const segs = followSchedule({ ...o, wpm: 120 });            // [1,3] [3.5,4.5] [5,8]
+  // (a) now inside the gap after sentence 1 (4.5..5): frac clamps to 1 -> sentence ends exactly at now
+  let r = followRetime(segs, 1, 4.75, { ...o, wpm: 180 });
+  near(r[1].end, 4.75); near(r[1].start, 4.75 - 2 / 3); near(r[2].start, 4.75 + 0.5);
+  // (d) now a bit after the old end of the last sentence (8.2): same clamp, nothing breaks
+  r = followRetime(segs, 2, 8.2, { ...o, wpm: 100 });         // 100 wpm = 0.6 s/word, d = 3.6
+  assert.deepEqual(r.slice(0, 2), segs.slice(0, 2));
+  near(r[2].end, 8.2); near(r[2].start, 8.2 - 3.6); assert.equal(r.length, 3);
+  // (b) last sentence, halfway (6.5 of [5,8]) at 180 wpm: d_new = 2, start = 6.5 - 1 = 5.5
+  r = followRetime(segs, 2, 6.5, { ...o, wpm: 180 });
+  near(r[2].start, 5.5); near(r[2].end, 7.5);
+  // (c) empty sentence (n = 0): zero length, frac 0, no NaN
+  const z = { wordCounts: [3, 0, 2], leadS: 0, gapS: 0.5 };
+  const zs = followSchedule({ ...z, wpm: 120 });              // [0,1.5] [2,2] [2.5,3.5]
+  assert.deepEqual(zs[1], { start: 2, end: 2 });
+  r = followRetime(zs, 1, 2.2, { ...z, wpm: 180 });
+  for (const g of r) { assert.ok(Number.isFinite(g.start) && Number.isFinite(g.end)); }
+  near(r[1].start, 2.2); near(r[1].end, 2.2); near(r[2].start, 2.7);
+});
+
+test('followSchedule(undefined) does not throw', () => {
+  assert.deepEqual(followSchedule(undefined), []);
+  assert.deepEqual(followSchedule(null), []);
 });

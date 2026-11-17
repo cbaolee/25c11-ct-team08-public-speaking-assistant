@@ -139,7 +139,45 @@
     return Object.assign({}, result, { alignment, sentences, pauses, fillers });
   }
 
-  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact };
+  /* ---- Practice follow-along schedule (demo: highlight moves by TIME, not by the real voice; NOT part of scoring) ---- */
+  const FOLLOW_WPM = { min: 100, max: 180, step: 5, def: 145 };
+  function clampFollowWpm(w) {                     // out of range -> clamp; not a finite number -> default
+    const n = typeof w === 'number' ? w : (w == null || w === '' ? NaN : Number(w));   // Number(null) would be 0
+    if (!Number.isFinite(n)) return FOLLOW_WPM.def;
+    return Math.min(FOLLOW_WPM.max, Math.max(FOLLOW_WPM.min, n));
+  }
+  function parseFollowWpm(raw) {                   // stored value (string/number): must be an integer multiple of 5 in range, else default
+    const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < FOLLOW_WPM.min || n > FOLLOW_WPM.max || n % FOLLOW_WPM.step !== 0) return FOLLOW_WPM.def;
+    return n;
+  }
+  /* wordCounts[i] = words in sentence i. Sentence i lasts n_i * 60 / wpm seconds; leadS before the first, gapS after each.
+     startIndex/startTime (optional): sentence startIndex begins at startTime and later ones follow; earlier ones are copied from prev
+     (or, without prev, from the schedule at this wpm). Returns [{start, end}] in seconds. */
+  function followSchedule(o) {
+    o = o || {};
+    const counts = Array.isArray(o.wordCounts) ? o.wordCounts : [];
+    const per = 60 / clampFollowWpm(o.wpm), lead = o.leadS == null ? 0 : o.leadS, gap = o.gapS == null ? 0 : o.gapS;
+    const k = Number.isInteger(o.startIndex) ? o.startIndex : -1, prev = o.prev || [];
+    let t = lead;
+    return counts.map((n, i) => {
+      if (i === k && typeof o.startTime === 'number') t = o.startTime;
+      const seg = i < k && prev[i] ? { start: prev[i].start, end: prev[i].end } : { start: t, end: t + n * per };
+      t = seg.end + gap;
+      return seg;
+    });
+  }
+  /* Change speed in the middle of a recording: sentences before idx stay; the current sentence keeps the fraction already read
+     (so the highlight does not jump back), later ones are recomputed. idx < 0 (still in the lead-in): only the sentences move. */
+  function followRetime(segs, idx, now, o) {
+    if (!segs || !segs.length) return [];
+    if (idx < 0) return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: 0, startTime: segs[0].start });
+    const old = segs[idx], dOld = old.end - old.start, frac = dOld > 0 ? Math.min(1, Math.max(0, (now - old.start) / dOld)) : 0;
+    const dNew = (o.wordCounts[idx] || 0) * 60 / clampFollowWpm(o.wpm);
+    return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
+  }
+
+  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
   root.EvaluateClient = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
