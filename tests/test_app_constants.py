@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from src.app import config, constants, main
 from src.app.config import Settings
 
-UI_FILE = Path(__file__).resolve().parents[1] / "src" / "web" / "templates" / "demo_ui.html"
+UI_FILE = Path(__file__).resolve().parents[1] / "src" / "web" / "static" / "js" / "main.js"
 
 
 def _use_toml(monkeypatch, tmp_path, retention: int, ttl: int) -> None:
