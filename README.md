@@ -68,6 +68,16 @@ Copy `.env.example` to `.env` and fill in your own values. Never commit `.env` a
 cp .env.example .env
 ```
 
+API keys (required). Each variable takes one or more keys separated by commas, for example `GROQ_API_KEYS=key1,key2`:
+
+| Variable | Description |
+| --- | --- |
+| `DEEPGRAM_API_KEYS` | Speech-to-text, tried first. |
+| `GLADIA_API_KEYS` | Speech-to-text fallback, used after every Deepgram key has failed. |
+| `GROQ_API_KEYS` | Script generation. Every key is tried for one model before moving to the fallback model. |
+
+When a key runs out of quota (HTTP 429 or 402) the server switches to the next key and tries the locked one again after `exhausted_cooldown_s` (`app_constants.toml`, default 600 s). A refused key (401 or 403) is skipped until restart. Logs name keys by position (`groq key #2`), never by value. The old single-key names (`DEEPGRAM_API_KEY`, `GLADIA_API_KEY`, `GROQ_API_KEY`) are no longer read: rename them in your `.env`.
+
 Database and storage variables:
 
 | Variable | Required | Description |

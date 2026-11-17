@@ -46,6 +46,11 @@ max_pdf_pages = 10
 slot_fill_min_words = 80
 slot_fill_max_words = 150
 
+[api_keys]
+# How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.
+# Keys refused with 401/403 stay skipped until the server restarts.
+exhausted_cooldown_s = 600
+
 [web]
 # Sent to the browser by GET /api/config. No secrets here.
 # Max characters in Practice "Own" text

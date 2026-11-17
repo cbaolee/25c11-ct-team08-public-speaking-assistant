@@ -210,12 +210,10 @@ def _group_slots_into_batches(
 
 
 def _get_groq_client() -> Any:
-    try:
-        from groq import Groq
-    except ImportError:
-        return None
-    api_key = settings.groq_api_key.strip()
-    return Groq(api_key=api_key) if api_key else None
+    """Groq client over the GROQ_API_KEYS pool (None without SDK or keys)."""
+    from .groq_pool import make_groq_client
+
+    return make_groq_client()
 
 
 def _get_model_chain() -> tuple[str, ...]:

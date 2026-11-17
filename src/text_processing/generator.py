@@ -14,14 +14,10 @@ from .contracts import (
     ParagraphCitation,
     ScriptGenerationError,
 )
+from .groq_pool import make_groq_client
 from .moderation import wrap_untrusted_document_context
 from .retrieval import SemanticRetriever, verify_paragraph_citation
 from .template_engine import TokenBucketLimiter
-
-try:
-    from groq import Groq
-except ImportError:
-    Groq = None
 
 SECTION_PLANS: dict[int, list[tuple[str, int]]] = {
     5: [("Opening & Core Argument", 350), ("Practical Evidence & Conclusion", 350)],
@@ -69,14 +65,14 @@ class ScriptGenerator:
         top_k: int = 3,
     ) -> None:
         # Keys and models come from Settings (the repo-root .env), like the rest of the app
-        self.api_key = api_key or settings.groq_api_key.strip()
         models = [
             settings.groq_llm_model.strip() or "openai/gpt-oss-120b",
             settings.groq_llm_fallback_model_1.strip() or "qwen/qwen3.8-27b",
             settings.groq_llm_fallback_model_2.strip() or "openai/gpt-oss-20b",
         ]
         self.model_chain = list(dict.fromkeys(m for m in models if m))
-        self.client = Groq(api_key=self.api_key) if (Groq and self.api_key) else None
+        # One explicit key (tests) or the GROQ_API_KEYS pool; the client switches key on 429/401/403
+        self.client = make_groq_client([api_key] if api_key else None)
         self.retriever = retriever or SemanticRetriever()
         self.limiter = limiter or TokenBucketLimiter()
         self.top_k = top_k
@@ -96,7 +92,7 @@ class ScriptGenerator:
     def generate_script(self, chunks: list[DocumentChunk], topic: str) -> ScriptResult:
         """Call Groq LLM in JSON mode to produce a 120-150 word English script."""
         if not self.client:
-            raise RuntimeError("Missing GROQ_API_KEY in environment.")
+            raise RuntimeError("Missing GROQ_API_KEYS in environment.")
         ctx = "\n\n".join(f"[Page {c.page} | Heading: {c.heading}]\n{c.content}" for c in chunks)
         msgs = [
             {
@@ -143,7 +139,7 @@ class ScriptGenerator:
         if not self.client:
             raise ScriptGenerationError(
                 "generation_unavailable",
-                "Groq client is not configured (missing GROQ_API_KEY).",
+                "Groq client is not configured (missing GROQ_API_KEYS).",
                 status_code=503,
             )
         raw_ctx = "\n\n".join(

@@ -1,7 +1,8 @@
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from src.app.constants import CONSTANTS
 
@@ -42,16 +43,21 @@ def _from_toml(section: str, key: str):
     return lambda: CONSTANTS[section][key]
 
 
+# A comma-separated list in .env ("key1,key2"), not JSON.
+KeyList = Annotated[list[str], NoDecode]
+
+
 class Settings(BaseSettings):
-    groq_api_key: str = ""
+    # Several keys per service: when one runs out of quota the next is used (src/app/key_pool.py)
+    groq_api_keys: KeyList = []
     groq_llm_model: str = ""
     groq_llm_fallback_model_1: str = ""
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
 
     # Speech-to-text providers (Deepgram primary, Gladia fallback)
-    deepgram_api_key: str = ""
-    gladia_api_key: str = ""
+    deepgram_api_keys: KeyList = []
+    gladia_api_keys: KeyList = []
 
     # Supabase: database and storage
     supabase_url: str = ""
@@ -59,11 +65,23 @@ class Settings(BaseSettings):
     audio_bucket: str = "audio"
     series_bucket: str = "series"
     baselines_bucket: str = "baselines"
-    retention_full_sessions: int = Field(default_factory=_from_toml("storage", "retention_full_sessions"))
+    retention_full_sessions: int = Field(
+        default_factory=_from_toml("storage", "retention_full_sessions")
+    )
     signed_url_ttl_s: int = Field(default_factory=_from_toml("storage", "signed_url_ttl_s"))
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
+
+    @field_validator("groq_api_keys", "deepgram_api_keys", "gladia_api_keys", mode="before")
+    @classmethod
+    def _split_keys(cls, value: object) -> object:
+        """"k1, k2,,k3" -> ["k1", "k2", "k3"]: split on commas, drop spaces and empty items."""
+        if isinstance(value, str):
+            value = value.split(",")
+        if isinstance(value, (list, tuple)):
+            return [str(k).strip() for k in value if str(k).strip()]
+        return value
 
     @field_validator("supabase_url")
     @classmethod
@@ -89,9 +107,9 @@ def missing_required_settings(s: Settings) -> list[str]:
     but a URL without its service key is a mistake.
     """
     required = {
-        "DEEPGRAM_API_KEY": s.deepgram_api_key,
-        "GLADIA_API_KEY": s.gladia_api_key,
-        "GROQ_API_KEY": s.groq_api_key,
+        "DEEPGRAM_API_KEYS": ",".join(s.deepgram_api_keys),
+        "GLADIA_API_KEYS": ",".join(s.gladia_api_keys),
+        "GROQ_API_KEYS": ",".join(s.groq_api_keys),
     }
     if s.app_env != "dev" or s.supabase_url:
         required["SUPABASE_URL"] = s.supabase_url

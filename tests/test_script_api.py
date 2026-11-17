@@ -82,7 +82,7 @@ def _build_test_pipeline() -> tuple[ScriptGenerationPipeline, MagicMock]:
 
 @pytest.fixture()
 def setup_pipeline(monkeypatch: pytest.MonkeyPatch) -> tuple[ScriptGenerationPipeline, MagicMock]:
-    monkeypatch.setattr(settings, "groq_api_key", "")
+    monkeypatch.setattr(settings, "groq_api_keys", [])
     pipeline, llm_mock = _build_test_pipeline()
     monkeypatch.setattr(app_main, "_script_pipeline", pipeline)
     return pipeline, llm_mock
