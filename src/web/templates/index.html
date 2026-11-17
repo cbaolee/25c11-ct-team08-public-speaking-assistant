@@ -28,7 +28,7 @@
       <button type="button" data-go="scriptStudio"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h5"/></svg><span data-t="nav.script"></span></button>
       <button type="button" data-go="practice"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span data-t="nav.practice"></span></button>
     </nav>
-    <div class="userMenuButton" id="userMenuButton">
+    <div class="acct" id="userMenuButton">
       <div class="row" id="guestBtns">
         <button class="btn btn-sm" type="button" id="hLogin" data-t="top.login"></button>
         <button class="btn btn-primary btn-sm" type="button" id="hSignup" data-t="top.signup"></button>
@@ -40,9 +40,7 @@
       </button>
       <div class="menu" id="userMenu" role="menu" hidden>
         <button type="button" role="menuitem" data-act="profile" data-t="top.profile"></button>
-        <button type="button" role="menuitem" data-act="audio" data-t="top.audio"></button>
-        <button type="button" role="menuitem" data-act="perm" data-t="top.permissions"></button>
-        <button type="button" role="menuitem" data-act="pass" data-t="top.changePassword"></button>
+        <button type="button" role="menuitem" data-act="settings" data-t="top.settings"></button>
         <hr>
         <button type="button" role="menuitem" data-act="logout" data-t="top.logout"></button>
       </div>
@@ -90,10 +88,13 @@
         <input type="password" id="authPassword" autocomplete="current-password">
       </div>
       <div id="pass2Wrap" hidden>
-        <label for="auPass2" data-t="auth.password2"></label>
-        <input type="password" id="auPass2" autocomplete="new-password">
+        <label for="authPassword2" data-t="auth.password2"></label>
+        <input type="password" id="authPassword2" autocomplete="new-password">
       </div>
       <div id="signupExtra" hidden>
+        <label for="signupExtraDisplayName" data-t="pm.displayName"></label>
+        <input type="text" id="signupExtraDisplayName" maxlength="50" autocomplete="nickname" data-t-ph="pm.displayNamePh" aria-describedby="eSuName">
+        <div class="ferr" id="eSuName" role="alert" data-t="pm.errName"></div>
         <label for="signupExtraGender"><span data-t="pm.gender"></span> <small data-t="pm.optional"></small></label>
         <select id="signupExtraGender"></select>
         <label for="signupExtraAge"><span data-t="pm.age"></span> <small data-t="pm.optional"></small></label>
@@ -273,7 +274,7 @@
       <div class="panel">
         <div class="row between"><h3 data-t="report.transcript"></h3></div>
         <p class="sr-only" data-t="report.txSr"></p>
-        <div class="transcriptView" id="transcriptView"></div>
+        <div class="tx" id="transcriptView"></div>
       </div>
       <div class="player" id="player">
         <button class="btn btn-primary iconbtn" type="button" id="playBtn" data-t-aria="common.play"></button>
@@ -329,6 +330,8 @@
 <div class="mbg" id="profileModal" role="dialog" aria-modal="true" aria-labelledby="mpTitle"><div class="box">
   <h2 id="mpTitle"></h2>
   <p class="note" id="mpSub"></p>
+  <label for="mpDisplayName" data-t="pm.displayName"></label>
+  <input type="text" id="mpDisplayName" maxlength="50" autocomplete="nickname" data-t-ph="pm.displayNamePh">
   <label for="mpGender"><span data-t="pm.gender"></span> <small data-t="pm.optional"></small></label>
   <select id="mpGender"></select>
   <label for="mpAge"><span data-t="pm.age"></span> <small data-t="pm.optional"></small></label>
@@ -353,41 +356,67 @@
   <div class="actions"><button class="btn" type="button" id="mcDeny" data-t="consent.deny"></button><button class="btn btn-primary" type="button" id="mcAllow" data-t="consent.allow"></button></div>
 </div></div>
 
-<div class="mbg" id="passwordModal" role="dialog" aria-modal="true" aria-labelledby="mpassTitle"><div class="box">
-  <h2 id="mpassTitle" data-t="pass.title"></h2>
-  <p class="note" data-t="pass.sub"></p>
-  <label for="mpUser" data-t="pass.username"></label>
-  <input type="email" id="mpUser" autocomplete="username" readonly>
-  <label for="mpNew" data-t="pass.newPass"></label>
-  <input type="password" id="mpNew" autocomplete="new-password">
-  <label for="mpNew2" data-t="pass.newPass2"></label>
-  <input type="password" id="mpNew2" autocomplete="new-password">
-  <div class="ferr" id="mpErr" role="alert"></div>
-  <div class="actions"><button class="btn" type="button" data-close data-t="common.cancel"></button><button class="btn btn-primary" type="button" id="passSave" data-t="common.save"></button></div>
-</div></div>
-
-<div class="mbg" id="audioSettingsModal" role="dialog" aria-modal="true" aria-labelledby="maTitle"><div class="box">
-  <h2 id="maTitle" data-t="audio.title"></h2>
-  <p class="note" data-t="audio.sub"></p>
-  <label for="audioMic" data-t="audio.mic"></label>
-  <select id="audioMic"></select>
-  <label for="audioInput"><span data-t="audio.recVol"></span>: <span id="audioInputValue" class="num">70</span>%</label>
-  <input type="range" id="audioInput" min="0" max="100" value="70">
-  <label for="audioOutput"><span data-t="audio.playVol"></span>: <span id="audioOutputValue" class="num">80</span>%</label>
-  <input type="range" id="audioOutput" min="0" max="100" value="80">
-  <div class="row" style="margin-top:16px"><button class="btn" type="button" id="audioTest" data-t="audio.test"></button><span class="note" id="audioTestNote" aria-live="polite"></span></div>
-  <div class="lvl" id="audioLevel" aria-hidden="true" style="margin-top:12px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-  <div class="actions"><button class="btn" type="button" data-close data-t="common.cancel"></button><button class="btn btn-primary" type="button" id="audioSave" data-t="common.save"></button></div>
-</div></div>
-
-<div class="mbg" id="permissionsModal" role="dialog" aria-modal="true" aria-labelledby="mprTitle"><div class="box">
-  <h2 id="mprTitle" data-t="perm.title"></h2>
-  <p class="note" data-t="perm.sub"></p>
-  <div class="switch">
+<div class="mbg" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle"><div class="box settings-box">
+<div class="settings-track">
+  <section class="settings-pane" id="settingsList">
+    <h2 id="settingsTitle" data-t="settings.title"></h2>
+    <ul class="settings-list">
+      <li><button type="button" data-settings="permissions"><span data-t="settings.permissions"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+      <li><button type="button" data-settings="audio"><span data-t="settings.audio"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+      <li><button type="button" data-settings="password"><span data-t="settings.password"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+      <li><button type="button" data-settings="delete"><span data-t="settings.delete"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+    </ul>
+    <div class="actions"><button class="btn" type="button" data-close data-t="common.close"></button></div>
+  </section>
+  <div class="settings-pane settings-detail" id="settingsDetail" inert>
+  <section id="settingsPermissions" data-pane="permissions" hidden>
+    <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
+    <h3 data-t="perm.title"></h3>
+    <p class="note" data-t="perm.sub"></p>
+    <div class="switch">
     <input type="checkbox" id="pmChk">
     <div><label for="pmChk" data-t="perm.allow"></label><div class="note" data-t="perm.note"></div></div>
+    </div>
+    <div class="actions"><button class="btn btn-primary" type="button" id="permSave" data-t="common.save"></button></div>
+  </section>
+  <section id="settingsAudio" data-pane="audio" hidden>
+    <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
+    <h3 data-t="audio.title"></h3>
+    <p class="note" data-t="audio.sub"></p>
+    <label for="audioMic" data-t="audio.mic"></label>
+    <select id="audioMic"></select>
+    <label for="audioInput"><span data-t="audio.recVol"></span>: <span id="audioInputValue" class="num">70</span>%</label>
+    <input type="range" id="audioInput" min="0" max="100" value="70">
+    <label for="audioOutput"><span data-t="audio.playVol"></span>: <span id="audioOutputValue" class="num">80</span>%</label>
+    <input type="range" id="audioOutput" min="0" max="100" value="80">
+    <div class="row" style="margin-top:16px"><button class="btn" type="button" id="audioTest" data-t="audio.test"></button><span class="note" id="audioTestNote" aria-live="polite"></span></div>
+    <div class="lvl" id="audioLevel" aria-hidden="true" style="margin-top:12px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="actions"><button class="btn btn-primary" type="button" id="audioSave" data-t="common.save"></button></div>
+  </section>
+  <section id="settingsPassword" data-pane="password" hidden>
+    <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
+    <h3 data-t="pass.title"></h3>
+    <p class="note" data-t="pass.sub"></p>
+    <label for="mpUser" data-t="pass.username"></label>
+    <input type="email" id="mpUser" autocomplete="username" readonly>
+    <label for="mpNew" data-t="pass.newPass"></label>
+    <input type="password" id="mpNew" autocomplete="new-password">
+    <label for="mpNew2" data-t="pass.newPass2"></label>
+    <input type="password" id="mpNew2" autocomplete="new-password">
+    <div class="ferr" id="mpErr" role="alert"></div>
+    <div class="actions"><button class="btn btn-primary" type="button" id="passSave" data-t="common.save"></button></div>
+  </section>
+  <section id="settingsDelete" data-pane="delete" hidden>
+    <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
+    <h3 data-t="del.title"></h3>
+    <p class="note" data-t="del.sub"></p>
+    <label for="delConfirmEmail" data-t="del.typeEmail"></label>
+    <input type="email" id="delConfirmEmail" autocomplete="off" spellcheck="false">
+    <div class="ferr" id="delErr" role="alert"></div>
+    <div class="actions"><button class="btn btn-danger" type="button" id="delConfirm" data-t="del.confirm" disabled></button></div>
+  </section>
   </div>
-  <div class="actions"><button class="btn" type="button" data-close data-t="common.cancel"></button><button class="btn btn-primary" type="button" id="permSave" data-t="common.save"></button></div>
+</div>
 </div></div>
 
 <div class="mbg" id="safetyAlert" role="alertdialog" aria-modal="true" aria-labelledby="msTitle" aria-describedby="msMsg"><div class="box" style="border-top:5px solid var(--bad)">

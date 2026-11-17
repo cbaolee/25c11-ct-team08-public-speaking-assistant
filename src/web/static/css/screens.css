@@ -365,3 +365,23 @@ table.t tr:last-child td { border-bottom: 0; }
   .w-wrong, .w-near, .w-missing { forced-color-adjust: none; }
   .btn-primary, .btn-record { border: 2px solid ButtonText; }
 }
+
+/* ---------- settings modal ----------
+   Fixed-size window; the list and the chosen screen sit side by side on a track that slides
+   left by one screen. The box keeps its size and position while the content moves. */
+.box.settings-box { max-width: 520px; height: min(600px, 88vh); height: min(600px, 88dvh); padding: 0; overflow: hidden; }
+.settings-track { display: flex; width: 200%; height: 100%; transition: transform .32s cubic-bezier(.2, .7, .3, 1); }
+.settings-box.detail .settings-track { transform: translateX(-50%); }
+.settings-pane { width: 50%; height: 100%; overflow: auto; padding: 24px 26px; display: flex; flex-direction: column; }
+.settings-pane > .actions:last-child, .settings-detail section > .actions:last-child { margin-top: auto; padding-top: 16px; }
+.settings-detail section { display: flex; flex-direction: column; min-height: 100%; }
+.settings-detail section[hidden] { display: none; }
+.settings-detail h3 { margin: 12px 0 4px; outline: none; }
+.settings-detail .back { align-self: flex-start; }
+.settings-list { list-style: none; margin: 16px 0 0; padding: 0; }
+.settings-list li + li { border-top: 1px solid var(--line); }
+.settings-list button { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 4px; background: none; border: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.settings-list button:hover { color: var(--accent); }
+.settings-list button[data-settings="delete"] { color: var(--bad); }
+.settings-list svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; flex: none; }
+@media (prefers-reduced-motion: reduce) { .settings-track { transition: none; } }

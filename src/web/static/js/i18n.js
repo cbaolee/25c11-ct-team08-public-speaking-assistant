@@ -10,7 +10,7 @@ export const TEXT = {
   /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
   nav: { label: 'Main', home: 'Home', script: 'Script', practice: 'Practice' },
-  top: { login: 'Log in', signup: 'Sign up', profile: 'Profile and baseline voice', audio: 'Audio settings', permissions: 'Permissions', changePassword: 'Change password', logout: 'Log out' },
+  top: { login: 'Log in', signup: 'Sign up', profile: 'Profile', settings: 'Settings', logout: 'Log out' },
 
   landing: {
     title: 'Read your script aloud. See exactly where to improve.',
@@ -214,6 +214,7 @@ export const TEXT = {
   },
 
   pm: {
+    displayName: 'Your name', displayNamePh: 'What should we call you?', errName: 'Enter your name.',
     titleFirst: 'Welcome. Tell us how you want to practise', titleEdit: 'Edit your details',
     subFirst: 'Choose your accent and topics to continue. Gender and age are optional.',
     subEdit: 'Update your details and press Save.',
@@ -229,6 +230,12 @@ export const TEXT = {
     title: 'Audio settings', sub: 'Choose your microphone and volume.', mic: 'Microphone',
     mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
     recVol: 'Recording volume', playVol: 'Playback volume', test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
+  },
+  settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', password: 'Change password', delete: 'Delete account' },
+  del: {
+    title: 'Delete account', sub: 'This deletes your account, your scripts, your recordings and your baseline. It cannot be undone.',
+    typeEmail: 'Type your email to confirm', confirm: 'Delete my account', mismatch: 'The email does not match your account.',
+    failed: 'Your account could not be deleted right now. Please try again later.', done: 'Your account was deleted.'
   },
   perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.' },
   overview: {

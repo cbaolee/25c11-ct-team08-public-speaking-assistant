@@ -1,4 +1,6 @@
 import { api } from '../api.js';
+import { userName } from './auth_panel.js';
+import { renderAccount } from '../nav.js';
 import { T, TOPICS } from '../i18n.js';
 import { fillTopicSelect } from '../screens/script_studio.js';
 import { RENDER, S } from '../state.js';
@@ -12,6 +14,7 @@ export function openProfileModal(first) {
   $('#mpTitle').textContent = T(first ? 'pm.titleFirst' : 'pm.titleEdit');
   $('#mpSub').textContent = T(first ? 'pm.subFirst' : 'pm.subEdit');
   $('#mpCancel').hidden = first;
+  $('#mpDisplayName').value = p.displayName || '';
   $('#mpGender').innerHTML = '<option value="">' + esc(T('pm.genderPh')) + '</option>' + T('pm.genders').map(g => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('');
   $('#mpGender').value = p.gender || '';
   $('#mpAge').value = p.age != null ? p.age : '';
@@ -30,13 +33,14 @@ export function saveProfileModal() {
   if (!okAge) { $('#mpAge').focus(); return; }
   if (!acc) { $('input[name=pmAccent]').focus(); return; }
   if (!tops.length) { $('input[name=pmTopic]').focus(); return; }
-  const next = { gender: $('#mpGender').value || null, age: n, accent: acc.value, topics: tops };
+  const next = { displayName: $('#mpDisplayName').value.trim() || null, gender: $('#mpGender').value || null, age: n, accent: acc.value, topics: tops };
   $('#mpSave').disabled = true;
-  api('/api/profile', { method: 'PATCH', json: { gender: next.gender, age: next.age, target_accent: next.accent, topics: next.topics } })
+  api('/api/profile', { method: 'PATCH', json: { display_name: next.displayName, gender: next.gender, age: next.age, target_accent: next.accent, topics: next.topics } })
     .then(r => {
       $('#mpSave').disabled = false;
       if (!r.ok) { if (r.status !== 401) toast(T('pm.saveErr'), true); return; }
       S.profile = next;
+      S.user.name = userName(next.displayName, S.user.email); renderAccount();
       closeModal('profileModal'); toast(T('pm.saved')); fillTopicSelect();
       if (RENDER[S.screen]) RENDER[S.screen]();
     }).catch(() => { $('#mpSave').disabled = false; toast(T('pm.saveErr'), true); });

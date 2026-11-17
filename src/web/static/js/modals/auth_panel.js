@@ -15,10 +15,11 @@ export function fillSignupForm(reset) {
   const p = {};
   sel.innerHTML = '<option value="">' + esc(T('pm.genderPh')) + '</option>' + T('pm.genders').map(g => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('');
   sel.value = p.gender || '';
+  $('#signupExtraDisplayName').value = ''; $('#signupExtraDisplayName').removeAttribute('aria-invalid');
   $('#signupExtraAge').value = p.age != null ? p.age : ''; $('#signupExtraAge').removeAttribute('aria-invalid');
   $('#signupExtraAccents').innerHTML = T('pm.accents').map(a => '<label><input type="radio" name="signupExtraAccent" value="' + esc(a) + '"' + (p.accent === a ? ' checked' : '') + '> ' + esc(a) + '</label>').join('');
   $('#signupExtraTopics').innerHTML = Object.keys(TOPICS).map(k => '<label><input type="checkbox" name="signupExtraTopic" value="' + k + '"' + (p.topics && p.topics.indexOf(k) >= 0 ? ' checked' : '') + '> ' + esc(TOPICS[k]) + '</label>').join('');
-  ['eSuAge', 'eSuAccent', 'eSuTopics'].forEach(i => $('#' + i).classList.remove('show'));
+  ['eSuName', 'eSuAge', 'eSuAccent', 'eSuTopics'].forEach(i => $('#' + i).classList.remove('show'));
 }
 /* Log in <-> Sign up on the open panel: the card blurs, shrinks and swipes out, the form changes while it is
    invisible (so the size jump never shows), then it swipes in from the other side. Sign up moves left, log in moves right. */
@@ -59,7 +60,7 @@ export function applyAuthMode(mode) {
   $('#authSubmit').textContent = T(mode === 'up' ? 'auth.btnSignup' : 'auth.btnLogin');
   $('#authPassword').setAttribute('autocomplete', mode === 'up' ? 'new-password' : 'current-password');
   $('#signupExtra').hidden = mode !== 'up';
-  $('#pass2Wrap').hidden = mode !== 'up'; $('#auPass2').value = ''; $('#auPass2').removeAttribute('aria-invalid');
+  $('#pass2Wrap').hidden = mode !== 'up'; $('#authPassword2').value = ''; $('#authPassword2').removeAttribute('aria-invalid');
   $('#lAuth').classList.toggle('signup', mode === 'up');
   $('#loginHint').hidden = true;
   clearErr($('#authError'));
@@ -83,10 +84,14 @@ export function enterApp(fresh) {
   renderAccount(); showView('app'); fillTopicSelect(); resetChat();
   go('home', { silent: !fresh });
 }
+/* How the app addresses the user: display_name, or the part of the email before "@". */
+export function userName(displayName, email) {
+  return (displayName || '').trim() || (email || '').split('@')[0] || 'you';
+}
 /* GET /api/profile -> S.user / S.profile / S.consent (the profile row is made at sign up). */
 export function applyProfile(p) {
-  S.user = { id: p.id, email: p.email, name: p.display_name || (p.email || '').split('@')[0] || 'you' };
-  S.profile = { gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent, topics: p.topics || [] };
+  S.user = { id: p.id, email: p.email, name: userName(p.display_name, p.email) };
+  S.profile = { displayName: p.display_name || null, gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent, topics: p.topics || [] };
   S.consent = !!p.consent_recording;
 }
 /* After log in, and on page load when tokens are stored: profile -> app -> baseline (F1) + history (F2). */
@@ -107,15 +112,18 @@ export function startSession(fresh) {
   }).catch(() => { if (fresh) showErr($('#authError'), T('auth.errServer')); else toast(T('auth.errServer'), true); });
 }
 export function readSignupProfile() {
+  const name = $('#signupExtraDisplayName').value.trim();
   const age = $('#signupExtraAge').value.trim(), acc = $('input[name=signupExtraAccent]:checked'), tops = $$('input[name=signupExtraTopic]:checked').map(i => i.value);
   const n = age === '' ? null : Number(age);
   const okAge = n === null || (Number.isInteger(n) && n >= 1 && n <= 120);
+  $('#eSuName').classList.toggle('show', !name); $('#signupExtraDisplayName').setAttribute('aria-invalid', String(!name));
   $('#eSuAge').classList.toggle('show', !okAge); $('#signupExtraAge').setAttribute('aria-invalid', String(!okAge));
   $('#eSuAccent').classList.toggle('show', !acc); $('#eSuTopics').classList.toggle('show', !tops.length);
+  if (!name) { $('#signupExtraDisplayName').focus(); return null; }
   if (!okAge) { $('#signupExtraAge').focus(); return null; }
   if (!acc) { $('input[name=signupExtraAccent]').focus(); return null; }
   if (!tops.length) { $('input[name=signupExtraTopic]').focus(); return null; }
-  return { gender: $('#signupExtraGender').value || null, age: n, accent: acc.value, topics: tops };
+  return { displayName: name, gender: $('#signupExtraGender').value || null, age: n, accent: acc.value, topics: tops };
 }
 export function onAuthSubmit(e) {
   e.preventDefault();
@@ -126,11 +134,11 @@ export function onAuthSubmit(e) {
   if (!EMAIL_RE.test(u)) { showErr(err, T('auth.errEmail')); $('#authEmail').setAttribute('aria-invalid', 'true'); $('#authEmail').focus(); return; }
   clearErr(err);
   if (S.authMode === 'up') {
-    const p2 = $('#auPass2').value;
+    const p2 = $('#authPassword2').value;
     if (p.length < MIN_PASSWORD) { showErr(err, T('auth.errWeak')); $('#authPassword').setAttribute('aria-invalid', 'true'); $('#authPassword').focus(); return; }
-    $('#auPass2').setAttribute('aria-invalid', String(!p2 || p2 !== p));
-    if (!p2) { showErr(err, T('auth.errRepeat')); $('#auPass2').focus(); return; }
-    if (p2 !== p) { showErr(err, T('auth.errMismatch')); $('#authPassword').setAttribute('aria-invalid', 'true'); $('#auPass2').focus(); return; }
+    $('#authPassword2').setAttribute('aria-invalid', String(!p2 || p2 !== p));
+    if (!p2) { showErr(err, T('auth.errRepeat')); $('#authPassword2').focus(); return; }
+    if (p2 !== p) { showErr(err, T('auth.errMismatch')); $('#authPassword').setAttribute('aria-invalid', 'true'); $('#authPassword2').focus(); return; }
     const prof = readSignupProfile();
     if (!prof) return;
     // Step 2 of sign up: ask for recording permission. The account is created when the person answers.
@@ -151,7 +159,7 @@ export function finishSignup(consent) {
   S.consent = false;                  // nobody is logged in yet; the answer is stored on the account
   const err = $('#authError');
   setAuthBusy(true);
-  api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: consent } })
+  api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: consent } })
     .then(readJson).then(({ ok, j }) => {
       setAuthBusy(false);
       const code = j && j.error_code;
