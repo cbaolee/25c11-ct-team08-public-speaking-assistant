@@ -1,6 +1,6 @@
 /* Tunable values. Defaults below; GET /api/config (app_constants.toml [web]) overrides them in main.js. */
 export const CONFIG = {
-  OWN_MAX_CHARS: 300,                  // max characters in "write my own text"
+  OWN_MAX_WORDS: 1500,                 // max words in "write my own text"
   BASELINE_MIN_SECONDS: 10,            // shortest baseline accepted (the backend also rejects audio with too little speech)
   BASELINE_SECONDS: 30,                // length of the baseline recording (lower it for quick demos)
   SPEAKING_WPM_FOR_ESTIMATE: 145,      // midpoint of the 130-160 target, only used for "about 0:25" hints

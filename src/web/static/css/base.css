@@ -37,7 +37,21 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
+/* Always keep room for the vertical scrollbar, so short screens (no scrollbar) and long screens
+   (scrollbar) have the same width and nothing jumps sideways when changing page or opening a modal */
+html { -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; }
+/* Dark scrollbar that matches the dark backdrop.
+   Chrome, Edge, Safari: the track starts under the top bar, and the strip beside the top bar is
+   painted in the top bar's colour, so the bar looks like it runs the full width and the scrollbar
+   only lives below it. (Chrome ignores these ::-webkit-scrollbar rules when scrollbar-color is
+   set, so scrollbar-color is only given to browsers without them, i.e. Firefox.) */
+@supports not selector(::-webkit-scrollbar) { html { scrollbar-color: #3A4256 #0B1020; } }
+html::-webkit-scrollbar { width: 12px; background: #0B1020; }
+html:has(body.app-view)::-webkit-scrollbar { background: linear-gradient(to bottom, #FAF7F0 0, #FAF7F0 var(--hh, 76px), #0B1020 var(--hh, 76px)); }
+html::-webkit-scrollbar-track { background: transparent; }
+html:has(body.app-view)::-webkit-scrollbar-track { margin-top: var(--hh, 76px); }
+html::-webkit-scrollbar-thumb { background: #3A4256; border-radius: 6px; border: 3px solid #0B1020; }
+html::-webkit-scrollbar-thumb:hover { background: #4E5870; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--sans); min-height: 100vh; }
 img, svg { max-width: 100%; }
 [hidden] { display: none !important; }

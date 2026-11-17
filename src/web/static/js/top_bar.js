@@ -1,7 +1,11 @@
+import { go } from './nav.js';
 import { isDropOpen, slideDown, slideUp } from './ui.js';
 import { $ } from './utils.js';
 
-/* ---------- user menu: opens on hover or click, a second click rolls it back up ---------- */
+/* ---------- user menu ----------
+   With a mouse: hovering opens the menu, clicking the avatar or name goes to Profile.
+   On touch screens (no hover) a tap opens and closes the menu, which also lists Profile.
+   Keyboard: Enter goes to Profile, Arrow Down opens the menu. */
 export let menuLeaveTimer = 0;
 export function closeUserMenu(focusBtn) {
   const m = $('#userMenu');
@@ -24,7 +28,12 @@ export function toggleUserMenu() {
   if (isDropOpen(m) && Date.now() - (m._hoverAt || 0) > 600) closeUserMenu(true);
   else openUserMenu(true);
 }
+export function onUserButtonClick() {
+  if (matchMedia('(hover: hover)').matches) { closeUserMenu(); go('profile'); }
+  else toggleUserMenu();
+}
 export function setupUserMenuHover() {
+  $('#userBtn').addEventListener('keydown', e => { if (e.key === 'ArrowDown') { e.preventDefault(); openUserMenu(true); } });
   const acct = $('#userMenuButton'), m = $('#userMenu');
   if (!acct || !matchMedia('(hover: hover)').matches) return;
   acct.addEventListener('mouseenter', () => {

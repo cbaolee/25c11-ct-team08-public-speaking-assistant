@@ -1,4 +1,5 @@
 import { redrawCharts } from './charts.js';
+import { heroLightsOn } from './screens/home.js';
 import { syncHero, syncStage } from './screens/landing.js';
 import { stopPlayback } from './screens/report.js';
 import { RENDER, S } from './state.js';
@@ -116,6 +117,7 @@ export function go(name, opts) {
   const slide = prev && next && prev !== next && !$('#viewApp').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (slide) leaveScreen(prev, dir);
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === screenId(name)));
+  if (name === 'home' && prev !== next) heroLightsOn();   // coming back to Home: lights come on, as when scrolling up
   if (slide) next.animate([
     { opacity: 0, transform: 'translateX(' + (56 * dir) + 'px)', filter: 'blur(8px)' },
     { opacity: 1, transform: 'none', filter: 'none' }

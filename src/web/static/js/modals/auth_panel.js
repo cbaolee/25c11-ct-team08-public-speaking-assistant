@@ -95,6 +95,15 @@ export function applyProfile(p) {
   S.consent = !!p.consent_recording;
 }
 /* After log in, and on page load when tokens are stored: profile -> app -> baseline (F1) + history (F2). */
+/* Full-screen loading screen shown between log in and a fully loaded Home. */
+export function showAppLoader(on) {
+  const el = $('#appLoader');
+  if (on) { el.hidden = false; el.classList.remove('out'); return; }
+  if (el.hidden) return;
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.hidden = true; return; }
+  el.classList.add('out');
+  setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 400);
+}
 export function startSession(fresh) {
   return api('/api/profile').then(readJson).then(({ ok, status, j }) => {
     if (!ok) {
@@ -105,11 +114,13 @@ export function startSession(fresh) {
     }
     applyProfile(j);
     S.sessions = []; S.baseline = null; S.savedScripts = null;
+    // Loading screen until history and the latest scores are in, so Home never shows an empty
+    // account first and then jumps. The Baseline Gate (if needed) opens after it.
+    showAppLoader(true);
     enterApp(fresh);
-    if (fresh) toast(T('auth.okLogin'));
-    loadBaseline(true);
-    loadHistory();
-  }).catch(() => { if (fresh) showErr($('#authError'), T('auth.errServer')); else toast(T('auth.errServer'), true); });
+    const user = S.user, ready = () => { showAppLoader(false); if (S.user !== user) return; if (fresh) toast(T('auth.okLogin')); loadBaseline(true); };
+    Promise.race([loadHistory(), new Promise(r => setTimeout(r, 10000))]).then(ready, ready);
+  }).catch(() => { showAppLoader(false); if (fresh) showErr($('#authError'), T('auth.errServer')); else toast(T('auth.errServer'), true); });
 }
 export function readSignupProfile() {
   const name = $('#signupExtraDisplayName').value.trim();

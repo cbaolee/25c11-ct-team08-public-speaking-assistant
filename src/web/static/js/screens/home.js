@@ -29,25 +29,68 @@ export const lineSpec = (ss0, pick, o) => { const ss = ss0.filter(s => pick(s) !
   xTick: (p, i) => fmtDay(ss[i].ts),
   table: { head: [T('history.colDate'), o.col], rows: ss.map(s => [fmtDay(s.ts), (o.fmtTip || (v => v.toFixed(0)))(pick(s))]) }
 }, o); };
-RENDER.home = function () {
-  const ss = scored(), n = S.user.name;
-  $('#homeH').textContent = T(S.sessions.length ? 'home.welcome' : 'home.welcomeNew', { name: n });
-  const empty = !ss.length;
-  $('#homeEmpty').hidden = !empty; $('#homeData').hidden = empty;
-  if (empty) {
-    $('#homeEmpty').innerHTML = '<h2>' + esc(T('home.emptyT')) + '</h2><p class="note">' + esc(T('home.emptyD')) + '</p><div class="row"><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('home.nextFirstCta')) + '</button>' +
-      (S.baseline ? '' : '<button class="btn" type="button" data-go="profile">' + esc(T('home.nextBaselineCta')) + '</button>') + '</div>';
+/* Hero: the first full screen of Home. One greeting, one summary line, one main action that
+   depends on the latest result, and a hint to scroll down to progress and history.
+   (A baseline is always there: the Baseline Gate asks for it right after log in.) */
+function greeting(name) {
+  const h = new Date().getHours();
+  return T(h < 12 ? 'home.greetMorning' : h < 18 ? 'home.greetAfternoon' : 'home.greetEvening', { name });
+}
+function renderHero(ss) {
+  $('#homeH').textContent = greeting(S.user.name);
+  const script = '<button class="btn btn-lg" type="button" data-go="scriptStudio">' + esc(T('home.ctaScript')) + '</button>';
+  if (!ss.length) {
+    $('#homeSummary').textContent = T('home.summaryNew');
+    $('#homeCta').innerHTML = '<button class="btn btn-primary btn-lg" type="button" data-go="practice">' + esc(T('home.ctaFirst')) + '</button>' + script;
+    $('#homeMoreText').textContent = T('home.moreNew');
     return;
   }
+  const last = ss[ss.length - 1], weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const week = S.sessions.filter(s => s.ts >= weekAgo).length, score = sh(last.sc.overall);
+  $('#homeSummary').textContent = T(week === 0 ? 'home.summaryIdle' : week === 1 ? 'home.summaryWeekOne' : 'home.summaryWeek', { n: week, score });
+  const adv = adviceList(last.sc, 1, 101)[0];
+  $('#homeCta').innerHTML = '<button class="btn btn-primary btn-lg" type="button" data-go="practice">' + esc(T('home.ctaFocus', { area: adv.area.toLowerCase() })) + '</button>' + script;
+  $('#homeMoreText').textContent = T('home.more');
+}
+/* Lights off while scrolling down to the progress section: 0 at the top of Home, 1 after
+   about half of the hero has scrolled away. CSS reads --hero-p (see .hero-beam). */
+function syncHeroLight() {
+  const hero = document.getElementById('homeHero');
+  if (!hero || S.screen !== 'home') return;
+  // short pages (no history yet) still reach "lights off" at the very bottom
+  const room = document.documentElement.scrollHeight - window.innerHeight;
+  const span = Math.max(1, Math.min(hero.offsetHeight * 0.55, room));
+  const p = Math.min(1, Math.max(0, window.scrollY / span));
+  hero.style.setProperty('--hero-p', p.toFixed(3));
+}
+window.addEventListener('scroll', syncHeroLight, { passive: true });   // one style write per event, cheap
+/* Coming back to Home: start from "lights off" and play the "lights on" motion (same as scrolling up) */
+export function heroLightsOn() {
+  const hero = document.getElementById('homeHero');
+  if (!hero) return;
+  hero.classList.remove('hero-anim');
+  hero.classList.add('hero-off');
+  void hero.offsetWidth;   // apply "off" first, without a transition
+  hero.classList.add('hero-anim');
+  hero.classList.remove('hero-off');
+  clearTimeout(hero._animT);
+  hero._animT = setTimeout(() => hero.classList.remove('hero-anim'), 700);
+}
+/* "Scroll for more": smooth unless the user asked for less motion */
+export function scrollHomeDown() {
+  const target = $('#homeData').hidden ? $('#homeEmpty') : $('#homeData');
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const top = target.getBoundingClientRect().top + window.scrollY - (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hh')) || 64) - 16;
+  window.scrollTo({ top: Math.max(0, top), behavior: calm ? 'auto' : 'smooth' });
+}
+RENDER.home = function () {
+  const ss = scored();
+  renderHero(ss);
+  syncHeroLight();
+  const empty = !ss.length;
+  $('#homeEmpty').hidden = !empty; $('#homeData').hidden = empty;
+  if (empty) { $('#homeEmpty').textContent = T('home.later'); return; }
   const last = ss[ss.length - 1], pd = progressDelta(S.sessions);
-  let nx;
-  if (!S.baseline) {
-    nx = '<span class="pill info">' + esc(T('home.nextKicker')) + '</span><h2>' + esc(T('home.nextBaselineT')) + '</h2><p>' + esc(T('home.nextBaselineD')) + '</p><div class="row" style="margin-top:16px"><button class="btn btn-primary" type="button" data-go="profile">' + esc(T('home.nextBaselineCta')) + '</button></div>';
-  } else {
-    const adv = adviceList(last.sc, 1, 101)[0];
-    nx = '<span class="pill info">' + esc(T('home.nextKicker')) + '</span><h2>' + esc(T('home.nextWeakT', { area: adv.area })) + '</h2><p>' + esc(adv.text) + '</p><div class="row" style="margin-top:16px"><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('home.nextWeakCta')) + '</button><button class="btn" type="button" data-go="scriptStudio">' + esc(T('home.nextScriptCta')) + '</button></div>';
-  }
-  $('#nextStep').innerHTML = nx;
   $('#latestPanel').innerHTML = '<h3>' + esc(T('home.latestTitle')) + '</h3><div class="bigscore"><b class="num">' + sh(last.sc.overall) + '</b><span class="mute">' + esc(T('report.outOf')) + '</span></div><div style="margin-top:10px">' + deltaPill(pd) + '</div><p class="note" style="margin-top:10px">' + esc(fmtDayLong(last.ts) + ' · ' + last.title) + '</p><div class="row" style="margin-top:14px"><button class="btn" type="button" data-open="' + last.id + '">' + esc(T('home.openReport')) + '</button></div>';
 
   const sn = ss.filter(s => s.sc.overall != null), ov = sn.map(s => s.sc.overall);   // null overall is not 0: left out of min/max and the chart

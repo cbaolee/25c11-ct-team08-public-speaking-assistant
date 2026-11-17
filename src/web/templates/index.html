@@ -39,10 +39,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <div class="menu" id="userMenu" role="menu" hidden>
-        <button type="button" role="menuitem" data-act="profile" data-t="top.profile"></button>
-        <button type="button" role="menuitem" data-act="settings" data-t="top.settings"></button>
+        <button type="button" role="menuitem" data-act="profile"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg><span data-t="top.profile"></span></button>
+        <button type="button" role="menuitem" data-act="settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span data-t="top.settings"></span></button>
         <hr>
-        <button type="button" role="menuitem" data-act="logout" data-t="top.logout"></button>
+        <button type="button" role="menuitem" data-act="logout"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span data-t="top.logout"></span></button>
       </div>
     </div>
   </div>
@@ -143,18 +143,28 @@
 
 <!-- HOME -->
 <section class="screen active" id="screenHome" aria-labelledby="homeH">
-  <div class="head">
-    <div><h1 id="homeH"></h1><p class="sub" data-t="home.sub"></p></div>
-  </div>
-  <div class="panel empty" id="homeEmpty" hidden></div>
-  <div id="homeData">
-    <div class="next">
-      <div class="panel go" id="nextStep"></div>
-      <div class="panel" id="latestPanel"></div>
+  <div class="home-hero" id="homeHero">
+    <div class="hero-deco" aria-hidden="true">
+      <span class="hero-beam"></span><span class="hero-glow"></span>
+      <svg class="hero-waves" viewBox="0 0 1200 160" preserveAspectRatio="none"><path d="M0 80 C 100 20, 200 140, 300 80 S 500 20, 600 80 S 800 140, 900 80 S 1100 20, 1200 80"/><path d="M0 92 C 120 52, 240 132, 360 92 S 600 52, 720 92 S 960 132, 1080 92 S 1170 72, 1200 92"/></svg>
     </div>
-    <div class="chart-grid">
+    <div class="hero-in">
+      <h1 id="homeH"></h1>
+      <p class="hero-summary" id="homeSummary"></p>
+      <div class="hero-cta" id="homeCta"></div>
+    </div>
+    <button class="hero-more" type="button" id="homeMore"><span id="homeMoreText"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+  </div>
+  <p class="home-later" id="homeEmpty" hidden></p>
+  <div class="home-data" id="homeData">
+    <h2 class="home-sec" data-t="home.progressTitle"></h2>
+    <div class="home-progress">
+      <div class="panel" id="latestPanel"></div>
       <div class="chartbox"><h3 data-t="home.cScore"></h3><p class="cap" id="capScore"></p><div class="chart" id="chScore"></div></div>
       <div class="chartbox"><h3 data-t="home.cActivity"></h3><p class="cap" id="capActivity"></p><div class="chart" id="chActivity"></div></div>
+    </div>
+    <h2 class="home-sec" data-t="home.detailsTitle"></h2>
+    <div class="chart-grid">
       <div class="chartbox"><h3 data-t="home.cWpm"></h3><p class="cap" id="capWpm"></p><div class="chart" id="chWpm"></div></div>
       <div class="chartbox"><h3 data-t="home.cPitch"></h3><p class="cap" id="capPitch"></p><div class="chart" id="chPitch"></div></div>
       <div class="chartbox"><h3 data-t="home.cClarity"></h3><p class="cap" id="capClarity"></p><div class="chart" id="chClarity"></div></div>
@@ -177,8 +187,8 @@
 
 <!-- SCRIPT (Generate Script) -->
 <section class="screen" id="screenScriptStudio" aria-labelledby="scriptH">
-  <div class="head"><div><h1 id="scriptH" data-t="script.title"></h1><p class="sub" data-t="script.sub"></p></div></div>
-  <div class="panel">
+  <h1 id="scriptH" class="sr-only" data-t="script.title"></h1>
+  <div class="studio">
     <div class="chat" id="chatFeed" role="log" aria-live="polite" data-t-aria="script.feedLabel" tabindex="0"></div>
     <div class="composer">
       <div id="composerFile"></div>
@@ -225,6 +235,7 @@
         <div class="ferr" id="ownErr" role="alert"></div>
       </div>
     </div>
+    <div class="prwork" id="practiceWork">
     <div id="pStep2" class="prbar" hidden>
       <div class="seg" role="tablist" data-t-aria="practice.voiceTitle">
         <button type="button" role="tab" id="voiceRecordTab" aria-selected="true" data-t="practice.tabRec"></button>
@@ -254,8 +265,11 @@
         <button class="btn btn-primary" type="button" id="evalBtn" data-t="practice.evaluate" disabled></button>
       </div>
     </div>
+    <div class="prtext">
     <div class="sheet-title" style="margin-top:14px"><strong id="sheetTitle" class="note"></strong><span class="note" id="sheetMeta"></span></div>
     <div class="reader reader-wide" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
+    </div>
+    </div>
     <div id="pStep1Go" class="row between" style="margin-top:14px"><span class="note" id="useHint"></span><button class="btn btn-primary" type="button" id="useScript" data-t="practice.useScript" disabled></button></div>
   </div>
 </section>
@@ -295,30 +309,36 @@
 <section class="screen" id="screenProfile" aria-labelledby="profH">
   <button class="btn btn-ghost btn-sm back" type="button" data-back><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-t="common.back"></span></button>
   <div class="head"><div><h1 id="profH" data-t="profile.title"></h1><p class="sub" data-t="profile.sub"></p></div></div>
-  <div class="grid2">
-    <div class="panel">
-      <h3 data-t="profile.userInfo"></h3>
-      <div class="who-row" style="margin-top:14px">
-        <span class="avatar xl" id="avBig" aria-hidden="true"></span>
-        <div class="row">
-          <button class="btn btn-sm" type="button" id="avChange" data-t="profile.changeAvatar"></button>
-          <button class="btn btn-sm btn-danger-ghost" type="button" id="avRemove" data-t="profile.removeAvatar"></button>
-        </div>
-        <input type="file" id="avFile" accept="image/*" hidden>
+  <div class="panel profile-card">
+    <div class="who-row">
+      <span class="avatar xl" id="avBig" aria-hidden="true"></span>
+      <div class="row">
+        <button class="btn btn-sm" type="button" id="avChange" data-t="profile.changeAvatar"></button>
+        <button class="btn btn-sm btn-danger-ghost" type="button" id="avRemove" data-t="profile.removeAvatar"></button>
       </div>
-      <table class="kvt"><tbody id="pfSummary"></tbody></table>
-      <div class="row" style="margin-top:16px"><button class="btn btn-primary" type="button" id="editInfo" data-t="profile.editInfo"></button></div>
+      <input type="file" id="avFile" accept="image/*" hidden>
     </div>
-    <div class="panel">
-      <h3 data-t="profile.baselineTitle"></h3>
-      <p class="note" style="margin-top:8px" data-t="profile.baselineNote"></p>
-      <p class="passage" data-t="gate.passage"></p>
-      <div class="timer" id="profileBaselineTimer" role="timer" aria-live="off"></div>
-      <div class="lvl" id="profileBaselineLevel" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="profileBaselineBarWrap" data-t-aria="profile.progress"><i id="profileBaselineBar"></i></div>
-      <div class="blbtns"><button class="btn btn-record" type="button" id="profileBaselineStart"></button><button class="btn" type="button" id="profileBaselineListen" data-t="profile.listen" hidden></button></div>
-      <div class="blmsgs"><span class="pill" id="profileBaselineStatus" role="status"></span><span class="pill warn" id="profileBaselineListenMessage" role="status" hidden></span></div>
-      <audio id="profileBaselineAudio" controls preload="none" hidden data-t-aria="profile.listenAria" style="margin-top:10px;width:100%"></audio>
+    <table class="kvt">
+      <tbody id="pfSummary"></tbody>
+      <tbody>
+        <tr class="bl-tr">
+          <th scope="row" data-t="profile.rowBaseline"></th>
+          <td>
+            <div class="bl-line">
+              <span id="pfBaseline"></span>
+              <span class="row bl-acts">
+                <button class="btn btn-sm" type="button" id="profileBaselineAgain" data-t="profile.again"></button>
+                <button class="btn btn-sm" type="button" id="profileBaselineListen" data-t="profile.listen" hidden></button>
+              </span>
+            </div>
+            <span class="pill warn" id="profileBaselineListenMessage" role="status" hidden></span>
+            <audio id="profileBaselineAudio" controls preload="none" hidden data-t-aria="profile.listenAria" style="margin-top:10px;width:100%"></audio>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="row profile-actions">
+      <button class="btn btn-primary" type="button" id="editInfo" data-t="profile.editInfo"></button>
     </div>
   </div>
 </section>
@@ -445,6 +465,18 @@
   <div class="actions"><button class="btn" type="button" data-close data-t="common.close"></button><button class="btn btn-primary" type="button" id="meRetry" data-t="eval.retry"></button></div>
 </div></div>
 
+<div class="mbg" id="baselineRecorder" role="dialog" aria-modal="true" aria-labelledby="baselineRecorderTitle"><div class="box wide">
+  <h2 id="baselineRecorderTitle" data-t="profile.baselineTitle"></h2>
+  <p class="note" style="margin-top:8px" data-t="profile.baselineNote"></p>
+  <p class="passage" data-t="gate.passage"></p>
+  <div class="timer" id="profileBaselineTimer" role="timer" aria-live="off"></div>
+  <div class="lvl" id="profileBaselineLevel" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="profileBaselineBarWrap" data-t-aria="profile.progress"><i id="profileBaselineBar"></i></div>
+  <div class="blbtns"><button class="btn btn-record" type="button" id="profileBaselineStart"></button></div>
+  <div class="blmsgs"><span class="pill" id="profileBaselineStatus" role="status"></span></div>
+  <div class="actions"><button class="btn" type="button" id="baselineRecorderClose" data-close data-t="common.close"></button></div>
+</div></div>
+
 <div class="mbg" id="baselineGate" role="dialog" aria-modal="true" aria-labelledby="baselineGateTitle" aria-describedby="baselineGateMessage"><div class="box wide">
   <h2 id="baselineGateTitle" data-t="gate.title"></h2>
   <p id="baselineGateMessage" data-t="gate.msg"></p>
@@ -470,6 +502,10 @@
   <div class="reader" id="mrBody" role="region" tabindex="0" data-t-aria="script.readerLabel"></div>
 </div></div>
 
+<div class="app-loader" id="appLoader" role="status" aria-live="polite" hidden>
+  <div class="loader-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <p class="loader-text" data-t="app.loading"></p>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>
 <script type="module" src="/static/js/main.js"></script>

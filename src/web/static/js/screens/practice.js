@@ -60,6 +60,8 @@ export function renderPractice() {
   // stepper: a real sequence. 1 = choose text (until "Use this script"), 2 = record, 3 = review. Finished steps can be clicked to go back.
   const cur = S.choosing || !txt ? 1 : !au ? 2 : 3, reach = [true, !!txt, !!au];
   $('#pStep1').hidden = cur !== 1; $('#pStep2').hidden = cur === 1; $('#pStep1Go').hidden = cur !== 1;
+  // from step 2: script on the left (the page scrolls it), Voice Input + speed pinned on the right
+  $('#practiceWork').classList.toggle('split', cur !== 1);
   $('#useScript').disabled = !txt; $('#useHint').textContent = txt ? '' : T('practice.hintNoText');
   const sh = $('#sheet');
   if (txt) {
@@ -99,16 +101,42 @@ export function renderPractice() {
     if (i === cur) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
     $('button', li).disabled = !!S.rec || !reach[i - 1] || i === cur;
   });
+  const changed = shownStep !== null && shownStep !== cur;
+  moveStepPill(changed);
+  if (changed) animateStepContent(cur > shownStep ? 1 : -1);
+  shownStep = cur;
 }
+/* Stepper: one blue pill glides to the current step (like the main nav). The step contents
+   slide in from the side of travel, the same motion as a page change. */
+let shownStep = null;
+export function moveStepPill(animate) {
+  const ol = $('#steps'), li = $('#steps li.cur');
+  if (!ol || !li || !li.offsetWidth) return;
+  const still = !animate || !ol.classList.contains('pill-on');
+  ol.classList.toggle('pill-still', still);
+  ol.style.setProperty('--pill-x', li.offsetLeft + 'px'); ol.style.setProperty('--pill-y', li.offsetTop + 'px');
+  ol.style.setProperty('--pill-w', li.offsetWidth + 'px'); ol.style.setProperty('--pill-h', li.offsetHeight + 'px');
+  ol.classList.add('pill-on');
+  if (still) { getComputedStyle(ol, '::before').transform; ol.classList.remove('pill-still'); }
+}
+function animateStepContent(dir) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  $$('#practicePanel > :not([hidden])').forEach(el => {
+    if (!el.animate) return;
+    el.animate([{ opacity: 0, transform: 'translateX(' + (40 * dir) + 'px)', filter: 'blur(6px)' }, { opacity: 1, transform: 'none', filter: 'none' }],
+      { duration: 450, easing: 'cubic-bezier(.2, .7, .3, 1)' });
+  });
+}
+window.addEventListener('resize', () => moveStepPill(false));
 RENDER.practice = function () { loadSavedScripts(); paintFollowWpm(); renderPractice(); };
 export function updateOwnCount() {
-  const n = $('#ownText').value.length;
-  $('#ownCnt').textContent = T('practice.ownCounter', { n, max: CONFIG.OWN_MAX_CHARS });
+  const n = wordsOf($('#ownText').value);
+  $('#ownCnt').textContent = T('practice.ownCounter', { n, max: CONFIG.OWN_MAX_WORDS });
 }
 export function useOwn() {
   const v = $('#ownText').value.trim(), err = $('#ownErr');
   if (!v) { showErr(err, T('practice.errOwnEmpty')); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
-  if (v.length > CONFIG.OWN_MAX_CHARS) { showErr(err, T('practice.errOwnMax', { max: CONFIG.OWN_MAX_CHARS })); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
+  if (wordsOf(v) > CONFIG.OWN_MAX_WORDS) { showErr(err, T('practice.errOwnMax', { max: CONFIG.OWN_MAX_WORDS })); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
   clearErr(err); $('#ownText').removeAttribute('aria-invalid');
   const applyOwn = () => {
     S.choosing = true;
@@ -168,9 +196,15 @@ export function paintFollow() {
   sh.classList.add('following');
   $$('.sent', sh).forEach((el, i) => { el.classList.toggle('done', i < f.idx); el.classList.toggle('cur', i === f.idx); });
   const cur = $('.sent.cur', sh);
-  if (cur && sh.scrollTo) {
-    const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    sh.scrollTo({ top: Math.max(0, cur.offsetTop - (sh.clientHeight - cur.offsetHeight) / 2), behavior: calm ? 'auto' : 'smooth' });
+  if (!cur) return;
+  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const behavior = calm ? 'auto' : 'smooth';
+  if ($('#practiceWork').classList.contains('split')) {
+    // the whole page scrolls so the bold sentence sits about one third down the screen
+    const top = cur.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3;
+    window.scrollTo({ top: Math.max(0, top), behavior });
+  } else if (sh.scrollTo) {
+    sh.scrollTo({ top: Math.max(0, cur.offsetTop - (sh.clientHeight - cur.offsetHeight) / 2), behavior });
   }
 }
 export function toggleRecording() {
