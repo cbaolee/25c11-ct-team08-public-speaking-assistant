@@ -1,0 +1,118 @@
+/* ---------- header ---------- */
+header.top { position: sticky; top: 0; z-index: 50; background: var(--surface); border-bottom: 1px solid var(--line); transition: background .2s, border-color .2s; }
+/* landing: the header sits on top of the photo (negative margin pulls the stage under it); it turns solid once the page scrolls */
+body.landing-view header.top { margin-bottom: calc(var(--hh) * -1); }
+header.top.hero { background: transparent; border-bottom-color: transparent; }
+header.top.hero .brand { color: #fff; }
+header.top.hero .btn:not(.btn-primary) { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .55); color: #fff; }
+header.top.hero .btn:not(.btn-primary):hover { background: rgba(255, 255, 255, .16); border-color: #fff; }
+header.top.hero .btn-primary { box-shadow: 0 0 0 1px rgba(255, 255, 255, .3); }
+header.top.hero :focus-visible { outline-color: #fff; }
+.top-in { max-width: 1120px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px; cursor: pointer; font: 600 22px/1 var(--serif); color: var(--ink); }
+.brand .lk { height: 36px; width: auto; display: block; flex: none; }
+.brand .lk-dark { display: none; }
+header.top.hero .brand .lk-light { display: none; }
+header.top.hero .brand .lk-dark { display: block; }
+/* Main nav: one raised track holding the three working screens; the current screen is the only filled shape in the header */
+.nav { display: flex; gap: 4px; margin-left: auto; padding: 4px; background: var(--paper); border: 1px solid var(--line-strong); border-radius: var(--r-pill); }
+.nav button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 22px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink); font: 600 16px/1 var(--sans); cursor: pointer; transition: background .15s, color .15s; }
+.nav button svg { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.nav button:hover { background: var(--accent-soft); color: var(--accent); }
+.nav button[aria-current="page"] { background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(29, 78, 216, .35); }
+.nav button:focus-visible { outline-offset: 3px; }
+/* Sliding pill: one blue shape behind the buttons that glides from the old screen to the new one (placed by moveNavPill) */
+.nav { position: relative; }
+.nav::before { content: ""; position: absolute; top: 4px; bottom: 4px; left: 0; width: var(--pill-w, 0); transform: translateX(var(--pill-x, 0));
+  border-radius: var(--r-pill); background: var(--accent); box-shadow: 0 2px 8px rgba(29, 78, 216, .35); opacity: 0; pointer-events: none;
+  transition: transform .45s cubic-bezier(.65, 0, .35, 1), width .45s cubic-bezier(.65, 0, .35, 1); }
+.nav.pill-on::before { opacity: 1; }
+.nav.pill-still::before { transition: none; }
+.nav button { position: relative; z-index: 1; transition: background .15s, color .3s; }
+.nav.pill-on button[aria-current="page"] { background: transparent; box-shadow: none; }
+.nav.pill-on button[aria-current="page"]:hover { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .nav::before { transition: none; } }
+.acct { margin-left: auto; display: flex; align-items: center; gap: 8px; position: relative; }
+.userbtn { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 4px 12px 4px 4px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; font: 600 15px var(--sans); color: var(--ink); }
+.userbtn:hover { background: var(--accent-soft); border-color: var(--accent-line); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: inline-flex; align-items: center; justify-content: center; font: 600 15px var(--sans); overflow: hidden; flex: none; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar.xl { width: 88px; height: 88px; font-size: 34px; }
+.menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 250px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); padding: 6px; z-index: 60; }
+.menu button { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 10px 12px; font: 500 15px var(--sans); color: var(--ink); cursor: pointer; }
+.menu button:hover, .menu button:focus-visible { background: var(--accent-soft); }
+.menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 0; }
+@media (max-width: 720px) {
+  .top-in { padding: 8px 16px; gap: 6px; }
+  .nav { order: 3; width: 100%; margin-left: 0; gap: 2px; }
+  .nav button { flex: 1; justify-content: center; gap: 6px; padding: 0 8px; font-size: 15px; }
+  .nav button svg { width: 18px; height: 18px; }
+  .userbtn .uname { display: none; }
+  .userbtn { padding: 4px; }
+  .brand .lk { height: 30px; }
+}
+
+/* ---------- layout ---------- */
+main { max-width: 1120px; margin: 0 auto; padding: 28px 24px 72px; }
+@media (max-width: 720px) { main { padding: 20px 16px 56px; } }
+.screen { display: none; }
+.screen.active { display: block; }
+.head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.head h1 { font-size: clamp(24px, 2.4vw, 30px); }
+.head .sub { font-size: 15px; }
+/* After login: every screen sits on the landing stage's dark backdrop (same colours and washes, no mic, no light beam).
+   Fixed behind everything, so panels scroll over it. */
+body.app-view { background: #05070D; }
+body.app-view::before { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(5, 7, 13, 0) 0%, rgba(5, 7, 13, .30) 50%, rgba(5, 7, 13, .62) 100%),
+    radial-gradient(90% 60% at 30% 100%, rgba(42, 50, 78, .55), rgba(42, 50, 78, 0) 70%),
+    linear-gradient(to bottom, #07080C 0%, #0A0D16 40%, #141A2C 80%, #1A2036 100%); }
+body.app-view::after { content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+  background: radial-gradient(60% 70% at 22% 45%, rgba(59, 108, 246, .12), rgba(59, 108, 246, 0) 70%); }
+/* Text that sits straight on the backdrop (screen titles) turns light; panels keep their own colours */
+body.app-view .screen > .head h1, body.app-view .screen > .head h2 { color: #fff; }
+body.app-view .screen > .head .sub { color: #C9D0DB; }
+/* Ombre frame on every panel (not pop-ups): the border fades from white to transparent, so the dark backdrop shows through */
+/* Ivory + white: the solid header (after login, and on the landing once scrolled) is ivory, its controls stay white */
+header.top:not(.hero) { background: #FAF7F0; }
+header.top:not(.hero) .nav { background: #fff; }
+/* Landing below the stage: page colour turns ivory too (the stage's floor fade follows --paper) */
+body.landing-view { --paper: #FAF7F0; background: var(--paper); }
+/* Pop-up windows and the account menu after login: ivory sheet, white controls inside */
+body.app-view .box, body.app-view .menu { background: #FAF7F0; }
+body.app-view .passage { background: #fff; border: 1px solid var(--line); }   /* no blue side bar: same plain frame as the other boxes */
+/* Segmented tabs after login: one white pill slides from the old choice to the new one (placed by moveSegPills) */
+body.app-view .seg, .l-auth .seg { position: relative; }
+body.app-view .seg::before, .l-auth .seg::before { content: ""; position: absolute; left: 0; top: 0; width: var(--seg-w, 0); height: var(--seg-h, 0); transform: translate(var(--seg-x, 0), var(--seg-y, 0));
+  border-radius: 8px; background: var(--surface); box-shadow: 0 0 0 1px var(--line-strong); opacity: 0; pointer-events: none;
+  transition: transform .4s cubic-bezier(.65, 0, .35, 1), width .4s cubic-bezier(.65, 0, .35, 1); }
+body.app-view .seg.pill-on::before, .l-auth .seg.pill-on::before { opacity: 1; }
+body.app-view .seg.pill-still::before, .l-auth .seg.pill-still::before { transition: none; }
+body.app-view .seg button, .l-auth .seg button { position: relative; z-index: 1; transition: color .25s; }
+body.app-view .seg.pill-on button[aria-selected="true"], .l-auth .seg.pill-on button[aria-selected="true"] { background: transparent; box-shadow: none; }
+/* Log in / Sign up tabs on the dark card: the sliding pill is the translucent white of the old selected tab */
+.l-auth .seg::before { background: rgba(255, 255, 255, .16); box-shadow: 0 0 0 1px rgba(255, 255, 255, .28); }
+/* Pop-ups after login: fade in while rising a little from below */
+body.app-view .mbg.show { animation: mbgIn .35s ease-out; }
+body.app-view .mbg.show .box { animation: boxUp .5s cubic-bezier(.2, .7, .3, 1); }
+@keyframes mbgIn { from { opacity: 0; } }
+@keyframes boxUp { from { opacity: 0; transform: translateY(40px); } }
+@media (prefers-reduced-motion: reduce) { body.app-view .mbg.show, body.app-view .mbg.show .box { animation: none; } }
+/* Page change: the old screen slides out to the left while the new one slides in from the right (see go) */
+main { position: relative; }
+.screen.leaving { display: block; position: absolute; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { body.app-view .seg::before { transition: none; } }   /* text blocks stay white on the ivory sheet */
+body.app-view header.top { border-bottom-color: rgba(255, 255, 255, .9);
+  box-shadow: 0 3px 0 rgba(255, 255, 255, .28), 0 7px 0 rgba(255, 255, 255, .12), 0 8px 22px 4px rgba(255, 255, 255, .07); }
+body.app-view .panel:not(.ov):not(.go), body.app-view .chartbox { background-color: #FAF7F0; }   /* ivory, softer than pure white on the dark backdrop */
+body.app-view .panel, body.app-view .chartbox { border-color: rgba(255, 255, 255, .9);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, .28), 0 0 0 7px rgba(255, 255, 255, .12), 0 0 22px 8px rgba(255, 255, 255, .07); }
+.back { margin-bottom: 10px; }
+/* On the dark backdrop the back button gets a light framed chip so it stays easy to see */
+body.app-view .btn.back { background: var(--paper); border-color: var(--line-strong); color: var(--ink); box-shadow: 0 2px 8px rgba(0, 0, 0, .25); }
+body.app-view .btn.back:hover:not(:disabled) { background: var(--surface); border-color: var(--accent-line); color: var(--accent); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); padding: 20px; }
+.panel > h3 + * { margin-top: 12px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }

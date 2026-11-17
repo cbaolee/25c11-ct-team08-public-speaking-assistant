@@ -89,7 +89,7 @@ def test_create_baseline_ok_saves_current(monkeypatch, repos):
 
 
 def test_create_baseline_webm_upload_from_ui_is_saved(monkeypatch, repos):
-    # demo_ui.html sends the recording as "baseline.webm"
+    # the UI (modals/baseline_gate.js) sends the recording as "baseline.webm"
     r = _post(
         monkeypatch,
         lambda audio_path, *, vad_params: _ok_payload(_profile()),

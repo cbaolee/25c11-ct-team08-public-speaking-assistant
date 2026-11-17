@@ -134,7 +134,7 @@ async def web_config() -> dict[str, Any]:
 
 @app.get("/")
 async def index(request: Request):
-    return templates.TemplateResponse(request, "demo_ui.html")
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.exception_handler(AudioRejected)

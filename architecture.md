@@ -18,7 +18,7 @@ This document describes the **current** structure of Public Speaking Coach: what
 
 ```mermaid
 flowchart LR
-    Browser["Browser<br/>(demo_ui.html)"] -->|HTTP / JSON| API["FastAPI app<br/>src/app"]
+    Browser["Browser<br/>(index.html + ES modules)"] -->|HTTP / JSON| API["FastAPI app<br/>src/app"]
     API --> Audio["Evaluate / Baseline Pipeline<br/>src/audio_processing"]
     API --> Text["Script Pipeline<br/>src/text_processing"]
     Audio -->|speech-to-text| STT["STT providers"]
@@ -57,7 +57,13 @@ src/app/
     └── session_helpers.py Pure helpers: Opus encode, split/merge series, compaction
 src/audio_processing/     Evaluate and Baseline Pipeline
 src/text_processing/      Script Pipeline
-src/web/                  UI templates and static files
+src/web/
+├── templates/index.html  Page markup only; loads the CSS files and static/js/main.js
+├── static/css/           base, layout, components, screens (loaded in this order)
+└── static/js/            ES modules (no bundler): main.js (init), state.js (S, CONFIG, RENDER),
+                          i18n.js (TEXT), api.js, ui.js, nav.js, top_bar.js, utils.js, charts.js,
+                          data.js, recorder.js, screens/*.js, modals/*.js;
+                          evaluate_client.js stays a classic script (also used by node tests)
 tests/db/                 Repository and helper tests
 ```
 
