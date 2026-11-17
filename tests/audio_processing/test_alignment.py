@@ -1,7 +1,7 @@
-"""Test alignment tầng 1 (ADR-005 P8 bước 1-2, phase3_decision §4 #5, #8).
+"""Tests for alignment level 1 (ADR-005 P8 steps 1-2, phase3_decision §4 #5, #8).
 
-Mọi số kỳ vọng là SỐ TÍNH TAY (không phải số đo). Dùng stub pron, không tải CMU, không mạng.
-jiwer chỉ dùng để ĐỐI CHIẾU, không phải đáp án.
+Every expected number is HAND-COMPUTED (not measured). Uses a pron stub, no CMU load, no network.
+jiwer is only used to CROSS-CHECK, not as the answer key.
 """
 
 import jiwer
@@ -49,8 +49,8 @@ def _w(word: str, i: int = 0) -> WordTimestamp:
 # ---------- prepare_hyp ----------
 
 def test_filler_not_ins():
-    # STT "I Um, think uh so": "Um," và "uh" là filler -> bị loại. Còn i, think, so
-    # -> hyp_index 0, 1, 2 liên tục. Script "I think so" -> 3 equal, 0 ins.
+    # STT "I Um, think uh so": "Um," and "uh" are fillers -> dropped. Left: i, think, so
+    # -> hyp_index 0, 1, 2 in a row. Script "I think so" -> 3 equal, 0 ins.
     words = [_w("I"), _w("Um,"), _w("think"), _w("uh"), _w("so")]
     hyp = prepare_hyp(words)
     assert hyp == [HypToken(0, "i"), HypToken(1, "think"), HypToken(2, "so")]
@@ -61,17 +61,17 @@ def test_filler_not_ins():
 
 
 def test_hyp_expansion_shares_hyp_index():
-    # STT "it's" -> contractions: "it", "is", cùng hyp_index 0 (phase3 #8).
+    # STT "it's" -> contractions: "it", "is", same hyp_index 0 (phase3 #8).
     hyp = prepare_hyp([_w("it's")])
     assert hyp == [HypToken(0, "it"), HypToken(0, "is")]
-    # Script "it is" -> 2 token con, ref_index 0 và 1 -> 2 equal.
+    # Script "it is" -> 2 sub-tokens, ref_index 0 and 1 -> 2 equal.
     result = align_tokens(indexed_subtokens(normalize_script("it is")), hyp, pron=stub_pron)
     assert _ops(result) == ["equal", "equal"]
     assert [t.hyp_index for t in result] == [0, 0]
 
 
 def test_prepare_hyp_empty_token_keeps_index():
-    # "—" chuẩn hoá ra rỗng: không sinh HypToken nhưng vẫn chiếm hyp_index 1.
+    # "—" normalizes to empty: no HypToken made but it still takes hyp_index 1.
     hyp = prepare_hyp([_w("well"), _w("—"), _w("ok")])
     assert hyp == [HypToken(0, "well"), HypToken(2, "ok")]
 
@@ -79,37 +79,37 @@ def test_prepare_hyp_empty_token_keeps_index():
 # ---------- align_tokens ----------
 
 def test_alignment_deterministic_tiebreak():
-    # Ba ca có >= 2 đường đi cùng chi phí. Hàng = ref, cột = hyp, D[i][j] (không phải số đo).
-    # Quy tắc (ADR-005 P8, làm rõ 11/11): mỗi ô lưu cost/n_eq, chọn theo (cost, -n_eq);
-    # hoà nữa thì khi truy vết ưu tiên equal > sub > del > ins.
+    # Three cases with >= 2 equal-cost paths. Row = ref, column = hyp, D[i][j] (not measured).
+    # Rule (ADR-005 P8, clarified 11/11): each cell stores cost/n_eq, pick by (cost, -n_eq);
+    # if still tied, the traceback prefers equal > sub > del > ins.
     #
-    # Ca A: ref [a, b], hyp [c] (không có cặp khớp, n_eq luôn 0).
-    #   Bảng cost/n_eq:   -     c
+    # Case A: ref [a, b], hyp [c] (no matching pair, n_eq always 0).
+    #   Grid cost/n_eq:   -     c
     #                -   0/0   1/0
     #                a   1/0   1/0
     #                b   2/0   2/0
-    #   D[2][1]: sub D[1][0]+1 = 2/0; del D[1][1]+1 = 2/0; ins D[2][0]+1 = 3/0. Hoà sub vs del
-    #   -> sub (b/c), rồi (1,0) chỉ còn del a. Tiến: del a, sub b/c. (Không đổi so với trước.)
+    #   D[2][1]: sub D[1][0]+1 = 2/0; del D[1][1]+1 = 2/0; ins D[2][0]+1 = 3/0. Tie sub vs del
+    #   -> sub (b/c), then (1,0) only has del a. Forward: del a, sub b/c. (Unchanged from before.)
     ref_a, hyp_a = _ref("a", "b"), _hyp("c")
     # Ca B: ref [a, a], hyp [a].
-    #   Bảng cost/n_eq:   -     a
+    #   Grid cost/n_eq:   -     a
     #                -   0/0   1/0
     #                a   1/0   0/1
     #                a   2/0   1/1
-    #   D[2][1]: equal D[1][0]+(0,1) = 1/1; del D[1][1]+1 = 1/1 (hoà); ins = 3/0.
-    #   Hoà equal vs del -> equal. Rồi (1,0): del. Tiến: del ref0, equal ref1/hyp0. (Không đổi.)
+    #   D[2][1]: equal D[1][0]+(0,1) = 1/1; del D[1][1]+1 = 1/1 (tie); ins = 3/0.
+    #   Tie equal vs del -> equal. Then (1,0): del. Forward: del ref0, equal ref1/hyp0. (Unchanged.)
     ref_b, hyp_b = _ref("a", "a"), _hyp("a")
     # Ca C: ref [a, b], hyp [b, c].
-    #   Bảng cost/n_eq:   -     b     c
+    #   Grid cost/n_eq:   -     b     c
     #                -   0/0   1/0   2/0
     #                a   1/0   1/0   2/0
     #                b   2/0   1/1   2/1
     #   D[2][2]: sub D[1][1]+1 = 2/0; del D[1][2]+1 = 3/0; ins D[2][1]+1 = 2/1.
-    #   Cùng cost 2 nhưng ins có n_eq = 1 > 0 -> chọn ins c. (2,1)=1/1: equal b/b
-    #   (D[1][0]+(0,1) = 1/1). (1,0): del a. Tiến: del a, equal b, ins c. (ĐỔI so với "sub, sub".)
+    #   Same cost 2 but ins has n_eq = 1 > 0 -> pick ins c. (2,1)=1/1: equal b/b
+    #   (D[1][0]+(0,1) = 1/1). (1,0): del a. Forward: del a, equal b, ins c. (CHANGED from "sub, sub".)
     ref_c, hyp_c = _ref("a", "b"), _hyp("b", "c")
 
-    for _ in range(2):  # chạy hai lần: cùng kết quả
+    for _ in range(2):  # run twice: same result
         assert _ops(align_tokens(ref_a, hyp_a, pron=stub_pron)) == ["del", "sub"]
         res_b = align_tokens(ref_b, hyp_b, pron=stub_pron)
         assert _ops(res_b) == ["del", "equal"]
@@ -120,17 +120,17 @@ def test_alignment_deterministic_tiebreak():
 
 
 def test_tiebreak_prefers_more_equal():
-    # Script "their cat sat", hyp ["there", "sat", "down"], their/there đồng âm.
-    # Số tính tay, không phải số đo. Bảng cost/n_eq (hàng = ref, cột = hyp):
+    # Script "their cat sat", hyp ["there", "sat", "down"], their/there are homophones.
+    # Hand-computed, not measured. Grid cost/n_eq (row = ref, column = hyp):
     #            -     there  sat    down
     #      -    0/0    1/0   2/0    3/0
     #   their   1/0    0/1   1/1    2/1
     #   cat     2/0    1/1   1/1    2/1
     #   sat     3/0    2/1   1/2    2/2
-    # Ô (3,3): sub D[2][2]+1 = 2/1; del D[2][3]+1 = 3/1; ins D[3][2]+1 = 2/2 -> chọn ins (n_eq 2).
-    # (3,2)=1/2: equal sat/sat (D[2][1]+(0,1) = 1/2). (2,1)=1/1: equal không khớp (cat/there);
-    # sub D[1][0]+1 = 2/0 sai; del D[1][1]+1 = 1/1 đúng -> del cat. (1,1): equal their/there.
-    # Đường cũ "equal, sub, sub" cũng cost 2 nhưng chỉ có 1 equal; đường mới có 2 equal.
+    # Cell (3,3): sub D[2][2]+1 = 2/1; del D[2][3]+1 = 3/1; ins D[3][2]+1 = 2/2 -> pick ins (n_eq 2).
+    # (3,2)=1/2: equal sat/sat (D[2][1]+(0,1) = 1/2). (2,1)=1/1: equal does not match (cat/there);
+    # sub D[1][0]+1 = 2/0 wrong; del D[1][1]+1 = 1/1 right -> del cat. (1,1): equal their/there.
+    # The old path "equal, sub, sub" also costs 2 but has only 1 equal; the new path has 2 equal.
     ref = indexed_subtokens(normalize_script("their cat sat"))
     res = align_tokens(ref, _hyp("there", "sat", "down"), pron=stub_pron)
     assert res == [
@@ -142,15 +142,15 @@ def test_tiebreak_prefers_more_equal():
 
 
 def test_tiebreak_del_vs_ins():
-    # ref [a, b], hyp [b, a]. Số tính tay, không phải số đo. Bảng cost/n_eq:
+    # ref [a, b], hyp [b, a]. Hand-computed, not measured. Grid cost/n_eq:
     #            -     b     a
     #      -    0/0   1/0   2/0
     #      a    1/0   1/0   1/1
     #      b    2/0   1/1   2/1
-    # D[1][2]: a/a khớp, diag D[0][1]+(0,1) = 1/1. D[2][1]: b/b khớp, diag D[1][0]+(0,1) = 1/1.
+    # D[1][2]: a/a match, diag D[0][1]+(0,1) = 1/1. D[2][1]: b/b match, diag D[1][0]+(0,1) = 1/1.
     # Ô (2,2): sub D[1][1]+1 = 2/0; del D[1][2]+1 = 2/1; ins D[2][1]+1 = 2/1.
-    # del và ins hoà (cùng 2/1), cả hai hơn sub; truy vết ưu tiên del trước ins -> del b.
-    # (1,2)=1/1: equal a/a (D[0][1]+(0,1)). (0,1): chỉ còn ins b. Tiến: ins b, equal a, del b.
+    # del and ins tie (both 2/1), both beat sub; traceback prefers del over ins -> del b.
+    # (1,2)=1/1: equal a/a (D[0][1]+(0,1)). (0,1): only ins b left. Forward: ins b, equal a, del b.
     res = align_tokens(_ref("a", "b"), _hyp("b", "a"), pron=stub_pron)
     assert res == [
         TokenOp("ins", None, None, 0, "b", False),
@@ -164,7 +164,7 @@ def _counts(res: list[TokenOp]) -> tuple[int, int, int]:
 
 
 def test_matches_jiwer_without_homophones():
-    # Tổng S+D+I phải bằng jiwer ở mọi ca (chi phí tối thiểu là duy nhất dù đường đi hoà).
+    # Total S+D+I must equal jiwer in every case (min cost is unique even when paths tie).
     totals = [
         ("a b c", "a x c"),
         ("a b c", "a c"),
@@ -175,7 +175,7 @@ def test_matches_jiwer_without_homophones():
         out = jiwer.process_words(ref_s, hyp_s)
         res = align_tokens(_ref(*ref_s.split()), _hyp(*hyp_s.split()), pron=stub_pron)
         assert sum(_counts(res)) == out.substitutions + out.deletions + out.insertions
-    # Từng loại S, D, I chỉ ở các ca không hoà (đường cost thấp nhất duy nhất):
+    # Each of S, D, I only in cases without ties (unique lowest-cost path):
     # "a b c"/"a x c": S=1. "a b c"/"a c": D=1. "the cat sat"/"... on": I=1.
     uniques = [
         ("a b c", "a x c", (1, 0, 0)),
@@ -190,14 +190,14 @@ def test_matches_jiwer_without_homophones():
 
 
 def test_del_case():
-    # ref a b c, hyp a c: cost 1 duy nhất = del b (đường khác: sub b/c + del c = 2).
+    # ref a b c, hyp a c: unique cost 1 = del b (other path: sub b/c + del c = 2).
     res = align_tokens(_ref("a", "b", "c"), _hyp("a", "c"), pron=stub_pron)
     assert _ops(res) == ["equal", "del", "equal"]
     assert res[1] == TokenOp("del", 1, "b", None, None, False)
 
 
 def test_ins_case():
-    # ref a c, hyp a b c: cost 1 duy nhất = ins b.
+    # ref a c, hyp a b c: unique cost 1 = ins b.
     res = align_tokens(_ref("a", "c"), _hyp("a", "b", "c"), pron=stub_pron)
     assert _ops(res) == ["equal", "ins", "equal"]
     assert res[1] == TokenOp("ins", None, None, 1, "b", False)
@@ -206,7 +206,7 @@ def test_ins_case():
 def test_homophone_their_there():
     res = align_tokens(_ref("their"), _hyp("there"), pron=stub_pron)
     assert res == [TokenOp("equal", 0, "their", 0, "there", True)]
-    # Cùng chuỗi: equal nhưng homophone False.
+    # Same string: equal but homophone False.
     res = align_tokens(_ref("their"), _hyp("their"), pron=stub_pron)
     assert res[0].op == "equal"
     assert res[0].homophone is False
@@ -214,7 +214,7 @@ def test_homophone_their_there():
 
 def test_empty_inputs():
     assert align_tokens([], [], pron=stub_pron) == []
-    # ref rỗng, hyp 2 token -> 2 ins; hyp rỗng, ref 2 token -> 2 del.
+    # empty ref, hyp 2 tokens -> 2 ins; empty hyp, ref 2 tokens -> 2 del.
     res = align_tokens([], _hyp("x", "y"), pron=stub_pron)
     assert _ops(res) == ["ins", "ins"]
     assert [t.hyp_index for t in res] == [0, 1]
@@ -224,16 +224,16 @@ def test_empty_inputs():
 
 
 def test_cost_equals_edit_distance():
-    # ref a b c d, hyp b c x d: cost tối thiểu 2 (xoá a, chèn x); cost 1 là không thể vì
-    # 3 vị trí lệch nhau. Số op khác equal = D[4][4] = 2.
+    # ref a b c d, hyp b c x d: min cost 2 (delete a, insert x); cost 1 is impossible because
+    # 3 positions are shifted. Non-equal op count = D[4][4] = 2.
     res = align_tokens(_ref("a", "b", "c", "d"), _hyp("b", "c", "x", "d"), pron=stub_pron)
     assert sum(t.op != "equal" for t in res) == 2
     assert _ops(res) == ["del", "equal", "equal", "ins", "equal"]
 
 
 def test_punct_only_ref_token_not_in_dp():
-    # "—" chuẩn hoá ra rỗng nên indexed_subtokens không sinh token con: 2 token vào DP,
-    # ref_index 0 và 2 (ref_index 1 không xuất hiện).
+    # "—" normalizes to empty so indexed_subtokens makes no sub-token: 2 tokens enter DP,
+    # ref_index 0 and 2 (ref_index 1 does not appear).
     ref = indexed_subtokens(normalize_script("Hello — world"))
     assert ref == [(0, "hello"), (2, "world")]
     res = align_tokens(ref, _hyp("hello", "world"), pron=stub_pron)
@@ -244,16 +244,16 @@ def test_punct_only_ref_token_not_in_dp():
 # ---------- pron_keys (phonetic.py) ----------
 
 def test_pron_keys_strips_stress_and_oov():
-    # the: DH AH0 | DH AH1 | DH IY0 -> bỏ stress, gộp trùng: {(DH, AH), (DH, IY)}.
+    # the: DH AH0 | DH AH1 | DH IY0 -> stress removed, duplicates merged: {(DH, AH), (DH, IY)}.
     assert pron_keys("the", pron=stub_pron) == frozenset({("DH", "AH"), ("DH", "IY")})
     assert pron_keys("covid", pron=stub_pron) == frozenset()
 
 
-# ---------- align() : tầng 2, gộp về ref_index (ADR-005 P5, P8 bước 3-4, P10, P11) ----------
-# Mọi số kỳ vọng ở dưới là SỐ TÍNH TAY, không phải số đo.
+# ---------- align() : level 2, merge back to ref_index (ADR-005 P5, P8 steps 3-4, P10, P11) ----------
+# Every expected number below is HAND-COMPUTED, not measured.
 
 _PH12_A = [f"P{i}" for i in range(12)]
-_PH12_B = [*_PH12_A[:11], "PX"]  # lệch đúng 1 phoneme: sim = 11/12 ~ 0.917 thuộc (0.90, 1.0)
+_PH12_B = [*_PH12_A[:11], "PX"]  # exactly 1 phoneme off: sim = 11/12 ~ 0.917 in (0.90, 1.0)
 
 ALIGN_STUB: dict[str, list[list[str]]] = {
     **STUB,
@@ -269,7 +269,7 @@ ALIGN_STUB: dict[str, list[list[str]]] = {
     "here": [["HH", "IY1", "R"]],
     "i": [["AY1"]],
     "so": [["S", "OW1"]],
-    # "covid": cố ý OOV (không có trong stub)
+    # "covid": OOV on purpose (not in the stub)
 }
 
 
@@ -278,7 +278,7 @@ def alias_pron(word: str) -> list[list[str]]:
 
 
 def _words(*ws: str) -> list[WordTimestamp]:
-    # Mỗi từ cách nhau 0.5 s: từ i bắt đầu i*0.5, kết thúc i*0.5 + 0.4 (số giả, không phải số đo).
+    # Words are 0.5 s apart: word i starts at i*0.5, ends at i*0.5 + 0.4 (fake, not measured).
     return [WordTimestamp(word=w, start_s=i * 0.5, end_s=i * 0.5 + 0.4) for i, w in enumerate(ws)]
 
 
@@ -288,20 +288,20 @@ def _status(res) -> list[str]:
 
 def test_contraction_one_ref_index():
     # "I don't know" -> ref (0,i) (1,do) (1,not) (2,know); hyp i, do, know.
-    # Đường rẻ nhất: equal, equal, del not, equal (cost 1). "don't" có 1 con equal + 1 con del
-    # -> P5: chỉ một phần del -> ĐÚNG MỘT sub. n_ref = 3 token gốc.
+    # Cheapest path: equal, equal, del not, equal (cost 1). "don't" has 1 equal child + 1 del child
+    # -> P5: only partly del -> EXACTLY ONE sub. n_ref = 3 original tokens.
     res = align("I don't know", _words("I", "do", "know"), pron=alias_pron)
     assert _status(res) == ["equal", "sub", "equal"]
     assert res.counts["n_ref"] == 3
     assert res.counts["n_sub"] == 1
     assert res.counts["n_del"] == 0
     assert res.items[1].ref_word == "don't"
-    assert res.items[1].hyp_index == 1  # hyp_index nhỏ nhất của các con có hyp
+    assert res.items[1].hyp_index == 1  # smallest hyp_index among children with a hyp
 
 
 def test_ref_index_sub_beats_near_miss():
     # "don't" -> do, not. hyp "dew zzz": do/dew near_miss (0.667), not/zzz sub (0).
-    # Ưu tiên lỗi > near_miss -> item sub, và near_miss KHÔNG được đếm (n_near_miss = 0).
+    # Error wins over near_miss -> item is sub, and near_miss is NOT counted (n_near_miss = 0).
     res = align("don't", _words("dew", "zzz"), pron=alias_pron)
     assert _status(res) == ["sub"]
     assert res.counts["n_near_miss"] == 0
@@ -309,7 +309,7 @@ def test_ref_index_sub_beats_near_miss():
 
 
 def test_gap_not_counted_as_homophone():
-    # sim = 11/12 thuộc (0.90, 1.0): P2 -> equal, homophone False; P11 -> không vào n_homophone.
+    # sim = 11/12 in (0.90, 1.0): P2 -> equal, homophone False; P11 -> not in n_homophone.
     res = align("alpha", _words("alphb"), pron=alias_pron)
     assert _status(res) == ["equal"]
     assert res.items[0].homophone is False
@@ -317,7 +317,7 @@ def test_gap_not_counted_as_homophone():
 
 
 def test_homophone_counted():
-    # their/there trùng chuỗi phoneme: equal ở tầng 1, homophone True -> n_homophone = 1.
+    # their/there have the same phoneme string: equal at level 1, homophone True -> n_homophone = 1.
     res = align("their", _words("there"), pron=alias_pron)
     assert _status(res) == ["equal"]
     assert res.items[0].homophone is True
@@ -325,7 +325,7 @@ def test_homophone_counted():
 
 
 def test_n_oov_counts_equal_items():
-    # "covid" OOV trong stub; hyp giống hệt -> equal, nhưng P10: vẫn đếm n_oov = 1 và gắn cờ.
+    # "covid" is OOV in the stub; identical hyp -> equal, but P10: still counts n_oov = 1 and flags it.
     res = align("covid is here", _words("covid", "is", "here"), pron=alias_pron)
     assert _status(res) == ["equal", "equal", "equal"]
     assert res.counts["n_oov"] == 1
@@ -339,26 +339,26 @@ def test_no_oov_no_flag():
 
 
 def test_contraction_symmetric_match():
-    # script "it's fine" -> it, is, fine; STT "it", "is", "fine": 2 item equal, không ins.
+    # script "it's fine" -> it, is, fine; STT "it", "is", "fine": 2 equal items, no ins.
     res = align("it's fine", _words("it", "is", "fine"), pron=alias_pron)
     assert _status(res) == ["equal", "equal"]
     first = res.items[0]
     assert first.ref_index == 0
     assert first.hyp_index == 0
-    assert first.start_s == pytest.approx(0.0)  # start của "it"
-    assert first.end_s == pytest.approx(0.9)  # end của "is" = 1*0.5 + 0.4
+    assert first.start_s == pytest.approx(0.0)  # start of "it"
+    assert first.end_s == pytest.approx(0.9)  # end of "is" = 1*0.5 + 0.4
     assert first.hyp_word == "it is"
     assert res.counts["n_ins"] == 0
 
 
 def test_raw_match_before_expand():
-    # "he's" hai bên: cùng bung thành "he is" hai phía -> equal hết.
+    # "he's" on both sides: both expand to "he is" -> all equal.
     res = align("he's here", _words("he's", "here"), pron=alias_pron)
     assert _status(res) == ["equal", "equal"]
 
 
 def test_known_limit_he_s_vs_he_has():
-    # GIỚI HẠN ĐÃ BIẾT, ADR-005 P12 ý 3: "he's" -> he is, STT "he has" -> is/has là sub.
+    # KNOWN LIMIT, ADR-005 P12 point 3: "he's" -> he is, STT "he has" -> is/has is sub.
     res = align("he's here", _words("he", "has", "here"), pron=alias_pron)
     assert _status(res) == ["sub", "equal"]
     assert res.items[0].ref_word == "he's"
@@ -366,7 +366,7 @@ def test_known_limit_he_s_vs_he_has():
 
 
 def test_del_has_no_times():
-    # ref a b c, hyp a c: del b, không nội suy thời gian.
+    # ref a b c, hyp a c: del b, no time interpolation.
     res = align("a b c", _words("a", "c"), pron=alias_pron)
     assert _status(res) == ["equal", "del", "equal"]
     d = res.items[1]
@@ -375,8 +375,8 @@ def test_del_has_no_times():
 
 
 def test_ins_sentence_index_follows_previous_ref():
-    # Script "Hello world. Next one." -> câu 0 = hello world, câu 1 = next one.
-    # Chèn "really" sau "world" -> câu 0; chèn sau "next" -> câu 1.
+    # Script "Hello world. Next one." -> sentence 0 = hello world, sentence 1 = next one.
+    # Insert "really" after "world" -> sentence 0; insert after "next" -> sentence 1.
     res = align("Hello world. Next one.", _words("hello", "world", "really", "next", "one"),
                 pron=alias_pron)
     ins = [it for it in res.items if it.status == "ins"]
@@ -387,7 +387,7 @@ def test_ins_sentence_index_follows_previous_ref():
     assert [it.sentence_index for it in ins] == [1]
     assert ins[0].ref_index is None
     assert ins[0].hyp_word == "really"
-    assert ins[0].start_s == pytest.approx(1.5)  # từ STT index 3 -> 3*0.5
+    assert ins[0].start_s == pytest.approx(1.5)  # STT word index 3 -> 3*0.5
 
 
 def test_ins_before_first_ref_is_sentence_zero():
@@ -397,7 +397,7 @@ def test_ins_before_first_ref_is_sentence_zero():
 
 
 def test_punct_only_token_is_equal_item_with_no_hyp():
-    # "Hello — world": 3 token gốc -> 3 item; "—" không có token con -> equal, hyp/time None.
+    # "Hello — world": 3 original tokens -> 3 items; "—" has no sub-token -> equal, hyp/time None.
     res = align("Hello — world", _words("hello", "world"), pron=alias_pron)
     assert _status(res) == ["equal", "equal", "equal"]
     mid = res.items[1]
@@ -408,7 +408,7 @@ def test_punct_only_token_is_equal_item_with_no_hyp():
 
 
 def test_near_miss_think_sink():
-    # think/sink sim 0.75 -> near_miss. Không tính vào n_sub (near_miss không phải lỗi A).
+    # think/sink sim 0.75 -> near_miss. Not counted in n_sub (near_miss is not an A error).
     res = align("I think so", _words("I", "sink", "so"), pron=alias_pron)
     assert _status(res) == ["equal", "near_miss", "equal"]
     assert res.counts["n_near_miss"] == 1
@@ -416,17 +416,17 @@ def test_near_miss_think_sink():
 
 
 def test_filler_in_middle_is_not_ins():
-    # "Um" bị loại trước khi gióng; hyp_index của "world" là 1 (D15), start lấy từ "world".
+    # "Um" is dropped before aligning; hyp_index of "world" is 1 (D15), start comes from "world".
     res = align("hello world", _words("hello", "Um", "world"), pron=alias_pron)
     assert _status(res) == ["equal", "equal"]
     assert res.counts["n_ins"] == 0
     assert res.items[1].hyp_index == 1
-    assert res.items[1].start_s == pytest.approx(1.0)  # "world" là từ STT index 2 -> 2*0.5
+    assert res.items[1].start_s == pytest.approx(1.0)  # "world" is STT word index 2 -> 2*0.5
 
 
 def test_partial_hyp_expansion_gives_equal_plus_ins():
-    # script "it", STT "it's" (-> it, is cùng hyp_index 0): "it" equal, "is" dư.
-    # Phần dư thành 1 ins mang cùng hyp_index 0 (phase3 #8).
+    # script "it", STT "it's" (-> it, is with same hyp_index 0): "it" equal, "is" extra.
+    # The extra part becomes 1 ins with the same hyp_index 0 (phase3 #8).
     res = align("it", _words("it's"), pron=alias_pron)
     assert _status(res) == ["equal", "ins"]
     assert res.items[0].hyp_index == 0

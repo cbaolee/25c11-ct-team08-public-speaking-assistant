@@ -20,8 +20,8 @@ def test_signature_has_no_settings_param():
     reason="ffmpeg/ffprobe not installed",
 )
 def test_garbage_file_is_rejected_not_type_error(tmp_path: Path):
-    # Gọi đúng như main.py (/api/baseline): chỉ audio_path= và vad_params=.
-    # Trước khi sửa: TypeError (thiếu keyword-only 'settings').
+    # Call exactly like main.py (/api/baseline): only audio_path= and vad_params=.
+    # Before the fix: TypeError (missing keyword-only 'settings').
     bad = tmp_path / "garbage.wav"
     bad.write_bytes(b"this is not audio" * 100)
     with pytest.raises(AudioRejected) as info:

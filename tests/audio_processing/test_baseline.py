@@ -11,7 +11,7 @@ from src.audio_processing.contracts import Pause
 
 
 def test_empty_pauses_uses_fixed_threshold_unreliable_not_no_baseline():
-    """D13: 0 khoảng lặng -> ngưỡng 0.7, cờ unreliable, KHÔNG gắn no_baseline."""
+    """D13: 0 silences -> threshold 0.7, unreliable flag, NO no_baseline tag."""
     result = compute_baseline_pause_profile([])
     assert result["median_pause_s"] is None
     assert result["hesitation_threshold_s"] == 0.7
@@ -20,7 +20,7 @@ def test_empty_pauses_uses_fixed_threshold_unreliable_not_no_baseline():
 
 
 def test_fewer_than_5_pauses_uses_fixed_threshold():
-    """D13: < 5 khoảng lặng -> ngưỡng cố định 0.7 (không dùng 2 x median)."""
+    """D13: < 5 silences -> fixed threshold 0.7 (2 x median not used)."""
     pauses = [Pause(start_s=0.0, end_s=0.5)] * 4
     result = compute_baseline_pause_profile(pauses)
 
@@ -38,8 +38,8 @@ def test_five_pauses_median_0_4_gives_0_8():
 
 
 def test_threshold_capped_at_1_2s():
-    """Kiểm tra ngưỡng tối đa không vượt quá 1.2s dù median lớn[cite: 1]."""
-    # Tạo 5 khoảng lặng, mỗi khoảng 0.8s -> 2 * 0.8 = 1.6s
+    """Check the max threshold never exceeds 1.2s even with a large median[cite: 1]."""
+    # Create 5 silences, 0.8s each -> 2 * 0.8 = 1.6s
     pauses = [Pause(start_s=0.0, end_s=0.8)] * 5
     result = compute_baseline_pause_profile(pauses)
 
@@ -48,8 +48,8 @@ def test_threshold_capped_at_1_2s():
     assert result["hesitation_threshold_s"] == 1.2
 
 def test_threshold_minimum_is_0_7s():
-    """Kiểm tra ngưỡng tối thiểu luôn được giữ ở 0.7s[cite: 1]."""
-    # Tạo 5 khoảng lặng, mỗi khoảng 0.35s -> 2 * 0.35 = 0.7s
+    """Check the min threshold always stays at 0.7s[cite: 1]."""
+    # Create 5 silences, 0.35s each -> 2 * 0.35 = 0.7s
     pauses = [Pause(start_s=0.0, end_s=0.35)] * 5
     result = compute_baseline_pause_profile(pauses)
 
@@ -57,10 +57,10 @@ def test_threshold_minimum_is_0_7s():
     assert result["hesitation_threshold_s"] == 0.7
 
 def test_threshold_floor_survives_float_noise():
-    """Bảo vệ max(0.7, ...): 1.15 - 0.8 = 0.34999999999999987 (nhiễu float, không phải số đo).
+    """Guards max(0.7, ...): 1.15 - 0.8 = 0.34999999999999987 (float noise, not a measurement).
 
-    median = 0.34999999999999987 -> 2 * median = 0.6999999999999997 < 0.7. Thiếu max thì
-    ngưỡng trả 0.6999999999999997 != 0.7.
+    median = 0.34999999999999987 -> 2 * median = 0.6999999999999997 < 0.7. Without max the
+    threshold would be 0.6999999999999997 != 0.7.
     """
     pauses = [Pause(start_s=0.8, end_s=1.15)] * 5
     assert pauses[0].end_s - pauses[0].start_s == 0.34999999999999987
@@ -69,8 +69,8 @@ def test_threshold_floor_survives_float_noise():
 
 
 def test_median_calculated_correctly():
-    """Kiểm tra tính đúng trung vị với bộ dữ liệu phân tán[cite: 1]."""
-    # Độ dài: 0.4, 0.5, 0.6, 0.8, 1.0 -> Trung vị (median) phải là 0.6
+    """Check the median is correct on a scattered data set[cite: 1]."""
+    # Lengths: 0.4, 0.5, 0.6, 0.8, 1.0 -> the median must be 0.6
     pauses = [
         Pause(start_s=0.0, end_s=0.4),
         Pause(start_s=0.0, end_s=0.5),

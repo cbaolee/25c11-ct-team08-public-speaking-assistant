@@ -241,7 +241,7 @@ def test_trailing_punct():
     assert trailing_punct("Hi,") == ","
     assert trailing_punct("(Yes.)") == "."
     assert trailing_punct("word") == ""
-    # ADR: "ký tự cuối liên tiếp" cho ".," (không phải ","); điều quan trọng là không đóng câu
+    # ADR: "consecutive trailing chars" for ".," (not ","); what matters is the sentence stays open
     assert trailing_punct("e.g.,")[-1] == ","
 
 

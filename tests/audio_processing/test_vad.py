@@ -28,7 +28,7 @@ def test_gap_just_below_threshold_is_dropped():
 
 def test_only_long_gaps_are_kept_in_order():
     segments = [seg(0.0, 1.0), seg(1.5, 2.0), seg(2.1, 3.0), seg(4.0, 5.0)]
-    # các khoảng: 0.5 (giữ), 0.1 (bỏ), 1.0 (giữ)
+    # gaps: 0.5 (kept), 0.1 (dropped), 1.0 (kept)
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == [
         Pause(1.0, 1.5),
         Pause(3.0, 4.0),
@@ -51,12 +51,12 @@ def test_pause_duration_matches_gap():
     assert pause.duration_s == 0.75
 
 # ==========================================
-# Lỗi float ở biên min_pause 0.35 s
+# Float error at the min_pause 0.35 s boundary
 # ==========================================
 
 def test_float_boundary_0_80_to_1_15_is_kept():
-    # 1.15 - 0.8 = 0.34999999999999987 trong float nhưng danh nghĩa là 0.35.
-    # (Cặp 0.68 -> 1.03 thực tế cho đúng 0.35, không tái hiện lỗi.)
+    # 1.15 - 0.8 = 0.34999999999999987 in float but nominally 0.35.
+    # (The pair 0.68 -> 1.03 really gives 0.35, so it does not reproduce the bug.)
     segments = [seg(0.0, 0.8), seg(1.15, 2.0)]
     assert find_pauses(segments, min_pause_s=MIN_PAUSE) == [Pause(0.8, 1.15)]
 
