@@ -1,0 +1,65 @@
+# Values the team may want to tune, in one place.
+# Read by src/app/constants.py at startup (restart the server after a change).
+# Secrets and per-environment values (API keys, SUPABASE_*, APP_ENV) stay in .env.
+# Values marked "(.env)" can also be overridden there; .env wins over this file.
+#
+# Fixed contracts that live in SQL and CANNOT be changed here (a new migration is needed):
+#   - scripts.duration_min in (5, 10, 15, 20)
+#   - schema_version of the stored evaluation result (ADR-004)
+
+[storage]
+# Number of newest sessions kept with full result, audio and charts (.env: RETENTION_FULL_SESSIONS)
+retention_full_sessions = 10
+# Lifetime of signed audio URLs, in seconds (.env: SIGNED_URL_TTL_S)
+signed_url_ttl_s = 600
+# Saved scripts per user; POST /api/scripts returns 429 rate_limited above this
+max_saved_scripts = 30
+# Largest uploaded audio file, in bytes (100 MB)
+max_upload_bytes = 104_857_600
+
+[audio]
+# Pauses shorter than this are ignored, in seconds
+min_pause_s = 0.35
+# Longest practice recording accepted, in seconds (22 min)
+max_audio_seconds = 1320
+# Baseline recording accepted only inside [min, max], in seconds
+baseline_min_seconds = 10
+baseline_max_seconds = 60
+# Longest ffmpeg decode before it is stopped, in seconds
+decode_timeout_s = 60
+# Extra seconds decoded past max_audio_seconds before the file is cut
+duration_cap_margin_s = 10
+# STT HTTP timeouts, in seconds: time to connect, longest wait between two reads
+stt_connect_timeout_s = 5
+stt_read_timeout_s = 120
+
+[script]
+# Practice script limits. 1320 s at 175 WPM is 3850 words; 4000 leaves a small margin.
+# The character cap stops a few huge "words".
+max_script_words = 4000
+max_script_chars = 40_000
+# Uploaded PDF limits: smallest and largest file in bytes (1 KB, 25 MB), most pages
+min_pdf_size_bytes = 1024
+max_pdf_size_bytes = 26_214_400
+max_pdf_pages = 10
+# Words the LLM writes for each template slot (min and max)
+slot_fill_min_words = 80
+slot_fill_max_words = 150
+
+[web]
+# Sent to the browser by GET /api/config. No secrets here.
+# Max characters in Practice "Own" text
+own_max_chars = 300
+# Length of the baseline recording, in seconds
+baseline_seconds = 30
+# Shortest baseline the UI accepts, in seconds
+baseline_min_seconds = 10
+# Speaking rate used only for "about 0:25" time hints, in words per minute
+speaking_wpm_for_estimate = 145
+# Seconds before the highlight reaches the first sentence while recording
+follow_lead_s = 1.0
+# Pause added after each sentence by the highlight, in seconds
+follow_gap_s = 0.5
+# Sessions per History page, and most pages loaded on Home and History
+history_page_size = 20
+history_max_pages = 5

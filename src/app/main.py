@@ -33,6 +33,7 @@ from src.app.config import (
     missing_required_settings,
     settings,
 )
+from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
     NewScript,
@@ -123,6 +124,12 @@ class SaveScriptPayload(BaseModel):
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
+
+
+@app.get("/api/config")
+async def web_config() -> dict[str, Any]:
+    """The [web] section of app_constants.toml for the browser (no secrets in it)."""
+    return dict(CONSTANTS["web"])
 
 
 @app.get("/")

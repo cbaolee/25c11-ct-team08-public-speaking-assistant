@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 from src.app.config import settings
+from src.app.constants import CONSTANTS
 
 from .contracts import (
     TARGET_WORD_COUNT_RANGES,
@@ -40,8 +41,8 @@ _DEFAULT_MODEL_CHAIN: tuple[str, ...] = (
     "qwen/qwen3.8-27b",
     "openai/gpt-oss-20b",
 )
-_SLOT_FILL_MIN_WORDS = 80
-_SLOT_FILL_MAX_WORDS = 150
+_SLOT_FILL_MIN_WORDS = CONSTANTS["script"]["slot_fill_min_words"]
+_SLOT_FILL_MAX_WORDS = CONSTANTS["script"]["slot_fill_max_words"]
 
 
 def parse_slots(

@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
+from src.app.constants import CONSTANTS
+
 try:
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=FutureWarning, module="fitz")
@@ -27,7 +29,9 @@ except ImportError:
     maybe_recover_page_text = None
 
 PDF_MAGIC_BYTES = b"%PDF-"
-MIN_PDF_SIZE_BYTES, MAX_PDF_SIZE_BYTES, MAX_POC_PAGES = 1024, 25 * 1024 * 1024, 10
+MIN_PDF_SIZE_BYTES = CONSTANTS["script"]["min_pdf_size_bytes"]
+MAX_PDF_SIZE_BYTES = CONSTANTS["script"]["max_pdf_size_bytes"]
+MAX_POC_PAGES = CONSTANTS["script"]["max_pdf_pages"]
 HEADING_PATTERN = re.compile(r"^(#{1,4})\s+(.+)$")
 
 
