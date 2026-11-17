@@ -210,7 +210,6 @@ body.app-view .btn.back:hover:not(:disabled) { background: var(--surface); borde
 .panel > h3 + * { margin-top: 12px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
 @media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
-.badge-demo { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--sans); padding: 3px 10px; border-radius: var(--r-pill); background: var(--warn-soft); color: var(--warn); }
 
 /* ---------- pills / status ---------- */
 .pill { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1.3 var(--sans); padding: 3px 10px; border-radius: var(--r-pill); background: var(--line); color: var(--ink); }
@@ -625,13 +624,11 @@ table.t tr:last-child td { border-bottom: 0; }
 .ov-tile span { display: block; margin-top: 6px; font: 500 13px/1.3 var(--sans); color: #C7D7FE; }
 .ov-hint { margin: 16px 0 0; font-size: 14px; color: #C7D7FE; }
 @media (max-width: 760px) { .ov-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .ov-list li { grid-template-columns: 1fr; gap: 4px; } .ov h2 { font-size: 32px; } }
-/* demo labels ("Sample data", "Demo only", ...) are hidden while SHOW_DEMO_LABELS = false */
-body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #gDemo { display: none !important; }
 
 /* ---------- follow-along (Practice) ---------- */
 .prbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 32px; row-gap: 0; align-items: start; margin-top: 14px;
-  grid-template-areas: "seg ." "pane speed" "note speed" "eval eval" "demo demo"; }
-.prbar.is-upload { grid-template-areas: "seg seg" "pane pane" "eval eval" "demo demo"; }   /* Upload tab: no follow-along column, the drop zone spans the panel */
+  grid-template-areas: "seg ." "pane speed" "note speed" "eval eval"; }
+.prbar.is-upload { grid-template-areas: "seg seg" "pane pane" "eval eval"; }   /* Upload tab: no follow-along column, the drop zone spans the panel */
 .prbar > .seg { grid-area: seg; justify-self: start; }
 .prbar .prrec { grid-area: pane; min-width: 0; margin-top: 12px; }   /* Record and Upload panes share one cell */
 .prbar #recNote { grid-area: note; margin-top: 10px; }
@@ -646,10 +643,9 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 .preval-msg { flex: 1 1 240px; min-width: 0; }
 .preval-msg #evalHint:not(:empty) { margin-left: 10px; }
 .preval .btn { margin-left: auto; }
-.prdemo { grid-area: demo; margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--line-strong); }
 @media (max-width: 760px) {
-  .prbar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seg" "pane" "note" "speed" "eval" "demo"; }
-  .prbar.is-upload { grid-template-areas: "seg" "pane" "eval" "demo"; }
+  .prbar { grid-template-columns: minmax(0, 1fr); grid-template-areas: "seg" "pane" "note" "speed" "eval"; }
+  .prbar.is-upload { grid-template-areas: "seg" "pane" "eval"; }
   .prspeed { margin-top: 16px; }
 }
 /* Profile baseline: both buttons on one row (same height), messages underneath */
@@ -812,7 +808,6 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
   </section>
   <div class="landing">
     <figure class="sample">
-      <p class="note" style="margin-bottom:8px"><span class="pill info" data-t="landing.sampleTag"></span></p>
       <div class="tx-text">
         Good evening, everyone, and welcome to tonight's <span class="w w-wrong">public</span> forum. Our community faces
         <span class="pausechip warn" role="img" aria-label="hesitation pause, 0.9 seconds">0.9 s</span>
@@ -842,7 +837,6 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 <section class="screen active" id="s-home" aria-labelledby="homeH">
   <div class="head">
     <div><h1 id="homeH"></h1><p class="sub" data-t="home.sub"></p></div>
-    <span class="badge-demo" id="demoBadge" hidden data-t="demo.badge"></span>
   </div>
   <div class="panel empty" id="homeEmpty" hidden></div>
   <div id="homeData">
@@ -951,15 +945,6 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
         <div class="preval-msg"><span class="note" id="audioState" aria-live="polite"></span><span class="note" id="evalHint"></span></div>
         <button class="btn btn-primary" type="button" id="evalBtn" data-t="practice.evaluate" disabled></button>
       </div>
-      <div class="prdemo">
-        <label for="demoScenario" style="margin:0 0 6px"><span class="badge-demo" data-t="demo.only"></span> <span data-t="demo.scenario"></span></label>
-        <select id="demoScenario">
-          <option value="ok" data-t="demo.sOk"></option>
-          <option value="quiet" data-t="demo.sQuiet"></option>
-          <option value="queue" data-t="demo.sQueue"></option>
-          <option value="error" data-t="demo.sError"></option>
-        </select>
-      </div>
     </div>
     <div class="sheet-title" style="margin-top:14px"><strong id="sheetTitle" class="note"></strong><span class="note" id="sheetMeta"></span></div>
     <div class="reader reader-wide" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
@@ -979,7 +964,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
     <div style="min-width:0">
       <div class="panel ov" id="repOverview" style="margin-bottom:16px"></div>
       <div class="panel">
-        <div class="row between"><h3 data-t="report.transcript"></h3><span class="badge-demo" data-t="demo.badge"></span></div>
+        <div class="row between"><h3 data-t="report.transcript"></h3></div>
         <p class="sr-only" data-t="report.txSr"></p>
         <div class="tx" id="tx"></div>
       </div>
@@ -1127,7 +1112,6 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 <div class="mbg" id="mBaseline" role="dialog" aria-modal="true" aria-labelledby="gTitle" aria-describedby="gMsg"><div class="box wide">
   <h2 id="gTitle" data-t="gate.title"></h2>
   <p id="gMsg" data-t="gate.msg"></p>
-  <p class="row" id="gDemo" style="margin-top:10px" hidden><span class="badge-demo" data-t="demo.only"></span><span class="note" data-t="gate.demoNote"></span></p>
   <div class="lbl" id="gLbl" data-t="gate.passageLabel"></div>
   <p class="passage" id="gPassage" data-t="gate.passage"></p>
   <div class="timer" id="gTimer" role="timer" aria-live="off"></div>
@@ -1139,7 +1123,7 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 </div></div>
 
 <div class="mbg" id="mPart" role="dialog" aria-modal="true" aria-labelledby="mpartTitle"><div class="box wide">
-  <div class="row between"><h2 id="mpartTitle"></h2><div class="row"><span class="pill" id="mpartPill"></span><span class="badge-demo" data-t="demo.badge"></span></div></div>
+  <div class="row between"><h2 id="mpartTitle"></h2><div class="row"><span class="pill" id="mpartPill"></span></div></div>
   <p class="note" id="mpartSub"></p>
   <div id="mpartBody"></div>
   <div class="actions"><button class="btn btn-primary" type="button" data-close data-t="common.close"></button></div>
@@ -1157,17 +1141,10 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
 /* =====================================================================
    DEMO SWITCHES
    ===================================================================== */
-const PREFILL_ONBOARDING = false;  // true = first-run form is pre-filled (just press Save)
-const PREFILL = { gender: 'Male', age: 21, accent: 'American English', topics: ['information_technology', 'learning_experiences'] };
 const OWN_MAX_CHARS = 300;         // max characters in "write my own text"
 const BASELINE_MIN_SECONDS = 10;   // shortest baseline accepted (the backend also rejects audio with too little speech)
 const BASELINE_SECONDS = 30;       // length of the baseline recording (lower it for quick demos)
 const SPEAKING_WPM_FOR_ESTIMATE = 145;   // midpoint of the 130-160 target, only used for "about 0:25" hints
-const USER_NAME = 'Nguyen Van A';
-const SHOW_DEMO_LABELS = false;   // false = hide every "Sample data" / "Demo only" label (clean demo). true = show them again
-const USE_SIM = false;   // demo mode off: always call the real APIs. simulate()/score() stay only until the UI refactor (2.1) removes them
-const SEED_SAMPLE_DATA = false;     // true = an account with no history gets the sample sessions at log in, so Home always shows charts + History (demo)
-const ALWAYS_ASK_BASELINE = false; // true = the baseline window opens on EVERY log in (demo). false: only when GET /api/baseline returns null.
 const FOLLOW_LEAD_S = 1.0;         // seconds before the highlight reaches the first sentence while recording
 const FOLLOW_GAP_S = 0.5;          // pause added after each sentence (matches a natural stop at a full stop)
 
@@ -1182,17 +1159,12 @@ const TEXT = {
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
   nav: { label: 'Main', home: 'Home', script: 'Script', practice: 'Practice' },
   top: { login: 'Log in', signup: 'Sign up', profile: 'Profile and baseline voice', audio: 'Audio settings', permissions: 'Permissions', changePassword: 'Change password', logout: 'Log out' },
-  demo: {
-    badge: 'Sample data', only: 'Demo only', scenario: 'Result to simulate',
-    sOk: 'Normal result', sQuiet: 'Too little speech', sQueue: 'Server busy (queue)', sError: 'Transcription fails'
-  },
 
   landing: {
     title: 'Read your script aloud. See exactly where to improve.',
     lead: 'Prepare a script, record yourself, and get a marked-up transcript with your pace, pauses and pitch.',
     cta: 'Create account', login: 'Log in',
     note: 'Free to try. You decide when recording is allowed.',
-    sampleTag: 'Sample report',
     sWpm: 'words per minute', sPauses: 'hesitation pauses', sPitch: 'pitch range',
     sampleCap: 'Red = a word that did not match. Yellow = a close match. Struck through = a word that was skipped.',
     h1n: 'Step 1', h1t: 'Prepare', h1d: 'Generate a script from your topic or a PDF, or paste your own.',
@@ -1253,7 +1225,6 @@ const TEXT = {
     blockedTag: 'Blocked by content rules',
     blockedTitle: 'Cannot generate script based on regulations.',
     blockedHarm: 'Your request asks for instructions to make an illegal or dangerous substance, so no script was written.',
-    blockedInject: 'Your message tries to override the assistant’s rules, so no script was written.',
     blockedNext: 'Try a safe angle instead, for example a talk that warns students about drug abuse. Edit your message and send it again.'
   },
   safety: { title: 'This material cannot be used', msg: 'It contains inappropriate or restricted language. Edit your text and try again.', ack: 'Edit my text' },
@@ -1301,7 +1272,6 @@ const TEXT = {
   eval: {
     title: 'Analysing your recording', step1: 'Step 1 of 2', step1Text: 'Preparing the audio...',
     step2: 'Step 2 of 2', step2Text: 'Transcribing and measuring pace, pauses and pitch...',
-    queue: 'Waiting in line', queueText: 'Many people are practising right now. Starting in {n} s...',
     errTitle: 'We could not transcribe your recording', errMsg: 'Nothing was scored or saved. Check your connection and try again.', retry: 'Try again',
     saved: 'Saved to History.', notSaved: 'Could not save to History. Your report is shown below.',
     errBaselineRequired: 'Record your baseline voice first, then try again.',
@@ -1423,7 +1393,6 @@ const TEXT = {
   gate: {
     title: 'Record your baseline voice',
     msg: 'We compare your pitch and pauses with your own voice. Read the passage below once, in a natural voice. It takes about 30 seconds.',
-    demoNote: 'This window opens on every log in, even if a baseline already exists.',
     passageLabel: 'Read this passage aloud',
     passage: 'Good morning, everyone, and thank you for joining me today. My name is Alex, and I would like to share a short story about learning to speak with confidence. At first, my voice shook, and my words felt too fast. Slowly, I learned to breathe, to pause, and to look at my audience. Now, each time I speak, I try to be clear, calm, and kind. Thank you for listening.',
     note: 'Your baseline is only used to compare your pitch and pauses. You can record it again in Profile.',
@@ -1509,45 +1478,9 @@ const SAMPLE_TEXTS = [
   "Dear friends and generous supporters, welcome to our annual charity gala. Tonight, every ticket, every song and every smile helps children in rural areas return to school. Thank you for believing that small acts of kindness can change a whole life. Let us make tonight unforgettable.",
   "Good evening, everyone, and thank you for joining our volunteer day kickoff. Today we will plant trees, pack food boxes and visit the senior home down the road. You do not need special skills, only a warm heart and a willing hand. Let us get started together!"
 ];
-const BANNED = ['kill', 'bomb', 'terror', 'fuck', 'shit', 'racist', 'suicide'];   // UI simulation only. Real check = regex + Llama-Guard (ADR-001)
-
-/* Jailbreak / harmful-instruction demo guard (UI simulation only; the real check runs locally with regex + Llama-Guard BEFORE any cloud LLM call).
-   Rule 1: a harmful subject AND a "teach me how" intent in the same message.
-   Rule 2: an attempt to override the assistant's rules.
-   A harmful subject alone does not block, so a prevention talk about drugs still works. */
-const HARM_TERMS = /\b(heroin|cocaine|methamphetamine|meth|fentanyl|napalm|ricin|sarin|explosives?)\b/i;
-const HOW_TO = /\b(instruct(?:s|ing)?|teach me|show me how|tell me how|how (?:do i|to|can i)|step[- ]by[- ]step|recipe for|synthesi[sz]e|synthesis|cook(?:ing)?|make|creat(?:e|ing)|produc(?:e|ing)|manufactur\w*)\b/i;
-const INJECTION = /(ignore|disregard|forget)\s+(all\s+|any\s+)?(the\s+)?(previous|prior|above|earlier|your)\s+(instructions?|rules?|prompts?)|\bjailbreak\b|\bdeveloper mode\b|\bbypass\s+(the\s+)?(safety|filters?|rules?)\b/i;
-function screenRequest(txt) {
-  if (INJECTION.test(txt)) return 'inject';
-  if (HARM_TERMS.test(txt) && HOW_TO.test(txt)) return 'harm';
-  return null;
-}
-
-/* Mock "take" profiles used ONLY to generate sample data. Not measurements.
-   wpm = pace; wrong/near/miss = per-word probabilities; hes = hesitation probability per word;
-   filler = filler probability per word; pitch = pitch amplitude (semitones). */
-const LEVELS = [
-  { wpm: 116, wrong: .17,  near: .07, miss: .07,  hes: .05,  filler: .08,  pitch: 2.2 },
-  { wpm: 122, wrong: .14,  near: .06, miss: .06,  hes: .04,  filler: .07,  pitch: 2.6 },
-  { wpm: 128, wrong: .11,  near: .05, miss: .05,  hes: .03,  filler: .06,  pitch: 3.0 },
-  { wpm: 134, wrong: .09,  near: .04, miss: .04,  hes: .024, filler: .05,  pitch: 3.4 },
-  { wpm: 140, wrong: .075, near: .035, miss: .03,  hes: .018, filler: .04,  pitch: 3.7 },
-  { wpm: 145, wrong: .06,  near: .03, miss: .025, hes: .012, filler: .035, pitch: 3.9 },
-  { wpm: 148, wrong: .05,  near: .025, miss: .02,  hes: .010, filler: .03,  pitch: 4.0 }
-];
-const LEVEL_NOW = { wpm: 146, wrong: .055, near: .03, miss: .02, hes: .012, filler: .03, pitch: 3.9 };
-/* Seeds picked so the sample trend (about 52 -> 90) is easy to read. Sample data only, not measurements. */
-const DEMO_SEEDS = [194, 4517, 5702, 960, 5449, 4501, 3659];
-const DEMO_DAYS_AGO = [13, 11, 9, 7, 5, 3, 1];
-const DEMO_TOPIC_KEYS = ['information_technology', 'sports', 'information_technology', 'wildlife', 'learning_experiences', 'sports', 'wildlife'];
 
 /* =====================================================================
-   SAMPLE-DATA ENGINE + SCORING (ADR-003)
-   simulate()  -> invents a plausible "take" (word timings, pauses, F0) for the DEMO ONLY.
-   score()     -> pure, deterministic implementation of the ADR-003 formulas.
-   In the real app, simulate() is replaced by STT word timestamps + Silero VAD + Parselmouth,
-   and score() is the function the QA lead unit-tests.
+   SCORING CONSTANTS (ADR-003)
    ===================================================================== */
 const ADR = {
   wpmLo: 130, wpmHi: 160, wpmPenalty: 2.5,
@@ -1558,28 +1491,7 @@ const ADR = {
   weights: { A: 0.40, F: 0.30, P: 0.20, S: 0.10 },
   minSessionsForDelta: 6
 };
-const clamp = (x, lo = 0, hi = 100) => Math.min(hi, Math.max(lo, x));
 const mean = a => (a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0);
-function pct(arr, p) {
-  const s = [...arr].sort((a, b) => a - b);
-  if (!s.length) return 0;
-  const i = (s.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
-  return s[lo] + (s[hi] - s[lo]) * (i - lo);
-}
-function rng(seed) {                         // mulberry32
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6D2B79F5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-function hashStr(s) {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
 
 function tokenize(text) {
   const sentences = (text.match(/[^.!?]+[.!?]*["')]*\s*/g) || [text]).map(s => s.trim()).filter(Boolean);
@@ -1593,79 +1505,6 @@ function tokenize(text) {
     }));
   });
   return { sentences, words };
-}
-
-function simulate(text, lvl, seed) {
-  const rnd = rng(seed);
-  const { sentences, words } = tokenize(text);
-  let t = 0.5;
-  const pauses = [], fillers = [];
-  let spokenCount = 0, voiced = 0;
-  words.forEach((w, i) => {
-    w.i = i;
-    const roll = rnd(), r1 = rnd(), r2 = rnd(), r3 = rnd();
-    let status = 'ok';
-    if (w.norm.length > 3) {
-      if (roll < lvl.miss) status = 'missing';
-      else if (roll < lvl.miss + lvl.wrong) status = 'wrong';
-      else if (roll < lvl.miss + lvl.wrong + lvl.near) status = 'near';
-    }
-    w.status = status;
-    if (status === 'missing') { w.start = w.end = null; return; }
-    const d = (60 / lvl.wpm) * 0.8 * (0.7 + 0.6 * r1) * (0.85 + Math.min(w.norm.length, 10) * 0.03);
-    w.start = t; w.end = t + d; t = w.end; voiced += d;
-    const k = spokenCount++;
-    w.f0 = lvl.pitch * (0.55 * Math.sin(k * 0.7 + (seed % 7)) + 0.8 * (r3 - 0.5)) - (w.endSent ? lvl.pitch * 0.25 : 0);
-    w.vol = 62 + 3 * Math.sin(k * 0.4) + 4 * (r2 - 0.5) - (w.endSent ? 2 : 0);
-    if (i < words.length - 1) {
-      let gap = 0.01 + 0.04 * r2, kind = null;
-      if (w.endSent) { gap = 0.5 + 0.4 * r1; kind = 'natural'; }
-      else if (w.endClause) { gap = 0.3 + 0.25 * r1; kind = 'natural'; }
-      else if (r3 < lvl.hes) { gap = 0.5 + 0.9 * r1; kind = gap >= ADR.forgotMin ? 'forgot' : 'hesitation'; }
-      if (gap >= ADR.pauseMin) {
-        w.pauseAfter = { start: t, dur: gap, kind: kind || 'natural', afterIdx: i };
-        pauses.push(w.pauseAfter);
-      }
-      t += gap;
-      if (rnd() < lvl.filler) { fillers.push({ afterIdx: i, t }); w.fillerAfter = true; t += 0.32; voiced += 0.3; }
-    }
-  });
-  const dur = t + 0.4;
-  const cos = sentences.map((_, si) => {
-    const ws = words.filter(w => w.si === si);
-    const err = ws.filter(w => w.status === 'wrong' || w.status === 'missing').length / Math.max(1, ws.length);
-    return clamp(0.97 - 1.6 * err + 0.04 * (rnd() - 0.5), 0, 1);
-  });
-  return { text, sentences, words, pauses, fillers, cos, dur, voicedRatio: voiced / dur };
-}
-
-function score(an) {
-  const N = an.words.length;
-  const spoken = an.words.filter(w => w.status !== 'missing');
-  if (an.voicedRatio < ADR.minVoiced || spoken.length === 0) return { status: 'insufficient_audio', voicedRatio: an.voicedRatio };
-  const sub = an.words.filter(w => w.status === 'wrong').length;
-  const del = an.words.filter(w => w.status === 'missing').length;
-  const near = an.words.filter(w => w.status === 'near').length;
-  const A = clamp(100 * (1 - (sub + del) / N));                              // fillers are not insertions here (counted in F)
-  const span = spoken[spoken.length - 1].end - spoken[0].start;
-  const wpm = spoken.length / (span / 60);
-  const Fwpm = (wpm >= ADR.wpmLo && wpm <= ADR.wpmHi) ? 100 : clamp(100 - ADR.wpmPenalty * (wpm < ADR.wpmLo ? ADR.wpmLo - wpm : wpm - ADR.wpmHi));
-  const hes = an.pauses.filter(p => p.kind !== 'natural').length;
-  const H = hes / (an.dur / 60);
-  const Fpause = clamp(100 - 20 * Math.max(0, H - 1));
-  const R = 100 * an.fillers.length / (spoken.length + an.fillers.length);
-  const Ffiller = clamp(100 * (ADR.fillerZero - R) / (ADR.fillerZero - ADR.fillerFull));
-  const F = mean([Fwpm, Fpause, Ffiller]);
-  const Pclar = clamp(100 * (1 - ADR.nearWeight * near / N));               // near-miss is not an error in A (counted here)
-  const f0 = spoken.map(w => w.f0);
-  const Rst = pct(f0, 0.9) - pct(f0, 0.1);
-  const Ppitch = Rst >= ADR.pitchFull ? 100 : Rst <= ADR.pitchZero ? 0 : 25 * (Rst - ADR.pitchZero);
-  const P = 0.5 * Pclar + 0.5 * Ppitch;
-  const cosOk = an.cos.filter(c => c >= ADR.cosine).length;
-  const S = 100 * cosOk / an.cos.length;
-  const parts = [A, F, P, S];
-  const overall = parts.every(Number.isFinite) ? ADR.weights.A * A + ADR.weights.F * F + ADR.weights.P * P + ADR.weights.S * S : null;
-  return { status: 'ok', N, sub, del, near, A, wpm, Fwpm, hes, H, Fpause, R, Ffiller, F, Pclar, Rst, Ppitch, P, cosOk, nSent: an.cos.length, S, overall };
 }
 
 /* score shown through the same rule as the backend (display_round: 1 decimal, half-up); null -> N/A. fx = other measures. */
@@ -1908,7 +1747,7 @@ const S = {
   view: 'landing', screen: 'home', from: 'home', authMode: 'in',
   user: null, profile: null, consent: false, baseline: null, avatar: null,
   texts: { mine: null, sample: null, own: null }, src: 'mine', sampleN: 0,
-  scriptN: 0, chatFile: null, lastReq: null, chatBusy: false,
+  chatFile: null, lastReq: null, chatBusy: false,
   audio: null, rec: null, brec: null, voiceTab: 'rec',
   sessions: [], cur: null, nextId: 1,
   play: { t: 0, on: false, iv: null },
@@ -2399,7 +2238,7 @@ function sessionEnded() {
 function fillSignupForm(reset) {
   const sel = $('#suGender');
   if (!reset && sel.options.length) return;
-  const p = PREFILL_ONBOARDING ? PREFILL : {};
+  const p = {};
   sel.innerHTML = '<option value="">' + esc(T('pm.genderPh')) + '</option>' + T('pm.genders').map(g => '<option value="' + esc(g) + '">' + esc(g) + '</option>').join('');
   sel.value = p.gender || '';
   $('#suAge').value = p.age != null ? p.age : ''; $('#suAge').removeAttribute('aria-invalid');
@@ -2457,17 +2296,7 @@ function openAuth(mode) {
   if (S.view !== 'landing') showView('landing');
   setStageAuth(true);
   window.scrollTo(0, 0);
-  if (PREFILL_ONBOARDING && !$('#auUser').value) $('#auUser').value = USER_NAME;
   $('#auUser').focus({ preventScroll: true });
-}
-function seedDemo() {
-  const now = Date.now();
-  S.sessions = DEMO_DAYS_AGO.map((d, i) => {
-    const topic = DEMO_TOPIC_KEYS[i], text = SAMPLE_TEXTS[i % SAMPLE_TEXTS.length];
-    const an = simulate(text, LEVELS[i], DEMO_SEEDS[i]);
-    const ts = new Date(now - d * 864e5).setHours(18, 0, 0, 0);
-    return { id: S.nextId++, ts, title: TOPICS[topic], topicKey: topic, an, sc: score(an), dur: an.dur, accent: PREFILL.accent, demo: true };
-  });
 }
 function resetChat() {
   const feed = $('#chatFeed');
@@ -2592,7 +2421,7 @@ function loadBaseline(openGate) {
     if (!ok) { toast(T('eval.errBaselineUnavailable'), true); return; }
     S.baseline = j ? { ts: Date.parse(j.recorded_at) || Date.now(), profile: j } : null;
     if (S.screen === 'home' || S.screen === 'profile') RENDER[S.screen]();
-    if (openGate && (ALWAYS_ASK_BASELINE || !S.baseline)) openBaselineGate();
+    if (openGate && !S.baseline) openBaselineGate();
   }).catch(() => { if (S.user === user) toast(T('eval.errNet'), true); });
 }
 
@@ -2614,7 +2443,6 @@ function postBaseline(rec, cb) {
 /* ---------- baseline window (opens after log in) ---------- */
 function openBaselineGate() {
   S.gate = { saved: false };
-  $('#gDemo').hidden = !S.baseline;
   renderGate();
   openModal('mBaseline', { lock: true, focus: '#gAgree' });
 }
@@ -2644,7 +2472,6 @@ function onGateAgree() {
         S.grec = null;
         const min = BASELINE_MIN_SECONDS;
         if (sec < min || !rec || !rec.blob) { renderGate(0, T('profile.tooShort', { n: min })); return; }
-        if (USE_SIM) { S.baseline = { ts: Date.now() }; S.gate.saved = true; renderGate(sec); toast(T('profile.toastSaved')); return; }
         const g = S.gate, user = S.user;
         g.busy = true; renderGate(0, T('profile.analysing'));
         postBaseline(rec, r => {
@@ -2700,7 +2527,6 @@ const lineSpec = (ss0, pick, o) => { const ss = ss0.filter(s => pick(s) != null)
 RENDER.home = function () {
   const ss = scored(), n = S.user.name;
   $('#homeH').textContent = T(S.sessions.length ? 'home.welcome' : 'home.welcomeNew', { name: n });
-  $('#demoBadge').hidden = !S.sessions.some(s => s.demo);
   const empty = !ss.length;
   $('#homeEmpty').hidden = !empty; $('#homeData').hidden = empty;
   if (empty) {
@@ -2816,10 +2642,10 @@ function saveScript(sc) {
 function syncTplSelect() {
   const cat = $('#chatTopic').value, tplSel = $('#chatTpl'), durSel = $('#chatDur');
   if (!tplSel || !durSel) return;
-  const list = (!USE_SIM && S.apiTopics ? S.apiTopics : []).filter(t => t.category_slug === cat);
+  const list = (S.apiTopics || []).filter(t => t.category_slug === cat);
   tplSel.innerHTML = '<option value="">Custom topic (LLM)</option>' + list.map(t => '<option value="' + esc(t.template_id) + '">' + esc((t.topic || t.title) + ' (' + t.duration_min + 'm)') + '</option>').join('');
   tplSel.value = list.length ? list[0].template_id : '';
-  tplSel.disabled = USE_SIM || cat === 'free' || !list.length;
+  tplSel.disabled = cat === 'free' || !list.length;
   syncDurLock();
 }
 function syncDurLock() {
@@ -2831,12 +2657,12 @@ function syncDurLock() {
 }
 function fillTopicSelect() {
   const sel = $('#chatTopic'), keep = sel.value;
-  if (!USE_SIM && !S.apiTopics) {
+  if (!S.apiTopics) {
     fetch('/api/topics').then(r => r.ok ? r.json() : null).then(d => {
       if (d && d.topics) { S.apiTopics = d.topics; S.apiCategories = d.categories || []; fillTopicSelect(); }
     }).catch(() => {});
   }
-  const keys = !USE_SIM ? Object.keys(CAT_LABELS) : (S.profile && S.profile.topics.length ? S.profile.topics : Object.keys(TOPICS));
+  const keys = Object.keys(CAT_LABELS);
   sel.innerHTML = keys.map(k => '<option value="' + k + '">' + esc(topicLabel(k)) + '</option>').join('');
   if (keep && keys.indexOf(keep) >= 0) sel.value = keep;
   syncTplSelect();
@@ -2876,12 +2702,12 @@ function titleFrom(txt, file, topic) {
   if (file) return file.name.replace(/\.pdf$/i, '');
   return topicLabel(topic);
 }
-function renderBlockedBubble(ai, reason) {
+function renderBlockedBubble(ai) {
   ai.classList.add('blocked');
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' +
-    '<div class="row"><span class="pill bad">' + IC.alert + esc(T('script.blockedTag')) + '</span><span class="badge-demo">' + esc(T('demo.badge')) + '</span></div>' +
+    '<div class="row"><span class="pill bad">' + IC.alert + esc(T('script.blockedTag')) + '</span></div>' +
     '<h3 class="blk-t">' + esc(T('script.blockedTitle')) + '</h3>' +
-    '<p>' + esc(T(reason === 'inject' ? 'script.blockedInject' : 'script.blockedHarm')) + '</p>' +
+    '<p>' + esc(T('script.blockedHarm')) + '</p>' +
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
 function generateScript(req, again) {
@@ -2889,87 +2715,49 @@ function generateScript(req, again) {
   const ai = addBubble('ai', '<div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div><p class="note" role="status"></p>');
   const status = $('.note', ai);
   status.textContent = req.file ? T('script.extracting') : (again ? T('script.regenerating') : T('script.generating'));
-  if (!USE_SIM) {
-    const fd = new FormData(), cleanTxt = (req.txt || '').replace(/^#+\s+/, '');
-    const isShortPrompt = !req.tplId && !req.file && wordsOf(cleanTxt) > 0 && wordsOf(cleanTxt) <= 25;
-    fd.append('topic', req.tplId || (isShortPrompt ? cleanTxt : titleFrom(cleanTxt, req.file, req.topic)));
-    fd.append('category', req.tplId ? req.topic : 'free');
-    fd.append('duration_min', String(req.dur || 5));
-    if (cleanTxt && !isShortPrompt) fd.append('raw_text', cleanTxt);
-    if (req.file && req.file.raw) fd.append('pdf', req.file.raw, req.file.name);
-    const failJob = (code, msg) => {
-      S.chatBusy = false; $('#chatSend').disabled = false;
-      if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#chatErr'), msg || T('script.errFile')); return; }
-      if (code === 'content_rejected') { renderBlockedBubble(ai, 'harm'); openModal('mSafety'); revealBubble(ai); return; }
-      toast(msg || T('eval.errServer'), true);
-      ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note">' + esc(msg || T('eval.errServer')) + '</p><div class="acts"><button class="btn btn-sm" type="button" data-a="again">' + esc(T('script.regenerate')) + '</button></div>';
-      ai._script = { req }; revealBubble(ai);
-    };
-    const poll = id => api('/api/generate-script/' + id).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
-      if (!ok || !j || j.status === 'failed') { failJob(j && j.error_code, j && j.message); return; }
-      if (j.status !== 'completed') {
-        status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
-        setTimeout(() => poll(id), 650); return;
-      }
-      const res = j.result || {}, text = res.script || '';
-      const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
-      /* The card is named after the Topic the person picked (template title when one is chosen), not the chat message */
-      const cardName = req.tplTitle || topicLabel(req.topic), dur = res.duration_min || req.dur || 5;
-      /* word_count comes from the result; if the API omits it, count whitespace-separated tokens (wordsOf) */
-      const wc = res.word_count || wordsOf(text);
-      let h = '<div class="fcard">' + IC.file + '<div class="fc-main"><div class="fc-name"></div><div class="note"></div></div></div>';
-      h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="view"></button><button class="btn btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
-      ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + h;
-      $('.fc-name', ai).textContent = cardName;
-      $('.fc-main .note', ai).textContent = dur + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + ((res.warnings || []).length ? ' · ' + T('script.hasNotes') : '');
-      const vb = $('[data-a=view]', ai); vb.textContent = T('script.viewNow'); vb.setAttribute('aria-label', T('script.viewAria', { title: cardName }));
-      $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
-      $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
-      ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
-        template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
-      S.chatBusy = false; $('#chatSend').disabled = false; revealBubble(ai);
-    }).catch(() => failJob('net', T('eval.errNet')));
-    api('/api/generate-script', { method: 'POST', body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
-      if (!ok || !j || !j.job_id) { failJob(j && j.error_code, j && j.message); return; }
-      poll(j.job_id);
-    }).catch(() => failJob('net', T('eval.errNet')));
-    return;
-  }
-  setTimeout(() => { if (req.file) status.textContent = T('script.generating'); }, 900);
-  setTimeout(() => {
-    const text = SAMPLE_TEXTS[S.scriptN++ % SAMPLE_TEXTS.length];
-    const sents = tokenize(text).sentences, mid = Math.ceil(sents.length / 2);
-    const paras = [sents.slice(0, mid).join(' '), sents.slice(mid).join(' ')];
-    const title = titleFrom(req.txt, req.file, req.topic);
-    let h = '<div class="row between" style="margin-bottom:8px"><strong style="font:600 14px var(--sans)"></strong><span class="badge-demo">' + esc(T('demo.badge')) + '</span></div>';
-    paras.forEach((p, i) => {
-      h += '<div class="para"><span class="ptxt"></span>' + (req.file ? (i === 0 ? '<span class="cite">' + esc(T('script.page', { n: 2 })) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '') + '</div>';
-    });
-    h += req.file ? '<p class="note" style="margin-top:10px">' + esc(T('script.uncitedHelp')) + '</p>' : '<p class="note" style="margin-top:10px">' + esc(T('script.citeNone')) + '</p>';
-    h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
+  const fd = new FormData(), cleanTxt = (req.txt || '').replace(/^#+\s+/, '');
+  const isShortPrompt = !req.tplId && !req.file && wordsOf(cleanTxt) > 0 && wordsOf(cleanTxt) <= 25;
+  fd.append('topic', req.tplId || (isShortPrompt ? cleanTxt : titleFrom(cleanTxt, req.file, req.topic)));
+  fd.append('category', req.tplId ? req.topic : 'free');
+  fd.append('duration_min', String(req.dur || 5));
+  if (cleanTxt && !isShortPrompt) fd.append('raw_text', cleanTxt);
+  if (req.file && req.file.raw) fd.append('pdf', req.file.raw, req.file.name);
+  const failJob = (code, msg) => {
+    S.chatBusy = false; $('#chatSend').disabled = false;
+    if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#chatErr'), msg || T('script.errFile')); return; }
+    if (code === 'content_rejected') { renderBlockedBubble(ai); openModal('mSafety'); revealBubble(ai); return; }
+    toast(msg || T('eval.errServer'), true);
+    ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note">' + esc(msg || T('eval.errServer')) + '</p><div class="acts"><button class="btn btn-sm" type="button" data-a="again">' + esc(T('script.regenerate')) + '</button></div>';
+    ai._script = { req }; revealBubble(ai);
+  };
+  const poll = id => api('/api/generate-script/' + id).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+    if (!ok || !j || j.status === 'failed') { failJob(j && j.error_code, j && j.message); return; }
+    if (j.status !== 'completed') {
+      status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
+      setTimeout(() => poll(id), 650); return;
+    }
+    const res = j.result || {}, text = res.script || '';
+    const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
+    /* The card is named after the Topic the person picked (template title when one is chosen), not the chat message */
+    const cardName = req.tplTitle || topicLabel(req.topic), dur = res.duration_min || req.dur || 5;
+    /* word_count comes from the result; if the API omits it, count whitespace-separated tokens (wordsOf) */
+    const wc = res.word_count || wordsOf(text);
+    let h = '<div class="fcard">' + IC.file + '<div class="fc-main"><div class="fc-name"></div><div class="note"></div></div></div>';
+    h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="view"></button><button class="btn btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
     ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + h;
-    $('strong', ai).textContent = T('script.scriptHeader', { title });
-    $$('.ptxt', ai).forEach((el, i) => { el.textContent = paras[i]; });
+    $('.fc-name', ai).textContent = cardName;
+    $('.fc-main .note', ai).textContent = dur + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + ((res.warnings || []).length ? ' · ' + T('script.hasNotes') : '');
+    const vb = $('[data-a=view]', ai); vb.textContent = T('script.viewNow'); vb.setAttribute('aria-label', T('script.viewAria', { title: cardName }));
     $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
     $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
-    ai._script = { title, text, topic: req.topic, req };
-    S.chatBusy = false; $('#chatSend').disabled = false;
-    revealBubble(ai);
-  }, req.file ? 1900 : 1300);
-}
-/* Refusal reply: the message stays in the box so the person can edit it and send again. No script is generated. */
-function refuseRequest(txt, reason) {
-  S.chatBusy = true; $('#chatSend').disabled = true;
-  const me = addBubble('me', '<span></span>');
-  me.firstChild.textContent = txt;
-  const ai = addBubble('ai', '<div class="skel" style="width:70%"></div><p class="note" role="status"></p>');
-  $('.note', ai).textContent = T('script.checking');
-  setTimeout(() => {
-    renderBlockedBubble(ai, reason);
-    S.chatBusy = false; $('#chatSend').disabled = false;
-    revealBubble(ai);
-    $('#chatIn').focus();
-  }, 700);
+    ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
+      template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
+    S.chatBusy = false; $('#chatSend').disabled = false; revealBubble(ai);
+  }).catch(() => failJob('net', T('eval.errNet')));
+  api('/api/generate-script', { method: 'POST', body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
+    if (!ok || !j || !j.job_id) { failJob(j && j.error_code, j && j.message); return; }
+    poll(j.job_id);
+  }).catch(() => failJob('net', T('eval.errNet')));
 }
 function sendChat() {
   if (S.chatBusy) return;
@@ -2978,9 +2766,6 @@ function sendChat() {
   if (!txt && !S.chatFile && !tplId) return;
   if (wordsOf(txt) > 3000) { showErr(err, T('script.errLong')); return; }
   clearErr(err);
-  const blockedBy = screenRequest(txt);
-  if (blockedBy) { refuseRequest(txt, blockedBy); return; }
-  if (BANNED.some(b => new RegExp('\\b' + b + '\\b', 'i').test(txt))) { openModal('mSafety'); return; }
   const tplName = tpl ? (tpl.topic || tpl.title) : '';
   const req = { txt, file: S.chatFile, topic: $('#chatTopic').value, tplId, tplTitle: tplName, dur: +($('#chatDur') && $('#chatDur').value || 5) };
   const me = addBubble('me', '<span></span>');
@@ -3159,7 +2944,7 @@ function pickSavedScript(id, byUser) {   // byUser: picked in the dropdown (back
   }).catch(() => {});
 }
 function loadSavedScripts(pickId) {
-  if (USE_SIM || !S.user) return;
+  if (!S.user) return;
   api('/api/scripts?limit=20').then(r => r.ok ? r.json() : null).then(d => {
     const list = (d && d.items) || [], wrap = $('#mineSaved'), sel = $('#mineSel');
     S.savedScripts = list;
@@ -3232,14 +3017,12 @@ function useOwn() {
   const v = $('#ownText').value.trim(), err = $('#ownErr');
   if (!v) { showErr(err, T('practice.errOwnEmpty')); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
   if (v.length > OWN_MAX_CHARS) { showErr(err, T('practice.errOwnMax', { max: OWN_MAX_CHARS })); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
-  if (BANNED.some(b => new RegExp('\\b' + b + '\\b', 'i').test(v)) || screenRequest(v)) { openModal('mSafety'); return; }
   clearErr(err); $('#ownText').removeAttribute('aria-invalid');
   const applyOwn = () => {
     S.choosing = true;
     S.texts.own = { title: T('practice.ownTitle'), short: T('practice.ownTitle'), text: v, topic: null };
     renderPractice();
   };
-  if (USE_SIM) { applyOwn(); return; }
   saveScript({ title: T('practice.ownTitle'), text: v, source: 'written' }).then(j => {
     applyOwn(); S.texts.own.id = j.id; loadSavedScripts();
   }).catch(e => {
@@ -3329,48 +3112,18 @@ function onAudioFile(e) {
   clearErr(err); S.audio = { kind: 'file', name: f.name, dur: null, file: f, mime: f.type || '' }; S.choosing = false; renderPractice();
 }
 
-/* ---- evaluation (SIM). Real app: POST audio -> FastAPI -> STT fallback router -> VAD/Parselmouth -> score() ---- */
 function runEval() {
-  const scn = $('#demoScenario').value, txt = S.texts[S.src];
+  const txt = S.texts[S.src];
   if (!txt || !S.audio) return;
-  if (!USE_SIM) { runEvalReal(txt); return; }
-  S.ev = { timers: [] };
-  const later = (fn, ms) => { S.ev.timers.push(setTimeout(fn, ms)); };
-  const steps = [];
-  if (scn === 'queue') for (let n = 3; n >= 1; n--) steps.push({ step: T('eval.queue'), text: T('eval.queueText', { n }), ms: 900 });
-  steps.push({ step: T('eval.step1'), text: T('eval.step1Text'), ms: 800 });
-  steps.push({ step: T('eval.step2'), text: T('eval.step2Text'), ms: 1600 });
-  const run = i => {
-    if (!S.ev) return;
-    if (i >= steps.length) { finishEval(scn, txt); return; }
-    $('#ovStep').textContent = steps[i].step; $('#ovText').textContent = steps[i].text;
-    later(() => run(i + 1), steps[i].ms);
-  };
-  openModal('mOverlay', { lock: true, focus: '#ovCancel' });
-  run(0);
+  runEvalReal(txt);
 }
 function cancelEval() {
   if (S.ev && S.ev.ctrl) S.ev.ctrl.abort();   // user cancel: S.ev is cleared below, so the fetch catch stays silent
   if (S.ev) { S.ev.timers.forEach(clearTimeout); S.ev = null; }
   closeModal('mOverlay');
 }
-function finishEval(scn, txt) {
-  S.ev = null;
-  closeModal('mOverlay', false);
-  if (scn === 'error') { openModal('mError', { focus: '#meRetry' }); return; }
-  const seed = (hashStr(txt.text) ^ (Date.now() & 0xffff)) >>> 0;
-  const an = simulate(txt.text, LEVEL_NOW, seed);
-  if (scn === 'quiet') an.voicedRatio = 0.12;
-  const sc = score(an);
-  const ses = { id: S.nextId++, ts: Date.now(), title: txt.short, topicKey: txt.topic, an, sc, dur: an.dur, accent: S.profile ? S.profile.accent : null, demo: false };
-  S.audio = null;
-  if (sc.status !== 'ok') { S.cur = ses; go('report'); return; }
-  S.sessions.push(ses); S.cur = ses;
-  go('report');
-  toast(T('eval.saved'));
-}
 
-/* ---- real evaluation: POST /api/evaluate (USE_SIM = false). S.audio is kept until a scored result is saved, so Retry re-sends the same audio. ---- */
+/* ---- real evaluation: POST /api/evaluate. S.audio is kept until a scored result is saved, so Retry re-sends the same audio. ---- */
 const EXT_BY_MIME = { 'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a' };
 const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', stt_unavailable: 'errStt', no_audio_stream: 'errNoStream', unsupported_format: 'errFormat', corrupt: 'errCorrupt', invalid_baseline: 'errBaseline',
   baseline_required: 'errBaselineRequired', baseline_unavailable: 'errBaselineUnavailable', baseline_not_saved: 'errBaselineNotSaved',
@@ -3766,7 +3519,7 @@ function renderBaseline(sec, msg) {
   const pct = Math.min(100, Math.round(s / BASELINE_SECONDS * 100));
   $('#blBar').style.width = pct + '%'; $('#blBarWrap').setAttribute('aria-valuenow', String(pct));
   const lb = $('#blListen');
-  lb.hidden = !S.baseline || USE_SIM; lb.disabled = rec || !!S.bbusy || !!S.blLoad;
+  lb.hidden = !S.baseline; lb.disabled = rec || !!S.bbusy || !!S.blLoad;
   if (!S.baseline) resetBaselineAudio();
   $('#blStart').innerHTML = rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('profile.stop')) : esc(T(S.baseline ? 'profile.again' : 'profile.start'));
   const st = $('#blStatus');
@@ -3816,7 +3569,6 @@ function toggleBaseline() {
         S.brec = null;
         const min = BASELINE_MIN_SECONDS;
         if (sec < min || !rec || !rec.blob) { renderBaseline(0, T('profile.tooShort', { n: min })); return; }
-        if (USE_SIM) { S.baseline = { ts: Date.now() }; renderBaseline(sec); toast(T('profile.toastSaved')); return; }
         const tok = S.bbusy = {}, user = S.user;
         renderBaseline(0, T('profile.analysing'));
         postBaseline(rec, r => {
@@ -3836,7 +3588,7 @@ function toggleBaseline() {
 /* ---------- profile modal ---------- */
 function openProfileModal(first) {
   S.pmFirst = first;
-  const p = S.profile || (first && PREFILL_ONBOARDING ? PREFILL : {});
+  const p = S.profile || {};
   $('#mpTitle').textContent = T(first ? 'pm.titleFirst' : 'pm.titleEdit');
   $('#mpSub').textContent = T(first ? 'pm.subFirst' : 'pm.subEdit');
   $('#mpCancel').hidden = first;
@@ -4024,13 +3776,11 @@ function init() {
   $('#tabRec').onclick = () => { if (S.rec) return; S.voiceTab = 'rec'; renderPractice(); };
   $('#tabUp').onclick = () => { if (S.rec) return; S.voiceTab = 'up'; renderPractice(); };
   $('#recBtn').onclick = toggleRecording;
-  document.body.classList.toggle('nodemo', !SHOW_DEMO_LABELS);
   $$('#steps [data-step]').forEach(b => { b.onclick = () => goStep(+b.getAttribute('data-step')); });
   $('#recClear').onclick = () => confirmBox(T('practice.discardT'), T('practice.discardD'), T('practice.discardOk'), () => { S.audio = null; renderPractice(); $('#recBtn').focus(); });
   $('#dropBtn').onclick = () => $('#fileIn').click();
   $('#fileIn').onchange = onAudioFile;
   $('#evalBtn').onclick = runEval;
-  if (!USE_SIM) { const sc = $('#demoScenario'); if (sc && sc.parentNode) sc.parentNode.hidden = true; }   // demo scenario picker only exists for the simulation
   $('#ovCancel').onclick = cancelEval;
   $('#meRetry').onclick = () => { closeModal('mError', false); runEval(); };
 
