@@ -315,6 +315,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .bubble .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .cite { font: 600 12px var(--sans); background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: var(--r-pill); margin-left: 6px; white-space: nowrap; vertical-align: 2px; }
 .cite.un { background: var(--warn-soft); color: var(--warn); }
+/* Script result card in the feed (file-style: name, length, View now) */
+.fcard { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--accent-line); background: var(--accent-soft); border-radius: var(--r-panel); }
+.fcard svg { width: 28px; height: 28px; flex: none; fill: none; stroke: var(--accent); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.fcard .fc-main { flex: 1; min-width: 0; }
+.fcard .fc-name { font: 600 15px var(--sans); overflow-wrap: anywhere; }
+/* Shared reading frame (script reader now; reusable for Practice): large type, airy lines, scrolls on its own */
+.reader { font: 400 1.1875rem/1.75 var(--serif); max-width: 68ch; margin: 0 auto; overflow-y: auto; overscroll-behavior: contain; }
+.reader .para + .para { margin-top: 1em; }
+.reader .note { font-size: 14px; line-height: 1.5; }
+.box.reader-box { max-width: min(1100px, 96vw); height: 92vh; height: 92dvh; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.box.reader-box .reader { flex: 1; min-height: 0; width: 100%; }
 .skel { height: 12px; border-radius: 6px; margin: 10px 0; background: linear-gradient(90deg, #EEF1F5 25%, #E3E7EE 50%, #EEF1F5 75%); background-size: 200% 100%; animation: shimmer 1.2s infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
 .composer { border-top: 1px solid var(--line); padding-top: 14px; margin-top: 4px; }
@@ -1102,6 +1113,11 @@ body.nodemo .badge-demo, body.nodemo [data-t="landing.sampleTag"], body.nodemo #
   <div class="actions"><button class="btn btn-primary" type="button" data-close data-t="common.close"></button></div>
 </div></div>
 
+<div class="mbg" id="mReader" role="dialog" aria-modal="true" aria-labelledby="mrTitle"><div class="box reader-box">
+  <div class="row between"><h2 id="mrTitle"></h2><button class="btn btn-primary" type="button" data-close data-t="common.close"></button></div>
+  <div class="reader" id="mrBody" role="region" tabindex="0" data-t-aria="script.readerLabel"></div>
+</div></div>
+
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>
 <script>
@@ -1196,6 +1212,7 @@ const TEXT = {
     extracting: 'Reading your material and checking it is safe to use...',
     generating: 'Writing your script...', regenerating: 'Writing another version...',
     scriptHeader: 'Script · {title}',
+    viewNow: 'View now', viewAria: 'View script: {title}', words: 'words', min: 'min', readerLabel: 'Script text', hasNotes: 'Has notes. Open to read.',
     practice: 'Practise with this script', copy: 'Copy text', download: 'Download', regenerate: 'Regenerate',
     copied: 'Script copied.', copyFail: 'Copy is not available in this browser.', downloadName: 'script.txt',
     citeNone: 'No source document attached, so this script has no citations. Attach a PDF to get citations.',
@@ -1879,6 +1896,7 @@ const IC = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5l12 7-12 7z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>',
   x: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  file: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5M9 13h6M9 17h6"/></svg>',
   chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>',
   ai: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" aria-hidden="true"><rect width="256" height="256" rx="58" fill="#1D4ED8"/><rect x="30" y="108" width="16" height="40" rx="8" fill="#fff"/><rect x="58" y="82" width="16" height="92" rx="8" fill="#fff"/><rect x="86" y="58" width="16" height="140" rx="8" fill="#fff"/><rect x="154" y="72" width="16" height="112" rx="8" fill="#fff"/><rect x="182" y="94" width="16" height="68" rx="8" fill="#fff"/><rect x="210" y="113" width="16" height="30" rx="8" fill="#fff"/><path d="M114 138 L128 110 L142 138" fill="none" stroke="#F59E0B" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 };
@@ -2858,24 +2876,22 @@ function generateScript(req, again) {
         status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
         setTimeout(() => poll(id), 650); return;
       }
-      const res = j.result || {}, text = res.script || '', paras = text.split(/\n\n+/).filter(Boolean), cites = res.citations || [], warns = res.warnings || [];
+      const res = j.result || {}, text = res.script || '';
       const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
-      let h = '<div class="row between" style="margin-bottom:8px"><strong style="font:600 14px var(--sans)"></strong><span class="note">' + esc((res.word_count || wordsOf(text)) + ' words · ' + (res.duration_min || req.dur || 5) + ' min') + '</span></div>';
-      paras.forEach((p, i) => {
-        const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
-        const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc((c.heading ? c.heading + ' · ' : '') + (c.page ? T('script.page', { n: c.page }) : 'cited')) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
-        h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
-      });
-      if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';
-      h += '<p class="note" style="margin-top:10px">' + esc(cites.length ? T('script.uncitedHelp') : T('script.citeNone')) + '</p>';
-      h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
+      /* The card is named after the Topic the person picked (template title when one is chosen), not the chat message */
+      const cardName = req.tplTitle || topicLabel(req.topic), dur = res.duration_min || req.dur || 5;
+      /* word_count comes from the result; if the API omits it, count whitespace-separated tokens (wordsOf) */
+      const wc = res.word_count || wordsOf(text);
+      let h = '<div class="fcard">' + IC.file + '<div class="fc-main"><div class="fc-name"></div><div class="note"></div></div></div>';
+      h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="view"></button><button class="btn btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
       ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + h;
-      $('strong', ai).textContent = T('script.scriptHeader', { title });
-      $$('.ptxt', ai).forEach((el, i) => { el.textContent = paras[i]; });
+      $('.fc-name', ai).textContent = cardName;
+      $('.fc-main .note', ai).textContent = dur + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + ((res.warnings || []).length ? ' · ' + T('script.hasNotes') : '');
+      const vb = $('[data-a=view]', ai); vb.textContent = T('script.viewNow'); vb.setAttribute('aria-label', T('script.viewAria', { title: cardName }));
       $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
       $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
-      ai._script = { title, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
-        template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], req };
+      ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
+        template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
       S.chatBusy = false; $('#chatSend').disabled = false; revealBubble(ai);
     }).catch(() => failJob('net', T('eval.errNet')));
     api('/api/generate-script', { method: 'POST', body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
@@ -2938,13 +2954,33 @@ function sendChat() {
   S.lastReq = req;
   generateScript(req, false);
 }
+/* Reader window: paragraphs with their citation / uncited badge, then the warnings and the citation note (same content the feed used to show) */
+function openReader(sc) {
+  const body = $('#mrBody'), paras = sc.text.split(/\n\n+/).filter(Boolean), cites = sc.citations || [], warns = sc.warnings || [];
+  let h = '';
+  paras.forEach((p, i) => {
+    const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
+    const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc((c.heading ? c.heading + ' · ' : '') + (c.page ? T('script.page', { n: c.page }) : 'cited')) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
+    h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
+  });
+  if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';
+  h += '<p class="note" style="margin-top:10px">' + esc(cites.length ? T('script.uncitedHelp') : T('script.citeNone')) + '</p>';
+  body.innerHTML = h;
+  $$('.ptxt', body).forEach((el, i) => { el.textContent = paras[i]; });
+  body.scrollTop = 0;
+  $('#mrTitle').textContent = sc.cardName || sc.title;
+  openModal('mReader', { focus: '[data-close]' });
+}
 function onChatAction(e) {
   const b = e.target.closest('[data-a]');
   if (!b) return;
   const sc = b.closest('.bubble')._script;
   if (!sc) return;
   const a = b.getAttribute('data-a');
-  if (a === 'practice') {
+  if (a === 'view') {
+    b.focus();   // some browsers do not focus a button on click; openModal stores document.activeElement as the opener to return to
+    openReader(sc);
+  } else if (a === 'practice') {
     const lbl = sc.title || TOPICS[sc.topic] || sc.topic;
     const practise = id => { S.texts.mine = { id: id || null, title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic }; S.src = 'mine'; go('practice'); };
     saveScript(sc).then(j => practise(j.id), () => practise(null));   // saved so the session links to it (C2); unsaved still works
