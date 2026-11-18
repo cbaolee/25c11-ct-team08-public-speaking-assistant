@@ -3,7 +3,8 @@ import { ADR, adviceList, fx, hasBase, paceWindows, progressDelta, sh } from '..
 import { T } from '../i18n.js';
 import { go, moveSegPills } from '../nav.js';
 import { deltaPill } from '../screens/home.js';
-import { RENDER, S } from '../state.js';
+import { CONFIG, RENDER, S } from '../state.js';
+import { openWordCoach, openSentenceCoach, closeWordCoach } from './word_coach.js';
 import { openModal } from '../ui.js';
 import { $, $$, IC, esc, fmtTime, plain } from '../utils.js';
 
@@ -23,9 +24,11 @@ export function wordHtml(w) {
   return h;
 }
 export function buildTranscript(an) {
+  const stats = window.EvaluateClient.sentenceErrorStats(an.words);
   return an.sentences.map((_, si) => {
     const ws = an.words.filter(w => w.si === si), first = ws.find(w => w.start != null), t0 = first ? first.start : 0;
-    return '<div class="tx-row"><button type="button" class="tx-time" data-t0="' + t0.toFixed(2) + '" aria-label="' + esc(T('report.playFrom', { t: fmtTime(t0) })) + '">' + fmtTime(t0) + '</button><div class="tx-text">' + ws.map(wordHtml).join(' ') + '</div></div>';
+    const practice = window.EvaluateClient.needsSentencePractice(stats.find(x => x.si === si), CONFIG.RETRY.minRatio) ? ' <button type="button" class="wc-sent-btn" data-si="' + si + '" aria-label="' + esc(T('wc.practiceSentence')) + '">&#8635; ' + esc(T('wc.practiceSentence')) + '</button>' : '';
+    return '<div class="tx-row"><button type="button" class="tx-time" data-t0="' + t0.toFixed(2) + '" aria-label="' + esc(T('report.playFrom', { t: fmtTime(t0) })) + '">' + fmtTime(t0) + '</button><div class="tx-text">' + ws.map(wordHtml).join(' ') + practice + '</div></div>';
   }).join('');
 }
 
@@ -376,6 +379,7 @@ export function drawVolume(s) {
 export let PA = null;
 export const hasAudio = () => !!(PA && S.currentSession && S.currentSession.audioUrl && PA._url === S.currentSession.audioUrl);
 export function bindPlayerAudio(s) {
+  closeWordCoach(false);
   if (!PA) {
     PA = new Audio(); PA.preload = 'auto';
     PA.addEventListener('loadedmetadata', () => { if (!Number.isFinite(PA.duration)) { PA._fix = true; PA.currentTime = 1e101; } });   // MediaRecorder webm has no duration: force the browser to scan to the end (UNTESTED trick)
@@ -426,7 +430,8 @@ export function startPlayback() {
 }
 export function seekTo(t, play) { stopPlayback(); S.play.t = Math.max(0, t); if (hasAudio()) PA.currentTime = S.play.t; if (play) startPlayback(); else updatePlayer(); }
 export function onTxClick(e) {
-  const tb = e.target.closest('.tx-time'), wb = e.target.closest('.w[data-i]');
+  const sb = e.target.closest('.wc-sent-btn'), tb = e.target.closest('.tx-time'), wb = e.target.closest('.w[data-i]');
+  if (sb) { openSentenceCoach(+sb.dataset.si, sb); return; }
   if (tb) { seekTo(parseFloat(tb.getAttribute('data-t0')), true); return; }
-  if (wb && S.currentSession) seekWord(+wb.getAttribute('data-i'));
+  if (wb && S.currentSession) { const i = +wb.getAttribute('data-i'); closeWordCoach(false); seekWord(i); openWordCoach(i, wb); }
 }

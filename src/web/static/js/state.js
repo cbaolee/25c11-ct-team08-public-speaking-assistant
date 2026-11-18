@@ -1,5 +1,6 @@
 /* Tunable values. Defaults below; GET /api/config (app_constants.toml [web]) overrides them in main.js. */
 export const CONFIG = {
+  RETRY: { minRatio: 0.30, wordMax: 6, sentenceMax: 30, clipPad: 0.15 }, // fallback mirrors app_constants.toml [retry]
   OWN_MAX_WORDS: 1500,                 // max words in "write my own text"
   BASELINE_MIN_SECONDS: 10,            // shortest baseline accepted (the backend also rejects audio with too little speech)
   BASELINE_SECONDS: 30,                // length of the baseline recording (lower it for quick demos)
