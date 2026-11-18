@@ -82,7 +82,7 @@ def test_middleware_rejects_large_body_without_content_length():
     """A streamed (chunked) multipart body has no Content-Length; bytes are counted instead."""
     boundary = "b0undary"
     head = (
-        f"--{boundary}\r\nContent-Disposition: form-data; name=\"audio\"; "
+        f'--{boundary}\r\nContent-Disposition: form-data; name="audio"; '
         'filename="a.wav"\r\nContent-Type: audio/wav\r\n\r\n'
     ).encode()
 
@@ -93,7 +93,8 @@ def test_middleware_rejects_large_body_without_content_length():
         yield f"\r\n--{boundary}--\r\n".encode()
 
     r = _limited_app(1_000).post(
-        "/up", content=chunks(),
+        "/up",
+        content=chunks(),
         headers={"content-type": f"multipart/form-data; boundary={boundary}"},
     )
     assert r.status_code == 413

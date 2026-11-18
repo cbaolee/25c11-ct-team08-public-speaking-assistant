@@ -26,14 +26,22 @@ USER_B = uuid4()
 
 def _profile(threshold: float = 1.0) -> BaselineProfile:
     return BaselineProfile(
-        median_pause_s=0.5, hesitation_threshold_s=threshold, median_f0_hz=120.0,
-        mean_loudness_db=65.0, flags=[],
+        median_pause_s=0.5,
+        hesitation_threshold_s=threshold,
+        median_f0_hz=120.0,
+        mean_loudness_db=65.0,
+        flags=[],
     )
 
 
 def _ok_payload(profile: BaselineProfile) -> dict:
-    return {"schema_version": "2.0", "status": "ok", "reason": None,
-            "profile": asdict(profile), "flags": list(profile.flags)}
+    return {
+        "schema_version": "2.0",
+        "status": "ok",
+        "reason": None,
+        "profile": asdict(profile),
+        "flags": list(profile.flags),
+    }
 
 
 def _fake_encode(src: Path, out: Path, timeout_s: float = 0) -> None:
@@ -58,9 +66,7 @@ def repos(monkeypatch, current):
 
 def _post(monkeypatch, fake, filename: str = "b.wav", mime: str = "audio/wav"):
     monkeypatch.setattr(baselines, "analyze_baseline", fake)
-    return TestClient(main.app).post(
-        "/api/baseline", files={"audio": (filename, b"x", mime)}
-    )
+    return TestClient(main.app).post("/api/baseline", files={"audio": (filename, b"x", mime)})
 
 
 def _get():
@@ -102,8 +108,13 @@ def test_create_baseline_webm_upload_from_ui_is_saved(monkeypatch, repos):
 
 def test_create_baseline_insufficient_saves_nothing(monkeypatch, repos):
     def fake(audio_path, *, vad_params):
-        return {"schema_version": "2.0", "status": "insufficient_audio",
-                "reason": "low_voiced_ratio", "profile": None, "flags": []}
+        return {
+            "schema_version": "2.0",
+            "status": "insufficient_audio",
+            "reason": "low_voiced_ratio",
+            "profile": None,
+            "flags": [],
+        }
 
     r = _post(monkeypatch, fake)
     assert set(r.json()) == KEYS

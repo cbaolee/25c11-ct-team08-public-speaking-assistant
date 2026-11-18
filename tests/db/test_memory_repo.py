@@ -389,9 +389,7 @@ def test_upload_file_same_path_raises_conflict_unless_upsert():
     with pytest.raises(ConflictError):
         repos.files.upload_file(user_id, "audio", path, b"second", "audio/webm")
 
-    repos.files.upload_file(
-        user_id, "audio", path, b"second", "audio/webm", upsert=True
-    )
+    repos.files.upload_file(user_id, "audio", path, b"second", "audio/webm", upsert=True)
     assert repos.files.download_file(user_id, "audio", path) == b"second"
 
 
@@ -405,9 +403,7 @@ def test_delete_files_ignores_missing_objects_and_signed_url_needs_existing_file
         repos.files.create_signed_url(user_id, "series", path, ttl_s=60)
 
     repos.files.upload_file(user_id, "series", path, b"{}", "application/json")
-    assert repos.files.create_signed_url(user_id, "series", path, ttl_s=60).startswith(
-        "memory://"
-    )
+    assert repos.files.create_signed_url(user_id, "series", path, ttl_s=60).startswith("memory://")
 
 
 def test_audio_store_delete_is_idempotent_and_owner_scoped():

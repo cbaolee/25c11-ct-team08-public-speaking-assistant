@@ -19,12 +19,10 @@ logger = logging.getLogger(__name__)
 # (connect, read): without a timeout a hung provider blocks the request forever.
 STT_TIMEOUT = (stt_connect_timeout_s, stt_read_timeout_s)
 
+
 def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -> SttResult:
     url = f"https://api.deepgram.com/v1/listen?model={model}&filler_words=true&punctuate=true&utterances=false"
-    headers = {
-        "Authorization": f"Token {api_key}",
-        "Content-Type": "audio/wav"
-    }
+    headers = {"Authorization": f"Token {api_key}", "Content-Type": "audio/wav"}
 
     # Read the audio file from master.path
     with open(master.path, "rb") as f:
@@ -48,26 +46,21 @@ def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -
 
     words = []
     for w in raw_words:
-        words.append(WordTimestamp(
-            word=w.get("punctuated_word", w.get("word", "")),
-            start_s=w["start"],
-            end_s=w["end"],
-            confidence=w.get("confidence")
-        ))
+        words.append(
+            WordTimestamp(
+                word=w.get("punctuated_word", w.get("word", "")),
+                start_s=w["start"],
+                end_s=w["end"],
+                confidence=w.get("confidence"),
+            )
+        )
 
-    return SttResult(
-        transcript=transcript,
-        words=words,
-        provider="deepgram",
-        model=model,
-        flags=[]
-    )
+    return SttResult(transcript=transcript, words=words, provider="deepgram", model=model, flags=[])
+
 
 def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     url = "https://api.gladia.io/audio/text/audio-transcription/"
-    headers = {
-        "x-gladia-key": api_key
-    }
+    headers = {"x-gladia-key": api_key}
 
     with open(master.path, "rb") as f:
         # Send the file name from master.path.name
@@ -83,12 +76,14 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     if "prediction" in data:
         transcript = data["prediction"]
         for w in data.get("prediction_raw", {}).get("words", []):
-            words.append(WordTimestamp(
-                word=w.get("word", ""),
-                start_s=w.get("time_begin", 0.0),
-                end_s=w.get("time_end", 0.0),
-                confidence=w.get("confidence")
-            ))
+            words.append(
+                WordTimestamp(
+                    word=w.get("word", ""),
+                    start_s=w.get("time_begin", 0.0),
+                    end_s=w.get("time_end", 0.0),
+                    confidence=w.get("confidence"),
+                )
+            )
 
     if not transcript.strip():
         raise InsufficientAudio("STT returned empty transcript")
@@ -98,8 +93,9 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
         words=words,
         provider="gladia",
         model="solaria-1",
-        flags=["filler_from_vad_only"]
+        flags=["filler_from_vad_only"],
     )
+
 
 def _try_provider(name: str, call: Callable[[str], SttResult], keys: list[str]) -> SttResult:
     """Try each usable key of one provider in order.

@@ -29,28 +29,36 @@ FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures"
 # ---- ok_mixed case (made-up numbers, not measurements) ----
 MIXED_SCRIPT = "Good morning my friends are here today."
 MIXED_WORDS = [
-    w("Good", 0.0, 0.4), w("morning", 0.5, 0.9),
-    w("um", 0.95, 1.1),                      # filler STT
-    w("friend", 1.2, 2.0),                   # "my" del; friends -> friend: near_miss
-    w("are", 2.8, 3.1),                      # after a 0.8 s silence: hesitation
-    w("cat", 3.2, 3.6),                      # "here" -> "cat": sub
-    w("today", 5.4, 5.8),                    # after a 1.7 s mid-sentence silence: forgot_word
-    w("really", 5.9, 6.3),                   # extra trailing word: ins
+    w("Good", 0.0, 0.4),
+    w("morning", 0.5, 0.9),
+    w("um", 0.95, 1.1),  # filler STT
+    w("friend", 1.2, 2.0),  # "my" del; friends -> friend: near_miss
+    w("are", 2.8, 3.1),  # after a 0.8 s silence: hesitation
+    w("cat", 3.2, 3.6),  # "here" -> "cat": sub
+    w("today", 5.4, 5.8),  # after a 1.7 s mid-sentence silence: forgot_word
+    w("really", 5.9, 6.3),  # extra trailing word: ins
 ]
 MIXED_SEGS = (SpeechSegment(0.0, 2.0), SpeechSegment(2.8, 3.7), SpeechSegment(5.4, 6.4))
-MIXED_F0 = [(0.05, 100.0), (0.55, 110.0), (1.25, 130.0), (2.85, 90.0), (3.25, 200.0),
-            (5.45, 120.0)]
-MIXED_LOUDNESS = {"start_s": 0.0, "step_s": 0.1,
-                  "values": [None if i % 5 == 4 else 55.0 + 0.25 * i for i in range(68)]}
+MIXED_F0 = [(0.05, 100.0), (0.55, 110.0), (1.25, 130.0), (2.85, 90.0), (3.25, 200.0), (5.45, 120.0)]
+MIXED_LOUDNESS = {
+    "start_s": 0.0,
+    "step_s": 0.1,
+    "values": [None if i % 5 == 4 else 55.0 + 0.25 * i for i in range(68)],
+}
 
 CASES = {
     "evaluation_ok.json": {},
     "evaluation_ok_mixed.json": {
-        "script": MIXED_SCRIPT, "words": MIXED_WORDS, "segments": MIXED_SEGS,
-        "duration": 6.8, "f0": MIXED_F0, "loudness": MIXED_LOUDNESS,
+        "script": MIXED_SCRIPT,
+        "words": MIXED_WORDS,
+        "segments": MIXED_SEGS,
+        "duration": 6.8,
+        "f0": MIXED_F0,
+        "loudness": MIXED_LOUDNESS,
     },
     "evaluation_insufficient.json": {
-        "segments": (SpeechSegment(0.0, 1.0),), "duration": 10.0,
+        "segments": (SpeechSegment(0.0, 1.0),),
+        "duration": 10.0,
     },
 }
 
@@ -72,12 +80,19 @@ def compare(actual, expected, path="$"):
             diffs += compare(a, e, f"{path}[{i}]")
         return diffs
     if isinstance(expected, float) or isinstance(actual, float):
-        ok = (isinstance(actual, (int, float)) and isinstance(expected, (int, float))
-              and not isinstance(actual, bool) and not isinstance(expected, bool)
-              and math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-12))
+        ok = (
+            isinstance(actual, (int, float))
+            and isinstance(expected, (int, float))
+            and not isinstance(actual, bool)
+            and not isinstance(expected, bool)
+            and math.isclose(actual, expected, rel_tol=1e-9, abs_tol=1e-12)
+        )
         return [] if ok else [f"{path}: {actual!r} != {expected!r}"]
-    return [] if (actual == expected and type(actual) is type(expected)) \
+    return (
+        []
+        if (actual == expected and type(actual) is type(expected))
         else [f"{path}: {actual!r} != {expected!r}"]
+    )
 
 
 @pytest.mark.parametrize("name", list(CASES))
@@ -113,12 +128,12 @@ def test_comparator_detects_drift():
     base = {"a": [1.0, {"b": None}], "c": "x", "d": True}
     assert compare(json.loads(json.dumps(base)), base) == []
     for mutate in (
-        lambda d: d["a"].__setitem__(0, 1.0001),      # float mismatch
-        lambda d: d["a"][1].__setitem__("b", 0.0),    # None -> number
-        lambda d: d.__setitem__("c", "y"),            # string mismatch
-        lambda d: d.__setitem__("e", 1),              # extra key
-        lambda d: d["a"].append(2),                   # length mismatch
-        lambda d: d.__setitem__("d", 1),              # bool vs int
+        lambda d: d["a"].__setitem__(0, 1.0001),  # float mismatch
+        lambda d: d["a"][1].__setitem__("b", 0.0),  # None -> number
+        lambda d: d.__setitem__("c", "y"),  # string mismatch
+        lambda d: d.__setitem__("e", 1),  # extra key
+        lambda d: d["a"].append(2),  # length mismatch
+        lambda d: d.__setitem__("d", 1),  # bool vs int
     ):
         copy = json.loads(json.dumps(base))
         mutate(copy)

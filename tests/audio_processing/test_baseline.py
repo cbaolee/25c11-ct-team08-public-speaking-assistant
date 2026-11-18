@@ -1,4 +1,3 @@
-
 import math
 
 import pytest
@@ -47,6 +46,7 @@ def test_threshold_capped_at_1_2s():
     assert result["median_pause_s"] == 0.8
     assert result["hesitation_threshold_s"] == 1.2
 
+
 def test_threshold_minimum_is_0_7s():
     """Check the min threshold always stays at 0.7s[cite: 1]."""
     # Create 5 silences, 0.35s each -> 2 * 0.35 = 0.7s
@@ -55,6 +55,7 @@ def test_threshold_minimum_is_0_7s():
 
     assert result["median_pause_s"] == 0.35
     assert result["hesitation_threshold_s"] == 0.7
+
 
 def test_threshold_floor_survives_float_noise():
     """Guards max(0.7, ...): 1.15 - 0.8 = 0.34999999999999987 (float noise, not a measurement).

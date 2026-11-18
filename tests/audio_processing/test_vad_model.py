@@ -54,8 +54,9 @@ def test_detect_speech_converts_samples_to_seconds_and_passes_params(tmp_path, m
         return [{"start": 16000, "end": 40000}, {"start": 48000, "end": 56000}]
 
     monkeypatch.setattr(silero_vad, "get_speech_timestamps", fake_get_speech_timestamps)
-    params = VadParams(threshold=0.4, min_speech_duration_ms=200,
-                       min_silence_duration_ms=150, speech_pad_ms=10)
+    params = VadParams(
+        threshold=0.4, min_speech_duration_ms=200, min_silence_duration_ms=150, speech_pad_ms=10
+    )
     result = detect_speech(_master(wav, 1.0), params=params)
 
     assert result == [SpeechSegment(1.0, 2.5), SpeechSegment(3.0, 3.5)]

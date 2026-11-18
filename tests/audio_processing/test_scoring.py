@@ -110,8 +110,11 @@ def test_pitch_range_st_empty_or_bad_ref():
 
 def _baseline(f0):
     return BaselineProfile(
-        median_pause_s=0.5, hesitation_threshold_s=1.0, median_f0_hz=f0,
-        mean_loudness_db=None, flags=[]
+        median_pause_s=0.5,
+        hesitation_threshold_s=1.0,
+        median_f0_hz=f0,
+        mean_loudness_db=None,
+        flags=[],
     )
 
 
@@ -259,13 +262,13 @@ def test_f0_contour_st_cell_boundary_half_open():
 
 def test_f0_contour_st_ignores_out_of_range_and_bad_frames():
     track = [
-        (-0.01, 400.0),        # t < 0
-        (0.3, 400.0),          # t >= n * step (n = 3)
-        (0.01, math.nan),      # non-finite hz
+        (-0.01, 400.0),  # t < 0
+        (0.3, 400.0),  # t >= n * step (n = 3)
+        (0.01, math.nan),  # non-finite hz
         (0.02, math.inf),
-        (0.03, 0.0),           # hz <= 0
+        (0.03, 0.0),  # hz <= 0
         (0.04, -50.0),
-        (0.05, 100.0),         # only valid frame -> ST 0
+        (0.05, 100.0),  # only valid frame -> ST 0
     ]
     res = scoring.f0_contour_st(track, 100.0, 0.3)
     assert res["values"] == [pytest.approx(0.0), None, None]
@@ -551,7 +554,13 @@ def test_accuracy_detail_has_seven_keys_matching_counts():
     result = _align("I think so now", "I", "sink", "so", "uh", "extra")
     res = accuracy_scores(result)
     assert set(res.accuracy_detail) == {
-        "n_ref", "n_sub", "n_del", "n_ins", "n_near_miss", "n_homophone", "n_oov",
+        "n_ref",
+        "n_sub",
+        "n_del",
+        "n_ins",
+        "n_near_miss",
+        "n_homophone",
+        "n_oov",
     }
     assert res.accuracy_detail == result.counts
     assert res.accuracy_detail is not result.counts  # a copy
@@ -834,9 +843,7 @@ def _cos_case(c: float):
     return {"R": [1.0, 0.0], "H": [c, math.sqrt(1 - c * c)]}
 
 
-@pytest.mark.parametrize(
-    ("c", "expected"), [(0.82, True), (0.81, False), (0.83, True)]
-)
+@pytest.mark.parametrize(("c", "expected"), [(0.82, True), (0.81, False), (0.83, True)])
 def test_score_sentences_cosine_threshold_boundary(c, expected):
     enc = _table_encoder(_cos_case(c))
     res = scoring.score_sentences([(0, 0, 2, "R", "H")], encode=enc)
@@ -846,8 +853,7 @@ def test_score_sentences_cosine_threshold_boundary(c, expected):
 
 def test_score_semantic_18_of_20_is_90():
     sentences = [
-        scoring.SentenceResult(i, f"r{i}", i, i + 1, f"h{i}", 0.9, i < 18)
-        for i in range(20)
+        scoring.SentenceResult(i, f"r{i}", i, i + 1, f"h{i}", 0.9, i < 18) for i in range(20)
     ]
     assert scoring.score_semantic(sentences) == pytest.approx(90.0)
 
@@ -880,8 +886,9 @@ def test_build_pairs_all_deleted_sentence_is_none_and_counts_in_denominator():
     res = align(script, _words("hello", "world"), pron=_no_pron)
     pairs = scoring.build_sentence_pairs(script, res.items)
     assert pairs[1][4] is None
-    enc = _table_encoder({"Hello world.": [1.0, 0.0], "hello world": [1.0, 0.0],
-                          "How are you?": [0.0, 1.0]})
+    enc = _table_encoder(
+        {"Hello world.": [1.0, 0.0], "hello world": [1.0, 0.0], "How are you?": [0.0, 1.0]}
+    )
     sents = scoring.score_sentences(pairs, encode=enc)
     assert sents[0].passed is True
     assert sents[1].hyp_text is None

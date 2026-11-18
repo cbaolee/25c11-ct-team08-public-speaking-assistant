@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     @field_validator("groq_api_keys", "deepgram_api_keys", "gladia_api_keys", mode="before")
     @classmethod
     def _split_keys(cls, value: object) -> object:
-        """"k1, k2,,k3" -> ["k1", "k2", "k3"]: split on commas, drop spaces and empty items."""
+        """ "k1, k2,,k3" -> ["k1", "k2", "k3"]: split on commas, drop spaces and empty items."""
         if isinstance(value, str):
             value = value.split(",")
         if isinstance(value, (list, tuple)):
@@ -95,6 +95,7 @@ class Settings(BaseSettings):
                 f"without an API path such as /rest/v1 (got {url!r})"
             )
         return url
+
 
 settings = Settings()
 

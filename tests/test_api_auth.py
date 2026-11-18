@@ -146,8 +146,9 @@ def test_change_password_then_login_with_new_one(client):
     token = _login(client).json()["access_token"]
     short = client.put("/api/auth/password", json={"password": "short"}, headers=_bearer(token))
     assert short.status_code == 422
-    r = client.put("/api/auth/password", json={"password": "new-password-9"},
-                   headers=_bearer(token))
+    r = client.put(
+        "/api/auth/password", json={"password": "new-password-9"}, headers=_bearer(token)
+    )
     assert r.json() == {"updated": True}
     assert _login(client).status_code == 401
     assert _login(client, password="new-password-9").status_code == 200
@@ -214,8 +215,9 @@ def test_supabase_sign_in_wrong_password_is_invalid_credentials(monkeypatch):
         raise _api_error("invalid_credentials", status=400)
 
     provider = _provider(SimpleNamespace())
-    monkeypatch.setattr(provider, "_new_client",
-                        lambda: SimpleNamespace(sign_in_with_password=sign_in))
+    monkeypatch.setattr(
+        provider, "_new_client", lambda: SimpleNamespace(sign_in_with_password=sign_in)
+    )
     with pytest.raises(InvalidCredentialsError):
         provider.sign_in("a@example.com", "bad")
 

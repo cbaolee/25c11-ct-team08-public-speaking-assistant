@@ -214,8 +214,12 @@ def test_save_same_text_twice_returns_existing_script(script_api) -> None:
 def test_save_script_generated_source_keeps_metadata(script_api) -> None:
     client, _, _ = script_api
     r = _save(
-        client, "A generated speech.", source="generated_llm",
-        models_used=["openai/gpt-oss-120b"], template_id=None, category="free",
+        client,
+        "A generated speech.",
+        source="generated_llm",
+        models_used=["openai/gpt-oss-120b"],
+        template_id=None,
+        category="free",
     )
     assert r.status_code == 201
     assert r.json()["models_used"] == ["openai/gpt-oss-120b"]

@@ -14,9 +14,7 @@ class AudioEncodingError(RuntimeError):
     """Audio could not be encoded as Opus."""
 
 
-def encode_opus(
-    wav_path: Path, out_path: Path, timeout_s: float = decode_timeout_s
-) -> None:
+def encode_opus(wav_path: Path, out_path: Path, timeout_s: float = decode_timeout_s) -> None:
     """Encode a WAV file as 32 kbps Opus in a WebM container.
 
     An existing file at ``out_path`` is overwritten.
@@ -54,8 +52,10 @@ def encode_opus(
         raise AudioEncodingError("Audio encoding timed out") from err
     except subprocess.CalledProcessError as err:
         detail = (err.stderr or "").strip()
-        message = f"FFmpeg could not encode the audio: {detail}" if detail else (
-            "FFmpeg could not encode the audio"
+        message = (
+            f"FFmpeg could not encode the audio: {detail}"
+            if detail
+            else ("FFmpeg could not encode the audio")
         )
         raise AudioEncodingError(message) from err
 
@@ -84,9 +84,7 @@ def merge_series(
 ) -> dict[str, Any]:
     """Restore chart series into a result without mutating either input."""
     result = copy.deepcopy(result_without_series)
-    result["pitch_detail"]["contour_st"] = copy.deepcopy(
-        series_json["pitch_detail"]["contour_st"]
-    )
+    result["pitch_detail"]["contour_st"] = copy.deepcopy(series_json["pitch_detail"]["contour_st"])
     result["display_only"]["loudness_db"] = copy.deepcopy(
         series_json["display_only"]["loudness_db"]
     )
@@ -118,9 +116,7 @@ def compact_session(
             last_ref_index = item["ref_index"]
         if item["status"] == "equal":
             continue
-        position = (
-            item["ref_index"] if item["ref_index"] is not None else last_ref_index + 0.5
-        )
+        position = item["ref_index"] if item["ref_index"] is not None else last_ref_index + 0.5
         keyed.append(
             (
                 position,

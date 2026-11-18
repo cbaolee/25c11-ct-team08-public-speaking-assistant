@@ -22,7 +22,7 @@ def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
         return {
             "median_pause_s": None,
             "hesitation_threshold_s": 0.7,
-            "flags": ["baseline_pause_unreliable"]
+            "flags": ["baseline_pause_unreliable"],
         }
 
     durations = [(p.end_s - p.start_s) for p in pauses]
@@ -32,7 +32,7 @@ def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
         return {
             "median_pause_s": median_pause_s,
             "hesitation_threshold_s": 0.7,
-            "flags": ["baseline_pause_unreliable"]
+            "flags": ["baseline_pause_unreliable"],
         }
 
     flags = []
@@ -44,7 +44,7 @@ def compute_baseline_pause_profile(pauses: list[Pause]) -> dict:
     return {
         "median_pause_s": median_pause_s,
         "hesitation_threshold_s": hesitation_threshold_s,
-        "flags": flags
+        "flags": flags,
     }
 
 
@@ -58,7 +58,7 @@ def compute_baseline_f0(master: MasterAudio) -> dict:
     try:
         snd = parselmouth.Sound(str(master.path))
         pitch = snd.to_pitch()
-        pitch_values = pitch.selected_array['frequency']
+        pitch_values = pitch.selected_array["frequency"]
 
         # Keep only voiced frames (frequency > 0)
         voiced_f0 = pitch_values[pitch_values > 0]
@@ -70,10 +70,7 @@ def compute_baseline_f0(master: MasterAudio) -> dict:
     except Exception:
         flags.append("no_f0")
 
-    return {
-        "median_f0_hz": median_f0_hz,
-        "flags": flags
-    }
+    return {"median_f0_hz": median_f0_hz, "flags": flags}
 
 
 def mean_loudness_db(values: Sequence[float]) -> float | None:
@@ -147,5 +144,5 @@ def build_baseline_profile(master: MasterAudio, vad_params: Any) -> BaselineProf
         hesitation_threshold_s=pause_profile["hesitation_threshold_s"],
         median_f0_hz=f0_profile["median_f0_hz"],
         mean_loudness_db=loudness,
-        flags=combined_flags
+        flags=combined_flags,
     )

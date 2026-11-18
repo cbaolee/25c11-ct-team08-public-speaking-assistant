@@ -5,26 +5,36 @@ from pathlib import Path
 from .contracts import AudioRejected, MasterAudio
 
 
-def decode_to_master(src: Path, workdir: Path, *, max_seconds: float,
-                     cap_margin_s: float, timeout_s: float) -> MasterAudio:
+def decode_to_master(
+    src: Path, workdir: Path, *, max_seconds: float, cap_margin_s: float, timeout_s: float
+) -> MasterAudio:
     out_path = workdir / "master.wav"
 
     command = [
-        "ffmpeg", "-nostdin", "-v",
-        "error", "-i", src, "-map",
-        "0:a:0", "-vn", "-ac", "1",
-        "-ar", "16000", "-c:a", "pcm_s16le",
-        "-t", str(max_seconds + cap_margin_s),
-        "-y", out_path
+        "ffmpeg",
+        "-nostdin",
+        "-v",
+        "error",
+        "-i",
+        src,
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-c:a",
+        "pcm_s16le",
+        "-t",
+        str(max_seconds + cap_margin_s),
+        "-y",
+        out_path,
     ]
 
     try:
         result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=timeout_s
+            command, capture_output=True, text=True, check=True, timeout=timeout_s
         )
     except (subprocess.TimeoutExpired, subprocess.CalledProcessError) as err:
         raise AudioRejected(
@@ -47,8 +57,7 @@ def decode_to_master(src: Path, workdir: Path, *, max_seconds: float,
     if frames == 0 or rate == 0:
         raise AudioRejected(
             "corrupt",
-            "No audio could be decoded from this file. "
-            "Please try another file or record again.",
+            "No audio could be decoded from this file. Please try another file or record again.",
         )
 
     duration_s = frames / rate

@@ -71,12 +71,16 @@ class BodySizeLimitMiddleware:
         body = json.dumps(
             {"error_code": "too_large", "message": too_large_message(self.max_bytes)}
         ).encode()
-        await send({
-            "type": "http.response.start",
-            "status": 413,
-            "headers": [(b"content-type", b"application/json"),
-                        (b"content-length", str(len(body)).encode())],
-        })
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-type", b"application/json"),
+                    (b"content-length", str(len(body)).encode()),
+                ],
+            }
+        )
         await send({"type": "http.response.body", "body": body})
 
     async def __call__(self, scope, receive, send):

@@ -120,7 +120,6 @@ class SaveScriptPayload(BaseModel):
     citations: list[dict] = Field(default_factory=list, max_length=500)
 
 
-
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
@@ -140,10 +139,7 @@ async def index(request: Request):
 @app.exception_handler(AudioRejected)
 async def audio_rejected_handler(request: Request, exc: AudioRejected):
     """422 `{error_code, message}` when probe or decode refuses the audio file."""
-    return JSONResponse(
-        status_code=422,
-        content={"error_code": exc.code, "message": exc.message}
-    )
+    return JSONResponse(status_code=422, content={"error_code": exc.code, "message": exc.message})
 
 
 @app.exception_handler(SttUnavailable)
@@ -154,7 +150,7 @@ async def stt_unavailable_handler(request: Request, exc: SttUnavailable):
         content={
             "error_code": "stt_unavailable",
             "message": "The speech recognition service is not available right now. "
-                       "Please try again in a few minutes.",
+            "Please try again in a few minutes.",
         },
     )
 
@@ -173,9 +169,7 @@ def _delete_session_files(repos: Repos, user_id: UUID, row: SessionRow) -> None:
 def _prune_old_sessions(repos: Repos, user_id: UUID) -> None:
     """Compact older full sessions to keep only the newest full set."""
     try:
-        rows = repos.sessions.list_full_beyond(
-            user_id, keep=settings.retention_full_sessions
-        )
+        rows = repos.sessions.list_full_beyond(user_id, keep=settings.retention_full_sessions)
     except Exception:
         logger.exception("Could not list old sessions for user %s", user_id)
         return
@@ -255,9 +249,7 @@ def _save_result_to_history(
             audio_path=audio_path,
             series_path=series_path,
             audio_duration_s=(
-                result.audio.get("duration_s")
-                if isinstance(result.audio, dict)
-                else None
+                result.audio.get("duration_s") if isinstance(result.audio, dict) else None
             ),
             stt_provider=(stt.get("provider") if isinstance(stt, dict) else None),
             stt_model=(stt.get("model") if isinstance(stt, dict) else None),
@@ -330,9 +322,7 @@ async def get_session(
 ):
     """Return the full session payload or a compact summary for older sessions."""
     try:
-        row = await run_in_threadpool(
-            repos.sessions.get_session, user.id, session_id
-        )
+        row = await run_in_threadpool(repos.sessions.get_session, user.id, session_id)
     except StorageError:
         logger.exception("Could not load session %s", session_id)
         return JSONResponse(
@@ -342,9 +332,7 @@ async def get_session(
     if row is None:
         return JSONResponse(status_code=404, content={"error": "session_not_found"})
 
-    data = row.model_dump(
-        mode="json", exclude={"user_id", "audio_path", "series_path"}
-    )
+    data = row.model_dump(mode="json", exclude={"user_id", "audio_path", "series_path"})
 
     if not row.is_compact and row.series_path:
         try:
@@ -387,9 +375,7 @@ async def delete_session(
 ):
     """Delete files and row for a single session; unknown IDs return 404."""
     try:
-        row = await run_in_threadpool(
-            repos.sessions.get_session, user.id, session_id
-        )
+        row = await run_in_threadpool(repos.sessions.get_session, user.id, session_id)
     except StorageError:
         logger.exception("Could not load session %s for deletion", session_id)
         return JSONResponse(
@@ -408,9 +394,7 @@ async def delete_session(
             content={"error": "session_storage_unavailable"},
         )
     try:
-        deleted = await run_in_threadpool(
-            repos.sessions.delete_session, user.id, session_id
-        )
+        deleted = await run_in_threadpool(repos.sessions.delete_session, user.id, session_id)
     except StorageError:
         logger.exception("Could not delete session row %s", session_id)
         return JSONResponse(
@@ -425,15 +409,19 @@ def _validate_script(script: str) -> JSONResponse | None:
     if not script.strip():
         return JSONResponse(
             status_code=422,
-            content={"error_code": "script_empty",
-                     "message": "The practice text is empty. Choose or write a text first."},
+            content={
+                "error_code": "script_empty",
+                "message": "The practice text is empty. Choose or write a text first.",
+            },
         )
     if len(script) > max_script_chars or len(script.split()) > max_script_words:
         return JSONResponse(
             status_code=422,
-            content={"error_code": "script_too_long",
-                     "message": f"The practice text is too long (maximum {max_script_words} "
-                                "words). Please use a shorter text."},
+            content={
+                "error_code": "script_too_long",
+                "message": f"The practice text is too long (maximum {max_script_words} "
+                "words). Please use a shorter text.",
+            },
         )
     return None
 
@@ -480,8 +468,10 @@ async def evaluate_endpoint(
         except ValueError:
             return JSONResponse(
                 status_code=422,
-                content={"error_code": "invalid_script_id",
-                         "message": "The selected script id is not valid."},
+                content={
+                    "error_code": "invalid_script_id",
+                    "message": "The selected script id is not valid.",
+                },
             )
         try:
             script_row = await run_in_threadpool(repos.scripts.get_script, user.id, script_uuid)
@@ -489,14 +479,18 @@ async def evaluate_endpoint(
             logger.exception("Could not load script for evaluation")
             return JSONResponse(
                 status_code=503,
-                content={"error_code": "script_storage_unavailable",
-                         "message": "Could not load the selected script. Please try again."},
+                content={
+                    "error_code": "script_storage_unavailable",
+                    "message": "Could not load the selected script. Please try again.",
+                },
             )
         if script_row is None:  # missing or another user's script: same answer
             return JSONResponse(
                 status_code=404,
-                content={"error_code": "script_not_found",
-                         "message": "The selected script no longer exists."},
+                content={
+                    "error_code": "script_not_found",
+                    "message": "The selected script no longer exists.",
+                },
             )
     session_topic = topic.strip()[:MAX_TOPIC_CHARS] or (script_row.topic if script_row else None)
 
@@ -509,14 +503,18 @@ async def evaluate_endpoint(
         logger.exception("Could not load baseline")
         return JSONResponse(
             status_code=503,
-            content={"error_code": "baseline_unavailable",
-                     "message": "Could not load the current baseline"},
+            content={
+                "error_code": "baseline_unavailable",
+                "message": "Could not load the current baseline",
+            },
         )
     if baseline_row is None and settings.baseline_required:
         return JSONResponse(
             status_code=409,
-            content={"error_code": "baseline_required",
-                     "message": "Record a baseline before practising"},
+            content={
+                "error_code": "baseline_required",
+                "message": "Record a baseline before practising",
+            },
         )
     baseline = baselines.to_baseline_profile(baseline_row) if baseline_row else None
 
@@ -563,9 +561,9 @@ async def evaluate_endpoint(
                 perf_counter() - save_started,
             )
 
-        return result.model_copy(
-            update={"session_id": session_id, "saved": saved}
-        ).model_dump(mode="json")
+        return result.model_copy(update={"session_id": session_id, "saved": saved}).model_dump(
+            mode="json"
+        )
 
 
 @app.exception_handler(ScriptGenerationError)
@@ -645,8 +643,11 @@ def _script_error(status_code: int, error_code: str, message: str) -> JSONRespon
 
 
 def _script_storage_unavailable() -> JSONResponse:
-    return _script_error(503, "script_storage_unavailable",
-                         "Saved scripts are not available right now. Please try again.")
+    return _script_error(
+        503,
+        "script_storage_unavailable",
+        "Saved scripts are not available right now. Please try again.",
+    )
 
 
 def _script_not_found() -> JSONResponse:

@@ -76,8 +76,15 @@ DEFAULT_HESITATION_THRESHOLD_S = 0.7
 _COMPONENT_KEYS = ("accuracy", "fluency", "pronunciation", "semantic")
 _SUBSCORE_KEYS = ("f_wpm", "f_pause", "f_filler", "p_clarity", "p_pitch")
 _ACCURACY_KEYS = ("n_ref", "n_sub", "n_del", "n_ins", "n_near_miss", "n_homophone", "n_oov")
-_FLUENCY_KEYS = ("wpm", "hesitations_per_min", "hesitation_count", "forgot_word_count",
-                 "pause_threshold_s", "filler_pct", "filler_count")
+_FLUENCY_KEYS = (
+    "wpm",
+    "hesitations_per_min",
+    "hesitation_count",
+    "forgot_word_count",
+    "pause_threshold_s",
+    "filler_pct",
+    "filler_count",
+)
 _PITCH_KEYS = ("range_semitones", "f0_ref_hz", "f0_ref_source", "contour_st")
 
 
@@ -95,8 +102,11 @@ def _merge_flags(*groups: list[str]) -> list[str]:
 def _baseline_block(baseline: BaselineProfile | None) -> dict | None:
     if baseline is None:
         return None
-    return {"used": True, "median_pause_s": baseline.median_pause_s,
-            "hesitation_threshold_s": baseline.hesitation_threshold_s}
+    return {
+        "used": True,
+        "median_pause_s": baseline.median_pause_s,
+        "hesitation_threshold_s": baseline.hesitation_threshold_s,
+    }
 
 
 def _insufficient(
@@ -110,8 +120,11 @@ def _insufficient(
 ) -> EvaluationResultV2:
     """Unscored result (ADR-004 D1): every score null, empty lists, NEVER 0."""
     return EvaluationResultV2(
-        schema_version="2.1", status="insufficient_audio", reason=reason,  # type: ignore[arg-type]
-        overall=None, label=None,
+        schema_version="2.1",
+        status="insufficient_audio",
+        reason=reason,  # type: ignore[arg-type]
+        overall=None,
+        label=None,
         components=dict.fromkeys(_COMPONENT_KEYS),
         subscores=dict.fromkeys(_SUBSCORE_KEYS),
         accuracy_detail=dict.fromkeys(_ACCURACY_KEYS),
@@ -119,12 +132,17 @@ def _insufficient(
         pitch_detail=dict.fromkeys(_PITCH_KEYS),
         audio={"duration_s": master.duration_s, "voiced_ratio": voiced_ratio},
         baseline=_baseline_block(baseline),
-        alignment=[], pauses=[], fillers=[], sentences=[],
+        alignment=[],
+        pauses=[],
+        fillers=[],
+        sentences=[],
         stt=stt,
         flags=_merge_flags(flags, baseline.flags if baseline else ["no_baseline"]),
         warnings=[],
-        display_only={"loudness_db": None,
-                      "loudness_ref_db": baseline.mean_loudness_db if baseline else None},
+        display_only={
+            "loudness_db": None,
+            "loudness_ref_db": baseline.mean_loudness_db if baseline else None,
+        },
     )
 
 
@@ -144,14 +162,14 @@ def evaluate_session(
             audio_path,
             max_seconds=max_audio_seconds,
             max_bytes=max_upload_bytes,
-            allowed_formats=frozenset(allowed_formats)
+            allowed_formats=frozenset(allowed_formats),
         )
         master = decode_to_master(
             audio_path,
             workdir=workdir,
             max_seconds=max_audio_seconds,
             cap_margin_s=duration_cap_margin_s,
-            timeout_s=decode_timeout_s
+            timeout_s=decode_timeout_s,
         )
 
         # (a) VAD + speech ratio check. Rejected before STT: no request is spent.
@@ -160,20 +178,38 @@ def evaluate_session(
         try:
             check_audio_quality(segments, master.duration_s)
         except InsufficientAudio:
-            return _insufficient("low_voiced_ratio", master=master, voiced_ratio=voiced_ratio,
-                                 baseline=baseline, stt=None, flags=[])
+            return _insufficient(
+                "low_voiced_ratio",
+                master=master,
+                voiced_ratio=voiced_ratio,
+                baseline=baseline,
+                stt=None,
+                flags=[],
+            )
 
         # (b) STT. transcribe raises InsufficientAudio on an empty transcript (provider/model
         # are then unknown, so stt = None, OUR CHOICE).
         try:
             stt = transcribe(master, settings=settings)
         except InsufficientAudio:
-            return _insufficient("empty_transcript", master=master, voiced_ratio=voiced_ratio,
-                                 baseline=baseline, stt=None, flags=[])
+            return _insufficient(
+                "empty_transcript",
+                master=master,
+                voiced_ratio=voiced_ratio,
+                baseline=baseline,
+                stt=None,
+                flags=[],
+            )
         stt_block = {"provider": stt.provider, "model": stt.model}
         if not any(not is_filler(x.word) for x in stt.words):
-            return _insufficient("empty_transcript", master=master, voiced_ratio=voiced_ratio,
-                                 baseline=baseline, stt=stt_block, flags=stt.flags)
+            return _insufficient(
+                "empty_transcript",
+                master=master,
+                voiced_ratio=voiced_ratio,
+                baseline=baseline,
+                stt=stt_block,
+                flags=stt.flags,
+            )
 
         # (c) ONE alignment, shared by A, P_clarity, pauses, fillers and S.
         result = align(script, stt.words)
@@ -181,8 +217,11 @@ def evaluate_session(
         ref_tokens = script.split()
 
         # (d) Pauses: personal threshold from the baseline, 0.7 s without one.
-        threshold = (baseline.hesitation_threshold_s if baseline is not None
-                     else DEFAULT_HESITATION_THRESHOLD_S)
+        threshold = (
+            baseline.hesitation_threshold_s
+            if baseline is not None
+            else DEFAULT_HESITATION_THRESHOLD_S
+        )
         pauses = find_pauses(segments, min_pause_s=MIN_PAUSE_S)
         classified = classify_pauses(pauses, result.items, script, hesitation_threshold_s=threshold)
 
@@ -207,52 +246,83 @@ def evaluate_session(
         overall = compute_overall(acc.accuracy, fluency, pronunciation, semantic)
 
         # (i) Data quality flags
-        flags = _merge_flags(stt.flags, result.flags, acc.flags, pitch.flags,
-                             baseline.flags if baseline is not None else ["no_baseline"])
+        flags = _merge_flags(
+            stt.flags,
+            result.flags,
+            acc.flags,
+            pitch.flags,
+            baseline.flags if baseline is not None else ["no_baseline"],
+        )
 
         return EvaluationResultV2(
-            schema_version="2.1", status="ok", reason=None,
-            overall=overall, label=get_label(overall),  # type: ignore[arg-type]
-            components={"accuracy": acc.accuracy, "fluency": fluency,
-                        "pronunciation": pronunciation, "semantic": semantic},
-            subscores={"f_wpm": f_wpm, "f_pause": f_pause, "f_filler": f_filler,
-                       "p_clarity": acc.clarity, "p_pitch": pitch.score},
+            schema_version="2.1",
+            status="ok",
+            reason=None,
+            overall=overall,
+            label=get_label(overall),  # type: ignore[arg-type]
+            components={
+                "accuracy": acc.accuracy,
+                "fluency": fluency,
+                "pronunciation": pronunciation,
+                "semantic": semantic,
+            },
+            subscores={
+                "f_wpm": f_wpm,
+                "f_pause": f_pause,
+                "f_filler": f_filler,
+                "p_clarity": acc.clarity,
+                "p_pitch": pitch.score,
+            },
             accuracy_detail=acc.accuracy_detail,
             fluency_detail={
-                "wpm": wpm, "hesitations_per_min": h, "hesitation_count": hes_count,
-                "forgot_word_count": forgot_count, "pause_threshold_s": threshold,
-                "filler_pct": r_pct, "filler_count": len(fillers),
+                "wpm": wpm,
+                "hesitations_per_min": h,
+                "hesitation_count": hes_count,
+                "forgot_word_count": forgot_count,
+                "pause_threshold_s": threshold,
+                "filler_pct": r_pct,
+                "filler_count": len(fillers),
             },
-            pitch_detail={"range_semitones": pitch.range_semitones, "f0_ref_hz": pitch.f0_ref_hz,
-                          "f0_ref_source": pitch.f0_ref_source,
-                          "contour_st": pitch.contour_st},
+            pitch_detail={
+                "range_semitones": pitch.range_semitones,
+                "f0_ref_hz": pitch.f0_ref_hz,
+                "f0_ref_source": pitch.f0_ref_source,
+                "contour_st": pitch.contour_st,
+            },
             audio={"duration_s": master.duration_s, "voiced_ratio": voiced_ratio},
             baseline=_baseline_block(baseline),
             alignment=[AlignmentItem(**asdict(it)) for it in result.items],
             pauses=[
-                PauseItem(start_s=cp.pause.start_s, end_s=cp.pause.end_s, kind=cp.kind.value,
-                          after_ref_index=cp.after_ref_index)
+                PauseItem(
+                    start_s=cp.pause.start_s,
+                    end_s=cp.pause.end_s,
+                    kind=cp.kind.value,
+                    after_ref_index=cp.after_ref_index,
+                )
                 for cp in classified
             ],
             fillers=[
-                FillerItem(start_s=f.start_s, end_s=f.end_s, source=f.source, text=f.text,
-                           after_ref_index=after_ref_index(result.items, f.start_s, ref_tokens))
+                FillerItem(
+                    start_s=f.start_s,
+                    end_s=f.end_s,
+                    source=f.source,
+                    text=f.text,
+                    after_ref_index=after_ref_index(result.items, f.start_s, ref_tokens),
+                )
                 for f in fillers
             ],
             sentences=[SentenceItem(**asdict(sr)) for sr in sentences],
             stt=stt_block,
             flags=flags,
             warnings=compute_warnings(wpm, r_pct, pitch.range_semitones),
-            display_only={"loudness_db": loudness_series(master),
-                          "loudness_ref_db": baseline.mean_loudness_db if baseline else None},
+            display_only={
+                "loudness_db": loudness_series(master),
+                "loudness_ref_db": baseline.mean_loudness_db if baseline else None,
+            },
         )
 
 
-def analyze_baseline(
-    audio_path: Path,
-    *,
-    vad_params: Any
-) -> dict:
+def analyze_baseline(audio_path: Path, *, vad_params: Any) -> dict:
     """
     Only for analysing the baseline voice sample.
     Returns one JSON shape (ADR-004 D12):
@@ -268,14 +338,14 @@ def analyze_baseline(
                 audio_path,
                 max_seconds=baseline_max_seconds,
                 max_bytes=max_upload_bytes,
-                allowed_formats=frozenset(allowed_formats)
+                allowed_formats=frozenset(allowed_formats),
             )
             master = decode_to_master(
                 audio_path,
                 workdir=workdir,
                 max_seconds=baseline_max_seconds,
                 cap_margin_s=duration_cap_margin_s,
-                timeout_s=decode_timeout_s
+                timeout_s=decode_timeout_s,
             )
         except AudioRejected as exc:
             if exc.code == "too_long":
@@ -297,8 +367,11 @@ def analyze_baseline(
             check_audio_quality(segments, master.duration_s)
         except InsufficientAudio:
             return {
-                "schema_version": "2.0", "status": "insufficient_audio",
-                "reason": "low_voiced_ratio", "profile": None, "flags": [],
+                "schema_version": "2.0",
+                "status": "insufficient_audio",
+                "reason": "low_voiced_ratio",
+                "profile": None,
+                "flags": [],
             }
 
         pauses = find_pauses(segments, min_pause_s=MIN_PAUSE_S)
@@ -313,9 +386,12 @@ def analyze_baseline(
             hesitation_threshold_s=pause_profile["hesitation_threshold_s"],
             median_f0_hz=f0_profile["median_f0_hz"],
             mean_loudness_db=mean_loudness_db(extract_loudness_db(master)),
-            flags=combined_flags
+            flags=combined_flags,
         )
         return {
-            "schema_version": "2.0", "status": "ok", "reason": None,
-            "profile": asdict(profile), "flags": combined_flags,
+            "schema_version": "2.0",
+            "status": "ok",
+            "reason": None,
+            "profile": asdict(profile),
+            "flags": combined_flags,
         }

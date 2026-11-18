@@ -292,4 +292,3 @@ class TemplateStore:
         if key in self._by_id:
             return self._by_id[key]
         return self._by_topic_lower.get(key.lower())
-
