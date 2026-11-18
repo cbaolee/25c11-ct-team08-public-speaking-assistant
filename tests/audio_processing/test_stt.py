@@ -191,15 +191,18 @@ def test_evaluate_returns_503_stt_unavailable(monkeypatch):
 
     from src.app import main
 
-    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+    def fake_evaluate(audio_path, script, baseline, *, vad_params, **callbacks):
         raise SttUnavailable("both down")
 
     monkeypatch.setattr(main.settings, "baseline_required", False)
     monkeypatch.setattr(main, "evaluate_session", fake_evaluate)
-    r = TestClient(main.app).post(
+    client = TestClient(main.app)
+    r = client.post(
         "/api/evaluate",
         files={"audio": ("a.wav", b"RIFF", "audio/wav")},
         data={"script": "Hello."},
     )
-    assert r.status_code == 503
+    assert r.status_code == 202
+    r = client.get(f"/api/evaluate/{r.json()['job_id']}")
+    assert r.json()["status"] == "failed"
     assert r.json()["error_code"] == "stt_unavailable"

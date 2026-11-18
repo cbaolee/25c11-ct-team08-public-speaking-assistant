@@ -20,18 +20,22 @@ def _on_event_loop() -> bool:
 def test_evaluate_session_runs_in_worker_thread(monkeypatch):
     seen: dict[str, bool] = {}
 
-    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+    def fake_evaluate(audio_path, script, baseline, *, vad_params, **callbacks):
         seen["loop"] = _on_event_loop()
         raise AudioRejected("corrupt", "stop here")
 
     monkeypatch.setattr(main.settings, "baseline_required", False)
     monkeypatch.setattr(main, "evaluate_session", fake_evaluate)
-    r = TestClient(main.app).post(
+    client = TestClient(main.app)
+    r = client.post(
         "/api/evaluate",
         files={"audio": ("a.wav", b"RIFF", "audio/wav")},
         data={"script": "Hello."},
     )
-    assert r.status_code == 422
+    assert r.status_code == 202
+    job = client.get(f"/api/evaluate/{r.json()['job_id']}").json()
+    assert job["status"] == "failed"
+    assert job["error_code"] == "corrupt"
     assert seen["loop"] is False
 
 
@@ -63,7 +67,7 @@ def _record_upload_thread(module, monkeypatch) -> dict[str, bool]:
 def test_evaluate_upload_copy_runs_in_worker_thread(monkeypatch):
     seen = _record_upload_thread(main, monkeypatch)
 
-    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+    def fake_evaluate(audio_path, script, baseline, *, vad_params, **callbacks):
         raise AudioRejected("corrupt", "stop here")
 
     monkeypatch.setattr(main.settings, "baseline_required", False)

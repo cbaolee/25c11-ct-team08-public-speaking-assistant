@@ -349,14 +349,15 @@ def _minimal_result() -> EvaluationResultV2:
 
 @pytest.fixture(autouse=True)
 def _signed_in_user():
-    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=uuid4())
+    user_id = uuid4()
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=user_id)
     main.app.dependency_overrides[get_repos] = build_memory_repos
     yield
     main.app.dependency_overrides.clear()
 
 
 def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
-    def fake(audio_path, script, baseline, *, vad_params):
+    def fake(audio_path, script, baseline, *, vad_params, on_stage=None, should_cancel=None):
         captured["baseline"] = baseline
         return _minimal_result()
 
@@ -367,9 +368,15 @@ def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
     data = {"script": "Hello."}
     if baseline_profile is not None:
         data["baseline_profile"] = baseline_profile
-    return TestClient(main.app).post(
+    client = TestClient(main.app)
+    response = client.post(
         "/api/evaluate", files={"audio": ("a.wav", b"x", "audio/wav")}, data=data
     )
+    assert response.status_code == 202
+    job = client.get(f"/api/evaluate/{response.json()['job_id']}")
+    assert job.json()["status"] == "done"
+    import httpx
+    return httpx.Response(200, json=job.json()["result"])
 
 
 def test_api_evaluate_returns_v2_json(monkeypatch):

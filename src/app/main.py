@@ -1,5 +1,6 @@
 import json
 import logging
+import shutil
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -54,6 +55,7 @@ from src.app.db.session_helpers import (
     split_series,
 )
 from src.app.deps import CurrentUser, get_current_user
+from src.app.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
@@ -94,6 +96,7 @@ app.include_router(practice.router)
 app.include_router(coach.router)
 
 _script_pipeline: ScriptGenerationPipeline | None = None
+_evaluate_jobs = EvaluateJobStore()
 
 
 def get_script_pipeline() -> ScriptGenerationPipeline:
@@ -132,6 +135,8 @@ async def web_config() -> dict[str, Any]:
     """The [web] section of app_constants.toml for the browser (no secrets in it)."""
     return {**CONSTANTS["web"], "retry": {key: CONSTANTS["retry"][key] for key in (
         "sentence_min_error_ratio", "word_max_seconds", "sentence_max_seconds", "clip_pad_s"
+    )}, "evaluate_job": {key: CONSTANTS["evaluate_job"][key] for key in (
+        "poll_interval_ms", "max_wait_s", "stage_weights"
     )}}
 
 
@@ -449,6 +454,7 @@ async def evaluate_endpoint(
     repos: Annotated[Repos, Depends(get_repos)],
     audio: Annotated[UploadFile, File()],
     script: Annotated[str, Form()],
+    background_tasks: BackgroundTasks,
     script_id: Annotated[str, Form()] = "",
     topic: Annotated[str, Form()] = "",
 ):
@@ -522,52 +528,74 @@ async def evaluate_endpoint(
         )
     baseline = baselines.to_baseline_profile(baseline_row) if baseline_row else None
 
-    with tempfile.TemporaryDirectory() as temp_dir:
-        audio_path = safe_upload_path(Path(temp_dir), audio.filename)
-        # Copying up to 100 MB is blocking file I/O: keep it off the event loop
-        await run_in_threadpool(save_upload_limited, audio, audio_path, max_bytes=max_upload_bytes)
-
-        # FFmpeg + VAD + STT + scoring take seconds: run them in a worker thread so the
-        # event loop keeps serving other requests (polling, other users) meanwhile.
-        result = await run_in_threadpool(
-            evaluate_session,
-            audio_path=audio_path,
-            script=script,
-            baseline=baseline,
-            vad_params=vad_params,
+    if _evaluate_jobs.count_active(str(user.id)) >= _evaluate_jobs.limit:
+        return JSONResponse(
+            status_code=429,
+            content={"error_code": "rate_limited", "message": "An evaluation is already running."},
         )
 
+    workdir = Path(tempfile.mkdtemp())
+    try:
+        audio_path = safe_upload_path(workdir, audio.filename)
+        await run_in_threadpool(save_upload_limited, audio, audio_path, max_bytes=max_upload_bytes)
+        try:
+            job = _evaluate_jobs.create_job(str(user.id), workdir)
+        except RateLimited:
+            shutil.rmtree(workdir, ignore_errors=True)
+            return JSONResponse(
+                status_code=429,
+                content={"error_code": "rate_limited",
+                         "message": "An evaluation is already running."},
+            )
+    except Exception:
+        shutil.rmtree(workdir, ignore_errors=True)
+        raise
+
+    def evaluate(**callbacks):
+        return evaluate_session(audio_path=audio_path, script=script, baseline=baseline,
+                                vad_params=vad_params, **callbacks)
+
+    def save(result):
         session_id = None
-        saved = False
         save_started = perf_counter()
         try:
-            accent = await run_in_threadpool(_load_profile_accent, repos, user.id)
-            session_id = await run_in_threadpool(
-                _save_result_to_history,
-                repos=repos,
-                user_id=user.id,
-                script=script,
-                result=result,
-                source_audio_path=audio_path,
-                baseline_id=baseline_row.id if baseline_row else None,
-                script_id=script_row.id if script_row else None,
-                topic=session_topic,
-                accent=accent,
+            accent = _load_profile_accent(repos, user.id)
+            session_id = _save_result_to_history(
+                repos=repos, user_id=user.id, script=script, result=result,
+                source_audio_path=audio_path, baseline_id=baseline_row.id if baseline_row else None,
+                script_id=script_row.id if script_row else None, topic=session_topic, accent=accent,
             )
-            saved = session_id is not None
         except Exception:
             logger.exception("Failed to save evaluation result to session history")
-            saved = False
-            session_id = None
         finally:
             logger.info(
-                "Evaluation session save attempt took %.3f seconds",
-                perf_counter() - save_started,
+                "Evaluation session save attempt took %.3f seconds", perf_counter() - save_started
             )
+        return result.model_copy(
+            update={"session_id": session_id, "saved": session_id is not None}
+        ).model_dump(mode="json")
 
-        return result.model_copy(update={"session_id": session_id, "saved": saved}).model_dump(
-            mode="json"
+    background_tasks.add_task(run_evaluate_job, _evaluate_jobs, job, evaluate, save)
+    return JSONResponse(status_code=202, content={"job_id": job.job_id, "status": "queued"})
+
+
+def _evaluate_job_response(job: dict | None):
+    if job is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error_code": "job_not_found", "message": "Evaluation job not found."},
         )
+    return job
+
+
+@app.get("/api/evaluate/{job_id}")
+async def get_evaluate_job(job_id: str, user: Annotated[CurrentUser, Depends(get_current_user)]):
+    return _evaluate_job_response(_evaluate_jobs.get(job_id, str(user.id)))
+
+
+@app.delete("/api/evaluate/{job_id}")
+async def cancel_evaluate_job(job_id: str, user: Annotated[CurrentUser, Depends(get_current_user)]):
+    return _evaluate_job_response(_evaluate_jobs.cancel(job_id, str(user.id)))
 
 
 @app.exception_handler(ScriptGenerationError)

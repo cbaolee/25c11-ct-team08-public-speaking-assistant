@@ -107,16 +107,20 @@ def test_evaluate_endpoint_ignores_client_path(monkeypatch, tmp_path):
 
     seen: dict[str, Path] = {}
 
-    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+    def fake_evaluate(audio_path, script, baseline, *, vad_params, **callbacks):
         seen["path"] = audio_path
         raise AudioRejected("corrupt", "stop here")
 
     monkeypatch.setattr(main.settings, "baseline_required", False)
     monkeypatch.setattr(main, "evaluate_session", fake_evaluate)
-    r = TestClient(main.app).post(
+    client = TestClient(main.app)
+    r = client.post(
         "/api/evaluate",
         files={"audio": ("../../x.wav", b"RIFF", "audio/wav")},
         data={"script": "Hello."},
     )
-    assert r.status_code == 422
+    assert r.status_code == 202
+    job = client.get(f"/api/evaluate/{r.json()['job_id']}").json()
+    assert job["status"] == "failed"
+    assert job["error_code"] == "corrupt"
     assert seen["path"].name == "upload.wav"
