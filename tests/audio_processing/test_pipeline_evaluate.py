@@ -85,6 +85,8 @@ def run(monkeypatch, tmp_path: Path):
         stt_flags=(),
         stt_exc=None,
         loudness=LOUDNESS,
+        on_stage=None,
+        should_cancel=None,
     ):
         audio = tmp_path / "a.wav"
         audio.write_bytes(b"x")
@@ -107,8 +109,13 @@ def run(monkeypatch, tmp_path: Path):
         monkeypatch.setattr(pipeline, "transcribe", fake_transcribe)
         monkeypatch.setattr(scoring, "_extract_f0", lambda m: list(f0))
         monkeypatch.setattr(pipeline, "loudness_series", lambda m, *a, **k: loudness)
+        callbacks = {}
+        if on_stage is not None:
+            callbacks["on_stage"] = on_stage
+        if should_cancel is not None:
+            callbacks["should_cancel"] = should_cancel
         return pipeline.evaluate_session(
-            audio, script, baseline, vad_params=VadParams(), encode=fake_encode
+            audio, script, baseline, vad_params=VadParams(), encode=fake_encode, **callbacks
         )
 
     return _run
@@ -565,3 +572,27 @@ def test_empty_script_gives_null_scores(run):
     assert r.components["semantic"] is None
     assert r.overall is None and r.label is None
     assert "empty_script" in r.flags
+
+
+def test_evaluate_stage_callbacks_preserve_result(run):
+    stages = []
+    original = run().model_dump(mode="json")
+    observed = run(on_stage=stages.append).model_dump(mode="json")
+    assert stages == ["decode", "vad", "stt", "align", "fluency", "pitch", "semantic"]
+    assert observed == original
+
+
+def test_evaluate_cancels_between_stages(run):
+    stages = []
+    with pytest.raises(pipeline.EvaluationCancelled):
+        run(on_stage=stages.append, should_cancel=lambda: "vad" in stages)
+    assert stages == ["decode", "vad"]
+
+
+def test_insufficient_stage_callbacks(run):
+    stages = []
+    run(segments=(SpeechSegment(0.0, 1.0),), duration=10.0, on_stage=stages.append)
+    assert stages == ["decode", "vad"]
+    stages.clear()
+    run(words=[], on_stage=stages.append)
+    assert stages == ["decode", "vad", "stt"]
