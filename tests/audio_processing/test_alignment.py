@@ -106,7 +106,8 @@ def test_alignment_deterministic_tiebreak():
     #                b   2/0   1/1   2/1
     #   D[2][2]: sub D[1][1]+1 = 2/0; del D[1][2]+1 = 3/0; ins D[2][1]+1 = 2/1.
     #   Same cost 2 but ins has n_eq = 1 > 0 -> pick ins c. (2,1)=1/1: equal b/b
-    #   (D[1][0]+(0,1) = 1/1). (1,0): del a. Forward: del a, equal b, ins c. (CHANGED from "sub, sub".)
+    #   (D[1][0]+(0,1) = 1/1). (1,0): del a. Forward: del a, equal b, ins c.
+    #   (CHANGED from "sub, sub".)
     ref_c, hyp_c = _ref("a", "b"), _hyp("b", "c")
 
     for _ in range(2):  # run twice: same result
@@ -127,7 +128,8 @@ def test_tiebreak_prefers_more_equal():
     #   their   1/0    0/1   1/1    2/1
     #   cat     2/0    1/1   1/1    2/1
     #   sat     3/0    2/1   1/2    2/2
-    # Cell (3,3): sub D[2][2]+1 = 2/1; del D[2][3]+1 = 3/1; ins D[3][2]+1 = 2/2 -> pick ins (n_eq 2).
+    # Cell (3,3): sub D[2][2]+1 = 2/1; del D[2][3]+1 = 3/1; ins D[3][2]+1 = 2/2
+    #   -> pick ins (n_eq 2).
     # (3,2)=1/2: equal sat/sat (D[2][1]+(0,1) = 1/2). (2,1)=1/1: equal does not match (cat/there);
     # sub D[1][0]+1 = 2/0 wrong; del D[1][1]+1 = 1/1 right -> del cat. (1,1): equal their/there.
     # The old path "equal, sub, sub" also costs 2 but has only 1 equal; the new path has 2 equal.
@@ -249,7 +251,7 @@ def test_pron_keys_strips_stress_and_oov():
     assert pron_keys("covid", pron=stub_pron) == frozenset()
 
 
-# ---------- align() : level 2, merge back to ref_index (ADR-005 P5, P8 steps 3-4, P10, P11) ----------
+# ---------- align() : level 2, merge back to ref_index (ADR-005 P5, P8 steps 3-4, P10, P11) ---
 # Every expected number below is HAND-COMPUTED, not measured.
 
 _PH12_A = [f"P{i}" for i in range(12)]
@@ -325,7 +327,8 @@ def test_homophone_counted():
 
 
 def test_n_oov_counts_equal_items():
-    # "covid" is OOV in the stub; identical hyp -> equal, but P10: still counts n_oov = 1 and flags it.
+    # "covid" is OOV in the stub; identical hyp -> equal,
+    # but P10: still counts n_oov = 1 and flags it.
     res = align("covid is here", _words("covid", "is", "here"), pron=alias_pron)
     assert _status(res) == ["equal", "equal", "equal"]
     assert res.counts["n_oov"] == 1
