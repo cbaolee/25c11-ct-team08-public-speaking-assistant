@@ -50,6 +50,7 @@ Cột **Trong code** là id hoặc class để tìm nhanh trong `src/web/`.
 | Report        | **Report Header**               | `#repH`, `#repMeta`, `#repAgain`                                                                   | Tiêu đề, tên bài, nút Practise again / View history                                                                                                                      |
 | Report        | **Report State**                | `#repState`                                                                                        | Thông báo khi buổi chấm lỗi hoặc thiếu dữ liệu                                                                                                                           |
 | Report        | **Overview Card**               | `#repOverview`                                                                                     | Thẻ xanh: nhận xét tổng quát và một hàng ô chỉ số                                                                                                                        |
+| Report        | **AI Coach Note**              | `#repCoachNote`, `.cn-`                                                                            | Nhận xét AI dựa trên điểm đã tính (`#repCoachNote`, class `.cn-`); chỉ diễn giải, không chấm điểm |
 | Report        | **Transcript View**             | `#transcriptView`                                                                                  | Từng từ được tô màu: **Wrong Word** (`.w-wrong`), **Near Miss** (`.w-near`), **Missing Word** (`.w-missing`), **Pause Chip** (`.pausechip`), **Filler Chip** (`.fillerchip`) |
 | Report        | **Word Coach**                  | `#wordCoach`, `word_coach.js`, `.wc-`                                                              | Panel nổi cạnh từ lỗi: nghe mẫu, nghe lại, thu lại                                                                                                                       |
 | Report        | **Sentence Coach**              | `.wc-sent-btn`                                                                                     | Nút cuối câu có tỉ lệ lỗi ≥ ngưỡng, mở cùng panel cho cả câu                                                                                                             |
@@ -93,6 +94,7 @@ Password Modal, Audio Settings và Permissions cũ đã gộp vào Settings Moda
 
 | Tên gọi               | Mô tả                                                                                   |
 | --------------------- | --------------------------------------------------------------------------------------- |
+| **Coach Note Service** | `POST /api/sessions/{id}/coach-note`, `src/app/coach_note.py` |
 | **Retry Endpoint**    | `/api/practice/retry`: nhận diện lại từ hoặc câu, không lưu phiên |
 | **Evaluate Pipeline** | Chấm điểm một bài nói: probe → decode → VAD → STT → align → scoring                     |
 | **Baseline Pipeline** | Phân tích giọng mẫu: probe → decode → VAD → pause profile + F0                          |
