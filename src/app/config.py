@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
 
+    # Moderation Layer 2 (Ollama / OpenAI-compatible Llama-Guard endpoint)
+    ollama_host: str = ""
+    ollama_api_key: str = ""
+    guard_model: str = "llama-guard3:1b"
+
     # Speech-to-text providers (Deepgram primary, Gladia fallback)
     deepgram_api_keys: KeyList = []
     gladia_api_keys: KeyList = []

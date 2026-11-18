@@ -290,6 +290,7 @@ class ContentModerator:
         enable_llama_guard: bool = False,
         ollama_url: str | None = None,
         *,
+        ollama_api_key: str | None = None,
         blocked_terms: Iterable[str] | None = None,
         cache_max_entries: int = DEFAULT_CACHE_MAX_ENTRIES,
         cache_ttl_s: float = DEFAULT_CACHE_TTL_S,
@@ -326,7 +327,15 @@ class ContentModerator:
         self._model = llama_guard_model
         self._layer2_max_chars = layer2_max_chars
         self._layer2_max_calls = layer2_max_calls
-        self._chat_url = f"{ollama_url.strip().rstrip('/')}/api/chat" if enable_llama_guard else ""
+        self._api_key = ollama_api_key.strip() if isinstance(ollama_api_key, str) else ""
+        clean_url = ollama_url.strip().rstrip("/") if isinstance(ollama_url, str) else ""
+        self._openai_compat = clean_url.lower().endswith("/chat/completions")
+        if not enable_llama_guard:
+            self._chat_url = ""
+        elif self._openai_compat:
+            self._chat_url = clean_url
+        else:
+            self._chat_url = f"{clean_url}/api/chat"
         self._owns_client = enable_llama_guard and http_client is None
         self._client = http_client
         if self._owns_client:
@@ -372,13 +381,22 @@ class ContentModerator:
         if self._client is None:
             raise _Layer2UnavailableError("no_client")
         try:
-            body = {
-                "model": self._model,
-                "messages": [{"role": "user", "content": _layer2_text(chunk)}],
-                "stream": False,
-                "options": {"temperature": 0},
-            }
-            response = self._client.post(self._chat_url, json=body)
+            messages = [{"role": "user", "content": _layer2_text(chunk)}]
+            if self._openai_compat:
+                body: dict[str, object] = {
+                    "model": self._model,
+                    "messages": messages,
+                    "temperature": 0,
+                }
+            else:
+                body = {
+                    "model": self._model,
+                    "messages": messages,
+                    "stream": False,
+                    "options": {"temperature": 0},
+                }
+            headers = {"Authorization": f"Bearer {self._api_key}"} if self._api_key else None
+            response = self._client.post(self._chat_url, json=body, headers=headers)
         except Exception as exc:
             raise _Layer2UnavailableError("request_failed") from exc
         if response.status_code != 200:
@@ -387,7 +405,12 @@ class ContentModerator:
             payload = response.json()
         except Exception as exc:
             raise _Layer2UnavailableError("bad_json") from exc
-        message = payload.get("message") if isinstance(payload, dict) else None
+        if self._openai_compat:
+            choices = payload.get("choices") if isinstance(payload, dict) else None
+            first = choices[0] if isinstance(choices, list) and choices else None
+            message = first.get("message") if isinstance(first, dict) else None
+        else:
+            message = payload.get("message") if isinstance(payload, dict) else None
         content = message.get("content") if isinstance(message, dict) else None
         if not isinstance(content, str):
             raise _Layer2UnavailableError("bad_shape")

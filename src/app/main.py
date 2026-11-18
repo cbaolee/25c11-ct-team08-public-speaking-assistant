@@ -65,6 +65,7 @@ from src.text_processing.contracts import (
     ScriptGenerationError,
     ScriptGenerationRequest,
 )
+from src.text_processing.moderation import DEFAULT_LLAMA_GUARD_MODEL, ContentModerator
 from src.text_processing.pipeline import ScriptGenerationPipeline
 from src.text_processing.sanitizer import sanitize_text
 
@@ -98,7 +99,13 @@ def get_script_pipeline() -> ScriptGenerationPipeline:
     """Return the process-wide `ScriptGenerationPipeline` singleton."""
     global _script_pipeline
     if _script_pipeline is None:
-        _script_pipeline = ScriptGenerationPipeline()
+        moderator = ContentModerator(
+            enable_llama_guard=bool(settings.ollama_host),
+            ollama_url=settings.ollama_host or None,
+            ollama_api_key=settings.ollama_api_key or None,
+            llama_guard_model=settings.guard_model or DEFAULT_LLAMA_GUARD_MODEL,
+        )
+        _script_pipeline = ScriptGenerationPipeline(moderator=moderator)
     return _script_pipeline
 
 
