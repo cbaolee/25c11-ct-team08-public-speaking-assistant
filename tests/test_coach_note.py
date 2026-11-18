@@ -228,3 +228,50 @@ def test_endpoint_groq_failure_uses_rule(endpoint_env, result):
     assert response.json()["source"] == "rule"
     create.assert_called_once()
     post.assert_not_called()
+
+
+def _gemini_ok():
+    return SimpleNamespace(
+        ok=True, status_code=200,
+        json=lambda: {"candidates": [{"content": {"parts": [{"text": "{}"}]}}]},
+    )
+
+
+def _gemini_settings():
+    return SimpleNamespace(gemini_api_keys=["test-retry-key"], gemini_model="model")
+
+
+def test_gemini_retries_once_when_overloaded(monkeypatch):
+    sleep = Mock()
+    monkeypatch.setattr(coach.time, "sleep", sleep)
+    post = Mock(side_effect=[SimpleNamespace(ok=False, status_code=503), _gemini_ok()])
+    monkeypatch.setattr(coach.requests, "post", post)
+    assert coach.call_gemini({}, _gemini_settings(), 1) == {}
+    assert post.call_count == 2
+    sleep.assert_called_once_with(coach.CONSTANTS["coach"]["retry_backoff_s"])
+
+
+def test_gemini_gives_up_after_the_retry(monkeypatch):
+    monkeypatch.setattr(coach.time, "sleep", Mock())
+    post = Mock(return_value=SimpleNamespace(ok=False, status_code=503))
+    monkeypatch.setattr(coach.requests, "post", post)
+    assert coach.call_gemini({}, _gemini_settings(), 1) is None
+    assert post.call_count == 1 + coach.CONSTANTS["coach"]["retry_unavailable"]
+
+
+def test_gemini_retries_after_a_timeout(monkeypatch):
+    monkeypatch.setattr(coach.time, "sleep", Mock())
+    post = Mock(side_effect=[coach.requests.Timeout("slow"), _gemini_ok()])
+    monkeypatch.setattr(coach.requests, "post", post)
+    assert coach.call_gemini({}, _gemini_settings(), 1) == {}
+
+
+def test_groq_uses_the_default_chain_when_env_models_are_empty(monkeypatch):
+    create = Mock(side_effect=RuntimeError("Mock Groq unavailable"))
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    monkeypatch.setattr(coach, "make_groq_client", lambda keys: client)
+    settings = SimpleNamespace(groq_api_keys=["fake"], groq_llm_model=" ",
+                               groq_llm_fallback_model_1="", groq_llm_fallback_model_2="")
+    assert coach.call_groq({}, settings, 1) is None
+    tried = [call.kwargs["model"] for call in create.call_args_list]
+    assert tried == list(coach._DEFAULT_MODEL_CHAIN)

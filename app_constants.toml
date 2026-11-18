@@ -88,6 +88,8 @@ max_output_chars = 900
 cache_ttl_s = 3600
 max_focus_items = 3      # focus points shown and accepted from the LLM (11.3)
 rule_max_warnings = 2    # warnings turned into focus points by the rule-based fallback
+retry_unavailable = 1    # extra Gemini attempts after 500/503 or a timeout (provider overloaded)
+retry_backoff_s = 2      # wait before that extra attempt
 
 [evaluate_job]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.1). Calibrate in M7.

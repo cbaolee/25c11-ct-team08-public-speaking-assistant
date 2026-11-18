@@ -13,6 +13,7 @@ from src.app.key_pool import KeysExhaustedError, get_pool
 from src.audio_processing.scoring import display_round
 from src.text_processing.groq_pool import make_groq_client
 from src.text_processing.moderation import ContentModerator
+from src.text_processing.template_engine import _DEFAULT_MODEL_CHAIN
 
 
 class CoachNote(TypedDict):
@@ -129,6 +130,7 @@ def call_gemini(payload, settings, timeout_s):
     if not settings.gemini_api_keys or not settings.gemini_model.strip():
         return None
     pool = get_pool('gemini', settings.gemini_api_keys)
+    config, retries = CONSTANTS['coach'], 0
     while True:
         try:
             key = pool.current()
@@ -145,8 +147,19 @@ def call_gemini(payload, settings, timeout_s):
             if not response.ok:
                 if pool.report(key, response.status_code):
                     continue
+                # 500/503: the model is overloaded right now; one more try often works
+                if response.status_code in (500, 503) and retries < config['retry_unavailable']:
+                    retries += 1
+                    time.sleep(config['retry_backoff_s'])
+                    continue
                 return None
             return json.loads(response.json()['candidates'][0]['content']['parts'][0]['text'])
+        except requests.Timeout:
+            if retries < config['retry_unavailable']:
+                retries += 1
+                time.sleep(config['retry_backoff_s'])
+                continue
+            return None
         except (requests.RequestException, ValueError, KeyError, IndexError, TypeError):
             return None
 
@@ -155,9 +168,10 @@ def call_groq(payload, settings, timeout_s):
     client = make_groq_client(settings.groq_api_keys)
     if client is None:
         return None
-    models = (settings.groq_llm_model, settings.groq_llm_fallback_model_1,
-              settings.groq_llm_fallback_model_2)
-    for model in dict.fromkeys(m.strip() for m in models if m.strip()):
+    # Same rule as script generation: the .env models, or the built-in chain when all are empty
+    models = [m.strip() for m in (settings.groq_llm_model, settings.groq_llm_fallback_model_1,
+                                  settings.groq_llm_fallback_model_2) if m.strip()]
+    for model in dict.fromkeys(models or _DEFAULT_MODEL_CHAIN):
         try:
             response = client.chat.completions.create(
                 model=model, timeout=timeout_s, response_format={'type': 'json_object'},
