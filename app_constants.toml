@@ -68,3 +68,14 @@ follow_gap_s = 0.5
 # Sessions per History page, and most pages loaded on Home and History
 history_page_size = 20
 history_max_pages = 5
+
+[retry]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.
+sentence_min_error_ratio = 0.30
+word_max_seconds = 6
+sentence_max_seconds = 30
+clip_pad_s = 0.15
+attempts_per_window = 20
+window_s = 600
+server_grace_s = 2
+max_target_chars = 500

@@ -52,7 +52,10 @@ def test_module_constants_match_repo_toml():
 def test_api_config_returns_web_section():
     response = TestClient(main.app).get("/api/config")
     assert response.status_code == 200
-    assert response.json() == constants.load_constants()["web"]
+    assert all(
+        response.json()[key] == value for key, value in constants.load_constants()["web"].items()
+    )
+    assert response.json()["retry"]["sentence_min_error_ratio"] == 0.30
 
 
 def test_ui_reads_every_web_key():
