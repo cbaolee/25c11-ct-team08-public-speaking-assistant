@@ -343,7 +343,7 @@ export function runEvalReal(txt) {
     const stt = stages.find(stage => stage.key === 'stt' && stage.state === 'running');
     if (stt && ev.sttStarted === null) ev.sttStarted = Date.now();
     if (!stt) ev.sttStarted = null;
-    ev.shown = EvaluateClient.displayProgress(ev.shown, job.progress || 0, stages, CONFIG.EVAL_JOB.weights, ev.sttStarted === null ? 0 : (Date.now() - ev.sttStarted) / 1000);
+    ev.shown = EvaluateClient.displayProgress(ev.shown, job.progress || 0, stages, CONFIG.EVAL_JOB.weights, ev.sttStarted === null ? 0 : (Date.now() - ev.sttStarted) / 1000, CONFIG.EVAL_JOB.tauS);
     $('#evPercent').textContent = T('eval.percentLabel', { n: ev.shown });
     $('#evBar').setAttribute('aria-valuenow', ev.shown);
     $('#evBar .ev-fill').style.width = ev.shown + '%';
@@ -353,7 +353,7 @@ export function runEvalReal(txt) {
       $('.ev-icon', el).textContent = state === 'done' ? '✓' : state === 'running' ? '●' : '○';
       $('.ev-status', el).textContent = state === 'skipped' ? T('eval.stepSkipped') : '';
     });
-    const bucket = Math.floor(ev.shown / 25), stage = job.stage || '';
+    const bucket = Math.floor(ev.shown / CONFIG.EVAL_JOB.announcePct), stage = job.stage || '';
     if (bucket !== ev.liveBucket || stage !== ev.liveStage) {
       $('#evLive').textContent = [stage ? T('eval.stages.' + stage) : '', T('eval.percentLabel', { n: ev.shown })].filter(Boolean).join(' - ');
       ev.liveBucket = bucket; ev.liveStage = stage;
@@ -378,7 +378,7 @@ export function runEvalReal(txt) {
       if (!res.ok || !job) { fail(job); return; }
       paint(job);
       if (job.status === 'done') {
-        ev.timers.push(setTimeout(() => { if (active()) { end(); finishEvalReal(job.result, txt); } }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400));
+        ev.timers.push(setTimeout(() => { if (active()) { end(); finishEvalReal(job.result, txt); } }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : CONFIG.EVAL_JOB.closeDelayMs));
       } else if (job.status === 'failed') fail(job);
       else if (job.status === 'cancelled') end();
       else ev.timers.push(setTimeout(poll, CONFIG.EVAL_JOB.pollMs));

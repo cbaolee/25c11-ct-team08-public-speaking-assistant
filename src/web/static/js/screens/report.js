@@ -89,7 +89,7 @@ function renderCoachNote(el, note) {
   const summary = document.createElement('div'); summary.textContent = note.summary; el.append(summary);
   if (note.focus.length) {
     const list = document.createElement('ul'); list.className = 'cn-list';
-    note.focus.slice(0, 3).forEach(text => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
+    note.focus.slice(0, CONFIG.COACH.maxFocus).forEach(text => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
     el.append(list);
   }
   const next = document.createElement('div'); next.className = 'cn-next'; next.textContent = T('overview.nextStep') + ': ' + note.next_step; el.append(next);

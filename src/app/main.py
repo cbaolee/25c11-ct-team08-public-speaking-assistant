@@ -136,8 +136,9 @@ async def web_config() -> dict[str, Any]:
     return {**CONSTANTS["web"], "retry": {key: CONSTANTS["retry"][key] for key in (
         "sentence_min_error_ratio", "word_max_seconds", "sentence_max_seconds", "clip_pad_s"
     )}, "evaluate_job": {key: CONSTANTS["evaluate_job"][key] for key in (
-        "poll_interval_ms", "max_wait_s", "stage_weights"
-    )}}
+        "poll_interval_ms", "max_wait_s", "stage_weights", "stt_estimate_tau_s",
+        "done_close_delay_ms", "announce_step_pct"
+    )}, "coach": {"max_focus_items": CONSTANTS["coach"]["max_focus_items"]}}
 
 
 @app.get("/")

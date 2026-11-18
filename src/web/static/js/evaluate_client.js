@@ -192,14 +192,15 @@
     return !!stat && stat.nRef > 0 && stat.ratio >= minRatio;
   }
 
-  function displayProgress(prevShown, serverProgress, stages, weights, stageElapsedS) {
+  function displayProgress(prevShown, serverProgress, stages, weights, stageElapsedS, tauS) {
     let shown = Math.max(0, prevShown || 0, serverProgress || 0);
     const list = stages || [], index = list.findIndex(s => s.key === 'stt' && s.state === 'running');
     if (index >= 0) {
       const start = list.slice(0, index).reduce((sum, s) => sum + (Number((weights || {})[s.key]) || 0), 0);
       const weight = Number((weights || {}).stt) || 0;
-      // Client-side estimate only, not measured STT progress; tau is 20 seconds.
-      if (weight > 1) shown = Math.max(shown, Math.floor(start + (weight - 1) * (1 - Math.exp(-Math.max(0, stageElapsedS || 0) / 20))));
+      // Client-side estimate only, not measured STT progress; tau comes from
+      // app_constants.toml [evaluate_job] stt_estimate_tau_s (no estimate without it).
+      if (weight > 1 && tauS > 0) shown = Math.max(shown, Math.floor(start + (weight - 1) * (1 - Math.exp(-Math.max(0, stageElapsedS || 0) / tauS))));
     }
     return Math.min(100, Math.floor(shown));
   }

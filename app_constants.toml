@@ -86,6 +86,8 @@ max_error_words = 15
 timeout_s = 20
 max_output_chars = 900
 cache_ttl_s = 3600
+max_focus_items = 3      # focus points shown and accepted from the LLM (11.3)
+rule_max_warnings = 2    # warnings turned into focus points by the rule-based fallback
 
 [evaluate_job]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.1). Calibrate in M7.
@@ -93,6 +95,9 @@ job_ttl_s = 900
 max_running_per_user = 1
 poll_interval_ms = 700
 max_wait_s = 300
+stt_estimate_tau_s = 20  # client-side estimate inside the stt stage (not measured progress)
+done_close_delay_ms = 400  # pause at 100% before the report opens (0 with reduced motion)
+announce_step_pct = 25   # screen reader hears the percent every N points or on a stage change
 
 [evaluate_job.stage_weights]
 upload = 5

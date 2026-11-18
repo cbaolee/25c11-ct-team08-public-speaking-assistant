@@ -288,8 +288,9 @@ test('evaluation progress stays monotonic and estimates only within STT', () => 
   const { displayProgress } = require('../../src/web/static/js/evaluate_client.js');
   const weights = { upload: 5, decode: 10, vad: 10, stt: 35, align: 10 };
   const stages = [{ key: 'upload', state: 'done' }, { key: 'decode', state: 'done' }, { key: 'vad', state: 'done' }, { key: 'stt', state: 'running' }, { key: 'align', state: 'pending' }];
-  const later = displayProgress(25, 25, stages, weights, 10000);
-  assert.ok(later < 60);
+  const later = displayProgress(25, 25, stages, weights, 10000, 20);
+  assert.ok(later > 25 && later < 60);
+  assert.equal(displayProgress(25, 25, stages, weights, 10000), 25); // no tau -> no estimate
   assert.equal(displayProgress(later, 25, stages, weights, 0), later);
   stages[3].state = 'done';
   assert.equal(displayProgress(25, 60, stages, weights, 100), 60);

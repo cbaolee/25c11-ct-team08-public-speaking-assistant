@@ -78,7 +78,9 @@ def allowed_numbers(payload: dict) -> set[Decimal]:
     return collect(payload)
 
 
-def validate_output(obj, payload, max_output_chars, moderator) -> CoachNote | None:
+def validate_output(obj, payload, max_output_chars, moderator, max_focus=None) -> CoachNote | None:
+    if max_focus is None:
+        max_focus = CONSTANTS['coach']['max_focus_items']
     if not isinstance(obj, dict) or set(obj) != {'summary', 'strengths', 'focus', 'next_step'}:
         return None
     if not isinstance(obj['summary'], str) or not obj['summary'].strip():
@@ -86,7 +88,7 @@ def validate_output(obj, payload, max_output_chars, moderator) -> CoachNote | No
     if not isinstance(obj['next_step'], str):
         return None
     if any(not isinstance(obj[k], list) or any(not isinstance(x, str) for x in obj[k])
-           for k in ('strengths', 'focus')) or len(obj['focus']) > 3:
+           for k in ('strengths', 'focus')) or len(obj['focus']) > max_focus:
         return None
     strings = [obj['summary'], *obj['strengths'], *obj['focus'], obj['next_step']]
     text = '\n'.join(strings)
@@ -106,7 +108,8 @@ def rule_based_note(payload) -> dict:
                 'filler_high': 'Notice and reduce filler words.',
                 'monotone': 'Try varying your intonation.'}
     focus = [f'Practise {min(scores, key=lambda x: x[1])[0]}.'] if scores else []
-    focus += [warnings[w] for w in payload.get('warnings', []) if w in warnings][:2]
+    limit = CONSTANTS['coach']['rule_max_warnings']
+    focus += [warnings[w] for w in payload.get('warnings', []) if w in warnings][:limit]
     return {'summary': 'Well done completing this practice.',
             'strengths': [max(scores, key=lambda x: x[1])[0]] if scores else [],
             'focus': focus, 'next_step': 'Try another practice using the focus points.'}

@@ -10,7 +10,7 @@ function harness(replies) {
   const nodes = new Map(), calls = [], timers = [], errors = [], finished = [], closed = [];
   const node = () => ({ textContent: '', style: {}, dataset: {}, setAttribute() {} });
   const $ = key => { if (!nodes.has(key)) nodes.set(key, node()); return nodes.get(key); };
-  const ctx = { S: { audio: { kind: 'file', name: 'a.wav', file: 'audio' } }, CONFIG: { EVAL_JOB: { pollMs: 700, maxWaitS: 300, weights: {} } }, EvaluateClient: client, AbortController, Date, encodeURIComponent,
+  const ctx = { S: { audio: { kind: 'file', name: 'a.wav', file: 'audio' } }, CONFIG: { EVAL_JOB: { pollMs: 700, maxWaitS: 300, weights: {}, tauS: 20, closeDelayMs: 400, announcePct: 25 } }, EvaluateClient: client, AbortController, Date, encodeURIComponent,
     FormData: class { append() {} }, $, $$: () => [], T: (x) => x, openModal() {}, closeModal(...args) { closed.push(args); }, toast() {}, openBaselineGate() {}, showEvalError: null,
     setTimeout: (fn, ms) => { const t = { fn, ms }; timers.push(t); return t; }, clearTimeout: t => { t.cleared = true; }, matchMedia: () => ({ matches: true }),
     finishEvalReal: (...args) => finished.push(args), api: (url, opts = {}) => { calls.push([url, opts.method || 'GET', opts]); const reply = replies.shift(); return Promise.resolve(reply).then(r => ({ status: r.status, ok: r.status < 400, json: () => Promise.resolve(r.body) })); } };
