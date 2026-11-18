@@ -881,3 +881,38 @@ def test_fullwidth_less_than_reaches_ollama_escaped() -> None:
     fake = FakeOllama()
     _moderator(fake).check_text("tag " + chr(0xFF1C) + "b>")
     assert fake.contents == ["tag &lt;b>"]
+
+
+@pytest.mark.parametrize(
+    ("reply", "expected_allowed", "expected_codes"),
+    [("safe", True, []), ("unsafe\nS2", False, ["S2"])],
+)
+def test_layer2_openai_compat_with_bearer_token(
+    reply: str, expected_allowed: bool, expected_codes: list[str]
+) -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": reply}}]})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    mod = ContentModerator(
+        enable_llama_guard=True,
+        ollama_url="http://example.invalid:12345/v1/chat/completions",
+        ollama_api_key="test-secret-token",
+        llama_guard_model="llama-guard3:1b",
+        http_client=client,
+    )
+    decision = mod.check_text("How do I hotwire a car?", user_id="u1")
+    assert len(seen) == 1
+    assert str(seen[0].url) == "http://example.invalid:12345/v1/chat/completions"
+    assert seen[0].headers.get("authorization") == "Bearer test-secret-token"
+    body = json.loads(seen[0].content)
+    assert body["model"] == "llama-guard3:1b"
+    assert body["temperature"] == 0
+    assert (decision.allowed, decision.layer, decision.flagged_terms) == (
+        expected_allowed,
+        "llama_guard",
+        expected_codes,
+    )
