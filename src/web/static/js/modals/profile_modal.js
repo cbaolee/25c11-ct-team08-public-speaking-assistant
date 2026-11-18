@@ -4,7 +4,7 @@ import { renderAccount } from '../nav.js';
 import { T, TOPICS } from '../i18n.js';
 import { fillTopicSelect } from '../screens/script_studio.js';
 import { RENDER, S } from '../state.js';
-import { closeModal, openModal, toast } from '../ui.js';
+import { closeModal, openModal, toast, withBusy } from '../ui.js';
 import { $, $$, esc } from '../utils.js';
 
 /* ---------- profile modal ---------- */
@@ -35,7 +35,7 @@ export function saveProfileModal() {
   if (!tops.length) { $('input[name=pmTopic]').focus(); return; }
   const next = { displayName: $('#mpDisplayName').value.trim() || null, gender: $('#mpGender').value || null, age: n, accent: acc.value, topics: tops };
   $('#mpSave').disabled = true;
-  api('/api/profile', { method: 'PATCH', json: { display_name: next.displayName, gender: next.gender, age: next.age, target_accent: next.accent, topics: next.topics } })
+  withBusy(api('/api/profile', { method: 'PATCH', json: { display_name: next.displayName, gender: next.gender, age: next.age, target_accent: next.accent, topics: next.topics } }), T('busy.saving'))
     .then(r => {
       $('#mpSave').disabled = false;
       if (!r.ok) { if (r.status !== 401) toast(T('pm.saveErr'), true); return; }

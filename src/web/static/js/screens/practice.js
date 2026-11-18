@@ -7,7 +7,7 @@ import { go } from '../nav.js';
 import { requireConsent, startRecorder } from '../recorder.js';
 import { saveScript } from '../screens/script_studio.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { closeModal, openModal, toast } from '../ui.js';
+import { closeModal, openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, fmtClock, fmtTime, showErr, wordsOf } from '../utils.js';
 
 /* ---------- Practice ---------- */
@@ -29,7 +29,8 @@ export function pickSample() {
 }
 /* Saved scripts (Practice > Mine): GET /api/scripts lists summaries; the text comes from GET /api/scripts/{id}. */
 export function pickSavedScript(id, byUser) {   // byUser: picked in the dropdown (back to step 1); the automatic first pick must not move the stepper
-  return api('/api/scripts/' + encodeURIComponent(id)).then(r => (r.ok ? r.json() : null)).then(s => {
+  const req = api('/api/scripts/' + encodeURIComponent(id));
+  return (byUser ? withBusy(req, T('busy.loading')) : req).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) return;
     S.texts.mine = { id: s.id, title: T('practice.fromScript', { title: s.title }), short: s.title, text: s.body, topic: s.category || null };
     if (S.screen === 'practice') { if (byUser) S.choosing = true; renderPractice(); }
@@ -66,6 +67,7 @@ export function renderPractice() {
   const sh = $('#sheet');
   if (txt) {
     sh.className = 'reader reader-wide'; sh.innerHTML = sentHtml(txt.text);
+    if (!S.rec) sh.style.paddingBottom = '';   // the room added for following along goes when recording stops
     $('#sheetTitle').textContent = txt.title;
     const n = wordsOf(txt.text);
     $('#sheetMeta').textContent = T('practice.words', { n, t: fmtTime(n / CONFIG.SPEAKING_WPM_FOR_ESTIMATE * 60) });
@@ -82,19 +84,22 @@ export function renderPractice() {
   const rec = S.voiceTab === 'rec';
   $('#voiceRecordTab').setAttribute('aria-selected', String(rec)); $('#voiceUploadTab').setAttribute('aria-selected', String(!rec));
   $('#voiceRecordPane').hidden = !rec; $('#voiceUploadPane').hidden = rec;
-  $('#recNote').hidden = !rec; $('#prSpeed').hidden = !rec;   // follow-along only exists while recording
+  $('#prSpeed').hidden = !rec;   // follow-along only exists while recording
   $('#pStep2').classList.toggle('is-upload', !rec);
   // recorder
   $('#recBtn').innerHTML = S.rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('practice.stop')) : esc(T('practice.start'));
   $('#recBtn').disabled = !S.rec && !!au;
   $('#recClear').disabled = !au || !!S.rec;
   if (!S.rec) $('#recTimer').textContent = au && au.kind === 'rec' ? fmtClock(au.dur) : '00:00';
-  $('#recNote').textContent = S.rec ? T('practice.recordingFollow') : au && au.kind === 'rec' ? T('practice.recFinished') : T('practice.recNote');
   $('#dropText').textContent = au && au.kind === 'file' ? au.name : T('practice.dropText');
-  $('#audioState').textContent = S.rec ? T('practice.recInProgress') : !au ? T('practice.noAudio') : au.kind === 'rec' ? T('practice.audioReady', { time: fmtTime(au.dur) }) : T('practice.fileReady', { name: au.name });
   const ready = !!txt && !!au && !S.rec;
   $('#evalBtn').disabled = !ready;
-  $('#evalHint').textContent = ready ? '' : (!txt ? T('practice.hintNoText') : T('practice.hintNoAudio'));
+  // one status line under the recorder (both tabs): what is happening, or what is still missing
+  $('#recNote').textContent = S.rec ? T('practice.recordingFollow')
+    : !txt ? T('practice.hintNoText')
+    : !au ? T('practice.noAudio') + ' ' + T('practice.hintNoAudio')
+    : au.kind === 'rec' ? T('practice.audioReady', { time: fmtTime(au.dur) })
+    : T('practice.fileReady', { name: au.name });
   [1, 2, 3].forEach(i => {
     const li = $('#st' + i);
     li.className = i < cur ? 'done' : i === cur ? 'cur' : '';
@@ -153,8 +158,23 @@ export function useOwn() {
 }
 /* ---- follow-along (SIM): the highlight moves by TIME, at S.followWpm (slider, default 145; separate from CONFIG.SPEAKING_WPM_FOR_ESTIMATE).
    Following the real voice later needs streaming STT or a local VAD: that is a new ADR ([CAN CHOT]), not part of this demo. ---- */
+/* The reading text: one span per sentence (the follow-along highlight moves over them, in order), grouped
+   into the text's own paragraphs (split at blank lines, like the Script reader). tokenize() cuts the
+   text into consecutive pieces, so each sentence's start in the text tells which paragraph it is in.
+   If the counts ever disagree, everything stays in one paragraph (the highlight still works). */
+const SENT_PIECE = /[^.!?]+[.!?]*["')]*\s*/g;
 export function sentHtml(text) {
-  return tokenize(text).sentences.map((s, i) => '<span class="sent" data-si="' + i + '">' + esc(s) + '</span>').join(' ');
+  const sentences = tokenize(text).sentences;
+  const breaks = Array.from(text.matchAll(/\n\s*\n/g), m => m.index);
+  const starts = [];
+  for (const m of text.matchAll(SENT_PIECE)) if (m[0].trim()) starts.push(m.index + m[0].length - m[0].trimStart().length);
+  const sameCount = starts.length === sentences.length;
+  const paras = [];
+  sentences.forEach((s, i) => {
+    const p = sameCount ? breaks.filter(b => b < starts[i]).length : 0;
+    (paras[p] = paras[p] || []).push('<span class="sent" data-si="' + i + '">' + esc(s) + '</span>');
+  });
+  return paras.filter(Boolean).map(g => '<p class="para">' + g.join(' ') + '</p>').join('');
 }
 export function followCounts(text) {
   const { sentences, words } = tokenize(text);
@@ -197,15 +217,57 @@ export function paintFollow() {
   $$('.sent', sh).forEach((el, i) => { el.classList.toggle('done', i < f.idx); el.classList.toggle('cur', i === f.idx); });
   const cur = $('.sent.cur', sh);
   if (!cur) return;
-  const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const behavior = calm ? 'auto' : 'smooth';
+  const r = cur.getBoundingClientRect();
   if ($('#practiceWork').classList.contains('split')) {
-    // the whole page scrolls so the bold sentence sits about one third down the screen
-    const top = cur.getBoundingClientRect().top + window.scrollY - window.innerHeight / 3;
-    window.scrollTo({ top: Math.max(0, top), behavior });
-  } else if (sh.scrollTo) {
-    sh.scrollTo({ top: Math.max(0, cur.offsetTop - (sh.clientHeight - cur.offsetHeight) / 2), behavior });
+    // the whole page scrolls so the middle of the bold sentence sits in the middle of the visible
+    // area (the screen below the header)
+    const hh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hh')) || 64;
+    const mid = hh + (window.innerHeight - hh) / 2;
+    const want = window.scrollY + r.top + r.height / 2 - mid;
+    // A text that fits the screen stays as it is (no extra room, no scrolling). A longer one gets just
+    // enough room under it, added only when needed, for the last sentences to reach the middle too.
+    const fits = sh.getBoundingClientRect().height <= window.innerHeight - hh - 32;
+    if (!fits) {
+      // the page does not always grow by exactly the room added (layout around the text): measure again
+      for (let k = 0; k < 3; k++) {
+        const short = want - (document.documentElement.scrollHeight - window.innerHeight);
+        if (short <= 0.5) break;
+        sh.style.paddingBottom = ((parseFloat(sh.style.paddingBottom) || 0) + short) + 'px';
+      }
+    }
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    glideScroll(window, Math.min(max, Math.max(0, want)));
+  } else {
+    const box = sh.getBoundingClientRect();
+    const target = sh.scrollTop + (r.top - box.top) + r.height / 2 - sh.clientHeight / 2;
+    glideScroll(sh, Math.min(sh.scrollHeight - sh.clientHeight, Math.max(0, target)));
   }
+}
+/* Slow, soft scroll for the follow-along: about 1.1 s with a gentle start and finish (the browser's own
+   "smooth" is quicker and more abrupt). A new sentence takes over from the running glide without a
+   jump. If the reader scrolls by hand (wheel, touch, keys) the glide stops and leaves them in control. */
+const GLIDE_MS = 1100;
+let glide = null;
+function glideScroll(el, to) {
+  const isWin = el === window;
+  const get = () => (isWin ? window.scrollY : el.scrollTop);
+  const set = y => { if (isWin) window.scrollTo(0, y); else el.scrollTop = y; };
+  if (glide) { cancelAnimationFrame(glide.raf); glide.stop(); glide = null; }
+  const from = get();
+  if (Math.abs(to - from) < 2) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { set(to); return; }
+  const t0 = performance.now(), ease = p => 0.5 - Math.cos(Math.PI * p) / 2;   // ease in-out (sine)
+  const hand = () => { if (glide) { cancelAnimationFrame(glide.raf); glide.stop(); glide = null; } };
+  const evs = ['wheel', 'touchstart', 'keydown'];
+  evs.forEach(e => window.addEventListener(e, hand, { passive: true }));
+  const g = { raf: 0, stop: () => evs.forEach(e => window.removeEventListener(e, hand)) };
+  const step = now => {
+    const p = Math.min(1, (now - t0) / GLIDE_MS);
+    set(from + (to - from) * ease(p));
+    if (p < 1) g.raf = requestAnimationFrame(step); else { g.stop(); if (glide === g) glide = null; }
+  };
+  glide = g;
+  g.raf = requestAnimationFrame(step);
 }
 export function toggleRecording() {
   if (S.rec) { S.rec.stop(false); return; }

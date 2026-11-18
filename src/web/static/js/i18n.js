@@ -6,6 +6,7 @@ import { $$ } from './utils.js';
    ===================================================================== */
 export const TEXT = {
   app: { loading: 'Loading your practice…', name: 'Public Speaking Assistant', tagline: 'Read your script aloud. See exactly where to improve.' },
+  busy: { saving: 'Saving…', deleting: 'Deleting…', loading: 'Loading…', signingIn: 'Logging in…', signingUp: 'Creating your account…' },
   common: { skip: 'Skip to content', back: 'Back', cancel: 'Cancel', save: 'Save', close: 'Close', play: 'Play', pause: 'Pause', delete: 'Delete', na: 'N/A' },
   /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
@@ -56,8 +57,8 @@ export const TEXT = {
 
   script: {
     title: 'Generate Script', sub: 'Choose a topic, describe your event or attach a PDF. You get an English script you can practise with.',
-    feedLabel: 'Conversation', topic: 'Topic', attach: 'Attach a PDF', inputLabel: 'Describe your event or paste material',
-    placeholder: 'Describe your event, or paste some material...', send: 'Send',
+    feedLabel: 'Conversation', topic: 'Category', duration: 'Duration', attach: 'Attach a PDF', inputLabel: 'Describe your event or paste material',
+    placeholder: 'Describe your event, or paste some material...', send: 'Send', fold: 'Make the text box smaller', unfold: 'Show more of your text',
     hint: 'The assistant can make mistakes. Read the script and check names, facts and figures before you practise.',
     assistant: 'Script assistant',
     greeting: 'Hi {name}. Pick a topic, then tell me about your event or attach a PDF with the key points.',
@@ -93,15 +94,14 @@ export const TEXT = {
     voiceTitle: 'Your voice', tabRec: 'Record', tabUp: 'Upload',
     useScript: 'Use this script',
     followWpmLabel: 'Highlight speed (follow-along only, not scored)', followWpmVal: '{n} words per minute', followWpmShort: '{n} wpm',
-    followNote: 'The highlight moves by time (demo), not by your voice. This setting does not change what is sent or your score.',
     start: 'Start recording', stop: 'Stop recording', discard: 'Discard',
-    recNote: 'Press Start, read the text aloud, then press Stop.', recording: 'Recording...',
-    recordingFollow: 'Recording... Read the text aloud. The highlight follows along.', recFinished: 'Recording finished.',
+    recording: 'Recording...',
+    recordingFollow: 'Recording... Read the text aloud. The highlight follows along.',
     dropText: 'Choose an audio file (mp3, wav, webm, m4a)', errAudio: 'That is not an audio file.',
     micDenied: 'Microphone access was blocked. Allow it in your browser, or upload an audio file instead.',
     micNodevice: 'No usable microphone was found. Upload an audio file instead.',
     micUnsupported: 'This browser cannot record audio here. Upload an audio file instead.',
-    noAudio: 'No audio yet.', recInProgress: 'Recording in progress...',
+    noAudio: 'No audio yet.',
     audioReady: 'Recording ready ({time}).', fileReady: 'File ready: {name}',
     evaluate: 'Evaluate', hintNoText: 'Choose the text to read first.', hintNoAudio: 'Record or upload your audio.',
     stepBackT: 'Go back and discard this audio?', stepBackD: 'Your recording belongs to the current text, so it will be removed. You can record again.',
@@ -193,7 +193,7 @@ export const TEXT = {
     delAllT: 'Delete all recordings?', delAllD: 'All audio and reports will be removed. This cannot be undone.', delAllOk: 'Delete all',
     deleted: 'Recording deleted.', deletedAll: 'All recordings deleted.',
     untitled: 'Practice session', loadErr: 'Could not load your history. Reload the page to try again.',
-    openErr: 'Could not open this report. Please try again.', delErr: 'Could not delete. Please try again.'
+    opening: 'Opening report…', openErr: 'Could not open this report. Please try again.', delErr: 'Could not delete. Please try again.'
   },
 
   profile: {
@@ -244,8 +244,10 @@ export const TEXT = {
     verdict_more: 'This take needs more practice. Fix one thing at a time.',
     na: 'No overall assessment: one part could not be scored.',
     strongest: 'Strongest', improve: 'Improve', focus: 'Focus next', allGood: 'All four parts are in good shape.',
-    gPace: 'Pace', gHes: 'Hesitations per minute', gFiller: 'Filler words', gWrong: 'Wrong or skipped', gPitch: 'Pitch range', gWords: '{n} of {total}',
-    hint: 'Open any score for its charts and tips.'
+    gPace: 'Pace', gHes: 'Hesitations / min', gFiller: 'Filler words', gWrong: 'Wrong / skipped', gPitch: 'Pitch range', gWords: '{n} of {total}',
+    keyNumbers: 'Key numbers', onTarget: 'On target', workOn: 'Work on it',
+    coachWho: 'Assistant', coachTag: 'Preview',
+    coachPlaceholder: 'Well done for finishing this take! Every run-through makes the next one easier. Read the focus point below, then give it one more try.'
   },
   gate: {
     title: 'Record your baseline voice',
@@ -269,7 +271,7 @@ export const TEXT = {
     wrongT: 'wrong word', nearT: 'close match', missT: 'skipped'
   },
   part: {
-    view: 'View details', weight: 'Weight in the overall score: {w}',
+    view: 'View details', title: 'Score details', tabsLabel: 'Score parts', weight: 'Weight in the overall score: {w}',
     band_good: 'Strong', band_mid: 'Fair', band_low: 'Needs work',
     assess: 'Assessment', measured: 'What we measured', suggest: 'Suggestions', review: 'Words to review',
     reviewHint: 'Click a word to hear it in the recording.', more: '+{n} more', nothing: 'Nothing to fix here. Keep practising to confirm it.',

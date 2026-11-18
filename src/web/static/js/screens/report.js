@@ -1,7 +1,7 @@
 import { chart, hideTip, showTip } from '../charts.js';
 import { ADR, adviceList, fx, hasBase, paceWindows, progressDelta, sh } from '../data.js';
 import { T } from '../i18n.js';
-import { go } from '../nav.js';
+import { go, moveSegPills } from '../nav.js';
 import { deltaPill } from '../screens/home.js';
 import { RENDER, S } from '../state.js';
 import { openModal } from '../ui.js';
@@ -59,7 +59,7 @@ export function bindTxTips() {
   window.addEventListener('scroll', hideTip, { passive: true });
 }
 
-/* ---- score sections: each one opens a detail window ---- */
+/* ---- score breakdown (read only); one "View details" button below opens the tabbed detail window ---- */
 export function partsHtml(sc) {
   const rows = [
     ['A', 'pA', 'wA', sc.A, T('report.dA', { n: sc.sub + sc.del, total: sc.N })],
@@ -67,36 +67,67 @@ export function partsHtml(sc) {
     ['P', 'pP', 'wP', sc.P, T('report.dP')],
     ['S', 'pS', 'wS', sc.S, T('report.dS', { n: sc.cosOk, total: sc.nSent })]
   ];
-  return '<ul class="parts">' + rows.map(r => '<li><button type="button" class="partbtn" data-part="' + r[0] + '" aria-haspopup="dialog"><div class="top"><span>' + esc(T('report.' + r[1])) + ' <small>' + esc(T('report.' + r[2])) + '</small></span><span>' + esc(sh(r[3])) + '</span></div><div class="bar" aria-hidden="true"><i style="width:' + (Number.isFinite(r[3]) ? Math.round(r[3]) : 0) + '%"></i></div><small>' + esc(r[4]) + '</small><span class="more">' + esc(T('part.view')) + IC.chev + '</span></button></li>').join('') + '</ul>';
+  return '<ul class="parts">' + rows.map(r => '<li><div class="top"><span>' + esc(T('report.' + r[1])) + ' <small>' + esc(T('report.' + r[2])) + '</small></span><span>' + esc(sh(r[3])) + '</span></div><div class="bar" aria-hidden="true"><i style="width:' + (Number.isFinite(r[3]) ? Math.round(r[3]) : 0) + '%"></i></div><small>' + esc(r[4]) + '</small></li>').join('') + '</ul>' +
+    '<button type="button" class="btn btn-primary rep-details" data-details aria-haspopup="dialog">' + esc(T('part.view')) + IC.chev + '</button>';
 }
 export const overallLabel = v => (v >= 85 ? 'good' : v >= 70 ? 'fair' : v >= 50 ? 'improve' : 'more');
+/* AI coach note: one short, friendly paragraph about the whole take.
+   PLACEHOLDER: fixed text until the LLM feedback call is ready. Whoever adds that call replaces the
+   body of this function (or fills #repCoachNote later with plain text; it is shown as text, not HTML). */
+export function coachNote(s) {
+  return T('overview.coachPlaceholder', { name: S.user ? S.user.name : '' });
+}
+const OV_IC = {
+  good: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+  warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg>',
+  focus: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
+  pace: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13l4-4M4 18a9 9 0 1 1 16 0"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5v14M15 5v14"/></svg>',
+  filler: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg>',
+  words: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg>',
+  pitch: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12c2-5 4-5 6 0s4 5 6 0 4-5 6 0"/></svg>'
+};
 export function overviewHtml(s) {
   const sc = s.sc;
   const parts = [['pA', sc.A], ['pF', sc.F], ['pP', sc.P], ['pS', sc.S]].map(p => ({ name: T('report.' + p[0]), v: p[1] }));
   const vp = parts.filter(p => Number.isFinite(p.v));
   const hi = vp.length ? vp.reduce((m, p) => (p.v > m.v ? p : m)) : null, lo = vp.length ? vp.reduce((m, p) => (p.v < m.v ? p : m)) : null;
   const adv = adviceList(sc, 1)[0];
-  const verdict = sc.overall != null ? T('overview.verdict_' + overallLabel(EvaluateClient.displayRound(sc.overall))) : T('overview.na');
-  const rows = [];
-  if (!lo) { /* no part could be scored */ } else if (lo.v >= 85) rows.push(['good', T('overview.strongest'), T('overview.allGood')]);
+  const band = sc.overall != null ? overallLabel(EvaluateClient.displayRound(sc.overall)) : null;
+  const verdict = band ? T('overview.verdict_' + band) : T('overview.na');
+  // three short cards: what went best, what to improve, what to do next
+  const cards = [];
+  if (!lo) { /* no part could be scored */ } else if (lo.v >= 85) cards.push(['good', T('overview.strongest'), esc(T('overview.allGood'))]);
   else {
-    rows.push(['good', T('overview.strongest'), '<b>' + esc(hi.name) + '</b>']);
-    rows.push(['warn', T('overview.improve'), '<b>' + esc(lo.name) + '</b>']);
+    cards.push(['good', T('overview.strongest'), '<b>' + esc(hi.name) + '</b>']);
+    cards.push(['warn', T('overview.improve'), '<b>' + esc(lo.name) + '</b>']);
   }
-  rows.push(['focus', T('overview.focus'), adv ? '<b>' + esc(adv.area.charAt(0).toUpperCase() + adv.area.slice(1)) + '.</b> ' + esc(adv.text) : esc(T('part.nothing'))]);
-  const ok = v => (v == null || v >= 85 ? '' : ' warn');
+  cards.push(['focus', T('overview.focus'), adv ? '<b>' + esc(adv.area.charAt(0).toUpperCase() + adv.area.slice(1)) + '.</b> ' + esc(adv.text) : esc(T('part.nothing'))]);
+  return '<div class="ov-deco" aria-hidden="true"></div>' +
+    '<p class="ov-eyebrow">' + esc(T('overview.title')) + '</p>' +
+    '<h2 class="ov-verdict' + (band ? ' ' + band : '') + '">' + esc(verdict) + '</h2>' +
+    '<div class="ov-coach"><span class="ov-coach-av" aria-hidden="true">' + IC.ai + '</span><div class="ov-coach-in">' +
+      '<p class="ov-coach-who">' + esc(T('overview.coachWho')) + ' <span class="ov-coach-tag">' + esc(T('overview.coachTag')) + '</span></p>' +
+      '<p class="ov-coach-text" id="repCoachNote">' + esc(coachNote(s)) + '</p></div></div>' +
+    '<ul class="ov-cards">' + cards.map(c => '<li class="ov-card ' + c[0] + '"><span class="ov-ic" aria-hidden="true">' + OV_IC[c[0]] + '</span><div><p class="ov-k">' + esc(c[1]) + '</p><p class="ov-v">' + c[2] + '</p></div></li>').join('') + '</ul>';
+}
+/* Key numbers (own panel at the top of the right column): one row per measure, with a green
+   "on target" or amber "work on it" state from the part score behind it */
+export function keyNumbersHtml(sc) {
+  const state = v => (v == null ? '' : v >= 85 ? 'ok' : 'warn');
   const tiles = [
-    [sc.wpm == null ? esc(T('common.na')) : Math.round(sc.wpm) + '<small>' + esc(T('report.unitWpm')) + '</small>', T('overview.gPace'), sc.Fwpm],
-    [esc(fx(sc.H, 1)), T('overview.gHes'), sc.Fpause],
-    [sc.R == null ? esc(T('common.na')) : fx(sc.R, 1) + '<small>%</small>', T('overview.gFiller'), sc.Ffiller],
-    [sc.sub == null || sc.del == null ? esc(T('common.na')) : esc(T('overview.gWords', { n: sc.sub + sc.del, total: sc.N })), T('overview.gWrong'), sc.A],
-    [sc.Rst == null ? esc(T('common.na')) : fx(sc.Rst, 1) + '<small>' + esc(T('report.unitSt')) + '</small>', T('overview.gPitch'), sc.Ppitch]
+    ['pace', sc.wpm == null ? esc(T('common.na')) : Math.round(sc.wpm) + '<small>' + esc(T('report.unitWpm')) + '</small>', T('overview.gPace'), sc.Fwpm],
+    ['pause', esc(fx(sc.H, 1)), T('overview.gHes'), sc.Fpause],
+    ['filler', sc.R == null ? esc(T('common.na')) : fx(sc.R, 1) + '<small>%</small>', T('overview.gFiller'), sc.Ffiller],
+    ['words', sc.sub == null || sc.del == null ? esc(T('common.na')) : esc(T('overview.gWords', { n: sc.sub + sc.del, total: sc.N })), T('overview.gWrong'), sc.A],
+    ['pitch', sc.Rst == null ? esc(T('common.na')) : fx(sc.Rst, 1) + '<small>' + esc(T('report.unitSt')) + '</small>', T('overview.gPitch'), sc.Ppitch]
   ];
-  return '<h2>' + esc(T('overview.title')) + '</h2>' +
-    '<p class="ov-verdict">' + esc(verdict) + '</p>' +
-    '<ul class="ov-list">' + rows.map(r => '<li><span class="ov-k ' + r[0] + '">' + esc(r[1]) + '</span><span>' + r[2] + '</span></li>').join('') + '</ul>' +
-    '<div class="ov-tiles">' + tiles.map(t => '<div class="ov-tile' + ok(t[2]) + '"><b>' + t[0] + '</b><span>' + esc(t[1]) + '</span></div>').join('') + '</div>' +
-    '<p class="ov-hint">' + esc(T('overview.hint')) + '</p>';
+  return '<h3>' + esc(T('overview.keyNumbers')) + '</h3>' +
+    '<ul class="kn-list">' + tiles.map(x => {
+      const st = state(x[3]), stTxt = st ? T(st === 'ok' ? 'overview.onTarget' : 'overview.workOn') : '';
+      // the icon's colour is the state (green on target, amber work on it); the words stay for screen readers and on hover
+      return '<li class="kn ' + st + '"' + (st ? ' title="' + esc(stTxt) + '"' : '') + '><span class="kn-ic" aria-hidden="true">' + OV_IC[x[0]] + '</span><span class="kn-txt"><span class="kn-lab">' + esc(x[2]) + '</span><b>' + x[1] + '</b>' + (st ? '<span class="sr-only">' + esc(stTxt) + '</span>' : '') + '</span></li>';
+    }).join('') + '</ul>';
 }
 RENDER.report = function () {
   const s = S.currentSession;
@@ -106,24 +137,63 @@ RENDER.report = function () {
   $('#player').hidden = !!s.remote && !s.audioUrl;   // compact session or audio file not available
   const bad = sc.status !== 'ok';
   $('#repState').hidden = !bad; $('#repMain').hidden = bad;
+  $('#repHeadActions').hidden = !bad;   // normally the two buttons sit at the top of the pinned right column
   hideTip();
   if (bad) {
     $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(sc.reason === 'empty_transcript' ? T('eval.insEmpty') : T('report.stInsD', { p: Math.round((sc.voicedRatio || 0) * 100) })) + '</p><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
     return;
   }
   $('#repOverview').innerHTML = overviewHtml(s);
+  $('#repKeyNumbers').innerHTML = keyNumbersHtml(sc);
   $('#transcriptView').innerHTML = buildTranscript(an);
   S.play = { t: 0, on: false, iv: null };
   bindPlayerAudio(s);
   const pd = progressDelta(S.sessions.filter(x => x.ts <= s.ts));
   $('#repScoreCard').innerHTML = '<h3>' + esc(T('report.overall')) + '</h3>' +
-    (sc.overall != null ? '<div class="hero-score" style="margin-top:8px"><b class="num">' + sh(sc.overall) + '</b><span>' + esc(T('report.outOf')) + '</span></div>' : '<div class="hero-score" style="margin-top:8px"><b>' + esc(T('common.na')) + '</b></div>') +
-    '<div style="margin-top:10px">' + (pd.d == null ? '<p class="note">' + esc(T('report.deltaNeed', { n: pd.n })) + '</p>' : deltaPill(pd, false)) + '</div>' +
-    '<h3 style="margin-top:20px">' + esc(T('report.parts')) + '</h3>' + partsHtml(sc) +
+    '<div class="rep-score-row">' +   // score and progress share one line (the progress note wraps under it when long)
+    (sc.overall != null ? '<div class="hero-score"><b class="num">' + sh(sc.overall) + '</b><span>' + esc(T('report.outOf')) + '</span></div>' : '<div class="hero-score"><b>' + esc(T('common.na')) + '</b></div>') +
+    (pd.d == null ? '<p class="note">' + esc(T('report.deltaNeed', { n: pd.n })) + '</p>' : deltaPill(pd, false)) + '</div>' +
+    '<h3 style="margin-top:16px">' + esc(T('report.parts')) + '</h3>' + partsHtml(sc) +
     (hasBase(sc) ? '' : '<p class="note" style="margin-top:12px">' + esc(T('report.noBaseline')) + '</p>');
   drawVolume(s);
   updatePlayer();
+  fitReportAside();
 };
+/* The right column stays pinned just under the top bar while the page scrolls, and must fit the
+   screen there (never under the top bar, never its own scrollbar). When it is too tall it gets
+   tighter step by step: 1. hide the small line under each part score (the details window has it),
+   2. hide the "no baseline" note, 3. scale the whole column down until it fits. */
+export function fitReportAside() {
+  const a = $('.rep-aside'); if (!a || !a.offsetParent) return;
+  const acts = $('.rep-actions', a), head = $('#screenReport > .head');
+  a.classList.remove('tight', 'tighter'); a.style.zoom = ''; a.style.top = ''; a.style.marginTop = ''; acts.style.height = ''; acts.style.marginBottom = '';
+  if (getComputedStyle(a).position !== 'sticky') return;   // narrow screens: the column sits above the report, no pinning
+  // At first the buttons sit on the title's row: the column is pulled up by the title block, its button row
+  // is as tall as that block, so the panels below start level with the Overview on the left. Scrolling
+  // down, the whole column (buttons included) stays pinned under the top bar.
+  const headH = head.offsetHeight, headGap = parseFloat(getComputedStyle(head).marginBottom) || 0, colGap = parseFloat(getComputedStyle(a).rowGap) || 0;
+  const align = z => {
+    a.style.marginTop = (-(headH + headGap) / z) + 'px';
+    acts.style.height = (headH / z) + 'px';
+    acts.style.marginBottom = ((headGap - colGap) / z) + 'px';
+  };
+  align(1);
+  const hh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hh')) || 64;
+  const room = window.innerHeight - hh - 32;
+  if (a.offsetHeight <= room) return;
+  a.classList.add('tight');
+  if (a.offsetHeight <= room) return;
+  a.classList.add('tighter');
+  if (a.offsetHeight > room) {
+    const z = Math.max(0.6, room / a.offsetHeight);
+    a.style.zoom = String(z);
+    a.style.top = ((hh + 16) / z) + 'px';   // zoom scales the sticky offset too: keep the real gap under the top bar at 16px
+    align(z);                               // and the pull-up and button row, so they still line up with the title
+  }
+}
+window.addEventListener('resize', () => { if (S.screen === 'report') fitReportAside(); });
+// the column's own height can change after drawing too (fonts, long progress note)
+if (window.ResizeObserver && $('.rep-aside')) new ResizeObserver(() => { if (S.screen === 'report') fitReportAside(); }).observe($('.rep-aside'));
 
 /* ---- detail windows. Assessments and suggestions are deterministic templates over the scores (the LLM never grades). ---- */
 export const PART_KEYS = { A: 'pA', F: 'pF', P: 'pP', S: 'pS' };
@@ -207,18 +277,48 @@ export function partS(s) {
 }
 export const PART_BODY = { A: partA, F: partF, P: partP, S: partS };
 export const PART_CHARTS = { F: s => { drawPace(s); drawPause(s); }, P: s => { drawPitch(s); } };
+/* "View details": opens on the weakest scored part (the one most worth reading), Accuracy if none */
+export function openDetails() {
+  const sc = S.currentSession && S.currentSession.sc; if (!sc) return;
+  const scored = Object.keys(PART_KEYS).filter(k => Number.isFinite(sc[k]));
+  openPart(scored.length ? scored.reduce((m, k) => (sc[k] < sc[m] ? k : m)) : 'A');
+}
+/* Show one part in the detail window (opens it if closed). The tabs at the top switch parts. */
 export function openPart(key) {
   const s = S.currentSession;
   if (!s || s.sc.status !== 'ok' || !PART_BODY[key]) return;
   hideTip();
   const v = s.sc[key], b = bandOf(v);   // v null: part not scored -> N/A pill, no body, no charts
-  $('#mpartTitle').textContent = T('report.' + PART_KEYS[key]);
+  $$('#mpartTabs [role=tab]').forEach(t => { const on = t.getAttribute('data-part') === key; t.setAttribute('aria-selected', String(on)); t.tabIndex = on ? 0 : -1; });
+  $('#mpartPanel').setAttribute('aria-labelledby', 'mpartTab' + key);
+  const m = $('#componentDetail'), wasOpen = m.classList.contains('show'), panel = $('#mpartPanel');
+  stopPartMotion(panel);
+  const h0 = panel.offsetHeight;                                   // height of the part shown until now (switching tabs)
   const pill = $('#mpartPill'); pill.className = 'pill ' + (v == null ? 'warn' : BAND_PILL[b]); pill.textContent = v == null ? T('common.na') : sh(v) + ' / 100 · ' + T('part.band_' + b);
   $('#mpartSub').textContent = T('part.weight', { w: T('report.w' + key) });
   $('#mpartBody').innerHTML = v == null ? '<p class="note">' + esc(T('eval.naPart')) + '</p>' : PART_BODY[key](s);
-  openModal('componentDetail', { focus: '.box' });
+  if (!wasOpen) openModal('componentDetail', { focus: '#mpartTab' + key });
+  moveSegPills(wasOpen, m);
   $('#componentDetail .box').scrollTop = 0;
   if (v != null && PART_CHARTS[key]) PART_CHARTS[key](s);          // draw after the window is visible, so the charts get their width
+  if (wasOpen) playPartSwitch(panel, h0);
+}
+/* Switching tabs: the panel grows or shrinks smoothly from the old part's height to the new one's while
+   the new content fades in and settles. The steps end on a timer, so a hidden tab (no animation frames)
+   can never leave the panel half-open or see-through. Off with "reduce motion". */
+const PART_GROW_MS = 320, PART_FADE_MS = 300;
+function stopPartMotion(panel) {
+  clearTimeout(panel._partT);
+  panel.getAnimations().forEach(a => a.cancel());
+  panel.style.overflow = '';
+}
+function playPartSwitch(panel, h0) {
+  if (!panel.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const h1 = panel.offsetHeight;
+  panel.style.overflow = 'hidden';
+  if (Math.abs(h1 - h0) > 1) panel.animate([{ height: h0 + 'px' }, { height: h1 + 'px' }], { duration: PART_GROW_MS, easing: 'cubic-bezier(.4, 0, .2, 1)' });
+  panel.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: PART_FADE_MS, delay: 60, easing: 'ease-out', fill: 'backwards' });
+  panel._partT = setTimeout(() => stopPartMotion(panel), Math.max(PART_GROW_MS, PART_FADE_MS + 60) + 40);
 }
 export function seekWord(i) {
   const words = S.currentSession.an.words, w = words[i];

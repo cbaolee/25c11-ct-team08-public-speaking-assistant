@@ -4,7 +4,7 @@ import { postBaseline } from '../modals/baseline_gate.js';
 import { paintAvatar } from '../nav.js';
 import { startRecorder } from '../recorder.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { closeModal, openModal, toast } from '../ui.js';
+import { closeModal, openModal, toast, withBusy } from '../ui.js';
 import { $, esc, fmtDayLong, fmtTime } from '../utils.js';
 
 /* ---------- Profile ---------- */
@@ -58,7 +58,7 @@ export function listenBaseline() {
   const stale = () => S.user !== user || S.blTok !== tok || S.brec || S.bbusy || S.grec;
   const fail = k => { a.hidden = true; m.textContent = T(k); m.hidden = false; };
   m.hidden = true;
-  return api('/api/baseline/audio').then(readJson).then(({ ok, status, j }) => {
+  return withBusy(api('/api/baseline/audio'), T('busy.loading')).then(readJson).then(({ ok, status, j }) => {
     if (stale() || status === 401) return;
     if (status === 404) { fail('profile.errListenNone'); return; }
     if (!ok || !j || !j.url) { fail('profile.errListen'); return; }

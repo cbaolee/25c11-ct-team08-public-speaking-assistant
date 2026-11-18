@@ -145,13 +145,13 @@
 <section class="screen active" id="screenHome" aria-labelledby="homeH">
   <div class="home-hero" id="homeHero">
     <div class="hero-deco" aria-hidden="true">
-      <span class="hero-beam"></span><span class="hero-glow"></span>
-      <svg class="hero-waves" viewBox="0 0 1200 160" preserveAspectRatio="none"><path d="M0 80 C 100 20, 200 140, 300 80 S 500 20, 600 80 S 800 140, 900 80 S 1100 20, 1200 80"/><path d="M0 92 C 120 52, 240 132, 360 92 S 600 52, 720 92 S 960 132, 1080 92 S 1170 72, 1200 92"/></svg>
+      <span class="hero-glow"></span>
     </div>
     <div class="hero-in">
       <h1 id="homeH"></h1>
       <p class="hero-summary" id="homeSummary"></p>
       <div class="hero-cta" id="homeCta"></div>
+      <div class="hero-mic" aria-hidden="true"><div class="hero-mic-float"><div class="hero-mic-spin"><canvas id="heroMicCanvas"></canvas></div></div></div>
     </div>
     <button class="hero-more" type="button" id="homeMore"><span id="homeMoreText"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
   </div>
@@ -191,18 +191,19 @@
   <div class="studio">
     <div class="chat" id="chatFeed" role="log" aria-live="polite" data-t-aria="script.feedLabel" tabindex="0"></div>
     <div class="composer">
+      <button class="composer-fold" type="button" id="composerFold" aria-controls="composerInput" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
       <div id="composerFile"></div>
       <div class="row" style="margin-bottom:10px">
         <label for="composerTopic" style="margin:0" data-t="script.topic"></label>
         <select id="composerTopic" style="width:auto;min-width:180px"></select>
-        <select id="chatTpl" style="width:auto;min-width:220px" aria-label="Template topic"></select>
-        <select id="composerDuration" style="width:auto;min-width:105px" aria-label="Duration"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select>
+        <label for="composerDuration" style="margin:0 0 0 6px" data-t="script.duration"></label>
+        <select id="composerDuration" style="width:auto;min-width:105px"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select>
       </div>
       <div class="row">
         <button class="btn iconbtn" type="button" id="attachBtn" data-t-aria="script.attach" data-t-title="script.attach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button>
         <input type="file" id="composerFileInput" accept=".pdf,application/pdf" hidden>
-        <textarea id="composerInput" rows="2" data-t-aria="script.inputLabel" data-t-ph="script.placeholder"></textarea>
-        <button class="btn btn-primary" type="button" id="composerSend" data-t="script.send"></button>
+        <textarea id="composerInput" rows="1" data-t-aria="script.inputLabel" data-t-ph="script.placeholder"></textarea>
+        <button class="btn btn-primary iconbtn composer-send" type="button" id="composerSend" data-t-aria="script.send" data-t-title="script.send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg></button>
       </div>
       <div class="ferr" id="composerError" role="alert"></div>
       <p class="note" style="margin-top:8px" data-t="script.hint"></p>
@@ -244,7 +245,7 @@
       <div id="voiceRecordPane" class="prrec">
         <div class="timer" id="recTimer" role="timer" aria-live="off">00:00</div>
         <div class="lvl" id="recLvl" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-        <div class="row">
+        <div class="row rec-actions">
           <button class="btn btn-record" type="button" id="recBtn"></button>
           <button class="btn" type="button" id="recClear" data-t="practice.discard" disabled></button>
         </div>
@@ -258,10 +259,9 @@
       <div class="prspeed" id="prSpeed">
         <label for="followWpm" id="followWpmLbl" data-t="practice.followWpmLabel"></label>
         <div class="row" style="flex-wrap:nowrap"><input type="range" id="followWpm" min="100" max="180" step="5" value="145"><output class="num" id="followWpmVal" for="followWpm"></output></div>
-        <p class="note" data-t="practice.followNote"></p>
       </div>
       <div class="preval">
-        <div class="preval-msg"><span class="note" id="audioState" aria-live="polite"></span><span class="note" id="evalHint"></span></div>
+        <span class="preval-msg"></span>
         <button class="btn btn-primary" type="button" id="evalBtn" data-t="practice.evaluate" disabled></button>
       </div>
     </div>
@@ -279,7 +279,7 @@
   <button class="btn btn-ghost btn-sm back" type="button" data-back><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg><span data-t="common.back"></span></button>
   <div class="head">
     <div><h1 id="repH" data-t="report.title"></h1><p class="sub" id="repMeta"></p></div>
-    <div class="row"><button class="btn btn-primary" type="button" id="repAgain" data-t="report.again"></button><button class="btn" type="button" data-go="home" data-scroll="histSection" data-t="report.history"></button></div>
+    <div class="row" id="repHeadActions" hidden><button class="btn btn-primary" type="button" data-go="practice" data-t="report.again"></button><button class="btn" type="button" data-go="home" data-scroll="histSection" data-t="report.history"></button></div>
   </div>
   <div id="repState" hidden></div>
   <div class="rep" id="repMain">
@@ -300,6 +300,8 @@
       </div>
     </div>
     <aside class="rep-aside" data-t-aria="report.asideLabel">
+      <div class="rep-actions"><button class="btn btn-primary" type="button" data-go="practice" data-t="report.again"></button><button class="btn" type="button" data-go="home" data-scroll="histSection" data-t="report.history"></button></div>
+      <div class="panel" id="repKeyNumbers"></div>
       <div class="panel" id="repScoreCard"></div>
     </aside>
   </div>
@@ -452,7 +454,7 @@
 </div></div>
 
 <div class="mbg" id="evaluatingOverlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle"><div class="box center">
-  <div class="spinner" aria-hidden="true"></div>
+  <div class="loader-bars on-light" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <h2 id="ovTitle" style="font-size:22px" data-t="eval.title"></h2>
   <p class="note" id="ovStep"></p>
   <p id="ovText" style="font-weight:600;margin-top:4px" aria-live="polite"></p>
@@ -491,9 +493,17 @@
 </div></div>
 
 <div class="mbg" id="componentDetail" role="dialog" aria-modal="true" aria-labelledby="mpartTitle"><div class="box wide">
-  <div class="row between"><h2 id="mpartTitle"></h2><div class="row"><span class="pill" id="mpartPill"></span></div></div>
-  <p class="note" id="mpartSub"></p>
-  <div id="mpartBody"></div>
+  <h2 id="mpartTitle" data-t="part.title"></h2>
+  <div class="seg mpart-tabs" role="tablist" id="mpartTabs" data-t-aria="part.tabsLabel">
+    <button type="button" role="tab" id="mpartTabA" data-part="A" aria-controls="mpartPanel" data-t="report.pA"></button>
+    <button type="button" role="tab" id="mpartTabF" data-part="F" aria-controls="mpartPanel" data-t="report.pF"></button>
+    <button type="button" role="tab" id="mpartTabP" data-part="P" aria-controls="mpartPanel" data-t="report.pP"></button>
+    <button type="button" role="tab" id="mpartTabS" data-part="S" aria-controls="mpartPanel" data-t="report.pS"></button>
+  </div>
+  <div id="mpartPanel" role="tabpanel">
+    <div class="row between mpart-head"><p class="note" id="mpartSub"></p><span class="pill" id="mpartPill"></span></div>
+    <div id="mpartBody"></div>
+  </div>
   <div class="actions"><button class="btn btn-primary" type="button" data-close data-t="common.close"></button></div>
 </div></div>
 
@@ -505,6 +515,10 @@
 <div class="app-loader" id="appLoader" role="status" aria-live="polite" hidden>
   <div class="loader-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <p class="loader-text" data-t="app.loading"></p>
+</div>
+<div class="busy" id="busyOverlay" role="status" aria-live="polite" hidden>
+  <div class="loader-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <p class="loader-text" id="busyText"></p>
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>

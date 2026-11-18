@@ -119,8 +119,38 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 @keyframes shimmer { to { background-position: -200% 0; } }
 .composer { background: #FAF7F0; border: 1px solid var(--line); border-radius: var(--r-panel); padding: 14px 16px; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); }
 .composer .row { align-items: flex-end; }
-.composer textarea { min-height: 68px; flex: 1; min-width: 200px; resize: none; font-size: 15px; }
+.composer { position: relative; }
+/* text box height is set by fitComposer() (1.5 to 5.5 lines); a small transition makes it grow softly */
+.composer textarea { min-height: 0; flex: 1; min-width: 160px; resize: none; font-size: 15px; overflow-y: auto; transition: height .18s ease-out;
+  padding-top: 9px; padding-bottom: 9px; }   /* one line sits centred in a box as tall as the 44px buttons */
+@media (prefers-reduced-motion: reduce) { .composer textarea { transition: none; } }
+/* Send: icon only, the same line icon style as Home / Script / Practice in the top bar */
+#screenScriptStudio .composer .composer-send svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+/* fold arrow at the top right of the composer: down = fold to 1.5 lines, up = unfold */
+.composer-fold { position: absolute; top: 8px; right: 10px; z-index: 1; display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 50%;
+  background: #fff; color: var(--muted); cursor: pointer; transition: color .15s, border-color .15s; }
+.composer-fold:hover { color: var(--accent); border-color: var(--accent-line); }
+.composer-fold[hidden] { display: none; }
+.composer-fold svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
+.composer-fold.up svg { transform: rotate(180deg); }
 #screenScriptStudio .composer select, #screenScriptStudio .composer .csel-btn { font-size: 15px; }
 #screenScriptStudio .composer .btn { min-height: 44px; }
 #screenScriptStudio .composer .iconbtn { width: 44px; height: 44px; padding: 0; }
 .fchip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 3px 4px 3px 12px; font: 500 14px var(--sans); margin-bottom: 10px; }
+.composer > .row:has(#composerTopic) { padding-right: 36px; }   /* room for the fold arrow at the top right */
+/* Category / Duration row: labels centred on the selects, and the selects a little shorter than the 44px buttons */
+.composer > .row:has(#composerTopic) { align-items: center; }
+.composer > .row:has(#composerTopic) .csel-btn, .composer > .row:has(#composerTopic) select { min-height: 38px; padding-top: 7px; padding-bottom: 7px; }
+/* Script reader window: the text spans the whole window (its scrollbar sits on the window's right edge)
+   with 50px margins left and right, justified, a blank line between paragraphs and a small first-line indent */
+.box.reader-box { padding: 24px 0 0; }
+.box.reader-box > .row { padding: 0 50px 12px; }
+.box.reader-box .reader { max-width: none; margin: 0; padding: 8px 50px 28px; }
+.box.reader-box .reader .para { text-align: justify; hyphens: auto; text-indent: 1.5em; }
+.box.reader-box .reader .para + .para { margin-top: 1.75em; }   /* one empty line (the line height) */
+.box.reader-box .reader .para .cite { text-indent: 0; }
+.box.reader-box .reader > .note { text-indent: 0; }
+@media (max-width: 560px) { .box.reader-box > .row { padding: 0 20px 12px; } .box.reader-box .reader { padding: 8px 20px 24px; } }
+/* Practice reading text (Record / Review): justified, a blank line between paragraphs, small first-line indent */
+.reader.reader-wide .para { margin: 0; text-align: justify; hyphens: auto; text-indent: 1.5em; }
+.reader.reader-wide .para + .para { margin-top: 1.75em; }   /* one empty line (the line height) */

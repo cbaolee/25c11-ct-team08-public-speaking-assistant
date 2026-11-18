@@ -4,7 +4,7 @@ import { logout } from './baseline_gate.js';
 import { saveConsent } from './profile_modal.js';
 import { levelAnim } from '../recorder.js';
 import { S } from '../state.js';
-import { openModal, toast } from '../ui.js';
+import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
 
 /* ---------- Settings Modal ----------
@@ -82,7 +82,7 @@ export function savePass() {
   if (a.length < MIN_PASSWORD) { showErr(err, T('auth.errWeak')); $('#mpNew').focus(); return; }
   if (a !== b) { showErr(err, T('pass.errMismatch')); $('#mpNew2').focus(); return; }
   $('#passSave').disabled = true;
-  api('/api/auth/password', { method: 'PUT', json: { password: a } }).then(readJson).then(({ ok, status, j }) => {
+  withBusy(api('/api/auth/password', { method: 'PUT', json: { password: a } }), T('busy.saving')).then(readJson).then(({ ok, status, j }) => {
     $('#passSave').disabled = false;
     if (status === 401) return;
     if (!ok) { showErr(err, j && j.error_code === 'weak_password' ? T('auth.errWeak') : T('auth.errServer')); return; }

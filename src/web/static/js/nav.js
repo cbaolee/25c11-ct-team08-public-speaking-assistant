@@ -4,7 +4,7 @@ import { syncHero, syncStage } from './screens/landing.js';
 import { stopPlayback } from './screens/report.js';
 import { RENDER, S } from './state.js';
 import { closeUserMenu } from './top_bar.js';
-import { focusHeading } from './ui.js';
+import { focusHeading, repaintScrollbar } from './ui.js';
 import { $, $$ } from './utils.js';
 
 /* Old screen: pinned where it was (out of the flow) and slid out to the left, then hidden */
@@ -20,8 +20,8 @@ export function screenPos(name, from) {
 }
 export function leaveScreen(el, dir) {
   dir = dir || 1;
-  /* go() jumps the window to the top for the new screen; shift the old one up by the same amount,
-     so the part the user was looking at stays exactly where it was while it slides out */
+  /* pinned where it is on screen now; go() then shifts it by the new screen's scroll position
+     (keepLeavingInPlace), so the part the user was looking at stays put while it slides out */
   el.style.top = (el.offsetTop - window.scrollY) + 'px'; el.style.left = el.offsetLeft + 'px'; el.style.width = el.offsetWidth + 'px';
   el.classList.add('leaving'); el.setAttribute('aria-hidden', 'true');
   const a = el.animate([
@@ -30,6 +30,15 @@ export function leaveScreen(el, dir) {
   ], { duration: 450, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'forwards' });
   const done = () => { a.cancel(); el.classList.remove('leaving'); el.removeAttribute('aria-hidden'); el.style.top = el.style.left = el.style.width = ''; };
   a.onfinish = done; el._leaveDone = done;
+}
+/* The new screen slides in from the side (dir 1: from the right) and comes out of a blur. Also used
+   for Home right after the loading screen, so the first look matches coming back from another screen. */
+export function slideIn(el, dir, delay) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  el.animate([
+    { opacity: 0, transform: 'translateX(' + (56 * (dir || 1)) + 'px)', filter: 'blur(8px)' },
+    { opacity: 1, transform: 'none', filter: 'none' }
+  ], { duration: 600, delay: delay || 0, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'backwards' });
 }
 export function endLeaving() { $$('.screen.leaving').forEach(s => { if (s._leaveDone) s._leaveDone(); }); }
 /* Slide the white pill of each segmented tab group to its selected button; animate=false jumps there */
@@ -104,9 +113,27 @@ export function renderAccount() {
   if (on) { $('#uName').textContent = S.user.name; paintAvatar($('#avTop')); }
   syncHeader();
 }
+/* Each screen remembers where the user had scrolled to, and going back to it returns there instead
+   of to the top. Reports are remembered per session. Cleared at log in (enterApp). */
+const scrollKey = name => (name === 'report' ? 'report:' + (S.currentSession ? S.currentSession.id : '') : name);
+/* the old screen sliding out is placed for scroll 0; move it by the new scroll so it does not jump */
+function keepLeavingInPlace(el, y) {
+  if (!el || !el.classList.contains('leaving')) return;
+  const base = el._top0 != null ? el._top0 : (el._top0 = parseFloat(el.style.top) || 0);
+  el.style.top = (base + y) + 'px';
+}
+/* Short app pages are made 1px taller than the screen so they still get a real (dark) scrollbar
+   (base.css). There is nothing to scroll, so hide the thumb and leave a plain dark track. */
+export function syncScrollThumb() {
+  const de = document.documentElement, want = de.scrollHeight - window.innerHeight <= 2;
+  if (de.classList.contains('no-scroll') === want) return;
+  de.classList.toggle('no-scroll', want);
+  repaintScrollbar();   // Chrome keeps the old thumb colour otherwise
+}
 export function go(name, opts) {
   opts = opts || {};
   if (!S.user) { showView('landing'); return; }
+  if (S.scrollKey && !$('#viewApp').hidden) S.scrollPos[S.scrollKey] = window.scrollY;   // where the user leaves this screen
   const fromPos = screenPos(S.screen, S.from);   // measured before S.from changes
   if ((name === 'report' || name === 'profile') && S.screen !== name) S.from = S.screen;
   const dir = screenPos(name, S.from) < fromPos ? -1 : 1;   // 1: old slides left, new comes from the right
@@ -115,19 +142,30 @@ export function go(name, opts) {
   endLeaving();   // a fast second click: finish the previous slide-out first
   const prev = $('.screen.active'), next = $('#' + screenId(name));
   const slide = prev && next && prev !== next && !$('#viewApp').hidden && !matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (slide) leaveScreen(prev, dir);
+  if (slide) { leaveScreen(prev, dir); prev._top0 = null; }
   $$('.screen').forEach(s => s.classList.toggle('active', s.id === screenId(name)));
   if (name === 'home' && prev !== next) heroLightsOn();   // coming back to Home: lights come on, as when scrolling up
-  if (slide) next.animate([
-    { opacity: 0, transform: 'translateX(' + (56 * dir) + 'px)', filter: 'blur(8px)' },
-    { opacity: 1, transform: 'none', filter: 'none' }
-  ], { duration: 600, delay: 120, easing: 'cubic-bezier(.65, 0, .35, 1)', fill: 'backwards' });
+  if (slide) slideIn(next, dir, 120);
   const navName = name === 'report' ? (['scriptStudio', 'practice'].indexOf(S.from) >= 0 ? S.from : 'home') : name;
   $$('#nav [data-go]').forEach(b => { if (b.getAttribute('data-go') === navName) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
   moveNavPill(true);
   if (RENDER[name]) RENDER[name]();
   moveSegPills(false);
-  window.scrollTo(0, 0);
+  S.scrollKey = scrollKey(name);
+  // where the new screen opens: an element asked for (opts.scrollTo, e.g. History) or where it was left.
+  // Set once, before anything is painted, and the old screen sliding out is moved by the same amount,
+  // so nothing jumps: the old screen slides out exactly where it was, the new one slides in already there.
+  const anchor = opts.scrollTo && document.getElementById(opts.scrollTo);
+  const hh = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hh')) || 64;
+  const target = () => (anchor ? Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - hh - 16) : (S.scrollPos[S.scrollKey] || 0));
+  const place = () => { window.scrollTo(0, target()); if (slide) keepLeavingInPlace(prev, window.scrollY); };
+  // the page height is only final once the old screen has slid out (it is still in the page until then)
+  setTimeout(syncScrollThumb, slide ? 500 : 0);
+  place();
   if (!opts.silent) focusHeading();
-  setTimeout(redrawCharts, 0);
+  setTimeout(() => {
+    redrawCharts();
+    // charts can change the page height: place it again once they are drawn
+    if (S.scrollKey === scrollKey(name) && (anchor || target())) place();
+  }, 0);
 }
