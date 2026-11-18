@@ -192,7 +192,19 @@
     return !!stat && stat.nRef > 0 && stat.ratio >= minRatio;
   }
 
-  const api = { sentenceErrorStats, needsSentencePractice, mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
+  function displayProgress(prevShown, serverProgress, stages, weights, stageElapsedS) {
+    let shown = Math.max(0, prevShown || 0, serverProgress || 0);
+    const list = stages || [], index = list.findIndex(s => s.key === 'stt' && s.state === 'running');
+    if (index >= 0) {
+      const start = list.slice(0, index).reduce((sum, s) => sum + (Number((weights || {})[s.key]) || 0), 0);
+      const weight = Number((weights || {}).stt) || 0;
+      // Client-side estimate only, not measured STT progress; tau is 20 seconds.
+      if (weight > 1) shown = Math.max(shown, Math.floor(start + (weight - 1) * (1 - Math.exp(-Math.max(0, stageElapsedS || 0) / 20))));
+    }
+    return Math.min(100, Math.floor(shown));
+  }
+
+  const api = { displayProgress, sentenceErrorStats, needsSentencePractice, mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
   root.EvaluateClient = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

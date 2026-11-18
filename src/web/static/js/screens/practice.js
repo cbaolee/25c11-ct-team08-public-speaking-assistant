@@ -306,8 +306,13 @@ export function runEval() {
   runEvalReal(txt);
 }
 export function cancelEval() {
-  if (S.evaluation && S.evaluation.ctrl) S.evaluation.ctrl.abort();   // user cancel: S.evaluation is cleared below, so the fetch catch stays silent
-  if (S.evaluation) { S.evaluation.timers.forEach(clearTimeout); S.evaluation = null; }
+  const ev = S.evaluation;
+  if (ev) {
+    S.evaluation = null;
+    ev.timers.forEach(clearTimeout);
+    ev.ctrl.abort();
+    if (ev.jobId) api('/api/evaluate/' + encodeURIComponent(ev.jobId), { method: 'DELETE', keepalive: true }).catch(() => {});
+  }
   closeModal('evaluatingOverlay');
 }
 
@@ -325,23 +330,66 @@ export function runEvalReal(txt) {
   fd.append('audio', blob, fname); fd.append('script', txt.text);   // the server reads the baseline itself
   if (txt.id) fd.append('script_id', txt.id);
   if (txt.short) fd.append('topic', txt.short);
-  const ctrl = new AbortController(), ev = S.evaluation = { timers: [], ctrl, timedOut: false };
-  ev.timers.push(setTimeout(() => { ev.timedOut = true; ctrl.abort(); }, 120000));
-  $('#ovStep').textContent = T('eval.step1'); $('#ovText').textContent = T('eval.step1Text');
-  openModal('evaluatingOverlay', { lock: true, focus: '#ovCancel' });
-  const end = () => { ev.timers.forEach(clearTimeout); S.evaluation = null; closeModal('evaluatingOverlay', false); };
-  api('/api/evaluate', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(j => {
-    if (S.evaluation !== ev) return;                       // cancelled by the user meanwhile
+  const ctrl = new AbortController(), ev = S.evaluation = { timers: [], ctrl, jobId: null, shown: 0, sttStarted: null };
+  const active = () => S.evaluation === ev;
+  const end = () => { ev.timers.forEach(clearTimeout); if (active()) S.evaluation = null; closeModal('evaluatingOverlay', false); };
+  const fail = j => {
     end();
-    if (res.ok && j && j.status) { finishEvalReal(j, txt); return; }
-    if (res.status === 401) return;                // logged out by sessionEnded()
     if (j && j.error_code === 'baseline_required') { S.baseline = null; toast(T('eval.errBaselineRequired'), true); openBaselineGate(); return; }
-    if (j && j.error_code) { showEvalError(EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : (j.message || T('eval.errServer'))); return; }
-    showEvalError(T('eval.errServer'));
-  })).catch(() => {
-    if (S.evaluation !== ev) return;                       // user cancel -> no error
-    end(); showEvalError(T(ev.timedOut ? 'eval.errTimeout' : 'eval.errNet'));
-  });
+    showEvalError(j && j.error_code && EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : ((j && j.message) || T('eval.errServer')));
+  };
+  const paint = job => {
+    const stages = job.stages || [];
+    const stt = stages.find(stage => stage.key === 'stt' && stage.state === 'running');
+    if (stt && ev.sttStarted === null) ev.sttStarted = Date.now();
+    if (!stt) ev.sttStarted = null;
+    ev.shown = EvaluateClient.displayProgress(ev.shown, job.progress || 0, stages, CONFIG.EVAL_JOB.weights, ev.sttStarted === null ? 0 : (Date.now() - ev.sttStarted) / 1000);
+    $('#evPercent').textContent = T('eval.percentLabel', { n: ev.shown });
+    $('#evBar').setAttribute('aria-valuenow', ev.shown);
+    $('#evBar .ev-fill').style.width = ev.shown + '%';
+    $$('.ev-step', $('#evaluatingOverlay')).forEach(el => {
+      const stage = stages.find(item => item.key === el.dataset.key), state = stage ? stage.state : 'pending';
+      el.dataset.state = state;
+      $('.ev-icon', el).textContent = state === 'done' ? '✓' : state === 'running' ? '●' : '○';
+      $('.ev-status', el).textContent = state === 'skipped' ? T('eval.stepSkipped') : '';
+    });
+    const bucket = Math.floor(ev.shown / 25), stage = job.stage || '';
+    if (bucket !== ev.liveBucket || stage !== ev.liveStage) {
+      $('#evLive').textContent = [stage ? T('eval.stages.' + stage) : '', T('eval.percentLabel', { n: ev.shown })].filter(Boolean).join(' - ');
+      ev.liveBucket = bucket; ev.liveStage = stage;
+    }
+    $('#ovStep').textContent = stt ? T('eval.estimateNote') : '';
+    $('#ovStep').hidden = !stt;
+    $('#ovText').textContent = ''; 
+  };
+  const timeout = () => {
+    if (!active()) return;
+    if (ev.jobId) api('/api/evaluate/' + encodeURIComponent(ev.jobId), { method: 'DELETE' }).catch(() => {});
+    ctrl.abort(); end(); showEvalError(T('eval.errTimeout'));
+  };
+  ev.timers.push(setTimeout(timeout, CONFIG.EVAL_JOB.maxWaitS * 1000));
+  paint({ progress: 0, stages: [] });
+  openModal('evaluatingOverlay', { lock: true, focus: '#ovCancel' });
+  const poll = () => {
+    api('/api/evaluate/' + encodeURIComponent(ev.jobId), { signal: ctrl.signal }).then(res => res.json().catch(() => null).then(job => {
+      if (!active()) return;
+      if (res.status === 401) { end(); return; }
+      if (res.status === 404) { end(); showEvalError(T('eval.errServer')); return; }
+      if (!res.ok || !job) { fail(job); return; }
+      paint(job);
+      if (job.status === 'done') {
+        ev.timers.push(setTimeout(() => { if (active()) { end(); finishEvalReal(job.result, txt); } }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 400));
+      } else if (job.status === 'failed') fail(job);
+      else if (job.status === 'cancelled') end();
+      else ev.timers.push(setTimeout(poll, CONFIG.EVAL_JOB.pollMs));
+    })).catch(() => { if (active()) { end(); showEvalError(T('eval.errNet')); } });
+  };
+  api('/api/evaluate', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(job => {
+    if (!active()) return;
+    if (res.status === 202 && job && job.job_id) { ev.jobId = job.job_id; poll(); return; }
+    if (res.status === 401) { end(); return; }
+    fail(job);
+  })).catch(() => { if (active()) { end(); showEvalError(T('eval.errNet')); } });
 }
 export function finishEvalReal(j, txt) {
   const m = EvaluateClient.mapResult(j, txt.text), base = { ts: Date.now(), title: txt.short, topicKey: txt.topic, an: m.an, sc: m.sc, dur: m.an.dur, accent: S.profile ? S.profile.accent : null, demo: false, raw: j };

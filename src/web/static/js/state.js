@@ -1,5 +1,6 @@
 /* Tunable values. Defaults below; GET /api/config (app_constants.toml [web]) overrides them in main.js. */
 export const CONFIG = {
+  EVAL_JOB: { pollMs: 700, maxWaitS: 300, weights: { upload: 5, decode: 10, vad: 10, stt: 35, align: 10, fluency: 5, pitch: 10, semantic: 10, save: 5 } },
   RETRY: { minRatio: 0.30, wordMax: 6, sentenceMax: 30, clipPad: 0.15 }, // fallback mirrors app_constants.toml [retry]
   OWN_MAX_WORDS: 1500,                 // max words in "write my own text"
   BASELINE_MIN_SECONDS: 10,            // shortest baseline accepted (the backend also rejects audio with too little speech)

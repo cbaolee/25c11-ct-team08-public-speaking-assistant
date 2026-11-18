@@ -120,6 +120,8 @@ export const TEXT = {
   },
 
   eval: {
+    stages: { upload: 'Upload', decode: 'Decode audio', vad: 'Find speech', stt: 'Transcribe', align: 'Match words', fluency: 'Pace and pauses', pitch: 'Pitch and loudness', semantic: 'Meaning match', save: 'Save' },
+    percentLabel: '{n}% done', stepSkipped: 'Skipped', estimateNote: 'Transcription progress is estimated.',
     title: 'Analysing your recording', step1: 'Step 1 of 2', step1Text: 'Preparing the audio...',
     step2: 'Step 2 of 2', step2Text: 'Transcribing and measuring pace, pauses and pitch...',
     errTitle: 'We could not transcribe your recording', errMsg: 'Nothing was scored or saved. Check your connection and try again.', retry: 'Try again',

@@ -46,6 +46,8 @@ import { $, $$, clearErr, esc, showErr } from './utils.js';
 export function loadConfig() {
   return fetch('/api/config').then(r => (r.ok ? r.json() : null)).then(c => {
     if (!c) return;
+    const job = c.evaluate_job || {};
+    CONFIG.EVAL_JOB = { pollMs: job.poll_interval_ms ?? CONFIG.EVAL_JOB.pollMs, maxWaitS: job.max_wait_s ?? CONFIG.EVAL_JOB.maxWaitS, weights: job.stage_weights ?? CONFIG.EVAL_JOB.weights };
     const retry = c.retry || {};
     CONFIG.RETRY = { minRatio: retry.sentence_min_error_ratio ?? CONFIG.RETRY.minRatio, wordMax: retry.word_max_seconds ?? CONFIG.RETRY.wordMax, sentenceMax: retry.sentence_max_seconds ?? CONFIG.RETRY.sentenceMax, clipPad: retry.clip_pad_s ?? CONFIG.RETRY.clipPad };
     CONFIG.OWN_MAX_WORDS = c.own_max_words ?? CONFIG.OWN_MAX_WORDS;
@@ -176,6 +178,8 @@ export function init() {
   $('#fileIn').onchange = onAudioFile;
   $('#evalBtn').onclick = runEval;
   $('#ovCancel').onclick = cancelEval;
+  window.addEventListener('pagehide', () => { if (S.evaluation) cancelEval(); });
+  new MutationObserver(() => { if (S.evaluation && S.screen !== 'practice') cancelEval(); }).observe($('#screenPractice'), { attributes: true, attributeFilter: ['class'] });
   $('#meRetry').onclick = () => { closeModal('errorDialog', false); runEval(); };
 
   // report

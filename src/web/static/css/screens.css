@@ -661,3 +661,20 @@ body:has(#screenScriptStudio.active) main { padding-top: 0; padding-bottom: 0; }
 .wc-checking::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 6px; border: 2px solid var(--accent-line); border-top-color: var(--accent); border-radius: 50%; animation: wc-spin 700ms linear infinite; }
 @keyframes wc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .wc-checking::before { animation: none; } }
+
+/* Evaluate job progress */
+.ev-percent { font: 600 42px/1.2 var(--serif); font-variant-numeric: tabular-nums; margin: 16px 0 10px; }
+.ev-track { height: 6px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
+.ev-fill { width: 0; height: 100%; background: var(--accent); transition: width 300ms cubic-bezier(.2,.7,.3,1); }
+.ev-steps { list-style: none; padding: 0; margin: 20px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; text-align: left; }
+.ev-step { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.ev-icon { width: 1em; text-align: center; flex: none; }
+.ev-step[data-state="running"] { color: var(--ink); font-weight: 600; opacity: 1; }
+.ev-step[data-state="running"] .ev-icon { color: var(--accent); }
+.ev-step[data-state="done"] { opacity: 1; }
+.ev-step[data-state="done"] .ev-icon { color: var(--ok); }
+.ev-step[data-state="skipped"] { color: var(--muted); text-decoration: line-through; }
+.ev-status { font-size: .8em; }
+.ev-sr { position: absolute; width: 1px; height: 1px; clip: rect(0, 0, 0, 0); overflow: hidden; }
+@media (max-width: 640px) { .ev-steps { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .ev-fill { transition: none; } }
