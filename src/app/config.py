@@ -49,8 +49,9 @@ KeyList = Annotated[list[str], NoDecode]
 
 class Settings(BaseSettings):
     # Several keys per service: when one runs out of quota the next is used (src/app/key_pool.py)
-    gemini_api_keys: KeyList = []
-    gemini_model: str = ""
+    cerebras_api_keys: KeyList = []
+    cerebras_model: str = ""
+    cerebras_fallback_model_2: str = ""
     groq_api_keys: KeyList = []
     groq_llm_model: str = ""
     groq_llm_fallback_model_1: str = ""
@@ -76,7 +77,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
     @field_validator(
-        "gemini_api_keys", "groq_api_keys", "deepgram_api_keys", "gladia_api_keys", mode="before"
+        "cerebras_api_keys", "groq_api_keys", "deepgram_api_keys", "gladia_api_keys", mode="before"
     )
     @classmethod
     def _split_keys(cls, value: object) -> object:

@@ -44,8 +44,8 @@ def test_payload_and_numbers(result):
     "bad", [None, {}, note("Score 999"), {**note(), "focus": ["a"] * 4}, note("x" * 901)]
 )
 def test_invalid_falls_back(result, bad):
-    output = coach.generate_coach_note(result, None, gemini=lambda *a: bad, groq=lambda *a: note())
-    assert output["source"] == "groq"
+    output = coach.generate_coach_note(result, None, cerebras=lambda *a: bad)
+    assert output["source"] == "rule"
 
 
 def test_moderation_and_rule(result):
@@ -56,51 +56,64 @@ def test_moderation_and_rule(result):
     ]
     assert (
         coach.generate_coach_note(
-            result, None, moderator=moderator, gemini=lambda *a: note(), groq=lambda *a: None
+            result, None, moderator=moderator, cerebras=lambda *a: note()
         )["source"]
         == "rule"
     )
 
 
-def test_gemini_rotation_and_missing(monkeypatch):
-    post = Mock(
-        side_effect=[
-            SimpleNamespace(ok=False, status_code=429),
-            SimpleNamespace(
-                ok=True, json=lambda: {"candidates": [{"content": {"parts": [{"text": "{}"}]}}]}
-            ),
-        ]
-    )
+def test_cerebras_rotation_and_missing(monkeypatch):
+    post = Mock(side_effect=[SimpleNamespace(ok=False, status_code=429), _cerebras_ok()])
     monkeypatch.setattr(coach.requests, "post", post)
-    settings = SimpleNamespace(
-        gemini_api_keys=["test-coach-one", "test-coach-two"], gemini_model="model"
-    )
-    assert coach.call_gemini({}, settings, 1) == {}
-    assert post.call_count == 2
+    settings = _cerebras_settings(keys=["rotation-one", "rotation-two"])
+    assert coach.call_cerebras({}, settings, 1) == {}
+    args, kwargs = post.call_args
+    assert args[0] == coach._CEREBRAS_URL
+    assert kwargs["headers"]["Authorization"] == "Bearer rotation-two"
+    assert kwargs["json"]["model"] == "model"
+    assert kwargs["json"]["response_format"] == {"type": "json_object"}
+    assert (kwargs["json"]["max_completion_tokens"]
+            == coach.CONSTANTS["coach"]["max_completion_tokens"])
+    assert kwargs["json"]["reasoning_effort"] == coach.CONSTANTS["coach"]["reasoning_effort"]
     post.reset_mock()
-    settings.gemini_model = ""
-    assert coach.call_gemini({}, settings, 1) is None
+    settings.cerebras_api_keys = []
+    assert coach.call_cerebras({}, settings, 1) is None
+    settings.cerebras_api_keys = ["key"]
+    settings.cerebras_model = " "
+    assert coach.call_cerebras({}, settings, 1) is None
     post.assert_not_called()
+
+
+def test_generate_cerebras_and_no_groq(result, monkeypatch):
+    from src.text_processing import groq_pool
+
+    def fail(*args, **kwargs):
+        raise AssertionError("Groq must not be called")
+
+    monkeypatch.setattr(groq_pool, "make_groq_client", fail)
+    output = coach.generate_coach_note(result, None, cerebras=lambda *a: note())
+    assert output["source"] == "cerebras"
+    assert coach.generate_coach_note(result, None, cerebras=lambda *a: None)["source"] == "rule"
 
 
 def test_cache():
     cache = coach.CoachNoteCache(10, clock=lambda: 0)
     cache.put("a", {"source": "rule"})
     assert cache.get("a") is None
-    cache.put("a", {"source": "groq"})
-    assert cache.get("a")["source"] == "groq"
+    cache.put("a", {"source": "cerebras"})
+    assert cache.get("a")["source"] == "cerebras"
 
 
 def test_cache_put_removes_expired_entries_and_keeps_live_entries():
     now = [0]
     cache = coach.CoachNoteCache(10, clock=lambda: now[0])
-    cache.put("expired", {"source": "gemini"})
+    cache.put("expired", {"source": "cerebras"})
     now[0] = 5
-    cache.put("live", {"source": "groq"})
+    cache.put("live", {"source": "cerebras"})
     now[0] = 10
     cache.put("rule", {"source": "rule"})
     assert "expired" not in cache._entries
-    assert cache.get("live")["source"] == "groq"
+    assert cache.get("live")["source"] == "cerebras"
     assert cache.get("rule") is None
 
 
@@ -122,22 +135,13 @@ def endpoint_env(monkeypatch):
     repos = build_memory_repos()
     user_id = UUID("00000000-0000-4000-8000-000000000001")
     app.dependency_overrides[get_repos] = lambda: repos
-    settings = SimpleNamespace(
-        gemini_api_keys=[], gemini_model="", groq_api_keys=["fake"],
-        groq_llm_model="fake-model", groq_llm_fallback_model_1="",
-        groq_llm_fallback_model_2="",
-    )
+    settings = _cerebras_settings(keys=["endpoint-key"])
     monkeypatch.setattr(route, "settings", settings)
     monkeypatch.setattr(route, "cache", coach.CoachNoteCache(3600))
-    post = Mock(side_effect=AssertionError("Unexpected Gemini HTTP request"))
-    groq_create = Mock(side_effect=RuntimeError("Mock Groq unavailable"))
-    client = SimpleNamespace(chat=SimpleNamespace(
-        completions=SimpleNamespace(create=groq_create)
-    ))
+    post = Mock(return_value=SimpleNamespace(ok=False, status_code=400))
     monkeypatch.setattr(coach.requests, "post", post)
-    monkeypatch.setattr(coach, "make_groq_client", Mock(return_value=client))
-    yield repos, user_id, post, groq_create
-    post.assert_not_called()
+    yield repos, user_id, post
+
 
 
 def _endpoint_session(repos, user_id, result, status="ok"):
@@ -156,51 +160,44 @@ def _endpoint_session(repos, user_id, result, status="ok"):
 def test_endpoint_ok_and_cache(endpoint_env, result):
     import json
 
-    repos, user_id, post, create = endpoint_env
-    create.side_effect = None
-    create.return_value = SimpleNamespace(choices=[SimpleNamespace(
-        message=SimpleNamespace(content=json.dumps(note()))
-    )])
+    repos, user_id, post = endpoint_env
+    post.return_value = _cerebras_ok(json.dumps(note()))
     row = _endpoint_session(repos, user_id, result)
     client = TestClient(app)
     responses = [client.post(f"/api/sessions/{row.id}/coach-note") for _ in range(2)]
     assert all(response.status_code == 200 for response in responses)
     assert set(responses[0].json()) == {"summary", "strengths", "focus", "next_step", "source"}
-    assert responses[0].json()["source"] == "groq"
+    assert responses[0].json()["source"] == "cerebras"
     assert responses[1].json() == responses[0].json()
-    assert create.call_count == 1
-    post.assert_not_called()
+    post.assert_called_once()
 
 
 def test_endpoint_other_user(endpoint_env, result):
     from uuid import uuid4
 
-    repos, _, post, create = endpoint_env
+    repos, _, post = endpoint_env
     row = _endpoint_session(repos, uuid4(), result)
     response = TestClient(app).post(f"/api/sessions/{row.id}/coach-note")
     assert response.status_code == 404
     assert response.json()["error_code"] == "session_not_found"
     post.assert_not_called()
-    create.assert_not_called()
 
 
 def test_endpoint_invalid_uuid(endpoint_env):
-    _, _, post, create = endpoint_env
+    _, _, post = endpoint_env
     response = TestClient(app).post("/api/sessions/not-a-uuid/coach-note")
     assert response.status_code == 404
     assert response.json()["error_code"] == "session_not_found"
     post.assert_not_called()
-    create.assert_not_called()
 
 
 def test_endpoint_insufficient_audio(endpoint_env, result):
-    repos, user_id, post, create = endpoint_env
+    repos, user_id, post = endpoint_env
     row = _endpoint_session(repos, user_id, result, status="insufficient_audio")
     response = TestClient(app).post(f"/api/sessions/{row.id}/coach-note")
     assert response.status_code == 409
     assert response.json()["error_code"] == "insufficient_audio"
     post.assert_not_called()
-    create.assert_not_called()
 
 
 def test_endpoint_storage_error(endpoint_env, monkeypatch):
@@ -208,7 +205,7 @@ def test_endpoint_storage_error(endpoint_env, monkeypatch):
 
     from src.app.db.models import StorageError
 
-    repos, _, post, create = endpoint_env
+    repos, _, post = endpoint_env
     def fail(*args):
         raise StorageError("unavailable")
 
@@ -217,17 +214,15 @@ def test_endpoint_storage_error(endpoint_env, monkeypatch):
     assert response.status_code == 503
     assert response.json()["error_code"] == "session_storage_unavailable"
     post.assert_not_called()
-    create.assert_not_called()
 
 
-def test_endpoint_groq_failure_uses_rule(endpoint_env, result):
-    repos, user_id, post, create = endpoint_env
+def test_endpoint_cerebras_failure_uses_rule(endpoint_env, result):
+    repos, user_id, post = endpoint_env
     row = _endpoint_session(repos, user_id, result)
     response = TestClient(app).post(f"/api/sessions/{row.id}/coach-note")
     assert response.status_code == 200
     assert response.json()["source"] == "rule"
-    create.assert_called_once()
-    post.assert_not_called()
+    post.assert_called_once()
 
 
 def _payload(**components):
@@ -252,48 +247,79 @@ def test_prompt_states_the_output_limits():
     assert str(coach.CONSTANTS["coach"]["max_output_chars"]) in coach._SYSTEM
 
 
-def _gemini_ok():
-    return SimpleNamespace(
-        ok=True, status_code=200,
-        json=lambda: {"candidates": [{"content": {"parts": [{"text": "{}"}]}}]},
-    )
+def _cerebras_ok(content="{}"):
+    return SimpleNamespace(ok=True, status_code=200,
+                           json=lambda: {"choices": [{"message": {"content": content}}]})
 
 
-def _gemini_settings():
-    return SimpleNamespace(gemini_api_keys=["test-retry-key"], gemini_model="model")
+def _cerebras_settings(keys=None, fallback=""):
+    return SimpleNamespace(cerebras_api_keys=keys if keys is not None else ["retry-key"],
+                           cerebras_model="model", cerebras_fallback_model_2=fallback)
 
 
-def test_gemini_retries_once_when_overloaded(monkeypatch):
+def test_cerebras_model_fallback_on_bad_response(monkeypatch):
+    post = Mock(side_effect=[SimpleNamespace(ok=False, status_code=400), _cerebras_ok()])
+    monkeypatch.setattr(coach.requests, "post", post)
+    assert coach.call_cerebras({}, _cerebras_settings(fallback="backup"), 1) == {}
+    assert [c.kwargs["json"]["model"] for c in post.call_args_list] == ["model", "backup"]
+
+
+def test_cerebras_retries_once_when_overloaded(monkeypatch):
     sleep = Mock()
     monkeypatch.setattr(coach.time, "sleep", sleep)
-    post = Mock(side_effect=[SimpleNamespace(ok=False, status_code=503), _gemini_ok()])
+    post = Mock(side_effect=[SimpleNamespace(ok=False, status_code=503), _cerebras_ok()])
     monkeypatch.setattr(coach.requests, "post", post)
-    assert coach.call_gemini({}, _gemini_settings(), 1) == {}
-    assert post.call_count == 2
+    assert coach.call_cerebras({}, _cerebras_settings(), 1) == {}
     sleep.assert_called_once_with(coach.CONSTANTS["coach"]["retry_backoff_s"])
 
 
-def test_gemini_gives_up_after_the_retry(monkeypatch):
+def test_cerebras_gives_up_after_retry_per_model(monkeypatch):
     monkeypatch.setattr(coach.time, "sleep", Mock())
     post = Mock(return_value=SimpleNamespace(ok=False, status_code=503))
     monkeypatch.setattr(coach.requests, "post", post)
-    assert coach.call_gemini({}, _gemini_settings(), 1) is None
-    assert post.call_count == 1 + coach.CONSTANTS["coach"]["retry_unavailable"]
+    assert coach.call_cerebras({}, _cerebras_settings(fallback="backup"), 1) is None
+    assert [c.kwargs["json"]["model"] for c in post.call_args_list] == [
+        "model", "model", "backup", "backup"
+    ]
 
 
-def test_gemini_retries_after_a_timeout(monkeypatch):
-    monkeypatch.setattr(coach.time, "sleep", Mock())
-    post = Mock(side_effect=[coach.requests.Timeout("slow"), _gemini_ok()])
+def test_cerebras_retries_after_timeout(monkeypatch):
+    sleep = Mock()
+    monkeypatch.setattr(coach.time, "sleep", sleep)
+    post = Mock(side_effect=[coach.requests.Timeout("slow"), _cerebras_ok()])
     monkeypatch.setattr(coach.requests, "post", post)
-    assert coach.call_gemini({}, _gemini_settings(), 1) == {}
+    assert coach.call_cerebras({}, _cerebras_settings(), 1) == {}
+    sleep.assert_called_once_with(coach.CONSTANTS["coach"]["retry_backoff_s"])
 
 
-def test_groq_uses_the_default_chain_when_env_models_are_empty(monkeypatch):
-    create = Mock(side_effect=RuntimeError("Mock Groq unavailable"))
-    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
-    monkeypatch.setattr(coach, "make_groq_client", lambda keys: client)
-    settings = SimpleNamespace(groq_api_keys=["fake"], groq_llm_model=" ",
-                               groq_llm_fallback_model_1="", groq_llm_fallback_model_2="")
-    assert coach.call_groq({}, settings, 1) is None
-    tried = [call.kwargs["model"] for call in create.call_args_list]
-    assert tried == list(coach._DEFAULT_MODEL_CHAIN)
+def test_cerebras_invalid_json_tries_fallback(monkeypatch):
+    post = Mock(side_effect=[_cerebras_ok("bad json"), _cerebras_ok()])
+    monkeypatch.setattr(coach.requests, "post", post)
+    assert coach.call_cerebras({}, _cerebras_settings(fallback="backup"), 1) == {}
+    assert post.call_args.kwargs["json"]["model"] == "backup"
+
+
+def test_cerebras_falls_back_when_all_model_keys_are_exhausted(monkeypatch):
+    keys = ["exhausted-fallback-key-one", "exhausted-fallback-key-two"]
+    post = Mock(side_effect=[
+        SimpleNamespace(ok=False, status_code=429),
+        SimpleNamespace(ok=False, status_code=429),
+        _cerebras_ok(),
+    ])
+    monkeypatch.setattr(coach.requests, "post", post)
+    settings = _cerebras_settings(keys=keys, fallback="backup")
+    assert coach.call_cerebras({}, settings, 1) == {}
+    assert [c.kwargs["json"]["model"] for c in post.call_args_list] == [
+        "model", "model", "backup"
+    ]
+    pool = coach.get_pool("cerebras", keys)
+    with pytest.raises(coach.KeysExhaustedError):
+        pool.current(scope="model")
+
+
+def test_cerebras_duplicate_fallback_model_is_called_once(monkeypatch):
+    post = Mock(return_value=SimpleNamespace(ok=False, status_code=400))
+    monkeypatch.setattr(coach.requests, "post", post)
+    settings = _cerebras_settings(keys=["duplicate-model-test-key"], fallback="model")
+    assert coach.call_cerebras({}, settings, 1) is None
+    post.assert_called_once()

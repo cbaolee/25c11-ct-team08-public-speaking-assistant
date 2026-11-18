@@ -11,9 +11,7 @@ import requests
 from src.app.constants import CONSTANTS
 from src.app.key_pool import KeysExhaustedError, get_pool
 from src.audio_processing.scoring import display_round
-from src.text_processing.groq_pool import make_groq_client
 from src.text_processing.moderation import ContentModerator
-from src.text_processing.template_engine import _DEFAULT_MODEL_CHAIN
 
 
 class CoachNote(TypedDict):
@@ -135,76 +133,66 @@ def _data(payload):
     return '<data>\n' + json.dumps(payload, ensure_ascii=False) + '\n</data>'
 
 
-def call_gemini(payload, settings, timeout_s):
-    if not settings.gemini_api_keys or not settings.gemini_model.strip():
+_CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions'
+
+
+def call_cerebras(payload, settings, timeout_s):
+    models = [m.strip() for m in (settings.cerebras_model, settings.cerebras_fallback_model_2)
+              if m.strip()]
+    if not settings.cerebras_api_keys or not models:
         return None
-    pool = get_pool('gemini', settings.gemini_api_keys)
-    config, retries = CONSTANTS['coach'], 0
-    while True:
-        try:
-            key = pool.current()
-        except KeysExhaustedError:
-            return None
-        try:
-            response = requests.post(
-                f'https://generativelanguage.googleapis.com/v1beta/models/{settings.gemini_model}:generateContent',
-                headers={'x-goog-api-key': key}, timeout=timeout_s,
-                json={'systemInstruction': {'parts': [{'text': _SYSTEM}]},
-                      'contents': [{'parts': [{'text': _data(payload)}]}],
-                      'generationConfig': {'responseMimeType': 'application/json'}},
-            )
-            if not response.ok:
-                if pool.report(key, response.status_code):
-                    continue
-                # 500/503: the model is overloaded right now; one more try often works
-                if response.status_code in (500, 503) and retries < config['retry_unavailable']:
+    pool = get_pool('cerebras', settings.cerebras_api_keys)
+    config = CONSTANTS['coach']
+    for model in dict.fromkeys(models):
+        retries = 0
+        while True:
+            try:
+                key = pool.current(scope=model)
+            except KeysExhaustedError:
+                break
+            try:
+                response = requests.post(
+                    _CEREBRAS_URL,
+                    headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+                    timeout=timeout_s,
+                    json={'model': model,
+                          'messages': [{'role': 'system', 'content': _SYSTEM},
+                                       {'role': 'user', 'content': _data(payload)}],
+                          'response_format': {'type': 'json_object'},
+                          'max_completion_tokens': config['max_completion_tokens'],
+                          'reasoning_effort': config['reasoning_effort']},
+                )
+                if not response.ok:
+                    if pool.report(key, response.status_code, scope=model):
+                        continue
+                    if response.status_code in (500, 503) and retries < config['retry_unavailable']:
+                        retries += 1
+                        time.sleep(config['retry_backoff_s'])
+                        continue
+                    break
+                return json.loads(response.json()['choices'][0]['message']['content'])
+            except requests.Timeout:
+                if retries < config['retry_unavailable']:
                     retries += 1
                     time.sleep(config['retry_backoff_s'])
                     continue
-                return None
-            return json.loads(response.json()['candidates'][0]['content']['parts'][0]['text'])
-        except requests.Timeout:
-            if retries < config['retry_unavailable']:
-                retries += 1
-                time.sleep(config['retry_backoff_s'])
-                continue
-            return None
-        except (requests.RequestException, ValueError, KeyError, IndexError, TypeError):
-            return None
-
-
-def call_groq(payload, settings, timeout_s):
-    client = make_groq_client(settings.groq_api_keys)
-    if client is None:
-        return None
-    # Same rule as script generation: the .env models, or the built-in chain when all are empty
-    models = [m.strip() for m in (settings.groq_llm_model, settings.groq_llm_fallback_model_1,
-                                  settings.groq_llm_fallback_model_2) if m.strip()]
-    for model in dict.fromkeys(models or _DEFAULT_MODEL_CHAIN):
-        try:
-            response = client.chat.completions.create(
-                model=model, timeout=timeout_s, response_format={'type': 'json_object'},
-                messages=[{'role': 'system', 'content': _SYSTEM},
-                          {'role': 'user', 'content': _data(payload)}],
-            )
-            return json.loads(response.choices[0].message.content)
-        except Exception:
-            continue
+                break
+            except (requests.RequestException, ValueError, KeyError, IndexError, TypeError):
+                break
     return None
 
 
-def generate_coach_note(result, settings, *, moderator=None, gemini=call_gemini, groq=call_groq):
+def generate_coach_note(result, settings, *, moderator=None, cerebras=call_cerebras):
     config = CONSTANTS['coach']
     payload = build_payload(result, config['max_error_words'])
     moderator = moderator or ContentModerator(enable_llama_guard=False)
-    for source, provider in (('gemini', gemini), ('groq', groq)):
-        try:
-            value = provider(payload, settings, config['timeout_s'])
-        except Exception:
-            value = None
-        note = validate_output(value, payload, config['max_output_chars'], moderator)
-        if note is not None:
-            return {**note, 'source': source}
+    try:
+        value = cerebras(payload, settings, config['timeout_s'])
+    except Exception:
+        value = None
+    note = validate_output(value, payload, config['max_output_chars'], moderator)
+    if note is not None:
+        return {**note, 'source': 'cerebras'}
     note = validate_output(rule_based_note(payload), payload, config['max_output_chars'], moderator)
     if note is None:
         raise ValueError('Rule-based coach note failed validation')
@@ -230,5 +218,5 @@ class CoachNoteCache:
             now = self.clock()
             for key in [key for key, entry in self._entries.items() if entry[0] <= now]:
                 del self._entries[key]
-            if note.get('source') in {'gemini', 'groq'}:
+            if note.get('source') != 'rule':
                 self._entries[session_id] = (now + self.ttl_s, dict(note))
