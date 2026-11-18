@@ -68,6 +68,9 @@ follow_gap_s = 0.5
 # Sessions per History page, and most pages loaded on Home and History
 history_page_size = 20
 history_max_pages = 5
+# Part score from which a part counts as "good" in the Overview, Key numbers and the
+# rule-based coach note (UI proposal, not yet agreed by the team; CLAUDE.md 1.7)
+part_good_min = 85
 
 [retry]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.

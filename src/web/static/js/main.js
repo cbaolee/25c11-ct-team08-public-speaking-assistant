@@ -59,6 +59,7 @@ export function loadConfig() {
     CONFIG.FOLLOW_GAP_S = c.follow_gap_s ?? CONFIG.FOLLOW_GAP_S;
     CONFIG.HISTORY_PAGE_SIZE = c.history_page_size ?? CONFIG.HISTORY_PAGE_SIZE;
     CONFIG.HISTORY_MAX_PAGES = c.history_max_pages ?? CONFIG.HISTORY_MAX_PAGES;
+    CONFIG.PART_GOOD_MIN = c.part_good_min ?? CONFIG.PART_GOOD_MIN;
   }).catch(() => {});
 }
 export function init() {

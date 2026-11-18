@@ -230,6 +230,28 @@ def test_endpoint_groq_failure_uses_rule(endpoint_env, result):
     post.assert_not_called()
 
 
+def _payload(**components):
+    return {"components": components, "warnings": []}
+
+
+def test_rule_note_has_no_focus_when_every_part_is_good():
+    good = coach.CONSTANTS["web"]["part_good_min"]
+    note = coach.rule_based_note(_payload(accuracy=good, fluency=good + 5))
+    assert note["focus"] == []
+    assert note["summary"] == "Every scored part is in good shape."
+
+
+def test_rule_note_focuses_on_the_lowest_part_below_good():
+    good = coach.CONSTANTS["web"]["part_good_min"]
+    note = coach.rule_based_note(_payload(accuracy=good - 20, fluency=good - 5, semantic=good + 5))
+    assert note["focus"] == ["Practise Accuracy."]
+    assert note["strengths"] == ["Meaning match"]
+
+
+def test_prompt_states_the_output_limits():
+    assert str(coach.CONSTANTS["coach"]["max_output_chars"]) in coach._SYSTEM
+
+
 def _gemini_ok():
     return SimpleNamespace(
         ok=True, status_code=200,
