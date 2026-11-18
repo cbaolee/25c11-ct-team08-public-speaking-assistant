@@ -55,7 +55,7 @@ from src.app.db.session_helpers import (
 )
 from src.app.deps import CurrentUser, get_current_user
 from src.app.routes import auth as auth_routes
-from src.app.routes import baselines, practice
+from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
@@ -91,6 +91,7 @@ app.include_router(auth_routes.router)
 app.include_router(profile_routes.router)
 app.include_router(baselines.router)
 app.include_router(practice.router)
+app.include_router(coach.router)
 
 _script_pipeline: ScriptGenerationPipeline | None = None
 

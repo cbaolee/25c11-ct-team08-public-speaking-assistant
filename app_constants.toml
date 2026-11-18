@@ -79,3 +79,10 @@ attempts_per_window = 20
 window_s = 600
 server_grace_s = 2
 max_target_chars = 500
+
+[coach]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.3). Calibrate in M7.
+max_error_words = 15
+timeout_s = 20
+max_output_chars = 900
+cache_ttl_s = 3600
