@@ -85,7 +85,7 @@ const coachCache = new Map();
 const coachPending = new Map();
 function renderCoachNote(el, note) {
   el.replaceChildren();
-  const label = document.createElement('div'); label.className = 'cn-label'; label.textContent = T('overview.aiLabel'); el.append(label);
+  const label = document.createElement('div'); label.className = 'cn-label'; label.textContent = T(note.source === 'rule' ? 'overview.ruleLabel' : 'overview.aiLabel'); el.append(label);
   const summary = document.createElement('div'); summary.textContent = note.summary; el.append(summary);
   if (note.focus.length) {
     const list = document.createElement('ul'); list.className = 'cn-list';
@@ -118,7 +118,7 @@ export async function loadCoachNote(s) {
   }
 }
 const OV_IC = {
-  good: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+  good: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
   warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg>',
   focus: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
   pace: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13l4-4M4 18a9 9 0 1 1 16 0"/></svg>',
@@ -137,7 +137,7 @@ export function overviewHtml(s) {
   const verdict = band ? T('overview.verdict_' + band) : T('overview.na');
   // three short cards: what went best, what to improve, what to do next
   const cards = [];
-  if (!lo) { /* no part could be scored */ } else if (lo.v >= 85) cards.push(['good', T('overview.strongest'), esc(T('overview.allGood'))]);
+  if (!lo) { /* no part could be scored */ } else if (lo.v >= CONFIG.PART_GOOD_MIN) cards.push(['good', T('overview.strongest'), esc(T('overview.allGood')), 'solo']);
   else {
     cards.push(['good', T('overview.strongest'), '<b>' + esc(hi.name) + '</b>']);
     cards.push(['warn', T('overview.improve'), '<b>' + esc(lo.name) + '</b>']);
@@ -149,12 +149,12 @@ export function overviewHtml(s) {
     '<div class="ov-coach"><span class="ov-coach-av" aria-hidden="true">' + IC.ai + '</span><div class="ov-coach-in">' +
       '<p class="ov-coach-who">' + esc(T('overview.coachWho')) + ' <span class="ov-coach-tag">' + esc(T('overview.coachTag')) + '</span></p>' +
       '<div class="ov-coach-text" id="repCoachNote">' + esc(coachNote(s)) + '</div></div></div>' +
-    '<ul class="ov-cards">' + cards.map(c => '<li class="ov-card ' + c[0] + '"><span class="ov-ic" aria-hidden="true">' + OV_IC[c[0]] + '</span><div><p class="ov-k">' + esc(c[1]) + '</p><p class="ov-v">' + c[2] + '</p></div></li>').join('') + '</ul>';
+    '<ul class="ov-cards">' + cards.map(c => '<li class="ov-card ' + c[0] + (c[3] ? ' ' + c[3] : '') + '"><span class="ov-ic" aria-hidden="true">' + OV_IC[c[0]] + '</span><div><p class="ov-k">' + esc(c[1]) + '</p><p class="ov-v">' + c[2] + '</p></div></li>').join('') + '</ul>';
 }
 /* Key numbers (own panel at the top of the right column): one row per measure, with a green
    "on target" or amber "work on it" state from the part score behind it */
 export function keyNumbersHtml(sc) {
-  const state = v => (v == null ? '' : v >= 85 ? 'ok' : 'warn');
+  const state = v => (v == null ? '' : v >= CONFIG.PART_GOOD_MIN ? 'ok' : 'warn');
   const tiles = [
     ['pace', sc.wpm == null ? esc(T('common.na')) : Math.round(sc.wpm) + '<small>' + esc(T('report.unitWpm')) + '</small>', T('overview.gPace'), sc.Fwpm],
     ['pause', esc(fx(sc.H, 1)), T('overview.gHes'), sc.Fpause],
@@ -238,7 +238,7 @@ if (window.ResizeObserver && $('.rep-aside')) new ResizeObserver(() => { if (S.s
 
 /* ---- detail windows. Assessments and suggestions are deterministic templates over the scores (the LLM never grades). ---- */
 export const PART_KEYS = { A: 'pA', F: 'pF', P: 'pP', S: 'pS' };
-export const bandOf = v => (v >= 85 ? 'good' : v >= 70 ? 'mid' : 'low');
+export const bandOf = v => (v >= CONFIG.PART_GOOD_MIN ? 'good' : v >= 70 ? 'mid' : 'low');
 export const BAND_PILL = { good: 'ok', mid: 'warn', low: 'bad' };
 export const secHtml = (title, inner) => '<section class="dsec"><h3>' + esc(title) + '</h3>' + inner + '</section>';
 export function tipsHtml(list) {

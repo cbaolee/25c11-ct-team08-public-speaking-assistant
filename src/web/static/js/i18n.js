@@ -250,6 +250,7 @@ export const TEXT = {
     keyNumbers: 'Key numbers', onTarget: 'On target', workOn: 'Work on it',
     coachWho: 'Assistant', coachTag: 'Preview',
     aiLabel: 'AI feedback, based on your scores',
+    ruleLabel: 'Summary based on your scores',
     nextStep: 'Next step',
     coachPlaceholder: 'Well done for finishing this take! Every run-through makes the next one easier. Read the focus point below, then give it one more try.'
   },

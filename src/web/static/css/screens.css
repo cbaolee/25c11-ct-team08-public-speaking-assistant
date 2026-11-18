@@ -288,6 +288,7 @@ table.t tr:last-child td { border-bottom: 0; }
 .ov-cards { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .ov-card { display: flex; gap: 12px; align-items: flex-start; padding: 14px 14px; border-radius: 14px; background: #fff; color: var(--ink); }
 .ov-card.focus { grid-column: 1 / -1; }
+.ov-card.solo { grid-column: 1 / -1; } /* lone card spans the row like the coach note and Focus next */
 .ov-ic { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; }
 .ov-ic svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .ov-card.good .ov-ic { background: #DCFCE7; color: #15803D; }
