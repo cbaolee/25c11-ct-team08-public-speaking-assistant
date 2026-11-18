@@ -179,3 +179,47 @@ export function redrawCharts() { $$('.chart').forEach(el => { if (el._spec && el
    UI LOGIC  (all behaviour is a front-end simulation: no network, no real audio)
    Real app: replace the marked  SIM  blocks with HTMX calls to FastAPI.
    ===================================================================== */
+
+/* "View as table" opens and closes with motion: the chart box grows (or shrinks) smoothly, so the
+   boxes below slide down (or up), then the table fades in (or fades out first). The steps run on
+   timers and the animations only show them, so the end state is always right (a hidden tab runs no
+   animation frames). With "reduce motion" it opens at once, as a plain <details>. */
+const TABLE_GROW_MS = 380, TABLE_FADE_MS = 260, TABLE_EASE = 'cubic-bezier(.4, 0, .2, 1)';
+function stopTableMotion(d, tbl) {
+  (d._timers || []).forEach(clearTimeout); d._timers = [];
+  d.getAnimations().concat(tbl.getAnimations()).forEach(a => a.cancel());
+  d.style.overflow = ''; tbl.style.opacity = '';
+}
+document.addEventListener('click', e => {
+  const sum = e.target.closest && e.target.closest('.chart details > summary');
+  if (!sum) return;
+  const d = sum.parentElement, tbl = $('table', d);
+  if (!tbl || !d.animate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;   // the browser toggles it
+  e.preventDefault();
+  stopTableMotion(d, tbl);
+  const later = (ms, fn) => d._timers.push(setTimeout(fn, ms));
+  const from = d.offsetHeight;
+  if (!d.open) {
+    // 1. grow the box (the boxes below move down), table hidden  2. fade the table in
+    d.open = true;
+    const to = d.offsetHeight;
+    tbl.style.opacity = '0'; d.style.overflow = 'hidden';
+    d.animate([{ height: from + 'px' }, { height: to + 'px' }], { duration: TABLE_GROW_MS, easing: TABLE_EASE });
+    later(TABLE_GROW_MS, () => {
+      d.getAnimations().forEach(a => a.cancel());   // the box is at its full height now
+      d.style.overflow = ''; tbl.style.opacity = '';
+      tbl.animate([{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }], { duration: TABLE_FADE_MS, easing: 'ease-out' });
+      later(TABLE_FADE_MS, () => stopTableMotion(d, tbl));   // done: nothing left holding a frame
+    });
+  } else {
+    // 1. fade the table out  2. shrink the box (the boxes below move up)  3. close
+    const out = Math.round(TABLE_FADE_MS * .7);
+    tbl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: out, easing: 'ease-in' });
+    later(out, () => {
+      tbl.getAnimations().forEach(a => a.cancel());
+      tbl.style.opacity = '0'; d.style.overflow = 'hidden';
+      d.animate([{ height: from + 'px' }, { height: sum.offsetHeight + 'px' }], { duration: TABLE_GROW_MS, easing: TABLE_EASE, fill: 'forwards' });
+      later(TABLE_GROW_MS, () => { stopTableMotion(d, tbl); d.open = false; });
+    });
+  }
+});

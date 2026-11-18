@@ -4,7 +4,7 @@ import { T } from '../i18n.js';
 import { go } from '../nav.js';
 import { revokeAudio } from '../screens/report.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { toast } from '../ui.js';
+import { busy, toast, withBusy } from '../ui.js';
 import { $, esc, fmtDay, fmtDayLong, fmtTime, scored } from '../utils.js';
 
 /* ---------- History from the server (F2): GET /api/sessions, /api/sessions/{id}, DELETE ---------- */
@@ -53,7 +53,7 @@ export function loadSessionDetail(s) {
   });
 }
 export function deleteSession(id) {
-  return api('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => {
+  return withBusy(api('/api/sessions/' + encodeURIComponent(id), { method: 'DELETE' }), T('busy.deleting')).then(r => {
     if (!r.ok && r.status !== 404) throw new Error('delete ' + r.status);   // 404: already gone
     S.sessions.filter(x => x.id === id).forEach(revokeAudio);
     S.sessions = S.sessions.filter(x => x.id !== id);
@@ -70,7 +70,12 @@ export function renderHistory() {
     return '<tr><td>' + esc(fmtDayLong(s.ts)) + '</td><td>' + esc(s.title) + '</td><td class="num">' + fmtTime(s.dur) + '</td><td class="num">' + esc(sh(s.sc.overall)) + '</td><td><div class="row" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn btn-ghost btn-sm" type="button" data-open="' + s.id + '" aria-label="' + esc(T('history.open') + ': ' + lab) + '">' + esc(T('history.open')) + '</button><button class="btn btn-danger-ghost btn-sm" type="button" data-del="' + s.id + '" aria-label="' + esc(T('history.delete') + ': ' + lab) + '">' + esc(T('history.delete')) + '</button></div></td></tr>';
   }).join('');
 }
+let opening = false;   // a second click while one report is loading is ignored
 export function openReport(id) {
-  const s = S.sessions.find(x => x.id === id); if (!s) return;
-  loadSessionDetail(s).then(() => { S.currentSession = s; go('report'); }).catch(() => toast(T('history.openErr'), true));
+  const s = S.sessions.find(x => x.id === id); if (!s || opening) return;
+  opening = true;
+  const done = busy(T('history.opening'), 150);   // dim + loading bars while the full report downloads
+  loadSessionDetail(s)
+    .then(() => { done(); S.currentSession = s; go('report'); }, () => { done(); toast(T('history.openErr'), true); })
+    .finally(() => { opening = false; });
 }

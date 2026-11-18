@@ -3,7 +3,7 @@ import { T, TOPICS } from '../i18n.js';
 import { go, paintAvatar } from '../nav.js';
 import { loadSavedScripts } from '../screens/practice.js';
 import { RENDER, S } from '../state.js';
-import { openModal, toast } from '../ui.js';
+import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, IC, clearErr, esc, showErr, wordsOf } from '../utils.js';
 
 /* ---------- Script (Generate Script) ---------- */
@@ -16,32 +16,18 @@ export const SCRIPT_DURATIONS = [5, 10, 15, 20];
 export function saveScript(sc) {
   if (sc.savedId) return Promise.resolve({ id: sc.savedId });
   const d = +sc.duration_min;
-  return api('/api/scripts', { method: 'POST', json: {
+  return withBusy(api('/api/scripts', { method: 'POST', json: {
     title: (sc.title || 'Script').slice(0, 200), body: sc.text, source: SCRIPT_SOURCE[sc.source] || 'written',
     duration_min: SCRIPT_DURATIONS.indexOf(d) >= 0 ? d : null, topic: sc.title ? sc.title.slice(0, 200) : null,
     category: sc.topic || null, template_id: sc.template_id || null, models_used: sc.models_used || [], citations: sc.citations || []
-  } }).then(readJson).then(({ ok, j }) => {
+  } }), T('busy.saving')).then(readJson).then(({ ok, j }) => {
     if (!ok) throw Object.assign(new Error('save'), { code: j && j.error_code, msg: j && j.message });
     sc.savedId = j.id;
     return j;
   });
 }
-export function syncTplSelect() {
-  const cat = $('#composerTopic').value, tplSel = $('#chatTpl'), durSel = $('#composerDuration');
-  if (!tplSel || !durSel) return;
-  const list = (S.apiTopics || []).filter(t => t.category_slug === cat);
-  tplSel.innerHTML = '<option value="">Custom topic (LLM)</option>' + list.map(t => '<option value="' + esc(t.template_id) + '">' + esc((t.topic || t.title) + ' (' + t.duration_min + 'm)') + '</option>').join('');
-  tplSel.value = list.length ? list[0].template_id : '';
-  tplSel.disabled = cat === 'free' || !list.length;
-  syncDurLock();
-}
-export function syncDurLock() {
-  const tplSel = $('#chatTpl'), durSel = $('#composerDuration');
-  if (!tplSel || !durSel) return;
-  const tpl = (S.apiTopics || []).find(t => t.template_id === tplSel.value);
-  if (tpl) { durSel.value = String(tpl.duration_min); durSel.disabled = true; }
-  else durSel.disabled = false;
-}
+/* Category select: one of the six fixed categories (no free topic). There is no template choice in the
+   UI any more; the request keeps its fields (tplId empty) until the backend is updated. */
 export function fillTopicSelect() {
   const sel = $('#composerTopic'), keep = sel.value;
   if (!S.apiTopics) {
@@ -49,10 +35,9 @@ export function fillTopicSelect() {
       if (d && d.topics) { S.apiTopics = d.topics; S.apiCategories = d.categories || []; fillTopicSelect(); }
     }).catch(() => {});
   }
-  const keys = Object.keys(CAT_LABELS);
+  const keys = Object.keys(TOPICS);
   sel.innerHTML = keys.map(k => '<option value="' + k + '">' + esc(topicLabel(k)) + '</option>').join('');
   if (keep && keys.indexOf(keep) >= 0) sel.value = keep;
-  syncTplSelect();
 }
 /* Chat-app layout: each message is a row with the sender's picture outside the bubble,
    the assistant's logo on the left, the user's avatar (photo or initial) on the right. */
@@ -156,9 +141,41 @@ export function generateScript(req, again) {
     poll(j.job_id);
   }).catch(() => failJob('net', T('eval.errNet')));
 }
+/* Composer text box: when short it is exactly as tall as the buttons beside it (attach / send), grows
+   line by line as the text gets longer, up to 5.5 lines (then it scrolls inside). The arrow at the top
+   right of the composer folds it back to the button height (arrow points down) and unfolds it again to
+   fit the text, at most 5.5 lines (arrow points up). The arrow only shows when the text is taller than
+   that short box, the only time folding changes anything. */
+const COMPOSER_MAX_LINES = 5.5;
+export function fitComposer() {
+  const ta = $('#composerInput'), fold = $('#composerFold'); if (!ta) return;
+  const st = getComputedStyle(ta), line = parseFloat(st.lineHeight) || 22;
+  const pad = parseFloat(st.paddingTop) + parseFloat(st.paddingBottom), edge = parseFloat(st.borderTopWidth) + parseFloat(st.borderBottomWidth);
+  // measure the text alone (height 0) with the height transition off, then put the old height back so
+  // the transition runs from where the box is now, not from 0 (that would flicker on every key)
+  const prev = ta.offsetHeight;
+  ta.style.transition = 'none'; ta.style.height = '0px';
+  const text = ta.scrollHeight - pad;
+  ta.style.height = prev + 'px'; void ta.offsetHeight; ta.style.transition = '';
+  const btn = $('#attachBtn'), lo = Math.max(line, ((btn && btn.offsetHeight) || 44) - pad - edge), hi = COMPOSER_MAX_LINES * line;
+  const open = Math.min(hi, Math.max(lo, text));
+  const tall = text > lo + 1;
+  if (!tall) S.composerFolded = false;                           // nothing to fold any more
+  ta.style.height = ((S.composerFolded ? lo : open) + pad + edge) + 'px';
+  fold.hidden = !tall;
+  fold.classList.toggle('up', !!S.composerFolded);
+  fold.setAttribute('aria-expanded', String(!S.composerFolded));
+  fold.setAttribute('aria-label', T(S.composerFolded ? 'script.unfold' : 'script.fold'));
+  fold.title = fold.getAttribute('aria-label');
+}
+export function toggleComposerFold() {
+  S.composerFolded = !S.composerFolded;
+  fitComposer();
+  if (!S.composerFolded) { const ta = $('#composerInput'); ta.scrollTop = ta.scrollHeight; }
+}
 export function sendChat() {
   if (S.chatBusy) return;
-  const txt = $('#composerInput').value.trim(), err = $('#composerError'), tplId = $('#chatTpl') ? $('#chatTpl').value : '';
+  const txt = $('#composerInput').value.trim(), err = $('#composerError'), tplId = '';   // no template choice in the UI
   const tpl = (S.apiTopics || []).find(t => t.template_id === tplId);
   if (!txt && !S.chatFile && !tplId) return;
   if (wordsOf(txt) > 3000) { showErr(err, T('script.errLong')); return; }
@@ -168,6 +185,7 @@ export function sendChat() {
   const me = addBubble('me', '<span></span>');
   me.firstChild.textContent = [tplName ? '📄 ' + tplName : '', txt, S.chatFile ? '📎 ' + S.chatFile.name : ''].filter(Boolean).join('\n');
   $('#composerInput').value = ''; S.chatFile = null; renderChatFile();
+  S.composerFolded = false; fitComposer();   // back to one short line
   S.lastReq = req;
   generateScript(req, false);
 }

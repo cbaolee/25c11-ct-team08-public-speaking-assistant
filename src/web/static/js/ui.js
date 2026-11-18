@@ -17,6 +17,77 @@ export function toast(msg, err) {
 /* ---------- modals (focus trap, Esc, focus return) ---------- */
 export const FOCUSABLE = 'a[href],button,input,select,textarea,[tabindex]:not([tabindex="-1"])';
 export const usable = el => !el.disabled && !el.closest('[hidden]') && el.getAttribute('tabindex') !== '-1';
+/* While a window is open the page behind must not scroll. overflow: hidden would do it, but it also
+   removes the scrollbar, and Chrome then paints its place next to the top bar black (base.css). So the
+   scrollbar stays: wheel, touch and scroll keys are stopped unless they scroll something inside the
+   window, and a drag of the scrollbar is put back at once. */
+/* Chrome does not repaint the page scrollbar when its ::-webkit-scrollbar colours change through a class
+   (modal-open, no-scroll in base.css). Rebuild it: hide and show it again in the same step (nothing is
+   painted in between, so nothing flickers) and keep the scroll position. */
+export function repaintScrollbar() {
+  const de = document.documentElement, y = window.scrollY;
+  de.style.overflowY = 'hidden'; void de.offsetWidth;
+  de.style.overflowY = ''; void de.offsetWidth;
+  if (window.scrollY !== y) window.scrollTo(0, y);
+}
+const SCROLL_KEYS = new Set([' ', 'PageUp', 'PageDown', 'Home', 'End', 'ArrowUp', 'ArrowDown']);
+let pageLock = null;
+function scrollsInside(target, dy) {
+  for (let el = target; el && el !== document.body; el = el.parentElement) {
+    if (el.classList && el.classList.contains('mbg')) return false;   // reached the dimmed backdrop: nothing inside scrolls
+    const st = getComputedStyle(el), canY = /(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight;
+    if (canY && (dy < 0 ? el.scrollTop > 0 : el.scrollTop + el.clientHeight < el.scrollHeight - 1)) return true;
+  }
+  return false;
+}
+function lockPageScroll(on) {
+  if (on && !pageLock) {
+    const y = window.scrollY;
+    let lastY = 0;
+    const wheel = e => { if (!scrollsInside(e.target, e.deltaY)) e.preventDefault(); };
+    const touchStart = e => { lastY = e.touches[0] ? e.touches[0].clientY : 0; };
+    const touch = e => { const cy = e.touches[0] ? e.touches[0].clientY : lastY, dy = lastY - cy; lastY = cy; if (!scrollsInside(e.target, dy)) e.preventDefault(); };
+    const key = e => { if (!SCROLL_KEYS.has(e.key)) return; const t = e.target; if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return; if (!scrollsInside(t, /Up|Home/.test(e.key) || (e.key === ' ' && e.shiftKey) ? -1 : 1)) e.preventDefault(); };
+    const back = () => { if (window.scrollY !== y) window.scrollTo(0, y); };
+    window.addEventListener('wheel', wheel, { passive: false });
+    window.addEventListener('touchstart', touchStart, { passive: true });
+    window.addEventListener('touchmove', touch, { passive: false });
+    window.addEventListener('keydown', key);
+    window.addEventListener('scroll', back);
+    document.documentElement.classList.add('modal-open');   // dims the scrollbar with the page (base.css)
+    repaintScrollbar();
+    pageLock = () => { window.removeEventListener('wheel', wheel); window.removeEventListener('touchstart', touchStart); window.removeEventListener('touchmove', touch); window.removeEventListener('keydown', key); window.removeEventListener('scroll', back); };
+  } else if (!on && pageLock) { pageLock(); pageLock = null; document.documentElement.classList.remove('modal-open'); repaintScrollbar(); }
+}
+/* Busy screen for waits on the server (opening a report, saving, deleting...): the page dims like
+   behind a window and the loading bars of the log-in screen play in the middle. Shown only once the
+   wait passes the delay (BUSY_DELAY_MS, 0.8 s), so quick actions never flash it.
+   busy(text, delay) returns done(): call it when the wait is over. withBusy(promise, text) does it for
+   a promise and hands the same result on. */
+const BUSY_DELAY_MS = 800;
+export function withBusy(promise, text, delay) {
+  const done = busy(text, delay);
+  return Promise.resolve(promise).finally(done);
+}
+export function busy(text, delay) {
+  const el = $('#busyOverlay');
+  let shown = false, over = false;
+  const tm = setTimeout(() => {
+    if (over) return;
+    shown = true;
+    $('#busyText').textContent = text || '';
+    el.hidden = false; el.classList.remove('out');
+    lockPageScroll(true);
+  }, delay != null ? delay : BUSY_DELAY_MS);
+  return () => {
+    over = true; clearTimeout(tm);
+    if (!shown) return;
+    if (!S.modal.length) lockPageScroll(false);
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.hidden = true; return; }
+    el.classList.add('out');
+    setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 250);
+  };
+}
 export function openModal(id, opts) {
   opts = opts || {};
   const m = $('#' + id);
@@ -25,7 +96,7 @@ export function openModal(id, opts) {
   if (m._closing) { m._closing.forEach(a => a.cancel()); m._closing = null; }   // reopened while it was still closing
   m.classList.add('show');
   S.modal.push(id);
-  document.body.style.overflow = 'hidden';
+  lockPageScroll(true);
   const target = (opts.focus && $(opts.focus, m)) || $$(FOCUSABLE, m).filter(usable)[0] || $('.box', m);
   target.focus();
 }
@@ -42,7 +113,7 @@ export function closeModal(id, restore) {
     anims[0].onfinish = () => { if (m._closing !== anims) return; m._closing = null; m.classList.remove('show'); anims.forEach(a => a.cancel()); };
   } else m.classList.remove('show');
   S.modal = S.modal.filter(x => x !== id);
-  if (!S.modal.length) document.body.style.overflow = '';
+  if (!S.modal.length) lockPageScroll(false);
   if (restore === false) return;
   const op = m._opener;
   if (op && document.body.contains(op) && !op.closest('[hidden]') && op.focus) op.focus();

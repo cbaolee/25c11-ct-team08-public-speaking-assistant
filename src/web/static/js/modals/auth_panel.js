@@ -1,12 +1,13 @@
 import { AUTH_ERR, EMAIL_RE, MIN_PASSWORD, api, readJson, storeAuth } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
-import { loadBaseline } from '../modals/baseline_gate.js';
-import { go, moveSegPills, renderAccount, showView } from '../nav.js';
+import { loadBaseline, openBaselineGate } from '../modals/baseline_gate.js';
+import { go, moveNavPill, moveSegPills, renderAccount, showView, slideIn, syncHeader } from '../nav.js';
+import { heroLightsOn } from '../screens/home.js';
 import { loadHistory } from '../screens/history.js';
 import { setStageAuth } from '../screens/landing.js';
 import { addBubble, fillTopicSelect, renderChatFile } from '../screens/script_studio.js';
-import { S } from '../state.js';
-import { openModal, toast } from '../ui.js';
+import { RENDER, S } from '../state.js';
+import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
 
 export function fillSignupForm(reset) {
@@ -77,10 +78,11 @@ export function resetChat() {
   const feed = $('#chatFeed');
   feed.innerHTML = '';
   addBubble('ai', '<p></p>').querySelector('p').textContent = T('script.greeting', { name: S.user.name });
-  S.chatFile = null; renderChatFile(); $('#composerInput').value = ''; clearErr($('#composerError'));
+  S.chatFile = null; renderChatFile(); $('#composerInput').value = ''; S.composerFolded = false; clearErr($('#composerError'));
 }
 export function enterApp(fresh) {
   S.texts = { mine: null, sample: null, own: null }; S.pickerTab = 'mine'; S.audio = null; S.currentSession = null; S.choosing = true;
+  S.scrollPos = {}; S.scrollKey = null;   // a new log in starts every screen at the top
   renderAccount(); showView('app'); fillTopicSelect(); resetChat();
   go('home', { silent: !fresh });
 }
@@ -114,12 +116,36 @@ export function startSession(fresh) {
     }
     applyProfile(j);
     S.sessions = []; S.baseline = null; S.savedScripts = null;
-    // Loading screen until history and the latest scores are in, so Home never shows an empty
-    // account first and then jumps. The Baseline Gate (if needed) opens after it.
+    // Loading screen until everything that changes Home's layout is in: history and the latest
+    // scores, the baseline, the web fonts (the serif greeting changes size when it swaps in) and
+    // the header height. Home is drawn once more under the loader, then shown as it will stay.
+    // The Baseline Gate (if needed) opens after the loader.
     showAppLoader(true);
     enterApp(fresh);
-    const user = S.user, ready = () => { showAppLoader(false); if (S.user !== user) return; if (fresh) toast(T('auth.okLogin')); loadBaseline(true); };
-    Promise.race([loadHistory(), new Promise(r => setTimeout(r, 10000))]).then(ready, ready);
+    const user = S.user;
+    const capped = (p, ms) => Promise.race([Promise.resolve(p).catch(() => {}), new Promise(r => setTimeout(r, ms))]);
+    const fonts = document.fonts ? document.fonts.ready : null;
+    Promise.all([capped(loadHistory(), 10000), capped(loadBaseline(false), 10000), capped(fonts, 3000)]).then(([, needGate]) => {
+      if (S.user !== user) { showAppLoader(false); return; }
+      syncHeader(); moveNavPill(false);
+      if (S.screen === 'home') RENDER.home();
+      // two frames: the browser has laid out and painted the final Home before the loader fades.
+      // A hidden tab runs no frames, so a timer reveals it anyway.
+      let shown = false;
+      const reveal = () => {
+        if (shown) return;
+        shown = true;
+        showAppLoader(false);
+        // Home slides in and its lights come on as the loader fades, like coming back from another screen
+        const cur = $('.screen.active');
+        if (cur) slideIn(cur, 1, 120);
+        if (S.screen === 'home') heroLightsOn();
+        if (fresh) toast(T('auth.okLogin'));
+        if (needGate === true) openBaselineGate();
+      };
+      requestAnimationFrame(() => requestAnimationFrame(reveal));
+      setTimeout(reveal, 200);
+    });
   }).catch(() => { showAppLoader(false); if (fresh) showErr($('#authError'), T('auth.errServer')); else toast(T('auth.errServer'), true); });
 }
 export function readSignupProfile() {
@@ -170,7 +196,7 @@ export function finishSignup(consent) {
   S.consent = false;                  // nobody is logged in yet; the answer is stored on the account
   const err = $('#authError');
   setAuthBusy(true);
-  api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: consent } })
+  withBusy(api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: consent } }), T('busy.signingUp'))
     .then(readJson).then(({ ok, j }) => {
       setAuthBusy(false);
       const code = j && j.error_code;
@@ -192,7 +218,7 @@ export function finishSignup(consent) {
 export function logIn(email, password) {
   const err = $('#authError');
   setAuthBusy(true);
-  fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+  withBusy(fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }), T('busy.signingIn'))
     .then(readJson).then(({ ok, j }) => {
       if (!ok) {
         setAuthBusy(false);

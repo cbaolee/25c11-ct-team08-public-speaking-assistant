@@ -46,11 +46,24 @@ html { -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; }
    only lives below it. (Chrome ignores these ::-webkit-scrollbar rules when scrollbar-color is
    set, so scrollbar-color is only given to browsers without them, i.e. Firefox.) */
 @supports not selector(::-webkit-scrollbar) { html { scrollbar-color: #3A4256 #0B1020; } }
+/* Short pages must still get a real scrollbar: Chrome paints an empty kept gutter with the plain page
+   colour only (black next to the top bar) and lets nothing draw into it, while a real scrollbar gets the
+   split colours below (ivory beside the top bar). So every app page is at least 1px taller than the screen. */
+body.app-view { min-height: calc(100vh + 1px); min-height: calc(max(100vh, 100dvh) + 1px); }
 html::-webkit-scrollbar { width: 12px; background: #0B1020; }
 html:has(body.app-view)::-webkit-scrollbar { background: linear-gradient(to bottom, #FAF7F0 0, #FAF7F0 var(--hh, 76px), #0B1020 var(--hh, 76px)); }
 html::-webkit-scrollbar-track { background: transparent; }
 html:has(body.app-view)::-webkit-scrollbar-track { margin-top: var(--hh, 76px); }
 html::-webkit-scrollbar-thumb { background: #3A4256; border-radius: 6px; border: 3px solid #0B1020; }
+/* Pages that only overflow by that 1px: no thumb to show, the track stays plain dark (class set by main.js) */
+html.no-scroll::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; }
+/* While a window is open the page is dimmed by its backdrop (rgba(27, 36, 51, .45)), but the scrollbar is
+   outside the page and stays bright: give it the same colours as seen through that backdrop (class set by
+   ui.js). Values are the normal colours mixed 55 / 45 with the backdrop. */
+html.modal-open:has(body.app-view)::-webkit-scrollbar { background: linear-gradient(to bottom, #96989B 0, #96989B var(--hh, 76px), #121929 var(--hh, 76px)); }
+html.modal-open::-webkit-scrollbar-thumb { background: #2C3446; border-color: #121929; }
+html.modal-open::-webkit-scrollbar-thumb:hover { background: #374155; }
+html.modal-open.no-scroll::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; }
 html::-webkit-scrollbar-thumb:hover { background: #4E5870; }
 body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--sans); min-height: 100vh; }
 img, svg { max-width: 100%; }

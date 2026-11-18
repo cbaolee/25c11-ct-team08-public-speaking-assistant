@@ -28,16 +28,17 @@ import { logout, onGateAgree } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
 import { openProfileModal, saveConsent, saveProfileModal } from './modals/profile_modal.js';
 import { openSettings, setupSettings } from './modals/settings_modal.js';
-import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, syncHeader } from './nav.js';
+import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, syncHeader, syncScrollThumb } from './nav.js';
 import { deleteSession, openReport } from './screens/history.js';
 import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing.js';
 import { cancelEval, goStep, loadFollowWpm, loadSavedScripts, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, pickSavedScript, renderPractice, runEval, selectPickerTab, toggleRecording, updateOwnCount, useOwn } from './screens/practice.js';
 import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
-import { bindTxTips, onTxClick, openPart, seekTo, seekWord, startPlayback, stopPlayback } from './screens/report.js';
-import { onChatAction, renderChatFile, sendChat, syncDurLock, syncTplSelect } from './screens/script_studio.js';
+import { bindTxTips, onTxClick, openDetails, openPart, seekTo, seekWord, startPlayback, stopPlayback } from './screens/report.js';
+import { fitComposer, onChatAction, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
 import { CONFIG, RENDER, S } from './state.js';
+import { initHeroMic } from './hero_mic.js';
 import { closeUserMenu, onUserButtonClick, setupUserMenuHover } from './top_bar.js';
-import { FOCUSABLE, closeModal, focusHeading, openModal, setupPwEyes, setupSelects, toast, usable } from './ui.js';
+import { FOCUSABLE, closeModal, focusHeading, openModal, setupPwEyes, setupSelects, toast, usable, withBusy } from './ui.js';
 import { $, $$, clearErr, esc, showErr } from './utils.js';
 
 /* ---------- init / events ---------- */
@@ -65,9 +66,7 @@ export function init() {
   document.addEventListener('click', e => {
     const g = e.target.closest('[data-go]');
     if (g) {
-      closeUserMenu(); go(g.getAttribute('data-go'));
-      const sc = g.getAttribute('data-scroll'), tgt = sc && document.getElementById(sc);
-      if (tgt) setTimeout(() => tgt.scrollIntoView({ block: 'start' }), 0);
+      closeUserMenu(); go(g.getAttribute('data-go'), { scrollTo: g.getAttribute('data-scroll') });   // data-scroll: open the screen at that element
       return;
     }
     if (e.target.closest('[data-back]')) { go(S.from || 'home'); return; }
@@ -133,8 +132,6 @@ export function init() {
   });
 
   // script
-  $('#composerTopic').onchange = syncTplSelect;
-  $('#chatTpl').onchange = syncDurLock;
   $('#attachBtn').onclick = () => $('#composerFileInput').click();
   $('#composerFileInput').onchange = e => {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
@@ -145,6 +142,10 @@ export function init() {
   };
   $('#composerFile').addEventListener('click', e => { if (e.target.closest('#chatFileX')) { S.chatFile = null; renderChatFile(); $('#attachBtn').focus(); } });
   $('#composerSend').onclick = sendChat;
+  $('#composerInput').addEventListener('input', fitComposer);   // grows with the text (1.5 to 5.5 lines)
+  $('#composerFold').onclick = toggleComposerFold;
+  window.addEventListener('resize', () => { if (S.screen === 'scriptStudio') fitComposer(); });
+  fitComposer();
   $('#composerInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendChat(); } });
   $('#chatFeed').addEventListener('click', onChatAction);
 
@@ -157,7 +158,7 @@ export function init() {
   $('#mineSel').onchange = () => { const id = $('#mineSel').value; if (id) pickSavedScript(id, true); };
   $('#mineDel').onclick = () => {
     const id = $('#mineSel').value; if (!id) return;
-    api('/api/scripts/' + encodeURIComponent(id), { method: 'DELETE' }).then(r => {
+    withBusy(api('/api/scripts/' + encodeURIComponent(id), { method: 'DELETE' }), T('busy.deleting')).then(r => {
       if (r.ok) { if (S.texts.mine && S.texts.mine.id === id) S.texts.mine = null; toast('Script deleted.'); loadSavedScripts(); renderPractice(); }
     }).catch(() => {});
   };
@@ -176,7 +177,6 @@ export function init() {
   $('#meRetry').onclick = () => { closeModal('errorDialog', false); runEval(); };
 
   // report
-  $('#repAgain').onclick = () => go('practice');
   $('#transcriptView').addEventListener('click', onTxClick);
   $('#playBtn').onclick = () => { if (S.play.on) stopPlayback(); else startPlayback(); };
   $('#seek').addEventListener('input', e => seekTo(+e.target.value / 10, false));
@@ -210,7 +210,12 @@ export function init() {
 
   // report: hover notes, score details
   bindTxTips();
-  $('#repScoreCard').addEventListener('click', e => { const b = e.target.closest('[data-part]'); if (b) openPart(b.getAttribute('data-part')); });
+  initHeroMic();   // Home: the 3D mic under the greeting
+  new ResizeObserver(syncScrollThumb).observe(document.body);   // short pages: no scrollbar thumb (see nav.js)
+  window.addEventListener('resize', syncScrollThumb);
+  syncScrollThumb();
+  $('#repScoreCard').addEventListener('click', e => { if (e.target.closest('[data-details]')) openDetails(); });
+  $('#mpartTabs').addEventListener('click', e => { const b = e.target.closest('[data-part]'); if (b) openPart(b.getAttribute('data-part')); });
   $('#mpartBody').addEventListener('click', e => {
     const c = e.target.closest('[data-wi]'); if (!c || !S.currentSession) return;
     const i = +c.getAttribute('data-wi');

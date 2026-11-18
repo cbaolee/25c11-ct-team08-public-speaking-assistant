@@ -12,7 +12,9 @@ import { CONFIG, RENDER, S } from '../state.js';
 import { closeModal, focusHeading, openModal, toast } from '../ui.js';
 import { $, esc, fmtDayLong, fmtTime } from '../utils.js';
 
-/* F1: the server decides if the Baseline Gate opens (GET /api/baseline returns null = no baseline yet). */
+/* F1: the server decides if the Baseline Gate opens (GET /api/baseline returns null = no baseline yet).
+   Resolves true only when the server said "no baseline", so a caller with openGate=false can open
+   the gate later (after the loading screen). Errors resolve undefined: no gate. */
 export function loadBaseline(openGate) {
   const user = S.user;
   return api('/api/baseline').then(readJson).then(({ ok, status, j }) => {
@@ -21,6 +23,7 @@ export function loadBaseline(openGate) {
     S.baseline = j ? { ts: Date.parse(j.recorded_at) || Date.now(), profile: j } : null;
     if (S.screen === 'home' || S.screen === 'profile') RENDER[S.screen]();
     if (openGate && !S.baseline) openBaselineGate();
+    return !S.baseline;
   }).catch(() => { if (S.user === user) toast(T('eval.errNet'), true); });
 }
 

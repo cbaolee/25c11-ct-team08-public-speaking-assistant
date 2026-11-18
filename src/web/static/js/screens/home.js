@@ -53,7 +53,7 @@ function renderHero(ss) {
   $('#homeMoreText').textContent = T('home.more');
 }
 /* Lights off while scrolling down to the progress section: 0 at the top of Home, 1 after
-   about half of the hero has scrolled away. CSS reads --hero-p (see .hero-beam). */
+   about half of the hero has scrolled away. CSS reads --hero-p (see .hero-glow). */
 function syncHeroLight() {
   const hero = document.getElementById('homeHero');
   if (!hero || S.screen !== 'home') return;
@@ -74,7 +74,7 @@ export function heroLightsOn() {
   hero.classList.add('hero-anim');
   hero.classList.remove('hero-off');
   clearTimeout(hero._animT);
-  hero._animT = setTimeout(() => hero.classList.remove('hero-anim'), 700);
+  hero._animT = setTimeout(() => hero.classList.remove('hero-anim'), 1300);
 }
 /* "Scroll for more": smooth unless the user asked for less motion */
 export function scrollHomeDown() {

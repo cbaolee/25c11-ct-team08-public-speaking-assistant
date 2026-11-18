@@ -15,6 +15,7 @@ export const CONFIG = {
 /* ---------- state ---------- */
 export const S = {
   view: 'landing', screen: 'home', from: 'home', authMode: 'in',
+  scrollPos: {}, scrollKey: null,   // where each screen was last scrolled to (nav.js go)
   user: null, profile: null, consent: false, baseline: null, avatar: null,
   texts: { mine: null, sample: null, own: null }, pickerTab: 'mine', sampleN: 0,
   chatFile: null, lastReq: null, chatBusy: false,
