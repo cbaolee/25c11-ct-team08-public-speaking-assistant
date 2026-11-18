@@ -98,7 +98,7 @@ class ScriptGenerator:
             {
                 "role": "system",
                 "content": (
-                    'Write a 120-150 word English speech script.'
+                    "Write a 120-150 word English speech script."
                     ' Return JSON: {"script": "...",'
                     ' "citations": [{"heading": "...", "page": 1}]}'
                 ),
@@ -304,4 +304,3 @@ class ScriptGenerator:
             flags=flags,
             warnings=warnings,
         )
-

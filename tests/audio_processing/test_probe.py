@@ -51,10 +51,27 @@ def nodur_webm(tmp_path: Path) -> Path:
     out = tmp_path / "nodur.webm"
     with open(out, "wb") as f:
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-v", "error",
-             "-f", "lavfi", "-i", _sine(220, 3, 48000),
-             "-ac", "2", "-c:a", "libopus", "-b:a", "32k", "-f", "webm", "pipe:1"],
-            stdout=f, check=True,
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                _sine(220, 3, 48000),
+                "-ac",
+                "2",
+                "-c:a",
+                "libopus",
+                "-b:a",
+                "32k",
+                "-f",
+                "webm",
+                "pipe:1",
+            ],
+            stdout=f,
+            check=True,
         )
     return out
 
@@ -70,9 +87,21 @@ def video_only_mp4(tmp_path: Path) -> Path:
 def two_audio_tracks(tmp_path: Path) -> Path:
     out = tmp_path / "two_tracks.mkv"
     _ffmpeg(
-        "-f", "lavfi", "-i", _sine(220, 2, 16000),
-        "-f", "lavfi", "-i", _sine(440, 2, 16000),
-        "-map", "0", "-map", "1", "-c:a", "pcm_s16le", str(out),
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(220, 2, 16000),
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(440, 2, 16000),
+        "-map",
+        "0",
+        "-map",
+        "1",
+        "-c:a",
+        "pcm_s16le",
+        str(out),
     )
     return out
 
@@ -92,6 +121,7 @@ def empty_file(tmp_path: Path) -> Path:
 
 
 # ---------- valid cases ----------
+
 
 def test_valid_wav_returns_probe(ok_wav):
     result = probe(ok_wav, **LIMITS)
@@ -170,9 +200,19 @@ def test_ffprobe_timeout_is_corrupt(ok_wav, monkeypatch):
 def mp4_with_video(tmp_path: Path) -> Path:
     out = tmp_path / "av.mp4"
     _ffmpeg(
-        "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2",
-        "-f", "lavfi", "-i", _sine(220, 2, 44100),
-        "-c:v", "mpeg4", "-c:a", "aac", str(out),
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=64x64:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(220, 2, 44100),
+        "-c:v",
+        "mpeg4",
+        "-c:a",
+        "aac",
+        str(out),
     )
     return out
 
@@ -181,9 +221,19 @@ def mp4_with_video(tmp_path: Path) -> Path:
 def mkv_with_video(tmp_path: Path) -> Path:
     out = tmp_path / "av.mkv"
     _ffmpeg(
-        "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2",
-        "-f", "lavfi", "-i", _sine(220, 2, 16000),
-        "-c:v", "mpeg4", "-c:a", "pcm_s16le", str(out),
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=64x64:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(220, 2, 16000),
+        "-c:v",
+        "mpeg4",
+        "-c:a",
+        "pcm_s16le",
+        str(out),
     )
     return out
 
@@ -195,8 +245,21 @@ def mp3_with_cover_art(tmp_path: Path) -> Path:
     out = tmp_path / "art.mp3"
     _ffmpeg("-f", "lavfi", "-i", _sine(220, 1, 44100), "-c:a", "libmp3lame", str(mp3))
     _ffmpeg("-f", "lavfi", "-i", "color=c=red:s=64x64:d=1", "-frames:v", "1", str(png))
-    _ffmpeg("-i", str(mp3), "-i", str(png), "-map", "0", "-map", "1",
-            "-c", "copy", "-id3v2_version", "3", str(out))
+    _ffmpeg(
+        "-i",
+        str(mp3),
+        "-i",
+        str(png),
+        "-map",
+        "0",
+        "-map",
+        "1",
+        "-c",
+        "copy",
+        "-id3v2_version",
+        "3",
+        str(out),
+    )
     return out
 
 

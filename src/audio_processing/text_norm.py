@@ -10,8 +10,20 @@ from num2words import num2words
 
 FILLER_WORDS: frozenset[str] = frozenset(
     {
-        "uh", "um", "er", "ah", "hmm", "uhm", "umm", "uhh",
-        "erm", "ahh", "hm", "hmmm", "mm", "mmm",
+        "uh",
+        "um",
+        "er",
+        "ah",
+        "hmm",
+        "uhm",
+        "umm",
+        "uhh",
+        "erm",
+        "ahh",
+        "hm",
+        "hmmm",
+        "mm",
+        "mmm",
     }
 )
 

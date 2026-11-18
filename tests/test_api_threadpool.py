@@ -43,9 +43,7 @@ def test_analyze_baseline_runs_in_worker_thread(monkeypatch):
         raise AudioRejected("corrupt", "stop here")
 
     monkeypatch.setattr(baselines, "analyze_baseline", fake_analyze)
-    r = TestClient(main.app).post(
-        "/api/baseline", files={"audio": ("b.webm", b"x", "audio/webm")}
-    )
+    r = TestClient(main.app).post("/api/baseline", files={"audio": ("b.webm", b"x", "audio/webm")})
     assert r.status_code == 422
     assert seen["loop"] is False
 

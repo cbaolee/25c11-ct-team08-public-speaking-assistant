@@ -115,8 +115,10 @@ class MemoryAuthProvider:
         self._access[access] = (user_id, time.monotonic() + self._token_ttl_s)
         self._refresh[refresh] = user_id
         return AuthSession(
-            access_token=access, refresh_token=refresh,
-            expires_in=self._token_ttl_s, user_id=user_id,
+            access_token=access,
+            refresh_token=refresh,
+            expires_in=self._token_ttl_s,
+            user_id=user_id,
         )
 
     def create_user(self, email: str, password: str) -> UUID:
@@ -204,8 +206,10 @@ class SupabaseAuthProvider:
 
     def _new_client(self) -> SyncGoTrueClient:
         return SyncGoTrueClient(
-            url=self._url, headers=dict(self._headers),
-            auto_refresh_token=False, persist_session=False,
+            url=self._url,
+            headers=dict(self._headers),
+            auto_refresh_token=False,
+            persist_session=False,
         )
 
     @staticmethod
@@ -214,8 +218,10 @@ class SupabaseAuthProvider:
         if session is None or resp.user is None:
             raise AuthUnavailableError("Auth answer has no session")
         return AuthSession(
-            access_token=session.access_token, refresh_token=session.refresh_token,
-            expires_in=session.expires_in, user_id=UUID(resp.user.id),
+            access_token=session.access_token,
+            refresh_token=session.refresh_token,
+            expires_in=session.expires_in,
+            user_id=UUID(resp.user.id),
         )
 
     def create_user(self, email: str, password: str) -> UUID:

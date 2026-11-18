@@ -82,8 +82,11 @@ async def create_baseline(
             )
         except InsufficientAudio:
             payload = {
-                "schema_version": "2.0", "status": "insufficient_audio",
-                "reason": "low_voiced_ratio", "profile": None, "flags": [],
+                "schema_version": "2.0",
+                "status": "insufficient_audio",
+                "reason": "low_voiced_ratio",
+                "profile": None,
+                "flags": [],
             }
         response = BaselineResponse(**payload)
 
@@ -121,8 +124,10 @@ async def get_baseline(
         logger.exception("Could not load baseline")
         return JSONResponse(
             status_code=503,
-            content={"error_code": "baseline_unavailable",
-                     "message": "Could not load the current baseline"},
+            content={
+                "error_code": "baseline_unavailable",
+                "message": "Could not load the current baseline",
+            },
         )
     if row is None:
         return None
@@ -132,8 +137,10 @@ async def get_baseline(
 def _audio_unavailable() -> JSONResponse:
     return JSONResponse(
         status_code=503,
-        content={"error_code": "baseline_audio_unavailable",
-                 "message": "Could not load the baseline recording"},
+        content={
+            "error_code": "baseline_audio_unavailable",
+            "message": "Could not load the baseline recording",
+        },
         headers={"Cache-Control": "no-store"},
     )
 
@@ -156,13 +163,18 @@ async def get_baseline_audio(
         if row is None or not row.audio_path:
             return JSONResponse(
                 status_code=404,
-                content={"error_code": "baseline_not_found",
-                         "message": "No baseline recording found"},
+                content={
+                    "error_code": "baseline_not_found",
+                    "message": "No baseline recording found",
+                },
                 headers={"Cache-Control": "no-store"},
             )
         url = await run_in_threadpool(
             repos.files.create_signed_url,
-            user.id, settings.baselines_bucket, row.audio_path, settings.signed_url_ttl_s,
+            user.id,
+            settings.baselines_bucket,
+            row.audio_path,
+            settings.signed_url_ttl_s,
         )
     except StorageError:
         logger.exception("Could not create baseline audio URL")

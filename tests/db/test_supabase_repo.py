@@ -215,8 +215,13 @@ def test_script_owner_only_and_find_by_hash(env):
     content_hash = f"it-{uuid4()}"
     script = repos.scripts.create_script(
         owner,
-        NewScript(title="IT", body="Hello there.", word_count=2, source="written",
-                  content_hash=content_hash),
+        NewScript(
+            title="IT",
+            body="Hello there.",
+            word_count=2,
+            source="written",
+            content_hash=content_hash,
+        ),
     )
     created["scripts"].append(script.id)
 
@@ -231,8 +236,13 @@ def test_count_scripts_counts_only_own_rows(env):
     before = repos.scripts.count_scripts(owner)
     script = repos.scripts.create_script(
         owner,
-        NewScript(title="IT", body="Count me.", word_count=2, source="written",
-                  content_hash=f"it-{uuid4()}"),
+        NewScript(
+            title="IT",
+            body="Count me.",
+            word_count=2,
+            source="written",
+            content_hash=f"it-{uuid4()}",
+        ),
     )
     created["scripts"].append(script.id)
 

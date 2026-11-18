@@ -59,8 +59,7 @@ def _read_samples(path: Path):
         layout = (wav.getframerate(), wav.getnchannels(), wav.getsampwidth())
         if layout != (MASTER_SAMPLE_RATE, 1, 2):
             raise ValueError(
-                "Expected 16 kHz mono 16-bit WAV, "
-                f"got (rate, channels, bytes)={layout}"
+                f"Expected 16 kHz mono 16-bit WAV, got (rate, channels, bytes)={layout}"
             )
         raw = wav.readframes(wav.getnframes())
     samples = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
@@ -81,8 +80,9 @@ def detect_speech(master: MasterAudio, *, params: VadParams) -> list[SpeechSegme
         speech_pad_ms=params.speech_pad_ms,
     )
     return [
-        SpeechSegment(start_s=item["start"] / MASTER_SAMPLE_RATE,
-                      end_s=item["end"] / MASTER_SAMPLE_RATE)
+        SpeechSegment(
+            start_s=item["start"] / MASTER_SAMPLE_RATE, end_s=item["end"] / MASTER_SAMPLE_RATE
+        )
         for item in raw
     ]
 

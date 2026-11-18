@@ -27,8 +27,14 @@ USER_B = uuid4()
 def _store_baseline(repos, user_id, threshold: float = 0.9):
     row, _ = repos.baselines.replace_current_baseline(
         user_id,
-        NewBaseline(id=uuid4(), hesitation_threshold_s=threshold, median_pause_s=0.45,
-                    median_f0_hz=110.0, mean_loudness_db=62.0, flags=["no_f0"]),
+        NewBaseline(
+            id=uuid4(),
+            hesitation_threshold_s=threshold,
+            median_pause_s=0.45,
+            median_f0_hz=110.0,
+            mean_loudness_db=62.0,
+            flags=["no_f0"],
+        ),
     )
     return row
 
@@ -55,11 +61,25 @@ def _signed_in_user(repos, current):
 
 def _minimal_result() -> EvaluationResultV2:
     return EvaluationResultV2(
-        schema_version="2.1", status="insufficient_audio", reason="low_voiced_ratio",
-        overall=None, label=None, components={}, subscores={}, accuracy_detail={},
-        fluency_detail={}, pitch_detail={}, audio={"duration_s": 1.0, "voiced_ratio": 0.0},
-        baseline=None, alignment=[], pauses=[], fillers=[], sentences=[], stt=None,
-        flags=["no_baseline"], warnings=[],
+        schema_version="2.1",
+        status="insufficient_audio",
+        reason="low_voiced_ratio",
+        overall=None,
+        label=None,
+        components={},
+        subscores={},
+        accuracy_detail={},
+        fluency_detail={},
+        pitch_detail={},
+        audio={"duration_s": 1.0, "voiced_ratio": 0.0},
+        baseline=None,
+        alignment=[],
+        pauses=[],
+        fillers=[],
+        sentences=[],
+        stt=None,
+        flags=["no_baseline"],
+        warnings=[],
         display_only={"loudness_db": None, "loudness_ref_db": None},
     )
 
@@ -90,14 +110,24 @@ def test_evaluate_uses_stored_baseline(monkeypatch):
     cap: dict = {}
     assert _post(monkeypatch, "", cap).status_code == 200
     assert cap["baseline"] == BaselineProfile(
-        median_pause_s=0.45, hesitation_threshold_s=0.9, median_f0_hz=110.0,
-        mean_loudness_db=62.0, flags=["no_f0"],
+        median_pause_s=0.45,
+        hesitation_threshold_s=0.9,
+        median_f0_hz=110.0,
+        mean_loudness_db=62.0,
+        flags=["no_f0"],
     )
 
 
 def test_evaluate_ignores_client_baseline_profile(monkeypatch):
-    fake_profile = json.dumps({"median_pause_s": 0.5, "hesitation_threshold_s": 1.2,
-                               "median_f0_hz": 300.0, "mean_loudness_db": 99.0, "flags": []})
+    fake_profile = json.dumps(
+        {
+            "median_pause_s": 0.5,
+            "hesitation_threshold_s": 1.2,
+            "median_f0_hz": 300.0,
+            "mean_loudness_db": 99.0,
+            "flags": [],
+        }
+    )
     cap: dict = {}
     assert _post(monkeypatch, fake_profile, cap).status_code == 200
     assert cap["baseline"].hesitation_threshold_s == 0.9
@@ -169,9 +199,7 @@ def test_evaluate_returns_saved_session_id(monkeypatch):
     assert saved["script"] == "Hello."
 
 
-def test_evaluate_save_failure_keeps_result_and_logs_without_script(
-    monkeypatch, caplog
-):
+def test_evaluate_save_failure_keeps_result_and_logs_without_script(monkeypatch, caplog):
     script = "Private practice script"
 
     def fail_save(**kwargs):
@@ -217,8 +245,7 @@ def test_save_webm_upload_stores_audio_and_series(monkeypatch, tmp_path):
     user_id = uuid4()
 
     session_id = main._save_result_to_history(
-        repos=repos,
-        user_id=user_id, script="Hello.", result=_ok_result(), source_audio_path=upload
+        repos=repos, user_id=user_id, script="Hello.", result=_ok_result(), source_audio_path=upload
     )
 
     row = repos.sessions.get_session(user_id, UUID(session_id))
@@ -234,7 +261,10 @@ def test_save_insufficient_audio_stores_row_without_files(monkeypatch):
 
     session_id = main._save_result_to_history(
         repos=repos,
-        user_id=user_id, script="Hello.", result=_minimal_result(), source_audio_path=None
+        user_id=user_id,
+        script="Hello.",
+        result=_minimal_result(),
+        source_audio_path=None,
     )
 
     row = repos.sessions.get_session(user_id, UUID(session_id))
@@ -257,7 +287,10 @@ def test_save_insert_failure_removes_uploaded_files(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError):
         main._save_result_to_history(
             repos=repos,
-            user_id=uuid4(), script="Hello.", result=_ok_result(), source_audio_path=upload
+            user_id=uuid4(),
+            script="Hello.",
+            result=_ok_result(),
+            source_audio_path=upload,
         )
     assert repos.files._state.files == {}
 
@@ -287,8 +320,14 @@ def _store_script(repos, user_id, topic: str | None = "Keystone species"):
 
     return repos.scripts.create_script(
         user_id,
-        NewScript(title="T", body="Hello.", word_count=1, source="written",
-                  content_hash=f"h-{uuid4()}", topic=topic),
+        NewScript(
+            title="T",
+            body="Hello.",
+            word_count=1,
+            source="written",
+            content_hash=f"h-{uuid4()}",
+            topic=topic,
+        ),
     )
 
 
@@ -359,8 +398,14 @@ def test_save_result_stores_script_topic_and_accent_on_row(monkeypatch, repos):
     script = _store_script(repos, USER_A)
     result = _minimal_result()
     session_id = main._save_result_to_history(
-        repos=repos, user_id=USER_A, script="Hello.", result=result, source_audio_path=None,
-        script_id=script.id, topic="Keystone species", accent="British",
+        repos=repos,
+        user_id=USER_A,
+        script="Hello.",
+        result=result,
+        source_audio_path=None,
+        script_id=script.id,
+        topic="Keystone species",
+        accent="British",
     )
     row = repos.sessions.get_session(USER_A, UUID(session_id))
     assert (row.script_id, row.topic, row.accent) == (script.id, "Keystone species", "British")

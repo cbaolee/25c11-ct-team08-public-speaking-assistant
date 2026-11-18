@@ -45,7 +45,7 @@ class ProfileRow(ProfileUpsert):
 
 
 class NewBaseline(BaseModel):
-    id: UUID                                # created by the app, the audio path needs it
+    id: UUID  # created by the app, the audio path needs it
     hesitation_threshold_s: float
     median_pause_s: float | None = None
     median_f0_hz: float | None = None
@@ -114,8 +114,7 @@ class NewSession(BaseModel):
         if self.status == "insufficient_audio":
             if self.overall is not None or self.audio_path is not None:
                 raise ValueError(
-                    "insufficient_audio sessions cannot have an overall score "
-                    "or stored audio"
+                    "insufficient_audio sessions cannot have an overall score or stored audio"
                 )
         return self
 

@@ -23,12 +23,12 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 
 ## Features
 
-| Feature | Description |
-|---|---|
-| **Script Generating** | Pick a topic and upload a PDF or type text. The system extracts the content, checks it for safety, and generates an English MC script. |
-| **Voice Evaluate** | Record or upload audio. The system transcribes the speech, measures speaking pace (WPM) and pauses, and compares the transcript with the script to produce a score. |
-| **Baseline** | A short voice sample is analysed once and kept as the user's current baseline. Every evaluation is scored against the baseline stored on the server. |
-| **Session History** | Each evaluated session is saved with its audio and chart data. The newest 10 sessions stay complete; older ones keep only scores, script and mistakes. Backend API only, see [Architecture](architecture.md). |
+| Feature               | Description                                                                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Script Generating** | Pick a topic and upload a PDF or type text. The system extracts the content, checks it for safety, and generates an English MC script.                                                                        |
+| **Voice Evaluate**    | Record or upload audio. The system transcribes the speech, measures speaking pace (WPM) and pauses, and compares the transcript with the script to produce a score.                                           |
+| **Baseline**          | A short voice sample is analysed once and kept as the user's current baseline. Every evaluation is scored against the baseline stored on the server.                                                          |
+| **Session History**   | Each evaluated session is saved with its audio and chart data. The newest 10 sessions stay complete; older ones keep only scores, script and mistakes. Backend API only, see [Architecture](architecture.md). |
 
 ## Tech Stack
 
@@ -70,23 +70,23 @@ cp .env.example .env
 
 API keys (required). Each variable takes one or more keys separated by commas, for example `GROQ_API_KEYS=key1,key2`:
 
-| Variable | Description |
-| --- | --- |
-| `DEEPGRAM_API_KEYS` | Speech-to-text, tried first. |
-| `GLADIA_API_KEYS` | Speech-to-text fallback, used after every Deepgram key has failed. |
-| `GROQ_API_KEYS` | Script generation. Every key is tried for one model before moving to the fallback model. |
+| Variable            | Description                                                                              |
+| ------------------- | ---------------------------------------------------------------------------------------- |
+| `DEEPGRAM_API_KEYS` | Speech-to-text, tried first.                                                             |
+| `GLADIA_API_KEYS`   | Speech-to-text fallback, used after every Deepgram key has failed.                       |
+| `GROQ_API_KEYS`     | Script generation. Every key is tried for one model before moving to the fallback model. |
 
 When a key runs out of quota (HTTP 429 or 402) the server switches to the next key and tries the locked one again after `exhausted_cooldown_s` (`app_constants.toml`, default 600 s). A refused key (401 or 403) is skipped until restart. Logs name keys by position (`groq key #2`), never by value. The old single-key names (`DEEPGRAM_API_KEY`, `GLADIA_API_KEY`, `GROQ_API_KEY`) are no longer read: rename them in your `.env`.
 
 Database and storage variables:
 
-| Variable | Required | Description |
-| --- | --- | --- |
-| `APP_ENV` | Yes | `dev` locally. Any other value disables the temporary dev user. |
-| `SUPABASE_URL` | No | Project URL `https://<ref>.supabase.co` from *Project Settings → API*, **without** `/rest/v1/` (the server refuses to start with it). Empty in `dev` = in-memory storage and accounts, data is lost on restart. |
-| `SUPABASE_SERVICE_KEY` | With `SUPABASE_URL` | Server-side key (`service_role` / `secret`). Full database access: keep it private. |
-| `DEV_USER_ID` | Integration tests | UUID of a first test user, only read by integration tests. The app itself uses real log in (`/api/auth/*`). |
-| `DEV2_USER_ID` | Integration tests | UUID of a second test user, only read by integration tests. |
+| Variable               | Required            | Description                                                                                                                                                                                                     |
+| ---------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `APP_ENV`              | Yes                 | `dev` locally. Any other value disables the temporary dev user.                                                                                                                                                 |
+| `SUPABASE_URL`         | No                  | Project URL `https://<ref>.supabase.co` from _Project Settings → API_, **without** `/rest/v1/` (the server refuses to start with it). Empty in `dev` = in-memory storage and accounts, data is lost on restart. |
+| `SUPABASE_SERVICE_KEY` | With `SUPABASE_URL` | Server-side key (`service_role` / `secret`). Full database access: keep it private.                                                                                                                             |
+| `DEV_USER_ID`          | Integration tests   | UUID of a first test user, only read by integration tests. The app itself uses real log in (`/api/auth/*`).                                                                                                     |
+| `DEV2_USER_ID`         | Integration tests   | UUID of a second test user, only read by integration tests.                                                                                                                                                     |
 
 Optional settings with defaults in `src/app/config.py`: `BASELINE_REQUIRED` (`true`), `RETENTION_FULL_SESSIONS` (`10`), `SIGNED_URL_TTL_S` (`600`), and the bucket names `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET`.
 
@@ -94,10 +94,10 @@ Optional settings with defaults in `src/app/config.py`: `BASELINE_REQUIRED` (`tr
 
 Only needed when `SUPABASE_URL` is set.
 
-1. **Run the migrations** in order on the Supabase project (*SQL Editor* → paste → *Run*):
+1. **Run the migrations** in order on the Supabase project (_SQL Editor_ → paste → _Run_):
    - `db/migrations/0001_init.sql`: tables, indexes, row level security, grants
    - `db/migrations/0002_storage.sql`: private buckets `audio`, `series`, `baselines` and their policies
-2. **Create test users** on `psc-dev` only: *Authentication → Users → Add user*. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
+2. **Create test users** on `psc-dev` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
 3. **Create a `profiles` row for each test user.** Baselines, scripts and sessions reference `profiles(id)`, so saving fails for a user without a profile.
 4. Record a baseline once for your test user: with `BASELINE_REQUIRED=true`, `/api/evaluate` returns `409 baseline_required` until a baseline exists.
 
@@ -123,7 +123,7 @@ uv run ruff check .
 Run every command from the repository root (the app reads `.env` from there).
 
 ```bash
-uv run uvicorn src.app.main:app --reload
+uv run uvicorn src.app.main:app --reload --port 8000
 ```
 
 Then open <http://localhost:8000> in the browser on the same machine. Browsers only allow the

@@ -6,22 +6,11 @@ from .contracts import AudioProbe, AudioRejected
 
 
 def _run_ffprobe(path: Path, timeout_s: float = 10) -> dict:
-    command = [
-        "ffprobe",
-        "-v", "error",
-        "-show_format",
-        "-show_streams",
-        "-of", "json",
-        path
-    ]
+    command = ["ffprobe", "-v", "error", "-show_format", "-show_streams", "-of", "json", path]
 
     try:
         result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=True,
-            timeout=timeout_s
+            command, capture_output=True, text=True, check=True, timeout=timeout_s
         )
 
         return json.loads(result.stdout)
@@ -38,8 +27,9 @@ def _run_ffprobe(path: Path, timeout_s: float = 10) -> dict:
         ) from err
 
 
-def probe(path: Path, *, max_seconds: float, max_bytes: int,
-          allowed_formats: frozenset[str]) -> AudioProbe:
+def probe(
+    path: Path, *, max_seconds: float, max_bytes: int, allowed_formats: frozenset[str]
+) -> AudioProbe:
     size_bytes = path.stat().st_size
     if size_bytes == 0:
         raise AudioRejected(
@@ -55,7 +45,8 @@ def probe(path: Path, *, max_seconds: float, max_bytes: int,
 
     ffprobe_result = _run_ffprobe(path)
     audio_streams = [
-        stream for stream in ffprobe_result.get("streams", [])
+        stream
+        for stream in ffprobe_result.get("streams", [])
         if stream.get("codec_type") == "audio"
     ]
 

@@ -66,7 +66,6 @@ def test_script_generator_fallback_and_citation_check(monkeypatch) -> None:
     mock_client.chat.completions.create.side_effect = [RuntimeError("429"), ok_resp]
     gen.client = mock_client
     res = gen.generate_script(parse_input_to_chunks(raw_text="# Intro\nPage 1."), topic="AI")
-    assert (
-        res.model_used == gen.model_chain[1]
-        and res.citations == [{"heading": "Intro", "page": 1}]
-    )
+    assert res.model_used == gen.model_chain[1] and res.citations == [
+        {"heading": "Intro", "page": 1}
+    ]

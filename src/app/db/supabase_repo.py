@@ -70,9 +70,7 @@ def _newest_page(query, limit: int, cursor: str | None):
     if cursor is not None:
         cursor_created_at, cursor_id = decode_cursor(cursor)
         stamp = cursor_created_at.isoformat()
-        query = query.or_(
-            f'created_at.lt."{stamp}",and(created_at.eq."{stamp}",id.lt.{cursor_id})'
-        )
+        query = query.or_(f'created_at.lt."{stamp}",and(created_at.eq."{stamp}",id.lt.{cursor_id})')
     return query
 
 
@@ -132,11 +130,7 @@ class SupabaseBaselineRepo:
 
     def get_current_baseline(self, user_id: UUID) -> BaselineRow | None:
         resp = _execute(
-            self._table()
-            .select("*")
-            .eq("user_id", str(user_id))
-            .eq("is_current", True)
-            .limit(1)
+            self._table().select("*").eq("user_id", str(user_id)).eq("is_current", True).limit(1)
         )
         row = _first(resp.data)
         return BaselineRow.model_validate(row) if row else None
@@ -192,11 +186,7 @@ class SupabaseScriptRepo:
 
     def get_script(self, user_id: UUID, script_id: UUID) -> ScriptRow | None:
         resp = _execute(
-            self._table()
-            .select("*")
-            .eq("id", str(script_id))
-            .eq("user_id", str(user_id))
-            .limit(1)
+            self._table().select("*").eq("id", str(script_id)).eq("user_id", str(user_id)).limit(1)
         )
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
@@ -214,9 +204,7 @@ class SupabaseScriptRepo:
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
 
-    def list_scripts(
-        self, user_id: UUID, limit: int, cursor: str | None
-    ) -> list[ScriptSummary]:
+    def list_scripts(self, user_id: UUID, limit: int, cursor: str | None) -> list[ScriptSummary]:
         query = self._table().select(SCRIPT_SUMMARY_COLUMNS).eq("user_id", str(user_id))
         resp = _execute(_newest_page(query, limit, cursor))
         return [ScriptSummary.model_validate(row) for row in resp.data]
@@ -229,9 +217,7 @@ class SupabaseScriptRepo:
 
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         # sessions.script_id is set to null by "on delete set null".
-        resp = _execute(
-            self._table().delete().eq("id", str(script_id)).eq("user_id", str(user_id))
-        )
+        resp = _execute(self._table().delete().eq("id", str(script_id)).eq("user_id", str(user_id)))
         return len(resp.data) > 0
 
 
@@ -257,18 +243,12 @@ class SupabaseSessionRepo:
 
     def get_session(self, user_id: UUID, session_id: UUID) -> SessionRow | None:
         resp = _execute(
-            self._table()
-            .select("*")
-            .eq("id", str(session_id))
-            .eq("user_id", str(user_id))
-            .limit(1)
+            self._table().select("*").eq("id", str(session_id)).eq("user_id", str(user_id)).limit(1)
         )
         row = _first(resp.data)
         return SessionRow.model_validate(row) if row else None
 
-    def list_sessions(
-        self, user_id: UUID, limit: int, cursor: str | None
-    ) -> list[SessionSummary]:
+    def list_sessions(self, user_id: UUID, limit: int, cursor: str | None) -> list[SessionSummary]:
         query = self._table().select(SESSION_SUMMARY_COLUMNS).eq("user_id", str(user_id))
         resp = _execute(_newest_page(query, limit, cursor))
         return [SessionSummary.model_validate(row) for row in resp.data]

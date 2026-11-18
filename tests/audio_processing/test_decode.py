@@ -54,8 +54,9 @@ def webm_48k_stereo(tmp_path: Path) -> Path:
     if not _has_encoder("libopus"):
         pytest.skip("libopus encoder not available")
     out = tmp_path / "src.webm"
-    _ffmpeg("-f", "lavfi", "-i", _sine(3, 48000),
-            "-ac", "2", "-c:a", "libopus", "-b:a", "32k", str(out))
+    _ffmpeg(
+        "-f", "lavfi", "-i", _sine(3, 48000), "-ac", "2", "-c:a", "libopus", "-b:a", "32k", str(out)
+    )
     return out
 
 
@@ -107,8 +108,7 @@ def test_decode_is_deterministic(webm_48k_stereo, tmp_path):
 def test_too_long_is_detected_through_duration_cap(wav_16k_mono, workdir):
     # 3-second source, 1-second limit, -t cap = 2 seconds. Master is 2 seconds > 1 second.
     with pytest.raises(AudioRejected) as info:
-        decode_to_master(wav_16k_mono, workdir,
-                         max_seconds=1, cap_margin_s=1, timeout_s=60)
+        decode_to_master(wav_16k_mono, workdir, max_seconds=1, cap_margin_s=1, timeout_s=60)
     assert _code(info) == "too_long"
 
 
@@ -116,8 +116,8 @@ def test_truncated_file_is_flagged_not_rejected(webm_48k_stereo, workdir, tmp_pa
     cut = tmp_path / "cut.webm"
     cut.write_bytes(webm_48k_stereo.read_bytes()[:3000])
     result = decode_to_master(cut, workdir, **LIMITS)
-    assert result.warnings                    # ffmpeg reported warnings
-    assert result.duration_s < 3.0            # only partly decoded
+    assert result.warnings  # ffmpeg reported warnings
+    assert result.duration_s < 3.0  # only partly decoded
 
 
 def test_fake_audio_file_is_corrupt(workdir, tmp_path):

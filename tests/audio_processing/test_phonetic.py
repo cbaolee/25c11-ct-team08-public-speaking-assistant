@@ -18,8 +18,26 @@ from src.audio_processing.phonetic import (
 
 # 20 phonemes for boundary tests: 12/20 or 13/20 is made by replacing the first k phonemes with "Y".
 _BASE20 = [
-    "P", "R", "OW1", "N", "AH0", "S", "IY0", "EY1", "SH", "AH0",
-    "N", "T", "K", "L", "M", "F", "V", "Z", "ZH", "W",
+    "P",
+    "R",
+    "OW1",
+    "N",
+    "AH0",
+    "S",
+    "IY0",
+    "EY1",
+    "SH",
+    "AH0",
+    "N",
+    "T",
+    "K",
+    "L",
+    "M",
+    "F",
+    "V",
+    "Z",
+    "ZH",
+    "W",
 ]
 
 
@@ -60,6 +78,7 @@ def stub_pron(word: str) -> list[list[str]]:
 
 # ---------- lev ----------
 
+
 def test_lev_phonemes_basic():
     # TH IH NG K vs S IH NG K: thay 1 phoneme -> 1.
     assert lev(["TH", "IH", "NG", "K"], ["S", "IH", "NG", "K"]) == 1
@@ -76,6 +95,7 @@ def test_lev_phonemes_empty():
 
 
 # ---------- phonetic_sim ----------
+
 
 def test_sim_strips_stress():
     # DH AH0 vs DH AH1: identical after stress removal -> 1.0.
@@ -94,6 +114,7 @@ def test_sim_oov_is_none():
 
 
 # ---------- classify_pair: table P2 ----------
+
 
 def test_homophone_equal():
     # their/there: DH EH R == DH EH R, sim 1.0, normalized strings differ.
@@ -158,6 +179,7 @@ def test_classify_sim_table():
 
 # ---------- P11, P3 ----------
 
+
 def test_same_string_not_homophone():
     # ref == hyp (string) -> equal but homophone=False (P11), even though phonemes match.
     m = classify_pair("their", "their", pron=stub_pron)
@@ -183,6 +205,7 @@ def test_oov_one_side_only_is_sub():
 
 # ---------- Real cmudict integration (no stub) ----------
 
+
 def test_cmudict_think_sink():
     # Real CMU: think TH IH1 NG K, sink S IH1 NG K -> 0.75 -> near_miss.
     m = classify_pair("think", "sink")
@@ -197,6 +220,7 @@ def test_cmudict_their_there():
 
 
 # ---------- Added after review (expected numbers are hand-computed, NOT measured) ----------
+
 
 def test_apostrophe_lookup():
     # ADR-005 "Package info": john's -> JH AA1 N Z; stress removed -> JH AA N Z.

@@ -51,11 +51,7 @@ def _after_cursor(rows, cursor: str | None):
         return rows
     cursor_created_at, cursor_id = decode_cursor(cursor)
     cursor_key = (cursor_created_at, str(cursor_id))
-    return [
-        row
-        for row in rows
-        if (row.created_at, str(row.id)) < cursor_key
-    ]
+    return [row for row in rows if (row.created_at, str(row.id)) < cursor_key]
 
 
 def _session_summary(row: SessionRow) -> SessionSummary:
@@ -121,9 +117,7 @@ class MemoryProfileRepo:
         self._state.baselines.pop(user_id, None)
 
         script_ids = {
-            script_id
-            for script_id, row in self._state.scripts.items()
-            if row.user_id == user_id
+            script_id for script_id, row in self._state.scripts.items() if row.user_id == user_id
         }
         for script_id in script_ids:
             del self._state.scripts[script_id]
@@ -140,11 +134,7 @@ class MemoryBaselineRepo:
 
     def get_current_baseline(self, user_id: UUID) -> BaselineRow | None:
         current = next(
-            (
-                row
-                for row in self._state.baselines.get(user_id, [])
-                if row.is_current
-            ),
+            (row for row in self._state.baselines.get(user_id, []) if row.is_current),
             None,
         )
         return current.model_copy(deep=True) if current is not None else None
@@ -196,9 +186,7 @@ class MemoryScriptRepo:
             return None
         return row.model_copy(deep=True)
 
-    def find_script_by_hash(
-        self, user_id: UUID, content_hash: str
-    ) -> ScriptRow | None:
+    def find_script_by_hash(self, user_id: UUID, content_hash: str) -> ScriptRow | None:
         matches = _newest_first(
             row
             for row in self._state.scripts.values()
@@ -206,18 +194,11 @@ class MemoryScriptRepo:
         )
         return matches[0].model_copy(deep=True) if matches else None
 
-    def list_scripts(
-        self, user_id: UUID, limit: int, cursor: str | None
-    ) -> list[ScriptSummary]:
+    def list_scripts(self, user_id: UUID, limit: int, cursor: str | None) -> list[ScriptSummary]:
         _validate_limit(limit)
-        rows = _newest_first(
-            row for row in self._state.scripts.values() if row.user_id == user_id
-        )
+        rows = _newest_first(row for row in self._state.scripts.values() if row.user_id == user_id)
         rows = _after_cursor(rows, cursor)
-        return [
-            ScriptSummary.model_validate(row.model_dump())
-            for row in rows[:limit]
-        ]
+        return [ScriptSummary.model_validate(row.model_dump()) for row in rows[:limit]]
 
     def count_scripts(self, user_id: UUID) -> int:
         return sum(1 for row in self._state.scripts.values() if row.user_id == user_id)
@@ -258,13 +239,9 @@ class MemorySessionRepo:
             return None
         return row.model_copy(deep=True)
 
-    def list_sessions(
-        self, user_id: UUID, limit: int, cursor: str | None
-    ) -> list[SessionSummary]:
+    def list_sessions(self, user_id: UUID, limit: int, cursor: str | None) -> list[SessionSummary]:
         _validate_limit(limit)
-        rows = _newest_first(
-            row for row in self._state.sessions.values() if row.user_id == user_id
-        )
+        rows = _newest_first(row for row in self._state.sessions.values() if row.user_id == user_id)
         rows = _after_cursor(rows, cursor)
         return [_session_summary(row) for row in rows[:limit]]
 
@@ -373,9 +350,7 @@ class MemoryAudioStore:
         for path in paths:
             self._state.files.pop((bucket, path), None)
 
-    def create_signed_url(
-        self, user_id: UUID, bucket: str, path: str, ttl_s: int
-    ) -> str:
+    def create_signed_url(self, user_id: UUID, bucket: str, path: str, ttl_s: int) -> str:
         self._validate_path(user_id, path)
         if ttl_s <= 0:
             raise ValueError("ttl_s must be positive")

@@ -24,9 +24,7 @@ def session_api(monkeypatch):
     repos = build_memory_repos()
     current_user = {"id": USER_A}
     main.app.dependency_overrides[get_repos] = lambda: repos
-    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(
-        id=current_user["id"]
-    )
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=current_user["id"])
     monkeypatch.setattr(settings, "retention_full_sessions", 10)
     yield repos, current_user
     main.app.dependency_overrides.clear()
@@ -36,9 +34,7 @@ def _create_session(repos, user_id, *, files=False):
     result = json.loads(FIXTURE.read_text(encoding="utf-8"))
     session_id = uuid4()
     audio_path = build_object_path(user_id, session_id, ".webm") if files else None
-    series_path = (
-        build_object_path(user_id, session_id, ".series.json") if files else None
-    )
+    series_path = build_object_path(user_id, session_id, ".series.json") if files else None
     without_series, series_json = split_series(result)
     row = repos.sessions.create_session(
         user_id,
@@ -75,12 +71,8 @@ def test_list_sessions_uses_cursor_pagination(session_api):
     first = client.get("/api/sessions", params={"limit": 2})
     assert first.status_code == 200
     first_body = first.json()
-    expected = sorted(
-        rows, key=lambda row: (row.created_at, str(row.id)), reverse=True
-    )
-    assert [item["id"] for item in first_body["items"]] == [
-        str(row.id) for row in expected[:2]
-    ]
+    expected = sorted(rows, key=lambda row: (row.created_at, str(row.id)), reverse=True)
+    assert [item["id"] for item in first_body["items"]] == [str(row.id) for row in expected[:2]]
     assert first_body["next_cursor"]
 
     second = client.get(
@@ -90,9 +82,9 @@ def test_list_sessions_uses_cursor_pagination(session_api):
     assert second.status_code == 200
     assert len(second.json()["items"]) == 1
     assert second.json()["next_cursor"] is None
-    assert not {
-        item["id"] for item in first_body["items"]
-    } & {item["id"] for item in second.json()["items"]}
+    assert not {item["id"] for item in first_body["items"]} & {
+        item["id"] for item in second.json()["items"]
+    }
 
 
 def test_list_sessions_limit_twenty_detects_another_page(session_api):

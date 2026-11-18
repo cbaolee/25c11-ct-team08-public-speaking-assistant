@@ -67,13 +67,15 @@ def _error(status_code: int, error_code: str, message: str) -> JSONResponse:
 
 
 def _auth_unavailable() -> JSONResponse:
-    return _error(503, "auth_unavailable",
-                  "The account service is not available right now. Please try again.")
+    return _error(
+        503, "auth_unavailable", "The account service is not available right now. Please try again."
+    )
 
 
 def _weak_password() -> JSONResponse:
-    return _error(422, "weak_password",
-                  f"Use a password with at least {MIN_PASSWORD_LENGTH} characters.")
+    return _error(
+        422, "weak_password", f"Use a password with at least {MIN_PASSWORD_LENGTH} characters."
+    )
 
 
 def _normalize_email(email: str) -> str:
@@ -132,8 +134,9 @@ async def sign_up(
     except StorageError:
         logger.exception("Could not save the profile of a new account")
         await run_in_threadpool(_rollback_account, auth, repos, user_id)
-        return _error(503, "profile_not_saved",
-                      "The account could not be created. Please try again.")
+        return _error(
+            503, "profile_not_saved", "The account could not be created. Please try again."
+        )
     return {"user_id": str(user_id)}
 
 

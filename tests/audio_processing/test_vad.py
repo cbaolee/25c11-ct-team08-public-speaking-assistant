@@ -50,9 +50,11 @@ def test_pause_duration_matches_gap():
     (pause,) = find_pauses(segments, min_pause_s=MIN_PAUSE)
     assert pause.duration_s == 0.75
 
+
 # ==========================================
 # Float error at the min_pause 0.35 s boundary
 # ==========================================
+
 
 def test_float_boundary_0_80_to_1_15_is_kept():
     # 1.15 - 0.8 = 0.34999999999999987 in float but nominally 0.35.
@@ -68,8 +70,9 @@ def test_float_boundary_sweep_nominal_0_35_always_kept():
     for i in range(0, 1001):
         end = Decimal(i) / Decimal(100)
         start = end + Decimal("0.35")
-        got = find_pauses([seg(0.0, float(end)), seg(float(start), float(start) + 1.0)],
-                          min_pause_s=MIN_PAUSE)
+        got = find_pauses(
+            [seg(0.0, float(end)), seg(float(start), float(start) + 1.0)], min_pause_s=MIN_PAUSE
+        )
         if len(got) != 1:
             missed.append(float(end))
     assert missed == []

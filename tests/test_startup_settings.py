@@ -9,8 +9,12 @@ from src.app.config import Settings, missing_required_settings
 
 def _settings(**overrides) -> Settings:
     base = dict(
-        deepgram_api_keys="dg", gladia_api_keys="gl", groq_api_keys="gq",
-        app_env="dev", supabase_url="", supabase_service_key="",
+        deepgram_api_keys="dg",
+        gladia_api_keys="gl",
+        groq_api_keys="gq",
+        app_env="dev",
+        supabase_url="",
+        supabase_service_key="",
     )
     base.update(overrides)
     return Settings(_env_file=None, **base)
@@ -22,9 +26,11 @@ def test_dev_with_all_keys_and_memory_storage_is_complete():
 
 @pytest.mark.parametrize(
     ("field", "env_name"),
-    [("deepgram_api_keys", "DEEPGRAM_API_KEYS"),
-     ("gladia_api_keys", "GLADIA_API_KEYS"),
-     ("groq_api_keys", "GROQ_API_KEYS")],
+    [
+        ("deepgram_api_keys", "DEEPGRAM_API_KEYS"),
+        ("gladia_api_keys", "GLADIA_API_KEYS"),
+        ("groq_api_keys", "GROQ_API_KEYS"),
+    ],
 )
 def test_missing_api_key_is_reported(field, env_name):
     assert missing_required_settings(_settings(**{field: "  "})) == [env_name]
@@ -32,7 +38,8 @@ def test_missing_api_key_is_reported(field, env_name):
 
 def test_supabase_required_outside_dev():
     assert missing_required_settings(_settings(app_env="prod")) == [
-        "SUPABASE_URL", "SUPABASE_SERVICE_KEY",
+        "SUPABASE_URL",
+        "SUPABASE_SERVICE_KEY",
     ]
 
 
@@ -62,7 +69,9 @@ def test_app_starts_when_keys_are_present(monkeypatch):
 
 
 def test_supabase_url_trailing_slash_is_removed():
-    assert _settings(supabase_url=" https://x.supabase.co/ ").supabase_url == "https://x.supabase.co"
+    assert (
+        _settings(supabase_url=" https://x.supabase.co/ ").supabase_url == "https://x.supabase.co"
+    )
 
 
 @pytest.mark.parametrize("suffix", ["/rest/v1", "/rest/v1/", "/auth/v1", "/storage/v1/"])

@@ -13,6 +13,7 @@ class MockSettings:
     deepgram_api_keys: tuple = ("fake_dg_key",)
     gladia_api_keys: tuple = ("fake_gl_key",)
 
+
 @pytest.fixture
 def mock_master(tmp_path):
     # Create a fake wav file to avoid FileNotFoundError on with open(...)
@@ -21,39 +22,44 @@ def mock_master(tmp_path):
 
     # Build MasterAudio with all of path, duration_s and warnings
     return MasterAudio(
-        path=fake_audio,       # Keep the Path object (tmp_path gives a Path)
-        duration_s=10.0,       # Assumed duration
-        warnings=[]            # Empty warning list
+        path=fake_audio,  # Keep the Path object (tmp_path gives a Path)
+        duration_s=10.0,  # Assumed duration
+        warnings=[],  # Empty warning list
     )
 
 
 def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
     """Check a Deepgram SttResult is parsed with correct timestamps[cite: 1]."""
+
     def mock_post(*args, **kwargs):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
             "results": {
-                "channels": [{
-                    "alternatives": [{
-                        "transcript": "hello world",
-                        "words": [
+                "channels": [
+                    {
+                        "alternatives": [
                             {
-                                "word": "hello",
-                                "punctuated_word": "Hello",
-                                "start": 0.0,
-                                "end": 0.5,
-                                "confidence": 0.9,
-                            },
-                            {
-                                "word": "world",
-                                "punctuated_word": "world.",
-                                "start": 0.5,
-                                "end": 1.0,
-                                "confidence": 0.8,
-                            },
+                                "transcript": "hello world",
+                                "words": [
+                                    {
+                                        "word": "hello",
+                                        "punctuated_word": "Hello",
+                                        "start": 0.0,
+                                        "end": 0.5,
+                                        "confidence": 0.9,
+                                    },
+                                    {
+                                        "word": "world",
+                                        "punctuated_word": "world.",
+                                        "start": 0.5,
+                                        "end": 1.0,
+                                        "confidence": 0.8,
+                                    },
+                                ],
+                            }
                         ]
-                    }]
-                }]
+                    }
+                ]
             }
         }
         return mock_resp
@@ -74,12 +80,11 @@ def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
 
 def test_empty_transcript_raises_insufficient_audio(monkeypatch, mock_master):
     """Check an empty STT transcript raises InsufficientAudio[cite: 1]."""
+
     def mock_post(*args, **kwargs):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
-            "results": {
-                "channels": [{"alternatives": [{"transcript": "   ", "words": []}]}]
-            }
+            "results": {"channels": [{"alternatives": [{"transcript": "   ", "words": []}]}]}
         }
         return mock_resp
 
@@ -91,13 +96,14 @@ def test_empty_transcript_raises_insufficient_audio(monkeypatch, mock_master):
 
 def test_gladia_adds_filler_flag(monkeypatch, mock_master):
     """Check Gladia automatically adds the 'filler_from_vad_only' flag[cite: 1]."""
+
     def mock_post(*args, **kwargs):
         mock_resp = MagicMock()
         mock_resp.json.return_value = {
             "prediction": "test transcript",
             "prediction_raw": {
                 "words": [{"word": "test", "time_begin": 0.0, "time_end": 0.5, "confidence": 0.9}]
-            }
+            },
         }
         return mock_resp
 
@@ -111,6 +117,7 @@ def test_gladia_adds_filler_flag(monkeypatch, mock_master):
 
 def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
     """Check the router: fall back to Gladia when Deepgram fails[cite: 1]."""
+
     def mock_post(url, *args, **kwargs):
         mock_resp = MagicMock()
         if "deepgram" in url:
@@ -120,7 +127,7 @@ def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
             # Return a good result for Gladia
             mock_resp.json.return_value = {
                 "prediction": "fallback success",
-                "prediction_raw": {"words": []}
+                "prediction_raw": {"words": []},
             }
         return mock_resp
 

@@ -35,8 +35,11 @@ SCRIPT = "Good morning my friends."
 # Times picked mid-cell of 0.1 s: cells 0, 5, 10, 15 (not near cell edges).
 F0 = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 200.0)]
 # Fixed fake loudness series (22 cells = ceil(2.2 / 0.1)), includes None.
-LOUDNESS = {"start_s": 0.0, "step_s": 0.1,
-            "values": [None] + [60.0 + i * 0.5 for i in range(20)] + [None]}
+LOUDNESS = {
+    "start_s": 0.0,
+    "step_s": 0.1,
+    "values": [None] + [60.0 + i * 0.5 for i in range(20)] + [None],
+}
 
 
 def fake_encode(texts):
@@ -48,12 +51,20 @@ def w(word, start, end):
     return WordTimestamp(word=word, start_s=start, end_s=end)
 
 
-GOOD_WORDS = [w("Good", 0.0, 0.4), w("morning", 0.5, 0.9), w("my", 1.0, 1.4),
-              w("friends.", 1.5, 2.0)]
+GOOD_WORDS = [
+    w("Good", 0.0, 0.4),
+    w("morning", 0.5, 0.9),
+    w("my", 1.0, 1.4),
+    w("friends.", 1.5, 2.0),
+]
 FULL_SEGS = (SpeechSegment(0.0, 2.0),)
 PAUSE_SEGS = (SpeechSegment(0.0, 0.95), SpeechSegment(1.75, 3.0))
-PAUSE_WORDS = [w("Good", 0.0, 0.4), w("morning", 0.5, 0.9), w("my", 1.8, 2.2),
-               w("friends.", 2.3, 2.9)]
+PAUSE_WORDS = [
+    w("Good", 0.0, 0.4),
+    w("morning", 0.5, 0.9),
+    w("my", 1.8, 2.2),
+    w("friends.", 2.3, 2.9),
+]
 
 
 @pytest.fixture
@@ -139,8 +150,15 @@ def test_ok_full_hand_calculation(run):
     # Overall = 0.4*100 + 0.3*(275/3) + 0.2*100 + 0.1*100 = 97.5
     assert r.overall == pytest.approx(97.5)
     assert r.label == "Excellent"
-    assert r.accuracy_detail == {"n_ref": 4, "n_sub": 0, "n_del": 0, "n_ins": 0,
-                                 "n_near_miss": 0, "n_homophone": 0, "n_oov": 0}
+    assert r.accuracy_detail == {
+        "n_ref": 4,
+        "n_sub": 0,
+        "n_del": 0,
+        "n_ins": 0,
+        "n_near_miss": 0,
+        "n_homophone": 0,
+        "n_oov": 0,
+    }
     assert [it.status for it in r.alignment] == ["equal"] * 4
     assert r.pauses == [] and r.fillers == []
     assert r.audio == {"duration_s": 2.2, "voiced_ratio": pytest.approx(2.0 / 2.2)}
@@ -152,8 +170,13 @@ def test_ok_full_hand_calculation(run):
 
 
 def test_baseline_merged_and_used(run):
-    base = BaselineProfile(median_pause_s=0.4, hesitation_threshold_s=0.9, median_f0_hz=100.0,
-                           mean_loudness_db=62.5, flags=["baseline_pause_unreliable"])
+    base = BaselineProfile(
+        median_pause_s=0.4,
+        hesitation_threshold_s=0.9,
+        median_f0_hz=100.0,
+        mean_loudness_db=62.5,
+        flags=["baseline_pause_unreliable"],
+    )
     # silence 0.95 -> 1.75 (0.8 s long) after "morning" (no punctuation): PAUSE_SEGS/PAUSE_WORDS
     r = run(baseline=base, segments=PAUSE_SEGS, words=PAUSE_WORDS, duration=3.0)
     assert r.flags == ["baseline_pause_unreliable"]  # no no_baseline
@@ -181,15 +204,25 @@ def test_default_threshold_without_baseline_makes_hesitation(run):
 def test_insufficient_low_voiced_ratio(run):
     # stt_exc=AssertionError: if the pipeline wrongly calls STT the test fails
     # (STT is ruled out earlier).
-    r = run(segments=(SpeechSegment(0.0, 1.0),), duration=10.0,
-            stt_exc=AssertionError("STT không được gọi khi voiced thấp"))  # 10% voiced
+    r = run(
+        segments=(SpeechSegment(0.0, 1.0),),
+        duration=10.0,
+        stt_exc=AssertionError("STT không được gọi khi voiced thấp"),
+    )  # 10% voiced
     assert r.status == "insufficient_audio" and r.reason == "low_voiced_ratio"
     assert r.stt is None
     assert r.overall is None and r.label is None
     assert all(v is None for v in r.components.values()) and len(r.components) == 4
     assert all(v is None for v in r.subscores.values()) and len(r.subscores) == 5
-    assert set(r.accuracy_detail) == {"n_ref", "n_sub", "n_del", "n_ins", "n_near_miss",
-                                      "n_homophone", "n_oov"}
+    assert set(r.accuracy_detail) == {
+        "n_ref",
+        "n_sub",
+        "n_del",
+        "n_ins",
+        "n_near_miss",
+        "n_homophone",
+        "n_oov",
+    }
     assert all(v is None for v in r.accuracy_detail.values())
     assert all(v is None for v in r.fluency_detail.values())
     assert r.alignment == [] and r.pauses == [] and r.fillers == [] and r.sentences == []
@@ -219,8 +252,12 @@ def test_empty_transcript_from_stt_exception(run):
 
 
 def test_under_two_words_gives_null_fluency_and_overall(run):
-    r = run(script="Hello world.", words=[w("hello", 0.0, 0.5)],
-            segments=(SpeechSegment(0.0, 0.6),), duration=1.0)
+    r = run(
+        script="Hello world.",
+        words=[w("hello", 0.0, 0.5)],
+        segments=(SpeechSegment(0.0, 0.6),),
+        duration=1.0,
+    )
     assert r.status == "ok"
     assert r.subscores["f_wpm"] is None and r.subscores["f_pause"] is None
     assert r.components["fluency"] is None
@@ -240,8 +277,13 @@ def test_no_f0(run):
 
 
 def test_stt_filler_listed_but_not_in_alignment(run):
-    words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
-             w("my", 1.1, 1.5), w("friends.", 1.6, 2.0)]
+    words = [
+        w("Good", 0.0, 0.4),
+        w("um", 0.45, 0.55),
+        w("morning", 0.6, 1.0),
+        w("my", 1.1, 1.5),
+        w("friends.", 1.6, 2.0),
+    ]
     r = run(words=words)
     assert len(r.fillers) == 1
     f = r.fillers[0]
@@ -272,13 +314,28 @@ def test_stt_flags_are_merged_in_order_without_duplicates(run):
 
 # ---- API ----
 
+
 def _minimal_result() -> EvaluationResultV2:
     return EvaluationResultV2(
-        schema_version="2.1", status="insufficient_audio", reason="low_voiced_ratio",
-        overall=None, label=None, components={}, subscores={}, accuracy_detail={},
-        fluency_detail={}, pitch_detail={}, audio={"duration_s": 1.0, "voiced_ratio": 0.0},
-        baseline=None, alignment=[], pauses=[], fillers=[], sentences=[], stt=None,
-        flags=["no_baseline"], warnings=[],
+        schema_version="2.1",
+        status="insufficient_audio",
+        reason="low_voiced_ratio",
+        overall=None,
+        label=None,
+        components={},
+        subscores={},
+        accuracy_detail={},
+        fluency_detail={},
+        pitch_detail={},
+        audio={"duration_s": 1.0, "voiced_ratio": 0.0},
+        baseline=None,
+        alignment=[],
+        pauses=[],
+        fillers=[],
+        sentences=[],
+        stt=None,
+        flags=["no_baseline"],
+        warnings=[],
         display_only={"loudness_db": None, "loudness_ref_db": None},
     )
 
@@ -318,6 +375,7 @@ def test_api_evaluate_returns_v2_json(monkeypatch):
 
 # ---- Added (review step 10): numbers below are hand-computed, not measured ----
 
+
 def test_align_called_once(run, monkeypatch):
     calls = []
     real_align = pipeline.align
@@ -345,8 +403,9 @@ def test_non_trivial_encoder_second_sentence_fails(run, monkeypatch):
         # hyp sentence 2: [0.6, 0.8] -> cosine 0.6 < 0.82.
         return np.array([[1.0, 0.0], [0.6, 0.8]])
 
-    r = _run_with_encoder(run, monkeypatch, words=words, script="Good morning. See you.",
-                          encode=encode)
+    r = _run_with_encoder(
+        run, monkeypatch, words=words, script="Good morning. See you.", encode=encode
+    )
     assert [s.passed for s in r.sentences] == [True, False]
     assert r.sentences[1].cosine == pytest.approx(0.6)
     # hyp_text comes from alignment: the sentence's hyp_words (normalized, from STT)
@@ -388,6 +447,7 @@ def test_near_miss_at_pipeline_level(run):
 
 # ---- Step E1: contour_st, loudness_db, warnings (hand-computed, not measured) ----
 
+
 def test_loudness_series_passed_through(run):
     custom = {"start_s": 0.0, "step_s": 0.1, "values": [70.0] * 22}
     assert run(loudness=custom).display_only["loudness_db"] == custom
@@ -411,8 +471,12 @@ def test_warnings_empty_in_default_fixture(run):
 
 def test_warning_wpm_slow(run):
     # 4 words, span 0.0 -> 2.2 = 2.2 s -> WPM = 4 / (2.2/60) = 109.09 < 110
-    words = [w("Good", 0.0, 0.4), w("morning", 0.6, 1.0),
-             w("my", 1.2, 1.6), w("friends.", 1.8, 2.2)]
+    words = [
+        w("Good", 0.0, 0.4),
+        w("morning", 0.6, 1.0),
+        w("my", 1.2, 1.6),
+        w("friends.", 1.8, 2.2),
+    ]
     r = run(words=words)
     assert r.fluency_detail["wpm"] == pytest.approx(109.0909, abs=1e-3)
     assert r.warnings == ["wpm_slow"]
@@ -420,8 +484,12 @@ def test_warning_wpm_slow(run):
 
 def test_warning_wpm_fast(run):
     # span 1.0 s -> WPM = 4 / (1/60) = 240 > 175 (voiced 1.0/2.2 = 45 % >= 30 %)
-    words = [w("Good", 0.0, 0.2), w("morning", 0.25, 0.5),
-             w("my", 0.55, 0.75), w("friends.", 0.8, 1.0)]
+    words = [
+        w("Good", 0.0, 0.2),
+        w("morning", 0.25, 0.5),
+        w("my", 0.55, 0.75),
+        w("friends.", 0.8, 1.0),
+    ]
     r = run(words=words, segments=(SpeechSegment(0.0, 1.0),))
     assert r.fluency_detail["wpm"] == pytest.approx(240.0)
     assert r.warnings == ["wpm_fast"]
@@ -429,8 +497,13 @@ def test_warning_wpm_fast(run):
 
 def test_warning_filler_high(run):
     # Same data as test_stt_filler_listed...: R = 1/4 = 25 % >= 4; WPM 120; R_st 8.4
-    words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
-             w("my", 1.1, 1.5), w("friends.", 1.6, 2.0)]
+    words = [
+        w("Good", 0.0, 0.4),
+        w("um", 0.45, 0.55),
+        w("morning", 0.6, 1.0),
+        w("my", 1.1, 1.5),
+        w("friends.", 1.6, 2.0),
+    ]
     assert run(words=words).warnings == ["filler_high"]
 
 
@@ -444,8 +517,13 @@ def test_warning_monotone(run):
 
 def test_warnings_order_slow_filler_monotone(run):
     # span 2.2 s, 4 real words = 109.09 WPM (slow) + 1 filler (25 %) + flat F0
-    words = [w("Good", 0.0, 0.4), w("um", 0.45, 0.55), w("morning", 0.6, 1.0),
-             w("my", 1.2, 1.6), w("friends.", 1.8, 2.2)]
+    words = [
+        w("Good", 0.0, 0.4),
+        w("um", 0.45, 0.55),
+        w("morning", 0.6, 1.0),
+        w("my", 1.2, 1.6),
+        w("friends.", 1.8, 2.2),
+    ]
     flat = [(0.05, 100.0), (0.55, 100.0), (1.05, 100.0), (1.55, 100.0)]
     r = run(words=words, f0=flat)
     assert r.warnings == ["wpm_slow", "filler_high", "monotone"]
@@ -465,12 +543,15 @@ def test_empty_transcript_has_no_warnings_or_loudness(run):
     assert r.warnings == [] and r.display_only["loudness_db"] is None
 
 
-@pytest.mark.parametrize("kwargs", [
-    {},
-    {"f0": []},
-    {"loudness": None},
-    {"segments": (SpeechSegment(0.0, 1.0),), "duration": 10.0},
-])
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"f0": []},
+        {"loudness": None},
+        {"segments": (SpeechSegment(0.0, 1.0),), "duration": 10.0},
+    ],
+)
 def test_result_json_is_strict(run, kwargs):
     r = run(**kwargs)
     json.dumps(r.model_dump(mode="json"), allow_nan=False)

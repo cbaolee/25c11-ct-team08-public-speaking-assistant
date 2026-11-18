@@ -38,7 +38,7 @@ def test_env_overrides_toml(monkeypatch, tmp_path):
     monkeypatch.setenv("RETENTION_FULL_SESSIONS", "20")
     s = Settings(_env_file=None)
     assert s.retention_full_sessions == 20  # .env wins
-    assert s.signed_url_ttl_s == 900        # not overridden: still from TOML
+    assert s.signed_url_ttl_s == 900  # not overridden: still from TOML
 
 
 def test_module_constants_match_repo_toml():

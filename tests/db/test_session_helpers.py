@@ -60,14 +60,11 @@ def test_compact_session_extracts_mistakes_and_keeps_score_data():
     assert [item["type"] for item in mistakes].count("filler") == 1
     assert [item["type"] for item in mistakes].count("pause") == 2
     assert any(
-        item["type"] == "alignment"
-        and item["status"] == "ins"
-        and item["ref_index"] is None
+        item["type"] == "alignment" and item["status"] == "ins" and item["ref_index"] is None
         for item in mistakes
     )
     assert any(
-        item["type"] == "filler" and item["after_ref_index"] is not None
-        for item in mistakes
+        item["type"] == "filler" and item["after_ref_index"] is not None for item in mistakes
     )
 
 

@@ -65,9 +65,19 @@ needs_ffmpeg = pytest.mark.skipif(
 
 def _tone(path: Path, seconds: float) -> Path:
     subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi",
-         "-i", f"sine=frequency=220:duration={seconds}:sample_rate=16000",
-         "-ac", "1", str(path)],
+        [
+            "ffmpeg",
+            "-y",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            f"sine=frequency=220:duration={seconds}:sample_rate=16000",
+            "-ac",
+            "1",
+            str(path),
+        ],
         check=True,
     )
     return path

@@ -48,6 +48,7 @@ def _w(word: str, i: int = 0) -> WordTimestamp:
 
 # ---------- prepare_hyp ----------
 
+
 def test_filler_not_ins():
     # STT "I Um, think uh so": "Um," and "uh" are fillers -> dropped. Left: i, think, so
     # -> hyp_index 0, 1, 2 in a row. Script "I think so" -> 3 equal, 0 ins.
@@ -77,6 +78,7 @@ def test_prepare_hyp_empty_token_keeps_index():
 
 
 # ---------- align_tokens ----------
+
 
 def test_alignment_deterministic_tiebreak():
     # Three cases with >= 2 equal-cost paths. Row = ref, column = hyp, D[i][j] (not measured).
@@ -245,6 +247,7 @@ def test_punct_only_ref_token_not_in_dp():
 
 # ---------- pron_keys (phonetic.py) ----------
 
+
 def test_pron_keys_strips_stress_and_oov():
     # the: DH AH0 | DH AH1 | DH IY0 -> stress removed, duplicates merged: {(DH, AH), (DH, IY)}.
     assert pron_keys("the", pron=stub_pron) == frozenset({("DH", "AH"), ("DH", "IY")})
@@ -380,12 +383,14 @@ def test_del_has_no_times():
 def test_ins_sentence_index_follows_previous_ref():
     # Script "Hello world. Next one." -> sentence 0 = hello world, sentence 1 = next one.
     # Insert "really" after "world" -> sentence 0; insert after "next" -> sentence 1.
-    res = align("Hello world. Next one.", _words("hello", "world", "really", "next", "one"),
-                pron=alias_pron)
+    res = align(
+        "Hello world. Next one.", _words("hello", "world", "really", "next", "one"), pron=alias_pron
+    )
     ins = [it for it in res.items if it.status == "ins"]
     assert [it.sentence_index for it in ins] == [0]
-    res = align("Hello world. Next one.", _words("hello", "world", "next", "really", "one"),
-                pron=alias_pron)
+    res = align(
+        "Hello world. Next one.", _words("hello", "world", "next", "really", "one"), pron=alias_pron
+    )
     ins = [it for it in res.items if it.status == "ins"]
     assert [it.sentence_index for it in ins] == [1]
     assert ins[0].ref_index is None
@@ -439,12 +444,19 @@ def test_partial_hyp_expansion_gives_equal_plus_ins():
 
 def test_total_items_non_ins_equals_n_ref():
     script = "I don't know — it's fine, really."
-    res = align(script, _words("I", "do", "know", "well", "it", "is", "fine", "so"),
-                pron=alias_pron)
+    res = align(
+        script, _words("I", "do", "know", "well", "it", "is", "fine", "so"), pron=alias_pron
+    )
     non_ins = [it for it in res.items if it.status != "ins"]
     assert len(non_ins) == res.counts["n_ref"] == len(script.split())
     assert sorted(it.ref_index for it in non_ins) == list(range(len(script.split())))
     assert isinstance(res.items[0], AlignedItem)
     assert set(res.counts) == {
-        "n_ref", "n_sub", "n_del", "n_ins", "n_near_miss", "n_homophone", "n_oov",
+        "n_ref",
+        "n_sub",
+        "n_del",
+        "n_ins",
+        "n_near_miss",
+        "n_homophone",
+        "n_oov",
     }

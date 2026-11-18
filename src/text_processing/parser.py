@@ -139,8 +139,7 @@ def _extract_pdf_pages(
     else:
         reader = pypdf.PdfReader(pdf_path)
         pages = [
-            {"page": i + 1, "text": p.extract_text() or ""}
-            for i, p in enumerate(reader.pages)
+            {"page": i + 1, "text": p.extract_text() or ""} for i, p in enumerate(reader.pages)
         ]
     if maybe_recover_page_text is not None:
         for item in pages:

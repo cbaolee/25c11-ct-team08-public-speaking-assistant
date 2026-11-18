@@ -70,9 +70,7 @@ def test_alignment_del_none_times():
     from src.audio_processing.result_schema import AlignmentItem
 
     item = AlignmentItem(
-        **_alignment_kwargs(
-            status="del", hyp_index=None, hyp_word=None, start_s=None, end_s=None
-        )
+        **_alignment_kwargs(status="del", hyp_index=None, hyp_word=None, start_s=None, end_s=None)
     )
     assert item.start_s is None and item.end_s is None
 

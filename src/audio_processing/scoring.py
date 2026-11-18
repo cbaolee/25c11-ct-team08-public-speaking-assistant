@@ -24,6 +24,7 @@ def clamp(x: float) -> float:
     """Clamp the value to 0.0 - 100.0."""
     return max(0.0, min(100.0, x))
 
+
 def _check_counts(**counts: int) -> None:
     for name, value in counts.items():
         if value < 0:
@@ -165,6 +166,7 @@ def compute_fluency(
         return None
     return (f_wpm + f_pause + f_filler) / 3.0
 
+
 def score_clarity(n_near_miss: int, n_ref: int) -> float | None:
     """P_clarity = clamp(100 * (1 - 5 * n_near_miss / n_ref)).
 
@@ -202,6 +204,7 @@ def accuracy_scores(result: AlignmentResult) -> AccuracyScores:
         accuracy_detail=dict(c),
         flags=flags,
     )
+
 
 def pitch_score_from_range(r_st: float | None) -> float | None:
     """Turn the pitch range R_st (semitones) into the score P_pitch (scoring_framework.md §6.2).
@@ -262,7 +265,9 @@ def _extract_f0(master: MasterAudio) -> list[tuple[float, float]]:
 
 
 def f0_contour_st(
-    track: Sequence[tuple[float, float]], f0_ref_hz: float | None, duration_s: float,
+    track: Sequence[tuple[float, float]],
+    f0_ref_hz: float | None,
+    duration_s: float,
     step_s: float = 0.1,
 ) -> dict | None:
     """Pitch contour Series in semitones relative to f0_ref (ADR-004 D10).

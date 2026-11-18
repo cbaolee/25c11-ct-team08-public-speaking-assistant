@@ -126,8 +126,9 @@ def align(
     for kind, idx in entries:
         if kind == "ins":
             w = kept[idx]
-            items.append(AlignedItem("ins", None, idx, None, w.word, w.start_s, w.end_s,
-                                     cur_sentence))
+            items.append(
+                AlignedItem("ins", None, idx, None, w.word, w.start_s, w.end_s, cur_sentence)
+            )
             continue
         cur_sentence = sentence_of[idx]
         raw = ref_tokens[idx].raw
@@ -146,9 +147,19 @@ def align(
         hs = sorted(hyp_set)
         if hs:
             first, last = kept[hs[0]], kept[hs[-1]]
-            items.append(AlignedItem(
-                status, idx, hs[0], raw, " ".join(kept[h].word for h in hs),
-                first.start_s, last.end_s, cur_sentence, status == "equal" and homo[0]))
+            items.append(
+                AlignedItem(
+                    status,
+                    idx,
+                    hs[0],
+                    raw,
+                    " ".join(kept[h].word for h in hs),
+                    first.start_s,
+                    last.end_s,
+                    cur_sentence,
+                    status == "equal" and homo[0],
+                )
+            )
         else:
             items.append(AlignedItem(status, idx, None, raw, None, None, None, cur_sentence))
 
@@ -173,11 +184,7 @@ def prepare_hyp(words: Sequence[WordTimestamp]) -> list[HypToken]:
     so the index matches the position in the STT word list without fillers (D15).
     """
     kept = [w for w in words if not is_filler(w.word)]
-    return [
-        HypToken(idx, sub)
-        for idx, w in enumerate(kept)
-        for sub in normalize_token(w.word)
-    ]
+    return [HypToken(idx, sub) for idx, w in enumerate(kept) for sub in normalize_token(w.word)]
 
 
 def align_tokens(
@@ -231,13 +238,23 @@ def align_tokens(
     ops: list[TokenOp] = []
     i, j = n, m
     while i > 0 or j > 0:
-        if (i > 0 and j > 0 and match[i - 1][j - 1] and d[i - 1][j - 1] == d[i][j]
-                and e[i - 1][j - 1] + 1 == e[i][j]):
+        if (
+            i > 0
+            and j > 0
+            and match[i - 1][j - 1]
+            and d[i - 1][j - 1] == d[i][j]
+            and e[i - 1][j - 1] + 1 == e[i][j]
+        ):
             r, h = ref[i - 1], hyp[j - 1]
             ops.append(TokenOp("equal", r[0], r[1], h.hyp_index, h.text, r[1] != h.text))
             i, j = i - 1, j - 1
-        elif (i > 0 and j > 0 and not match[i - 1][j - 1] and d[i - 1][j - 1] + 1 == d[i][j]
-                and e[i - 1][j - 1] == e[i][j]):
+        elif (
+            i > 0
+            and j > 0
+            and not match[i - 1][j - 1]
+            and d[i - 1][j - 1] + 1 == d[i][j]
+            and e[i - 1][j - 1] == e[i][j]
+        ):
             r, h = ref[i - 1], hyp[j - 1]
             ops.append(TokenOp("sub", r[0], r[1], h.hyp_index, h.text, False))
             i, j = i - 1, j - 1

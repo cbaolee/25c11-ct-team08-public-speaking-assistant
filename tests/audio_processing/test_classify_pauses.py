@@ -1,4 +1,3 @@
-
 import pytest
 
 from src.audio_processing.alignment import AlignedItem, align
@@ -15,15 +14,18 @@ from src.audio_processing.vad import check_audio_quality, classify_pauses
 # TESTS CHO HÀM check_audio_quality
 # ==========================================
 
+
 def test_check_audio_quality_empty_segments_raises_insufficient_audio():
     with pytest.raises(InsufficientAudio, match="Speech < 30%"):
         check_audio_quality(segments=[], duration_s=10.0)
+
 
 def test_check_audio_quality_below_30_percent_raises_insufficient_audio():
     # 2.5s of speech out of 10.0s total (25%) -> Raise
     segments = [SpeechSegment(start_s=0.0, end_s=2.5)]
     with pytest.raises(InsufficientAudio, match="Speech < 30%"):
         check_audio_quality(segments=segments, duration_s=10.0)
+
 
 def test_check_audio_quality_above_30_percent_passes():
     # 3.5s of speech out of 10.0s total (35%) -> Pass
@@ -101,8 +103,13 @@ def test_natural_pause_is_returned_not_dropped():
 def test_word_with_and_without_punct_is_distinguished():
     # Bug 1.9.2 #26: "now" both with and without a comma.
     script = "go now, go now please"
-    spoken = [("go", 0.0, 0.3), ("now", 0.3, 0.6), ("go", 2.0, 2.3), ("now", 2.3, 2.6),
-              ("please", 3.4, 3.8)]
+    spoken = [
+        ("go", 0.0, 0.3),
+        ("now", 0.3, 0.6),
+        ("go", 2.0, 2.3),
+        ("now", 2.3, 2.6),
+        ("please", 3.4, 3.8),
+    ]
     pauses = [Pause(0.6, 1.4), Pause(2.6, 3.4)]
     out = classify_pauses(pauses, _items(script, spoken), script, hesitation_threshold_s=0.7)
     assert [c.kind for c in out] == [PauseKind.PUNCTUATION, PauseKind.HESITATION]
@@ -123,8 +130,8 @@ def test_boundary_hesitation_threshold_inclusive_exact():
 def test_boundary_default_values_0_7_and_1_2():
     s = "Hello world and welcome."
     sp = [("world", 0.0, 1.0)]
-    assert _kind(s, sp, Pause(1.0, 1.7)).kind == PauseKind.HESITATION   # exactly 0.7
-    assert _kind(s, sp, Pause(1.0, 1.69)).kind == PauseKind.NATURAL     # 0.69
+    assert _kind(s, sp, Pause(1.0, 1.7)).kind == PauseKind.HESITATION  # exactly 0.7
+    assert _kind(s, sp, Pause(1.0, 1.69)).kind == PauseKind.NATURAL  # 0.69
     assert _kind(s, sp, Pause(1.0, 2.2)).kind == PauseKind.FORGOT_WORD  # exactly 1.2
 
 
@@ -173,8 +180,14 @@ def test_del_item_is_never_chosen_as_preceding_word():
 
 def test_all_pauses_returned_in_input_order():
     script = "Hello world. How are you today"
-    spoken = [("hello", 0.0, 0.4), ("world", 0.4, 0.8), ("how", 2.0, 2.3),
-              ("are", 2.3, 2.6), ("you", 3.2, 3.5), ("today", 3.5, 3.9)]
+    spoken = [
+        ("hello", 0.0, 0.4),
+        ("world", 0.4, 0.8),
+        ("how", 2.0, 2.3),
+        ("are", 2.3, 2.6),
+        ("you", 3.2, 3.5),
+        ("today", 3.5, 3.9),
+    ]
     pauses = [Pause(0.8, 2.0), Pause(2.6, 3.2), Pause(0.4, 0.45), Pause(3.5, 5.0)]
     out = classify_pauses(pauses, _items(script, spoken), script, hesitation_threshold_s=0.7)
     assert [c.pause for c in out] == pauses
@@ -183,6 +196,7 @@ def test_all_pauses_returned_in_input_order():
 # ==========================================
 # Float error at the 0.7 s / 1.2 s boundaries (review 3.8, bug 1)
 # ==========================================
+
 
 def test_float_boundary_0_68_to_1_38_is_hesitation():
     # 1.38 - 0.68 = 0.6999999999999998 in float but nominally 0.7.
@@ -203,8 +217,10 @@ def test_float_boundary_sweep_no_misclassification():
     wrong = []
     for i in range(0, 1001):
         start = Decimal(i) / Decimal(100)
-        for nominal, expected in ((Decimal("0.7"), PauseKind.HESITATION),
-                                  (Decimal("1.2"), PauseKind.FORGOT_WORD)):
+        for nominal, expected in (
+            (Decimal("0.7"), PauseKind.HESITATION),
+            (Decimal("1.2"), PauseKind.FORGOT_WORD),
+        ):
             p = Pause(float(start), float(start + nominal))
             items = _items(s, [("world", 0.0, float(start))]) if start > 0 else _items(s, [])
             out = classify_pauses([p], items, s, hesitation_threshold_s=0.7)
@@ -217,10 +233,18 @@ def test_float_boundary_sweep_no_misclassification():
 # Punctuation-only tokens block ins from finding a ref (review 3.8, bug 2)
 # ==========================================
 
+
 def _item(status, ref_index, hyp_index, ref_word, hyp_word, start_s, end_s):
-    return AlignedItem(status=status, ref_index=ref_index, hyp_index=hyp_index,
-                       ref_word=ref_word, hyp_word=hyp_word, start_s=start_s,
-                       end_s=end_s, sentence_index=0)
+    return AlignedItem(
+        status=status,
+        ref_index=ref_index,
+        hyp_index=hyp_index,
+        ref_word=ref_word,
+        hyp_word=hyp_word,
+        start_s=start_s,
+        end_s=end_s,
+        sentence_index=0,
+    )
 
 
 def test_ins_after_punct_only_token_skips_to_real_ref():
@@ -252,10 +276,12 @@ def test_ins_after_del_uses_del_ref_index():
 # VAD/STT sync tolerance (WORD_PAUSE_TOLERANCE_S = 0.1)
 # ==========================================
 
+
 def test_stt_end_slightly_after_pause_start_still_counts_as_preceding_word():
     # "world" ends at 1.00 but VAD says the pause starts at 0.97 (off by 0.03 s, within tolerance).
-    r = _kind("Hello world. How are you", [("hello", 0.0, 0.4), ("world", 0.5, 1.0)],
-              Pause(0.97, 1.8))
+    r = _kind(
+        "Hello world. How are you", [("hello", 0.0, 0.4), ("world", 0.5, 1.0)], Pause(0.97, 1.8)
+    )
     assert r.kind == PauseKind.PUNCTUATION
     assert r.after_ref_index == 1
 
@@ -263,7 +289,8 @@ def test_stt_end_slightly_after_pause_start_still_counts_as_preceding_word():
 def test_stt_end_beyond_tolerance_falls_back_to_previous_word():
     # Pause starts at 0.85, "world" ends at 1.00 (off by 0.15 s > 0.1): "world" is dropped,
     # the word before the pause is "hello" (no punctuation) -> HESITATION, after_ref_index == 0.
-    r = _kind("Hello world. How are you", [("hello", 0.0, 0.4), ("world", 0.5, 1.0)],
-              Pause(0.85, 1.8))
+    r = _kind(
+        "Hello world. How are you", [("hello", 0.0, 0.4), ("world", 0.5, 1.0)], Pause(0.85, 1.8)
+    )
     assert r.after_ref_index == 0
     assert r.kind == PauseKind.HESITATION

@@ -255,6 +255,4 @@ def test_punct_constants():
 
 
 def test_filler_words_exact():
-    assert FILLER_WORDS == frozenset(
-        "uh um er ah hmm uhm umm uhh erm ahh hm hmmm mm mmm".split()
-    )
+    assert FILLER_WORDS == frozenset("uh um er ah hmm uhm umm uhh erm ahh hm hmmm mm mmm".split())
