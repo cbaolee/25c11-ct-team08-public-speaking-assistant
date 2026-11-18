@@ -260,3 +260,25 @@ test('followSchedule(undefined) does not throw', () => {
   assert.deepEqual(followSchedule(undefined), []);
   assert.deepEqual(followSchedule(null), []);
 });
+
+
+test('sentence practice counts only reference errors and includes the threshold', () => {
+  const client = require('../../src/web/static/js/evaluate_client.js');
+  const words = Array.from({length: 10}, (_, i) => ({si: 0, status: i < 3 ? 'wrong' : 'ok'}));
+  const stat = client.sentenceErrorStats(words)[0];
+  assert.equal(stat.ratio, 0.3);
+  assert.equal(client.needsSentencePractice(stat, 0.3), true);
+  assert.equal(client.needsSentencePractice(stat, 0.31), false);
+  assert.equal(client.needsSentencePractice(client.sentenceErrorStats([{si: 1, status: 'ok'}])[0], 0.3), false);
+  assert.deepEqual(client.sentenceErrorStats([]), []);
+  assert.deepEqual(client.sentenceErrorStats([{si: 2, status: 'ins'}]), []);
+});
+
+
+test('sentence statistics omit empty and insertion-only sentences independently', () => {
+  const client = require('../../src/web/static/js/evaluate_client.js');
+  const stats = client.sentenceErrorStats([{ si: 3, status: 'ins' }, { si: 4, status: 'ok' }, { si: 4, status: 'ins' }]);
+  assert.deepEqual(stats, [{ si: 4, nRef: 1, nErr: 0, ratio: 0 }]);
+  assert.equal(client.needsSentencePractice(undefined, 0.3), false);
+  assert.equal(client.needsSentencePractice({ nRef: 0, ratio: 0 }, 0), false);
+});

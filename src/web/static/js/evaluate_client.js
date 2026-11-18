@@ -177,7 +177,22 @@
     return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
   }
 
-  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
+  // Sentences with no reference words, including insertion-only sentences, are omitted.
+  function sentenceErrorStats(words) {
+    const stats = new Map();
+    (words || []).filter(w => w.status !== 'ins').forEach(w => {
+      if (!stats.has(w.si)) stats.set(w.si, { si: w.si, nRef: 0, nErr: 0, ratio: 0 });
+      const stat = stats.get(w.si); stat.nRef++;
+      if (['wrong', 'near', 'missing'].includes(w.status)) stat.nErr++;
+      stat.ratio = stat.nErr / stat.nRef;
+    });
+    return Array.from(stats.values());
+  }
+  function needsSentencePractice(stat, minRatio) {
+    return !!stat && stat.nRef > 0 && stat.ratio >= minRatio;
+  }
+
+  const api = { sentenceErrorStats, needsSentencePractice, mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
   root.EvaluateClient = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);
