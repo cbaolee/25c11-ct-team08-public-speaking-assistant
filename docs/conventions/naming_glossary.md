@@ -71,7 +71,7 @@ Cột **Trong code** là id hoặc class để tìm nhanh trong `src/web/`.
 | **Settings Modal**     | `#settingsModal`     | Danh sách 4 mục; chọn mục thì trượt sang trong cùng khung: **Permissions**, **Audio**, **Change Password**, **Delete Account** |
 | **Safety Alert**       | `#safetyAlert`       | Báo nội dung bị cấm                                                                                                             |
 | **Confirm Dialog**     | `#confirmDialog`     | Xác nhận xoá hoặc thoát                                                                                                         |
-| **Evaluating Overlay** | `#evaluatingOverlay` | Màn hình chờ chấm điểm                                                                                                          |
+| **Evaluating Overlay** | `#evaluatingOverlay` | Màn hình chờ chấm điểm: phần trăm và 9 bước, class `.ev-*` |
 | **Error Dialog**       | `#errorDialog`       | Báo lỗi                                                                                                                         |
 | **Baseline Gate**      | `#baselineGate`      | Ghi âm 30 giây giọng mẫu (mở sau khi đăng nhập nếu chưa có baseline)                                                            |
 | **Baseline Recorder**  | `#baselineRecorder`  | Ghi lại baseline từ Profile (Record again); không hỏi lại quyền ghi âm, không đóng được khi đang ghi hoặc đang gửi               |
@@ -96,6 +96,7 @@ Password Modal, Audio Settings và Permissions cũ đã gộp vào Settings Moda
 | --------------------- | --------------------------------------------------------------------------------------- |
 | **Coach Note Service** | `POST /api/sessions/{id}/coach-note`, `src/app/coach_note.py` |
 | **Retry Endpoint**    | `/api/practice/retry`: nhận diện lại từ hoặc câu, không lưu phiên |
+| **Evaluate Job** | `POST /api/evaluate`, `GET/DELETE /api/evaluate/{job_id}`, `src/app/evaluate_jobs.py` |
 | **Evaluate Pipeline** | Chấm điểm một bài nói: probe → decode → VAD → STT → align → scoring                     |
 | **Baseline Pipeline** | Phân tích giọng mẫu: probe → decode → VAD → pause profile + F0                          |
 | **Script Pipeline**   | Sinh script: parser → sanitizer → generator. Sắp thêm **Template Matcher** và **Guard** |
