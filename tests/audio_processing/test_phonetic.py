@@ -1,7 +1,8 @@
 """Test phonetic.py (ADR-005 P1, P2, P3, P7, P11).
 
 Every expected number is HAND-COMPUTED per ADR-005 ("Hand-computed examples"), NOT measured.
-Phoneme stubs come from the "Verified package info" section (with stress digits to test stress removal).
+Phoneme stubs come from the "Verified package info" section
+(with stress digits to test stress removal).
 """
 
 import pytest

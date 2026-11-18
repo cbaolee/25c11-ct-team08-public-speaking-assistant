@@ -58,7 +58,10 @@ PAUSE_WORDS = [w("Good", 0.0, 0.4), w("morning", 0.5, 0.9), w("my", 1.8, 2.2),
 
 @pytest.fixture
 def run(monkeypatch, tmp_path: Path):
-    """Build a fake environment then call evaluate_session. Returns run(...) -> EvaluationResultV2."""
+    """Build a fake environment then call evaluate_session.
+
+    Returns run(...) -> EvaluationResultV2.
+    """
 
     def _run(
         *,
@@ -123,7 +126,8 @@ def test_ok_full_hand_calculation(run):
     assert r.pitch_detail["range_semitones"] == pytest.approx(8.4)
     assert r.pitch_detail["f0_ref_hz"] == pytest.approx(100.0)
     assert r.pitch_detail["f0_ref_source"] == "session"
-    # contour_st: 22 cells, frames in cells 0, 5, 10 (ST 0) and cell 15 (ST 12 = 12*log2(200/100)); rest None
+    # contour_st: 22 cells, frames in cells 0, 5, 10 (ST 0)
+    # and cell 15 (ST 12 = 12*log2(200/100)); rest None
     cs = r.pitch_detail["contour_st"]
     assert cs["start_s"] == 0.0 and cs["step_s"] == 0.1 and len(cs["values"]) == 22
     assert [i for i, v in enumerate(cs["values"]) if v is not None] == [0, 5, 10, 15]
@@ -175,7 +179,8 @@ def test_default_threshold_without_baseline_makes_hesitation(run):
 
 
 def test_insufficient_low_voiced_ratio(run):
-    # stt_exc=AssertionError: if the pipeline wrongly calls STT the test fails (STT is ruled out earlier).
+    # stt_exc=AssertionError: if the pipeline wrongly calls STT the test fails
+    # (STT is ruled out earlier).
     r = run(segments=(SpeechSegment(0.0, 1.0),), duration=10.0,
             stt_exc=AssertionError("STT không được gọi khi voiced thấp"))  # 10% voiced
     assert r.status == "insufficient_audio" and r.reason == "low_voiced_ratio"
@@ -292,7 +297,8 @@ def _post_eval(monkeypatch, baseline_profile: str | None, captured: dict):
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
-    # Only checks the returned JSON shape; baseline (required) is tested in tests/test_api_evaluate.py
+    # Only checks the returned JSON shape;
+    # baseline (required) is tested in tests/test_api_evaluate.py
     monkeypatch.setattr(settings, "baseline_required", False)
     data = {"script": "Hello."}
     if baseline_profile is not None:
@@ -335,7 +341,8 @@ def test_non_trivial_encoder_second_sentence_fails(run, monkeypatch):
         calls.append(list(texts))
         if len(calls) == 1:
             return np.array([[1.0, 0.0]] * len(texts))
-        # hyp sentence 1: same direction as ref (cosine 1.0). hyp sentence 2: [0.6, 0.8] -> cosine 0.6 < 0.82.
+        # hyp sentence 1: same direction as ref (cosine 1.0).
+        # hyp sentence 2: [0.6, 0.8] -> cosine 0.6 < 0.82.
         return np.array([[1.0, 0.0], [0.6, 0.8]])
 
     r = _run_with_encoder(run, monkeypatch, words=words, script="Good morning. See you.",
@@ -352,7 +359,8 @@ def test_non_trivial_encoder_second_sentence_fails(run, monkeypatch):
 
 
 def _run_with_encoder(run, monkeypatch, *, words, script, encode):
-    # fixture `run` fixes encode=fake_encode; wrap evaluate_session to swap the encoder for this test.
+    # fixture `run` fixes encode=fake_encode;
+    # wrap evaluate_session to swap the encoder for this test.
     orig = pipeline.evaluate_session
 
     def patched(audio, scr, baseline, *, vad_params, encode=None):  # noqa: ARG001

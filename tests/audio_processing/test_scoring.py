@@ -588,7 +588,8 @@ def test_matches_jiwer_when_no_homophone_or_near_miss(ref, hyp):
 
 # ---------- Item 3.7 Phase 3: speech_span, WPM, H, filler, compute_fluency ----------
 # Every number below is hand-computed (scoring_framework.md §12 and made up), not measured.
-# Import at module level; tests call `scoring.<name>` so a missing function fails with AttributeError.
+# Import at module level; tests call `scoring.<name>`
+# so a missing function fails with AttributeError.
 
 from src.audio_processing.contracts import (  # noqa: E402
     ClassifiedPause,

@@ -1,4 +1,7 @@
-"""app_constants.toml: Settings defaults come from it, .env overrides it, /api/config serves [web]."""
+"""app_constants.toml: Settings defaults come from it.
+
+.env overrides it, /api/config serves [web].
+"""
 
 from pathlib import Path
 
