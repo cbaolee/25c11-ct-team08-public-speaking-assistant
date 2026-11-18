@@ -281,6 +281,10 @@ table.t tr:last-child td { border-bottom: 0; }
 .ov-coach-who { margin: 0; font: 700 14px var(--sans); color: #1D4ED8; display: flex; align-items: center; gap: 8px; }
 .ov-coach-tag { font: 600 11px/1 var(--sans); padding: 3px 8px; border-radius: var(--r-pill); background: #DBEAFE; color: #1E40AF; }
 .ov-coach-text { margin: 4px 0 0; font-size: 16px; line-height: 1.55; color: var(--ink); }
+.cn-skel { height: 10px; margin: 8px 0; border-radius: var(--r-pill); }
+.cn-label { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.cn-list { margin: 6px 0; padding-left: 18px; line-height: 1.55; }
+.cn-next { margin-top: 6px; }
 .ov-cards { list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
 .ov-card { display: flex; gap: 12px; align-items: flex-start; padding: 14px 14px; border-radius: 14px; background: #fff; color: var(--ink); }
 .ov-card.focus { grid-column: 1 / -1; }

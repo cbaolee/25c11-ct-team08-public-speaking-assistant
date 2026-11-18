@@ -1,3 +1,4 @@
+import { api, readJson } from '../api.js';
 import { chart, hideTip, showTip } from '../charts.js';
 import { ADR, adviceList, fx, hasBase, paceWindows, progressDelta, sh } from '../data.js';
 import { T } from '../i18n.js';
@@ -80,6 +81,42 @@ export const overallLabel = v => (v >= 85 ? 'good' : v >= 70 ? 'fair' : v >= 50 
 export function coachNote(s) {
   return T('overview.coachPlaceholder', { name: S.user ? S.user.name : '' });
 }
+const coachCache = new Map();
+const coachPending = new Map();
+function renderCoachNote(el, note) {
+  el.replaceChildren();
+  const label = document.createElement('div'); label.className = 'cn-label'; label.textContent = T('overview.aiLabel'); el.append(label);
+  const summary = document.createElement('div'); summary.textContent = note.summary; el.append(summary);
+  if (note.focus.length) {
+    const list = document.createElement('ul'); list.className = 'cn-list';
+    note.focus.slice(0, 3).forEach(text => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
+    el.append(list);
+  }
+  const next = document.createElement('div'); next.className = 'cn-next'; next.textContent = T('overview.nextStep') + ': ' + note.next_step; el.append(next);
+  el.removeAttribute('aria-busy');
+}
+export async function loadCoachNote(s) {
+  if (!s.remote || !s.sc || s.sc.status !== 'ok' || s.demo) return;
+  const el = $('#repCoachNote'); if (!el) return;
+  if (coachCache.has(s.id)) { renderCoachNote(el, coachCache.get(s.id)); return; }
+  el.replaceChildren(); el.setAttribute('aria-busy', 'true');
+  for (let i = 0; i < 3; i++) { const bar = document.createElement('span'); bar.className = 'skel cn-skel'; el.append(bar); }
+  try {
+    if (!coachPending.has(s.id)) {
+      const pending = (async () => {
+        const { ok, j } = await readJson(await api('/api/sessions/' + encodeURIComponent(s.id) + '/coach-note', { method: 'POST' }));
+        if (!ok || !j || typeof j.summary !== 'string' || !Array.isArray(j.focus) || typeof j.next_step !== 'string') throw new Error('Invalid feedback');
+        coachCache.set(s.id, j);
+        return j;
+      })().finally(() => coachPending.delete(s.id));
+      coachPending.set(s.id, pending);
+    }
+    const j = await coachPending.get(s.id);
+    if (S.currentSession === s && $('#repCoachNote') === el) renderCoachNote(el, j);
+  } catch (_) {
+    if (S.currentSession === s && $('#repCoachNote') === el) { el.textContent = coachNote(s); el.removeAttribute('aria-busy'); }
+  }
+}
 const OV_IC = {
   good: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
   warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg>',
@@ -111,7 +148,7 @@ export function overviewHtml(s) {
     '<h2 class="ov-verdict' + (band ? ' ' + band : '') + '">' + esc(verdict) + '</h2>' +
     '<div class="ov-coach"><span class="ov-coach-av" aria-hidden="true">' + IC.ai + '</span><div class="ov-coach-in">' +
       '<p class="ov-coach-who">' + esc(T('overview.coachWho')) + ' <span class="ov-coach-tag">' + esc(T('overview.coachTag')) + '</span></p>' +
-      '<p class="ov-coach-text" id="repCoachNote">' + esc(coachNote(s)) + '</p></div></div>' +
+      '<div class="ov-coach-text" id="repCoachNote">' + esc(coachNote(s)) + '</div></div></div>' +
     '<ul class="ov-cards">' + cards.map(c => '<li class="ov-card ' + c[0] + '"><span class="ov-ic" aria-hidden="true">' + OV_IC[c[0]] + '</span><div><p class="ov-k">' + esc(c[1]) + '</p><p class="ov-v">' + c[2] + '</p></div></li>').join('') + '</ul>';
 }
 /* Key numbers (own panel at the top of the right column): one row per measure, with a green
@@ -147,6 +184,7 @@ RENDER.report = function () {
     return;
   }
   $('#repOverview').innerHTML = overviewHtml(s);
+  loadCoachNote(s);
   $('#repKeyNumbers').innerHTML = keyNumbersHtml(sc);
   $('#transcriptView').innerHTML = buildTranscript(an);
   S.play = { t: 0, on: false, iv: null };

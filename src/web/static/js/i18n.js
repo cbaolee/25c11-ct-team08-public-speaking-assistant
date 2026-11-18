@@ -247,6 +247,8 @@ export const TEXT = {
     gPace: 'Pace', gHes: 'Hesitations / min', gFiller: 'Filler words', gWrong: 'Wrong / skipped', gPitch: 'Pitch range', gWords: '{n} of {total}',
     keyNumbers: 'Key numbers', onTarget: 'On target', workOn: 'Work on it',
     coachWho: 'Assistant', coachTag: 'Preview',
+    aiLabel: 'AI feedback, based on your scores',
+    nextStep: 'Next step',
     coachPlaceholder: 'Well done for finishing this take! Every run-through makes the next one easier. Read the focus point below, then give it one more try.'
   },
   gate: {
