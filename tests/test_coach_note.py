@@ -254,7 +254,7 @@ def _cerebras_ok(content="{}"):
 
 def _cerebras_settings(keys=None, fallback=""):
     return SimpleNamespace(cerebras_api_keys=keys if keys is not None else ["retry-key"],
-                           cerebras_model="model", cerebras_fallback_model_2=fallback)
+                           cerebras_model="model", cerebras_fallback_model_1=fallback)
 
 
 def test_cerebras_model_fallback_on_bad_response(monkeypatch):

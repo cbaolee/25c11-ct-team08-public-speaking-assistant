@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # Several keys per service: when one runs out of quota the next is used (src/app/key_pool.py)
     cerebras_api_keys: KeyList = []
     cerebras_model: str = ""
-    cerebras_fallback_model_2: str = ""
+    cerebras_fallback_model_1: str = ""
     groq_api_keys: KeyList = []
     groq_llm_model: str = ""
     groq_llm_fallback_model_1: str = ""

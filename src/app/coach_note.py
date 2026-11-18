@@ -137,7 +137,7 @@ _CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions'
 
 
 def call_cerebras(payload, settings, timeout_s):
-    models = [m.strip() for m in (settings.cerebras_model, settings.cerebras_fallback_model_2)
+    models = [m.strip() for m in (settings.cerebras_model, settings.cerebras_fallback_model_1)
               if m.strip()]
     if not settings.cerebras_api_keys or not models:
         return None
