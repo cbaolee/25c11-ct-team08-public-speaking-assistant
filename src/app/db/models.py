@@ -3,7 +3,7 @@ import binascii
 import hashlib
 import json
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
@@ -35,10 +35,13 @@ class ProfilePatch(BaseModel):
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = None
     topics: list[str] | None = None
+    preferences: dict[str, Any] | None = None
 
 
 class ProfileRow(ProfileUpsert):
     id: UUID
+    avatar_path: str | None = None
+    preferences: dict[str, Any] = Field(default_factory=dict)
     consent_recording: bool
     consent_updated_at: datetime | None
     created_at: datetime
@@ -174,6 +177,10 @@ def build_object_path(user_id: UUID, object_id: UUID, suffix: str) -> str:
     if suffix not in {".webm", ".series.json"}:
         raise ValueError("Unsupported object suffix")
     return f"{user_id}/{object_id}{suffix}"
+
+
+def build_avatar_path(user_id: UUID) -> str:
+    return f"{user_id}/avatar.webp"
 
 
 def encode_cursor(created_at: datetime, row_id: UUID) -> str:

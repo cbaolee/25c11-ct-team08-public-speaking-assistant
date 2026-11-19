@@ -28,6 +28,7 @@ from src.app.db.models import (
     SessionRow,
     SessionSummary,
     StorageError,
+    build_avatar_path,
     build_object_path,
     decode_cursor,
 )
@@ -112,6 +113,11 @@ class SupabaseProfileRepo:
             "consent_updated_at": datetime.now(UTC).isoformat(),
         }
         resp = _execute(self._table().update(values).eq("id", str(user_id)))
+        row = _first(resp.data)
+        return ProfileRow.model_validate(row) if row else None
+
+    def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None:
+        resp = _execute(self._table().update({"avatar_path": avatar_path}).eq("id", str(user_id)))
         row = _first(resp.data)
         return ProfileRow.model_validate(row) if row else None
 
@@ -326,6 +332,8 @@ def _validate_object_path(user_id: UUID, path: str) -> None:
                 return
         except ValueError:
             continue
+    if build_avatar_path(user_id) == path:
+        return
     raise StorageError("Object path must be created with build_object_path")
 
 

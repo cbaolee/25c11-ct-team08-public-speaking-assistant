@@ -146,9 +146,13 @@
     if (!Number.isFinite(n)) return FOLLOW_WPM.def;
     return Math.min(FOLLOW_WPM.max, Math.max(FOLLOW_WPM.min, n));
   }
-  function parseFollowWpm(raw) {                   // stored value (string/number): must be an integer multiple of 5 in range, else default
+  function parseFollowWpm(raw, limits) {            // stored value (string/number): must be an integer multiple of the configured step in range, else default
+    const min = limits && limits.min != null ? limits.min : FOLLOW_WPM.min;
+    const max = limits && limits.max != null ? limits.max : FOLLOW_WPM.max;
+    const step = limits && limits.step != null ? limits.step : FOLLOW_WPM.step;
+    const def = limits && limits.def != null ? limits.def : FOLLOW_WPM.def;
     const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
-    if (typeof n !== 'number' || !Number.isInteger(n) || n < FOLLOW_WPM.min || n > FOLLOW_WPM.max || n % FOLLOW_WPM.step !== 0) return FOLLOW_WPM.def;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < min || n > max || n % step !== 0) return def;
     return n;
   }
   /* wordCounts[i] = words in sentence i. Sentence i lasts n_i * 60 / wpm seconds; leadS before the first, gapS after each.
