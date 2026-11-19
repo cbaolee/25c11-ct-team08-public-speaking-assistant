@@ -8,6 +8,11 @@ export const CONFIG = {
   FOLLOW_GAP_S: 0.5,                   // pause added after each sentence (matches a natural stop at a full stop)
   HISTORY_MAX_PAGES: 5,                // 5 pages x 20 = the newest 100 sessions on Home and History
   HISTORY_PAGE_SIZE: 20,               // sessions per /api/sessions page
+  FOLLOW_WPM_MIN: 100,
+  FOLLOW_WPM_MAX: 180,
+  FOLLOW_WPM_STEP: 5,
+  FOLLOW_WPM_DEFAULT: 145,
+  FOLLOW_WPM_SAVE_DELAY_MS: 800,
 };
 
 

@@ -1,7 +1,10 @@
 """GET/PATCH /api/profile with the in-memory repositories (tests/conftest.py)."""
 
+from io import BytesIO
+
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 import src.app.main as main
 from src.app.db.factory import get_repos
@@ -68,3 +71,33 @@ def test_profile_storage_error_returns_503(client, repos, monkeypatch):
     r = client.get("/api/profile")
     assert r.status_code == 503
     assert r.json()["error_code"] == "profile_unavailable"
+
+
+def test_patch_profile_merges_preferences(client):
+    first = client.patch("/api/profile", json={"preferences": {"follow_wpm": 150, "theme": "dark"}})
+    assert first.status_code == 200
+    second = client.patch("/api/profile", json={"preferences": {"follow_wpm": 155}})
+    assert second.status_code == 200
+    assert second.json()["preferences"] == {"follow_wpm": 155, "theme": "dark"}
+
+
+def test_patch_profile_rejects_follow_wpm_outside_range(client):
+    r = client.patch("/api/profile", json={"preferences": {"follow_wpm": 181}})
+    assert r.status_code == 422
+
+
+def test_upload_avatar_resizes_and_delete_clears_it(client):
+    source = BytesIO()
+    Image.new("RGB", (600, 400), "red").save(source, format="PNG")
+    upload = ("avatar.png", source.getvalue(), "image/png")
+    r = client.put("/api/profile/avatar", files={"file": upload})
+    assert r.status_code == 200
+    assert r.json()["avatar_url"].startswith("memory://")
+
+    profile = client.get("/api/profile").json()
+    assert profile["avatar_path"].endswith("/avatar.webp")
+
+    r = client.delete("/api/profile/avatar")
+    assert r.status_code == 200
+    assert r.json()["avatar_url"] is None
+    assert client.get("/api/profile").json()["avatar_path"] is None

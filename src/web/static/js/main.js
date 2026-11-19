@@ -54,6 +54,11 @@ export function loadConfig() {
     CONFIG.FOLLOW_GAP_S = c.follow_gap_s ?? CONFIG.FOLLOW_GAP_S;
     CONFIG.HISTORY_PAGE_SIZE = c.history_page_size ?? CONFIG.HISTORY_PAGE_SIZE;
     CONFIG.HISTORY_MAX_PAGES = c.history_max_pages ?? CONFIG.HISTORY_MAX_PAGES;
+    CONFIG.FOLLOW_WPM_MIN = c.follow_wpm_min ?? CONFIG.FOLLOW_WPM_MIN;
+    CONFIG.FOLLOW_WPM_MAX = c.follow_wpm_max ?? CONFIG.FOLLOW_WPM_MAX;
+    CONFIG.FOLLOW_WPM_STEP = c.follow_wpm_step ?? CONFIG.FOLLOW_WPM_STEP;
+    CONFIG.FOLLOW_WPM_DEFAULT = c.follow_wpm_default ?? CONFIG.FOLLOW_WPM_DEFAULT;
+    CONFIG.FOLLOW_WPM_SAVE_DELAY_MS = c.follow_wpm_save_delay_ms ?? CONFIG.FOLLOW_WPM_SAVE_DELAY_MS;
   }).catch(() => {});
 }
 export function init() {
@@ -193,12 +198,18 @@ export function init() {
   $('#avFile').onchange = e => {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
     if (!f) return;
-    if (!(f.type || '').startsWith('image/')) { toast(T('profile.errImage'), true); return; }
-    const r = new FileReader();
-    r.onload = () => { S.avatar = r.result; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okAvatar')); };
-    r.readAsDataURL(f);
+    const fd = new FormData(); fd.append('file', f);
+    withBusy(api('/api/profile/avatar', { method: 'PUT', body: fd }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
+      if (!r.ok) { toast((j && j.message) || T('profile.errImage'), true); return; }
+      S.avatar = j.avatar_url; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okAvatar'));
+    })).catch(() => toast(T('profile.errImage'), true));
   };
-  $('#avRemove').onclick = () => { S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved')); };
+  $('#avRemove').onclick = () => {
+    withBusy(api('/api/profile/avatar', { method: 'DELETE' }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
+      if (!r.ok) { toast(T('profile.errImage'), true); return; }
+      S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved'));
+    })).catch(() => toast(T('profile.errImage'), true));
+  };
   $('#profileBaselineStart').onclick = toggleBaseline;
   $('#profileBaselineAgain').onclick = openBaselineRecorder;
   $('#profileBaselineListen').onclick = listenBaseline;

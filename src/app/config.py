@@ -25,6 +25,8 @@ max_script_words = _script["max_script_words"]
 max_script_chars = _script["max_script_chars"]
 max_upload_bytes = _storage["max_upload_bytes"]
 max_saved_scripts = _storage["max_saved_scripts"]
+avatar_max_bytes = _storage["avatar_max_bytes"]
+avatar_size_px = _storage["avatar_size_px"]
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
@@ -70,6 +72,7 @@ class Settings(BaseSettings):
     audio_bucket: str = "audio"
     series_bucket: str = "series"
     baselines_bucket: str = "baselines"
+    avatars_bucket: str = "avatars"
     retention_full_sessions: int = Field(
         default_factory=_from_toml("storage", "retention_full_sessions")
     )

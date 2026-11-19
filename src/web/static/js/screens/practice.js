@@ -185,19 +185,28 @@ export function buildFollow(counts) {
 }
 /* Highlight speed slider. It only moves the demo highlight: nothing here is sent to /api/* or used by score() (ADR-003 scores 130-160 WPM, unrelated). */
 export const FOLLOW_WPM_KEY = 'psc.followWpm';
+let followWpmSaveTimer = null;
 export function loadFollowWpm() {
-  try { S.followWpm = EvaluateClient.parseFollowWpm(localStorage.getItem(FOLLOW_WPM_KEY)); } catch (e) { S.followWpm = EvaluateClient.FOLLOW_WPM.def; }
+  const limits = { min: CONFIG.FOLLOW_WPM_MIN, max: CONFIG.FOLLOW_WPM_MAX, step: CONFIG.FOLLOW_WPM_STEP, def: CONFIG.FOLLOW_WPM_DEFAULT };
+  try { S.followWpm = EvaluateClient.parseFollowWpm(localStorage.getItem(FOLLOW_WPM_KEY), limits); } catch (e) { S.followWpm = CONFIG.FOLLOW_WPM_DEFAULT; }
 }
 export function paintFollowWpm() {
   const sl = $('#followWpm'); if (!sl) return;
+  sl.min = String(CONFIG.FOLLOW_WPM_MIN);
+  sl.max = String(CONFIG.FOLLOW_WPM_MAX);
+  sl.step = String(CONFIG.FOLLOW_WPM_STEP);
   sl.value = String(S.followWpm);
   sl.setAttribute('aria-valuetext', T('practice.followWpmVal', { n: S.followWpm }));
   $('#followWpmVal').textContent = T('practice.followWpmShort', { n: S.followWpm });
 }
 export function onFollowWpm() {
-  S.followWpm = EvaluateClient.parseFollowWpm(Number($('#followWpm').value));
+  S.followWpm = EvaluateClient.parseFollowWpm(Number($('#followWpm').value), { min: CONFIG.FOLLOW_WPM_MIN, max: CONFIG.FOLLOW_WPM_MAX, step: CONFIG.FOLLOW_WPM_STEP, def: CONFIG.FOLLOW_WPM_DEFAULT });
   try { localStorage.setItem(FOLLOW_WPM_KEY, String(S.followWpm)); } catch (e) { /* private mode: lasts until reload */ }
   paintFollowWpm();
+  if (followWpmSaveTimer) clearTimeout(followWpmSaveTimer);
+  followWpmSaveTimer = setTimeout(() => {
+    api('/api/profile', { method: 'PATCH', json: { preferences: { follow_wpm: S.followWpm } } }).catch(() => {});
+  }, CONFIG.FOLLOW_WPM_SAVE_DELAY_MS);
   const f = S.follow;
   if (S.rec && f) {   // keep the current sentence and the part already read; only the rest speeds up or slows down
     f.segs = EvaluateClient.followRetime(f.segs, f.idx, f.now || 0, { wordCounts: f.counts, wpm: S.followWpm, leadS: CONFIG.FOLLOW_LEAD_S, gapS: CONFIG.FOLLOW_GAP_S });

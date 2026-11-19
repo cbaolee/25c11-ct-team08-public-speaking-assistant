@@ -18,6 +18,7 @@ from src.app.db.models import (
     SessionRow,
     SessionSummary,
     StorageError,
+    build_avatar_path,
     build_object_path,
     decode_cursor,
     read_session_metric,
@@ -107,6 +108,14 @@ class MemoryProfileRepo:
             },
             deep=True,
         )
+        self._state.profiles[user_id] = row
+        return row.model_copy(deep=True)
+
+    def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None:
+        existing = self._state.profiles.get(user_id)
+        if existing is None:
+            return None
+        row = existing.model_copy(update={"avatar_path": avatar_path}, deep=True)
         self._state.profiles[user_id] = row
         return row.model_copy(deep=True)
 
@@ -311,6 +320,8 @@ class MemoryAudioStore:
         prefix = f"{user_id}/"
         if not isinstance(path, str) or not path.startswith(prefix) or "\\" in path:
             raise StorageError("Object path must be scoped to the current user")
+        if build_avatar_path(user_id) == path:
+            return
         for suffix in (".series.json", ".webm"):
             object_id = path[len(prefix) : -len(suffix)] if path.endswith(suffix) else ""
             try:
