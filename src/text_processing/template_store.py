@@ -11,15 +11,24 @@ Responsibilities (Brief §5.3, §5.4):
 import logging
 import re
 from bisect import bisect_left
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
+
+import numpy as np
+
+from src.app.constants import CONSTANTS
 
 from .contracts import CATEGORY_SLUG_MAP, VALID_DURATIONS, TemplateDocument, TopicMetadata
+from .retrieval import SemanticRetriever
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "data" / "templates"
+DEFAULT_SUGGEST_TOP_K: int = CONSTANTS["script"]["topic_suggest_top_k"]
+DEFAULT_SUGGEST_MIN_SCORE: float = CONSTANTS["script"]["topic_suggest_min_score"]
+_FALLBACK_WEAK_MATCH_LIMIT = 3
+_REV_CATEGORY_MAP = {v.lower(): k for k, v in CATEGORY_SLUG_MAP.items()}
 SLOT_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 # Each alternative of the quoted string starts with a different character: no backtracking blow-up.
 _QUOTED = r'"((?:[^"\\]|\\["\\])*)"[ \t]*'
@@ -228,6 +237,44 @@ def lint_corpus(templates_dir: Path) -> list[LintIssue]:
     return issues
 
 
+@dataclass(frozen=True)
+class TopicSuggestion:
+    """One ranked template suggestion returned for the Script Studio chatbot."""
+
+    template_id: str
+    topic: str
+    category_slug: str
+    duration_min: int
+    score: float
+    is_strong_match: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class TopicSuggestionResult:
+    """Ranked template suggestions plus a free-topic recommendation flag."""
+
+    suggestions: list[TopicSuggestion]
+    recommend_free_topic: bool
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "suggestions": [item.to_dict() for item in self.suggestions],
+            "recommend_free_topic": self.recommend_free_topic,
+        }
+
+
+def _lexical_overlap_score(query: str, candidate_text: str) -> float:
+    """Deterministic fallback score when sentence-transformers is unavailable."""
+    q_tokens = set(re.findall(r"[a-z0-9]+", query.lower()))
+    c_tokens = set(re.findall(r"[a-z0-9]+", candidate_text.lower()))
+    if not q_tokens or not c_tokens:
+        return 0.0
+    return len(q_tokens & c_tokens) / len(q_tokens)
+
+
 class TemplateStore:
     """In-memory index of markdown script templates loaded at startup (Brief §5.4)."""
 
@@ -235,6 +282,7 @@ class TemplateStore:
         self.templates_dir = templates_dir or DEFAULT_TEMPLATES_DIR
         self._by_id: dict[str, TemplateDocument] = {}
         self._by_topic_lower: dict[str, TemplateDocument] = {}
+        self._embedding_cache: dict[tuple[str, int], tuple[list[TopicMetadata], Any]] = {}
         self.load_issues: list[LintIssue] = []
 
     def load(self) -> int:
@@ -246,6 +294,7 @@ class TemplateStore:
         """
         self._by_id.clear()
         self._by_topic_lower.clear()
+        self._embedding_cache.clear()
         self.load_issues = []
         skipped = 0
         for md_file in _iter_template_files(self.templates_dir):
@@ -292,3 +341,78 @@ class TemplateStore:
         if key in self._by_id:
             return self._by_id[key]
         return self._by_topic_lower.get(key.lower())
+
+    def suggest_topics(
+        self,
+        category_slug: str,
+        duration_min: int,
+        query: str,
+        retriever: SemanticRetriever | None = None,
+        top_k: int = DEFAULT_SUGGEST_TOP_K,
+        min_score: float = DEFAULT_SUGGEST_MIN_SCORE,
+    ) -> TopicSuggestionResult:
+        """Rank templates for `(category_slug, duration_min)` using local embeddings (0 LLM tokens).
+
+        Returns up to `top_k` (4-5) templates sorted by cosine similarity. If no template meets
+        `min_score`, sets `recommend_free_topic=True` and returns at most 3 closest fallbacks.
+        """
+        raw_cat = category_slug.strip().lower()
+        norm_slug = _REV_CATEGORY_MAP.get(raw_cat, raw_cat)
+        candidates = [
+            doc.metadata
+            for doc in self._by_id.values()
+            if doc.metadata.category_slug == norm_slug and doc.metadata.duration_min == duration_min
+        ]
+        if not candidates or top_k <= 0:
+            return TopicSuggestionResult(suggestions=[], recommend_free_topic=True)
+
+        clean_query = query.strip()
+        if not clean_query:
+            picked = [
+                TopicSuggestion(
+                    template_id=m.template_id,
+                    topic=m.topic,
+                    category_slug=m.category_slug,
+                    duration_min=m.duration_min,
+                    score=0.0,
+                    is_strong_match=False,
+                )
+                for m in candidates[:top_k]
+            ]
+            return TopicSuggestionResult(suggestions=picked, recommend_free_topic=False)
+
+        active_retriever = retriever or SemanticRetriever()
+        model = active_retriever.get_model()
+        if model is not None:
+            cache_key = (norm_slug, duration_min)
+            cached = self._embedding_cache.get(cache_key)
+            if cached is None or len(cached[0]) != len(candidates):
+                texts = [f"{m.topic} {m.category}" for m in candidates]
+                vecs = active_retriever._encode(model, texts)
+                self._embedding_cache[cache_key] = (candidates, vecs)
+            else:
+                candidates, vecs = cached
+            query_vec = active_retriever._encode(model, [clean_query])
+            raw_scores = np.atleast_1d((vecs @ query_vec.T).squeeze())
+            scored = [(m, float(s)) for m, s in zip(candidates, raw_scores, strict=True)]
+        else:
+            scored = [
+                (m, _lexical_overlap_score(clean_query, f"{m.topic} {m.category}"))
+                for m in candidates
+            ]
+
+        scored.sort(key=lambda pair: pair[1], reverse=True)
+        has_strong = any(score >= min_score for _, score in scored)
+        limit = top_k if has_strong else min(_FALLBACK_WEAK_MATCH_LIMIT, top_k)
+        suggestions = [
+            TopicSuggestion(
+                template_id=m.template_id,
+                topic=m.topic,
+                category_slug=m.category_slug,
+                duration_min=m.duration_min,
+                score=round(score, 4),
+                is_strong_match=score >= min_score,
+            )
+            for m, score in scored[:limit]
+        ]
+        return TopicSuggestionResult(suggestions=suggestions, recommend_free_topic=not has_strong)
