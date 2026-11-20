@@ -73,12 +73,39 @@ def test_profile_storage_error_returns_503(client, repos, monkeypatch):
     assert r.json()["error_code"] == "profile_unavailable"
 
 
-def test_patch_profile_merges_preferences(client):
-    first = client.patch("/api/profile", json={"preferences": {"follow_wpm": 150, "theme": "dark"}})
+def test_patch_profile_merges_preferences(client, repos):
+    # A key written earlier (e.g. by a newer app version) must survive a PATCH of follow_wpm.
+    repos.profiles.merge_preferences(TEST_USER_ID, {"theme": "dark"})
+    first = client.patch("/api/profile", json={"preferences": {"follow_wpm": 150}})
     assert first.status_code == 200
     second = client.patch("/api/profile", json={"preferences": {"follow_wpm": 155}})
     assert second.status_code == 200
     assert second.json()["preferences"] == {"follow_wpm": 155, "theme": "dark"}
+
+
+def test_patch_preferences_ignores_bad_stored_value(client, repos):
+    # A stored value outside today's range must not block saving a valid one.
+    repos.profiles.merge_preferences(TEST_USER_ID, {"follow_wpm": 999})
+    r = client.patch("/api/profile", json={"preferences": {"follow_wpm": 150}})
+    assert r.status_code == 200
+    assert r.json()["preferences"]["follow_wpm"] == 150
+
+
+@pytest.mark.parametrize(
+    "prefs", [{"follow_wpm": 147}, {"follow_wpm": "150"}, {"follow_wpm": True}, {"abc": 1}]
+)
+def test_patch_preferences_rejects_bad_input(client, prefs):
+    assert client.patch("/api/profile", json={"preferences": prefs}).status_code == 422
+
+
+def test_patch_preferences_storage_error_returns_503(client, repos, monkeypatch):
+    def fail(*_args):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.profiles, "merge_preferences", fail)
+    r = client.patch("/api/profile", json={"preferences": {"follow_wpm": 150}})
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "profile_unavailable"
 
 
 def test_patch_profile_rejects_follow_wpm_outside_range(client):

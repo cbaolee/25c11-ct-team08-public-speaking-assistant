@@ -16,6 +16,7 @@ from src.app.db.models import (
     ProfilePatch,
     ProfileRow,
     StorageError,
+    UserPreferences,
     build_avatar_path,
 )
 from src.app.deps import CurrentUser, get_current_user
@@ -34,7 +35,7 @@ class ProfileUpdatePayload(BaseModel):
     gender: str | None = Field(default=None, max_length=50)
     topics: list[str] | None = Field(default=None, max_length=20)
     consent_recording: bool | None = None
-    preferences: dict | None = None
+    preferences: UserPreferences | None = None
 
 
 def _error(status_code: int, error_code: str, message: str) -> JSONResponse:
@@ -181,32 +182,15 @@ async def update_profile(
     if "target_accent" in sent and sent["target_accent"] is None:
         return _error(422, "invalid_profile", "The target accent cannot be empty.")
     consent = sent.pop("consent_recording", None)
-    preferences = sent.pop("preferences", None)
-    if preferences is not None:
-        row_before = await run_in_threadpool(repos.profiles.get_profile, user.id)
-        if row_before is None:
-            return _not_found()
-        merged = {**row_before.preferences, **preferences}
-        follow_wpm = merged.get("follow_wpm")
-        if follow_wpm is not None:
-            from src.app.constants import CONSTANTS
-            web = CONSTANTS["web"]
-            minimum = web["follow_wpm_min"]
-            maximum = web["follow_wpm_max"]
-            step = web["follow_wpm_step"]
-            if (
-                isinstance(follow_wpm, bool)
-                or not isinstance(follow_wpm, int)
-                or follow_wpm < minimum
-                or follow_wpm > maximum
-                or follow_wpm % step != 0
-            ):
-                return _error(422, "invalid_profile", "The follow-along speed is invalid.")
-        sent["preferences"] = merged
+    sent.pop("preferences", None)
+    # Only the keys the client sent; the model already checked them (UserPreferences).
+    prefs = payload.preferences.model_dump(exclude_unset=True) if payload.preferences else None
     try:
         row = await run_in_threadpool(repos.profiles.update_profile, user.id, ProfilePatch(**sent))
         if row is not None and consent is not None and consent != row.consent_recording:
             row = await run_in_threadpool(repos.profiles.set_consent, user.id, consent)
+        if row is not None and prefs:
+            row = await run_in_threadpool(repos.profiles.merge_preferences, user.id, prefs)
     except StorageError:
         logger.exception("Could not update profile")
         return _unavailable()
