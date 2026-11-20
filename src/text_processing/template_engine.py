@@ -122,6 +122,7 @@ def _build_slot_fill_prompt(
     slots: list[TemplateSlot],
     chunks_context: str,
     topic: str,
+    user_feedback: str | None = None,
 ) -> list[dict[str, str]]:
     """Build the LLM messages for filling one or more argument slots."""
     slot_descriptions = [
@@ -150,6 +151,8 @@ def _build_slot_fill_prompt(
     user_msg_parts = [f"Topic: {topic}\n"]
     if chunks_context.strip():
         user_msg_parts.append(f"Source document:\n{chunks_context}\n")
+    if user_feedback and user_feedback.strip():
+        user_msg_parts.append(f"User revision request: {user_feedback.strip()}\n")
     user_msg_parts.append("Slots to fill:\n" + "\n".join(slot_descriptions))
 
     return [
@@ -158,9 +161,16 @@ def _build_slot_fill_prompt(
     ]
 
 
-def _estimate_prompt_tokens(slots: list[TemplateSlot], chunks_context: str) -> int:
-    prompt_words = len(chunks_context.split()) + sum(
-        len(s.lead_in.split()) + len(s.follow_text.split()) + 30 for s in slots
+def _estimate_prompt_tokens(
+    slots: list[TemplateSlot],
+    chunks_context: str,
+    user_feedback: str | None = None,
+) -> int:
+    feedback_words = len(user_feedback.split()) if user_feedback else 0
+    prompt_words = (
+        len(chunks_context.split())
+        + feedback_words
+        + sum(len(s.lead_in.split()) + len(s.follow_text.split()) + 30 for s in slots)
     )
     output_words = len(slots) * (_SLOT_FILL_MAX_WORDS + 20)
     return int((prompt_words + output_words) * _TOKENS_PER_WORD)
@@ -298,6 +308,7 @@ class TemplateEngine:
         self,
         template: TemplateDocument,
         chunks: list[DocumentChunk] | None = None,
+        user_feedback: str | None = None,
         *,
         max_fill_retries: int = 2,
         client: Any = None,
@@ -365,8 +376,12 @@ class TemplateEngine:
                     else:
                         batch_chunks_context = ""
 
-                    messages = _build_slot_fill_prompt(batch, batch_chunks_context, topic)
-                    estimated_tokens = _estimate_prompt_tokens(batch, batch_chunks_context)
+                    messages = _build_slot_fill_prompt(
+                        batch, batch_chunks_context, topic, user_feedback=user_feedback
+                    )
+                    estimated_tokens = _estimate_prompt_tokens(
+                        batch, batch_chunks_context, user_feedback=user_feedback
+                    )
 
                     for retry in range(max_fill_retries):
                         try:
@@ -432,3 +447,111 @@ class TemplateEngine:
             flags=flags,
             warnings=warnings,
         )
+
+
+def polish_script_paragraphs(
+    assembled: str,
+    topic: str,
+    client: Any,
+    model_chain: tuple[str, ...] | list[str] | None = None,
+    limiter: TokenBucketLimiter | None = None,
+) -> str:
+    """Smooth transitions around slot boundaries for natural spoken delivery.
+
+    Keeps the exact same number of paragraphs.
+    If LLM fails, returns invalid JSON, or paragraph count does not match,
+    returns original assembled text.
+    """
+    if not assembled or not assembled.strip():
+        return assembled
+
+    if client is None:
+        return assembled
+
+    paragraphs = assembled.split("\n\n")
+    expected_count = len(paragraphs)
+    if expected_count == 0:
+        return assembled
+
+    if model_chain is None:
+        active_chain = _get_model_chain()
+    elif isinstance(model_chain, (list, tuple)):
+        active_chain = tuple(model_chain)
+    else:
+        active_chain = (str(model_chain),)
+
+    active_limiter = limiter if limiter is not None else TokenBucketLimiter()
+
+    system_msg = (
+        "You are an expert speech editor. Your task is to polish and smooth transitions "
+        "around slot boundaries in an assembled speech script for natural spoken delivery.\n\n"
+        "RULES:\n"
+        "1. Smooth transitions between sentences and paragraphs for natural spoken delivery.\n"
+        f"2. You MUST return exactly {expected_count} paragraphs matching the input structure.\n"
+        "3. Preserve all factual claims, data points, and citations.\n"
+        "4. Return ONLY valid JSON in this exact format:\n"
+        '   {"paragraphs": ["polished paragraph 1", "polished paragraph 2", ...]}'
+    )
+
+    formatted_paras = "\n\n".join(
+        f"[Paragraph {i + 1}]\n{p.strip()}" for i, p in enumerate(paragraphs)
+    )
+    user_msg = (
+        f"Topic: {topic}\n\n"
+        f"Please polish the following {expected_count} paragraphs "
+        "to smooth transitions for spoken delivery:\n\n"
+        f"{formatted_paras}"
+    )
+
+    messages = [
+        {"role": "system", "content": system_msg},
+        {"role": "user", "content": user_msg},
+    ]
+
+    estimated_tokens = int(len(assembled.split()) * 2.5 * _TOKENS_PER_WORD) + 300
+
+    try:
+        data, _ = _call_llm_with_fallback(
+            messages=messages,
+            model_chain=active_chain,
+            limiter=active_limiter,
+            estimated_tokens=estimated_tokens,
+            client=client,
+        )
+    except Exception as exc:
+        logger.warning(
+            "polish_script_paragraphs LLM call failed (%s); returning original assembled script.",
+            exc,
+        )
+        return assembled
+
+    if not isinstance(data, dict):
+        logger.warning("polish_script_paragraphs returned non-dict JSON; returning original.")
+        return assembled
+
+    raw_paragraphs = data.get("paragraphs")
+    if not isinstance(raw_paragraphs, list):
+        logger.warning(
+            "polish_script_paragraphs JSON missing 'paragraphs' list; returning original."
+        )
+        return assembled
+
+    if len(raw_paragraphs) != expected_count:
+        logger.warning(
+            "polish_script_paragraphs count mismatch: expected %d, got %d; returning original.",
+            expected_count,
+            len(raw_paragraphs),
+        )
+        return assembled
+
+    cleaned_paragraphs: list[str] = []
+    for item in raw_paragraphs:
+        if isinstance(item, str) and item.strip():
+            cleaned_paragraphs.append(item.strip())
+        elif isinstance(item, dict) and "text" in item and str(item["text"]).strip():
+            cleaned_paragraphs.append(str(item["text"]).strip())
+        else:
+            logger.warning("polish_script_paragraphs item not valid string; returning original.")
+            return assembled
+
+    return "\n\n".join(cleaned_paragraphs)
