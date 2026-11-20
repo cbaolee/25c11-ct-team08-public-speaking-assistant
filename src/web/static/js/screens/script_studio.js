@@ -6,6 +6,46 @@ import { RENDER, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, IC, clearErr, esc, showErr, wordsOf } from '../utils.js';
 
+/* ---------- Chat constants (Issue #58) ---------- */
+const POLL_INTERVAL_MS = 650;                                          // gap between two GET /api/generate-script/{id} polls
+const POLL_MAX_MS = 5 * 60 * 1000;                                     // stop polling after about 5 minutes
+const POLL_MAX_TRIES = Math.ceil(POLL_MAX_MS / POLL_INTERVAL_MS);
+const FALLBACK_USER_NAME = 'you';                                      // same fallback as userName() in auth_panel.js
+/* Error code -> message group. In the contract (contracts.py, Brief 5.7): invalid_pdf, no_text_layer,
+   content_rejected (422), rate_limited (429), generation_unavailable (503). moderation_unavailable (503) is raised by
+   moderation.py / ADR-006 but is not in the contract list. job_not_found IS in the code (src/app/main.py:640, 404
+   {"error_code": "job_not_found"}) but not in the Member 2 contract; it is NOT mapped to 'session' on purpose: a lost
+   job is not an expired chat, and resetting would wipe scripts that are not saved yet (it shows the generic error
+   bubble with a retry button instead). GUESSES for the chat endpoint, not confirmed by its owner:
+   session_not_found (today only the evaluation sessions return {"error": "session_not_found"}), a bare HTTP 429
+   without a code, a bare HTTP 503 without a code, and rate_limited / moderation_unavailable / generation_unavailable
+   on the chat route. */
+const ERR_KIND = { invalid_pdf: 'file', no_text_layer: 'file', content_rejected: 'blocked', session_not_found: 'session',
+  rate_limited: 'rate', moderation_unavailable: 'moderation', generation_unavailable: 'generation', net: 'net' };
+const ERR_TEXT = { rate: 'script.errRate', moderation: 'script.errModeration', net: 'eval.errNet' };   // other groups: server message, else script.errGeneric
+
+/* ---------- Chat state: lives in memory only (no localStorage / sessionStorage / IndexedDB), gone on reload ----------
+   chatStage: 'idle' | 'picking_topic' | 'gathering' | 'generated'. chatEpoch grows on every New chat so that answers
+   of an older turn can tell they are stale. chatAbort / chatPollTimer belong to the turn that is running. */
+export function initChatState() {
+  Object.assign(S, { chatSessionId: null, chatStage: 'idle', selectedTemplate: null, sessionFiles: [],
+    chatEpoch: 0, chatPollTimer: null, chatAbort: null, chatOwner: null });
+}
+initChatState();
+const setComposerBusy = on => { S.chatBusy = on; $('#composerSend').disabled = on; };
+/* New chat: drop the running turn (timer, request, answer) and every piece of chat state, then show the greeting
+   like resetChat() in modals/auth_panel.js does. Works while a turn is busy. */
+export function startNewChat() {
+  S.chatEpoch += 1;
+  clearTimeout(S.chatPollTimer); S.chatPollTimer = null;
+  if (S.chatAbort) { S.chatAbort.abort(); S.chatAbort = null; }
+  Object.assign(S, { chatSessionId: null, chatStage: 'idle', selectedTemplate: null, sessionFiles: [] });
+  setComposerBusy(false);
+  $('#chatFeed').innerHTML = '';
+  addBubble('ai', '<p></p>').querySelector('p').textContent = T('script.greeting', { name: S.user ? S.user.name : FALLBACK_USER_NAME });
+  S.chatFile = null; renderChatFile(); $('#composerInput').value = ''; S.composerFolded = false; fitComposer(); clearErr($('#composerError'));
+}
+
 /* ---------- Script (Generate Script) ---------- */
 export const CAT_LABELS = Object.assign({}, TOPICS, { free: 'Free topic (LLM)' });
 export const topicLabel = k => CAT_LABELS[k] || TOPICS[k] || k;
@@ -92,9 +132,41 @@ export function renderBlockedBubble(ai) {
     '<p>' + esc(T('script.blockedHarm')) + '</p>' +
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
+/* Error bubble with a retry button; the text is set with textContent (it may come from the server). */
+function renderErrorBubble(ai, text) {
+  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p><div class="acts"><button class="btn btn-sm" type="button" data-a="again"></button></div>';
+  $('.note', ai).textContent = text; $('[data-a=again]', ai).textContent = T('script.regenerate');
+  revealBubble(ai);
+}
+/* Which message group an error belongs to: error_code first, HTTP status only when there is no known code. */
+export function chatErrorKind(code, status) {
+  if (Object.hasOwn(ERR_KIND, code)) return ERR_KIND[code];
+  return status === 429 ? 'rate' : status === 503 ? 'generation' : 'other';
+}
+/* One place for every chat error. `ai` is the loading bubble of the failed turn (ai._script.req is kept for retry).
+   Each error group has its own message. A session error starts a new chat but keeps the user's text. */
+export function handleChatError(ai, code, message, status) {
+  const kind = chatErrorKind(code, status);
+  if (kind === 'file') { ai.remove(); showErr($('#composerError'), message || T('script.errFile')); return; }
+  if (kind === 'blocked') { renderBlockedBubble(ai); openModal('safetyAlert'); revealBubble(ai); return; }
+  if (kind === 'session') {
+    const input = $('#composerInput'), draft = input.value, sent = ai._script && ai._script.req && ai._script.req.txt;
+    toast(T('script.errSession'), true); startNewChat();
+    input.value = draft.trim() ? draft : (sent || ''); fitComposer();   // keep the draft, else the request that was just sent
+    return;
+  }
+  const text = Object.hasOwn(ERR_TEXT, kind) ? T(ERR_TEXT[kind]) : (message || T('script.errGeneric'));   // fail-closed moderation never opens safetyAlert
+  toast(text, true);
+  renderErrorBubble(ai, text);
+}
 export function generateScript(req, again) {
-  S.chatBusy = true; $('#composerSend').disabled = true;
+  const ep = S.chatEpoch, owner = S.user, ctl = new AbortController();
+  /* New chat, logout or another login since this turn began. S.user is a new object on every login (and null after
+     logout), so comparing the reference also catches logout then login of the same account. */
+  const stale = () => ep !== S.chatEpoch || S.user !== owner;
+  S.chatAbort = ctl; setComposerBusy(true);
   const ai = addBubble('ai', '<div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div><p class="note" role="status"></p>');
+  ai._script = { req };
   const status = $('.note', ai);
   status.textContent = req.file ? T('script.extracting') : (again ? T('script.regenerating') : T('script.generating'));
   const fd = new FormData(), cleanTxt = (req.txt || '').replace(/^#+\s+/, '');
@@ -104,19 +176,20 @@ export function generateScript(req, again) {
   fd.append('duration_min', String(req.dur || 5));
   if (cleanTxt && !isShortPrompt) fd.append('raw_text', cleanTxt);
   if (req.file && req.file.raw) fd.append('pdf', req.file.raw, req.file.name);
-  const failJob = (code, msg) => {
-    S.chatBusy = false; $('#composerSend').disabled = false;
-    if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#composerError'), msg || T('script.errFile')); return; }
-    if (code === 'content_rejected') { renderBlockedBubble(ai); openModal('safetyAlert'); revealBubble(ai); return; }
-    toast(msg || T('eval.errServer'), true);
-    ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note">' + esc(msg || T('eval.errServer')) + '</p><div class="acts"><button class="btn btn-sm" type="button" data-a="again">' + esc(T('script.regenerate')) + '</button></div>';
-    ai._script = { req }; revealBubble(ai);
-  };
-  const poll = id => api('/api/generate-script/' + id).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
-    if (!ok || !j || j.status === 'failed') { failJob(j && j.error_code, j && j.message); return; }
+  /* A stale turn (New chat / other account) stays silent: no render, no busy flag. `j.error` is read too because
+     some routes answer {"error": "<code>"} instead of {"error_code": ...}. */
+  const fail = (code, msg, httpStatus) => { if (!stale()) { setComposerBusy(false); handleChatError(ai, code, msg, httpStatus); } };
+  const failFrom = (j, httpStatus) => fail(j && (j.error_code || (typeof j.error === 'string' ? j.error : null)), j && j.message, httpStatus);
+  let tries = 0;
+  const poll = id => {
+    if (stale()) return;
+    if (++tries > POLL_MAX_TRIES) { fail('poll_timeout', null); return; }
+    api('/api/generate-script/' + id, { signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
+    if (stale()) return;
+    if (!ok || !j || j.status === 'failed') { failFrom(j, httpStatus); return; }
     if (j.status !== 'completed') {
       status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
-      setTimeout(() => poll(id), 650); return;
+      S.chatPollTimer = setTimeout(() => poll(id), POLL_INTERVAL_MS); return;
     }
     const res = j.result || {}, text = res.script || '';
     const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
@@ -134,12 +207,14 @@ export function generateScript(req, again) {
     $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
     ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
       template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
-    S.chatBusy = false; $('#composerSend').disabled = false; revealBubble(ai);
-  }).catch(() => failJob('net', T('eval.errNet')));
-  api('/api/generate-script', { method: 'POST', body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
-    if (!ok || !j || !j.job_id) { failJob(j && j.error_code, j && j.message); return; }
+    setComposerBusy(false); revealBubble(ai);
+    }).catch(() => fail('net', null));
+  };
+  api('/api/generate-script', { method: 'POST', body: fd, signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
+    if (stale()) return;
+    if (!ok || !j || !j.job_id) { failFrom(j, httpStatus); return; }
     poll(j.job_id);
-  }).catch(() => failJob('net', T('eval.errNet')));
+  }).catch(() => fail('net', null));
 }
 /* Composer text box: when short it is exactly as tall as the buttons beside it (attach / send), grows
    line by line as the text gets longer, up to 5.5 lines (then it scrolls inside). The arrow at the top
@@ -232,4 +307,8 @@ export function onChatAction(e) {
     if (!S.chatBusy) generateScript(sc.req, true);
   }
 }
-RENDER.scriptStudio = function () { fillTopicSelect(); };
+RENDER.scriptStudio = function () {
+  fillTopicSelect();
+  $('#chatResetBtn').onclick = () => startNewChat();   // property, not addEventListener: running RENDER again never stacks handlers
+  if (S.user && S.user !== S.chatOwner) { startNewChat(); S.chatOwner = S.user; }   // new login (any account) without F5: no chat carry-over
+};
