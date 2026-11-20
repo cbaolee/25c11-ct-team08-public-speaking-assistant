@@ -61,8 +61,13 @@ from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_uplo
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.pipeline import evaluate_session
 from src.text_processing.chat_session import (
-    READY_MESSAGE, ChatSessionState, analyze_slot_coverage,
-    build_followup_reply, chat_session_store, check_ready_to_generate, ingest_upload_file,
+    READY_MESSAGE,
+    ChatSessionState,
+    analyze_slot_coverage,
+    build_followup_reply,
+    chat_session_store,
+    check_ready_to_generate,
+    ingest_upload_file,
 )
 from src.text_processing.contracts import (
     CATEGORY_SLUG_MAP,
@@ -896,9 +901,13 @@ async def script_chat_message_endpoint(
             session.missing_groups = missing_groups
 
     session.ready_to_generate = check_ready_to_generate(
-        selected_template_id=session.selected_template_id, missing_entities=session.missing_entities,
-        coverage_ratio=session.coverage_ratio, gather_turns=session.gather_turns,
-        files_loaded=session.files_loaded, prompt=session.initial_prompt, user_notes=session.user_notes,
+        selected_template_id=session.selected_template_id,
+        missing_entities=session.missing_entities,
+        coverage_ratio=session.coverage_ratio,
+        gather_turns=session.gather_turns,
+        files_loaded=session.files_loaded,
+        prompt=session.initial_prompt,
+        user_notes=session.user_notes,
     )
 
     topic = session.topic or session.initial_prompt or "your speech"
