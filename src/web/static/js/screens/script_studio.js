@@ -1,4 +1,4 @@
-import { api, chatHistoryKey, readJson } from '../api.js';
+import { api, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
 import { go, paintAvatar } from '../nav.js';
 import { loadSavedScripts } from '../screens/practice.js';
@@ -92,6 +92,12 @@ export function renderBlockedBubble(ai) {
     '<h3 class="blk-t">' + esc(T('script.blockedTitle')) + '</h3>' +
     '<p>' + esc(T('script.blockedHarm')) + '</p>' +
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
+}
+/* The latest Script Studio chat, kept in localStorage per user so two accounts on one browser never see each other's chat. */
+const chatHistoryKey = userId => 'psa.chat.' + userId;
+export function clearChatHistory(userId) {        // on Log out and Delete account, not on session expiry
+  if (!userId) return;
+  try { localStorage.removeItem(chatHistoryKey(userId)); } catch (e) { /* storage may be unavailable */ }
 }
 function chatMaxMessages() {
   return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 20);
