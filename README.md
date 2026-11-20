@@ -97,6 +97,7 @@ Only needed when `SUPABASE_URL` is set.
 1. **Run the migrations** in order on the Supabase project (_SQL Editor_ → paste → _Run_):
    - `db/migrations/0001_init.sql`: tables, indexes, row level security, grants
    - `db/migrations/0002_storage.sql`: private buckets `audio`, `series`, `baselines` and their policies
+   - `db/migrations/0003_purge_insufficient_sessions.sql`: optional pg_cron job that deletes `insufficient_audio` sessions older than 7 days (must match `app_constants.toml` `[retention] insufficient_days`). Enable the `pg_cron` extension first (Supabase Dashboard -> Database -> Extensions), then run the file in the SQL Editor. Until it has been run, insufficient sessions are not deleted even though the UI says "deleted after 7 days".
 2. **Create test users** on `psc-dev` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
 3. **Create a `profiles` row for each test user.** Baselines, scripts and sessions reference `profiles(id)`, so saving fails for a user without a profile.
 4. Record a baseline once for your test user: with `BASELINE_REQUIRED=true`, `/api/evaluate` returns `409 baseline_required` until a baseline exists.

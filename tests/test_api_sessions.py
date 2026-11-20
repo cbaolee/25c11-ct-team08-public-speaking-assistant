@@ -63,6 +63,26 @@ def _create_session(repos, user_id, *, files=False):
     return row
 
 
+def test_insufficient_session_is_hidden_from_list_but_available_by_id(session_api):
+    repos, _ = session_api
+    visible = _create_session(repos, USER_A)
+    result = EvaluationResultV2.model_validate_json(
+        INSUFFICIENT_FIXTURE.read_text(encoding="utf-8")
+    )
+    session_id = main._save_result_to_history(
+        repos=repos, user_id=USER_A, script="Practice script", result=result,
+        source_audio_path=None,
+    )
+    client = TestClient(main.app)
+
+    response = client.get("/api/sessions")
+    assert response.status_code == 200
+    assert [item["id"] for item in response.json()["items"]] == [str(visible.id)]
+    detail = client.get(f"/api/sessions/{session_id}")
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "insufficient_audio"
+
+
 def test_list_sessions_uses_cursor_pagination(session_api):
     repos, _ = session_api
     rows = [_create_session(repos, USER_A) for _ in range(3)]

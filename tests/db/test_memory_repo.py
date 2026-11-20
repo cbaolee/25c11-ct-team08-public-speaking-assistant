@@ -116,7 +116,7 @@ def test_insufficient_audio_session_cannot_have_score_or_audio_path():
         )
 
 
-def test_list_score_history_is_oldest_first_and_keeps_null_scores():
+def test_list_score_history_is_oldest_first_and_excludes_insufficient():
     repos = build_memory_repos()
     user_id = uuid4()
     first = repos.sessions.create_session(user_id, _new_session())
@@ -132,12 +132,16 @@ def test_list_score_history_is_oldest_first_and_keeps_null_scores():
 
     history = repos.sessions.list_score_history(user_id, limit=20)
     expected = sorted(
-        [first, second, third],
+        [first, third],
         key=lambda row: (row.created_at, str(row.id)),
     )
 
     assert [point.session_id for point in history] == [row.id for row in expected]
     assert [point.overall for point in history] == [row.overall for row in expected]
+    assert repos.sessions.get_session(user_id, second.id) == second
+    assert second.id not in [row.id for row in repos.sessions.list_sessions(user_id, 20, None)]
+    assert second.id not in [row.id for row in repos.sessions.list_full_beyond(user_id, 0)]
+    assert len(repos.sessions.list_full_beyond(user_id, 1)) == 1
 
 
 def test_list_full_beyond_skips_newest_full_sessions():
