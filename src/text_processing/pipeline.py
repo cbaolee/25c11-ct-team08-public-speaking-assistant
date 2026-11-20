@@ -104,8 +104,20 @@ class ScriptGenerationPipeline:
         chunks: list[DocumentChunk] = []
         if request.session_id:
             sess = self.session_store.get(request.session_id, user_id=request.user_id)
-            if sess and sess.chunks:
-                chunks.extend(sess.chunks)
+            if sess:
+                if sess.chunks:
+                    chunks.extend(sess.chunks)
+                if sess.user_notes:
+                    notes_text = sanitize_text("\n".join(sess.user_notes)).strip()
+                    if notes_text:
+                        chunks.append(
+                            DocumentChunk(
+                                chunk_id=len(chunks) + 1,
+                                heading="User Notes",
+                                page=1,
+                                content=notes_text,
+                            )
+                        )
 
         if request.pdf_path or request.raw_text:
             try:

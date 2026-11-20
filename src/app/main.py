@@ -742,6 +742,7 @@ async def script_chat_suggest_endpoint(
     res = suggestion_res.to_dict()
     res["session_id"] = session.session_id
     res["topics"] = list(res["suggestions"])
+    res["files_loaded"] = list(session.files_loaded)
     return res
 
 
@@ -805,6 +806,8 @@ async def script_chat_select_topic_endpoint(
         )
     else:
         session.selected_template_id = None
+        if not session.topic:
+            session.topic = session.initial_prompt or session.category or "Custom Speech"
         session.missing_entities = []
         session.missing_groups = []
         session.coverage_ratio = 0.0
@@ -827,7 +830,9 @@ async def script_chat_select_topic_endpoint(
 
     store.put(session)
     return {
-        "session_id": session.session_id, "selected_template_id": session.selected_template_id,
+        "session_id": session.session_id,
+        "template_id": session.selected_template_id,
+        "selected_template_id": session.selected_template_id,
         "ready_to_generate": session.ready_to_generate, "coverage_ratio": session.coverage_ratio,
         "missing_entities": session.missing_entities, "missing_groups": session.missing_groups,
         "reply_message": reply,
@@ -930,7 +935,7 @@ async def script_chat_message_endpoint(
         "session_id": session.session_id, "reply_message": reply,
         "ready_to_generate": session.ready_to_generate, "coverage_ratio": session.coverage_ratio,
         "missing_entities": session.missing_entities, "missing_groups": session.missing_groups,
-        "gather_turns": session.gather_turns,
+        "gather_turns": session.gather_turns, "files_loaded": list(session.files_loaded),
     }
 
 
