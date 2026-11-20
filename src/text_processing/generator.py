@@ -134,6 +134,7 @@ class ScriptGenerator:
         section_chunks: list[DocumentChunk],
         prior_summary: str,
         greeting: str | None = None,
+        user_feedback: str | None = None,
     ) -> tuple[str, list[tuple[str, list[int]]]]:
         """Generate one speech section via the 3-model Groq fallback chain."""
         if not self.client:
@@ -157,6 +158,11 @@ class ScriptGenerator:
             if prior_summary
             else ""
         )
+        feedback_note = (
+            f"User revision request: {user_feedback.strip()}\n"
+            if (user_feedback and user_feedback.strip())
+            else ""
+        )
         msgs = [
             {
                 "role": "system",
@@ -173,7 +179,7 @@ class ScriptGenerator:
                 "role": "user",
                 "content": (
                     f"Topic: {topic}\nSection: {section_title}\n"
-                    f"{greeting_note}{continuity_note}{wrapped_ctx}"
+                    f"{greeting_note}{continuity_note}{feedback_note}{wrapped_ctx}"
                 ),
             },
         ]
@@ -234,6 +240,7 @@ class ScriptGenerator:
         duration_min: int = 5,
         chunks: list[DocumentChunk] | None = None,
         greeting: str | None = None,
+        user_feedback: str | None = None,
     ) -> GeneratedScript:
         """Generate a multi-section free-topic speech script for 5, 10, 15, or 20 minutes."""
         clean_topic = topic.strip()
@@ -271,6 +278,7 @@ class ScriptGenerator:
                 section_chunks=section_chunks,
                 prior_summary=", ".join(prior_titles),
                 greeting=greeting if idx == 1 else None,
+                user_feedback=user_feedback,
             )
             if model_id not in models_used:
                 models_used.append(model_id)
