@@ -109,6 +109,10 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .fcard .fc-main { flex: 1; min-width: 0; }
 .fcard .fc-name { font: 600 16px var(--sans); overflow-wrap: anywhere; }
 .fcard .fc-main .note { font-size: 15px; }
+.fcard .fc-main > span { display: block; }
+/* the chat's file card is itself the button that opens the reader */
+button.fcard-open { width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 /* Shared reading frame (script reader now; reusable for Practice): large type, airy lines, scrolls on its own */
 .reader { font: 400 1.1875rem/1.75 var(--serif); max-width: 68ch; margin: 0 auto; overflow-y: auto; overscroll-behavior: contain; }
 .reader .para + .para { margin-top: 1em; }
@@ -145,7 +149,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
    with 50px margins left and right, justified, a blank line between paragraphs and a small first-line indent */
 .box.reader-box { padding: 24px 0 0; }
 .box.reader-box > .row { padding: 0 50px 12px; }
-.box.reader-box .reader { max-width: none; margin: 0; padding: 8px 50px 28px; }
+.box.reader-box .reader { max-width: none; margin: 0; padding: 8px 50px 28px; font-size: clamp(1.25rem, 2vw, 1.625rem); }
 .box.reader-box .reader .para { text-align: justify; hyphens: auto; text-indent: 1.5em; }
 .box.reader-box .reader .para + .para { margin-top: 1.75em; }   /* one empty line (the line height) */
 .box.reader-box .reader .para .cite { text-indent: 0; }

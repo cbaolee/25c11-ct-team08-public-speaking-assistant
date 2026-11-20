@@ -149,6 +149,62 @@ export function setupPwEyes() {
 /* ---------- drop-down slide (account menu, select lists): unrolls downwards, rolls back up; no fade ---------- */
 export const calmMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const isDropOpen = el => !el.hidden && !el._closing;
+/* A new or changed piece of UI rises and fades in (nothing moves when the system asks for less motion). */
+export function popIn(el, opts) {
+  if (!el || !el.animate || calmMotion()) return;
+  opts = opts || {};
+  el.animate([{ opacity: 0, transform: 'translate(' + (opts.x || 0) + 'px, ' + (opts.y == null ? 8 : opts.y) + 'px)' }, { opacity: 1, transform: 'none' }],
+    { duration: opts.duration || 260, delay: opts.delay || 0, easing: 'cubic-bezier(.2, .7, .3, 1)', fill: 'backwards' });
+}
+/* The reverse of popIn: fade and sink a little, then hide. */
+export function popOut(el, done) {
+  if (!el || el.hidden) { if (done) done(); return; }
+  if (!el.animate || calmMotion()) { el.hidden = true; if (done) done(); return; }
+  const a = el.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(6px)' }], { duration: 180, easing: 'ease-in', fill: 'forwards' });
+  a.onfinish = () => { el.hidden = true; a.cancel(); if (done) done(); };
+}
+/* "Saved" tick: the circle and the check are drawn, held for 2 seconds, then fade away (CSS .saved-tick.play). */
+export function showSavedTick(el) {
+  if (!el) return;
+  clearTimeout(el._timer);
+  el.hidden = false; el.classList.remove('play'); void el.offsetWidth; el.classList.add('play');
+  el._timer = setTimeout(() => { el.hidden = true; el.classList.remove('play'); }, calmMotion() ? 2000 : 2900);
+}
+/* Edit in place: the element keeps its look, only a caret appears. Plain text only (no pasted formatting). */
+export function setEditable(el, on) {
+  if (on) { el.setAttribute('contenteditable', 'plaintext-only'); if (el.contentEditable !== 'plaintext-only') el.contentEditable = 'true'; }
+  else el.removeAttribute('contenteditable');
+  el.classList.toggle('is-editing', on);
+}
+/* Text typed in an editable block: paragraphs separated by one blank line, no stray spaces. */
+export function editedText(el) {
+  return el.innerText.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+/* Paragraphs as plain <p class="para"> blocks, ready to be edited in place. */
+export function paragraphsHtml(text) {
+  return text.split(/\n\s*\n/).filter(p => p.trim()).map(() => '<p class="para"></p>').join('');
+}
+export function fillParagraphs(el, text) {
+  el.innerHTML = paragraphsHtml(text);
+  const parts = text.split(/\n\s*\n/).filter(p => p.trim());
+  [...el.children].forEach((p, i) => { p.textContent = parts[i]; });
+}
+/* A one-line editable title: Enter moves on instead of breaking the line, and it never grows past `max`. */
+export function guardTitle(el, max, onEnter) {
+  el.addEventListener('keydown', e => { if (e.key === 'Enter' && el.isContentEditable) { e.preventDefault(); onEnter(); } });
+  el.addEventListener('input', () => {
+    const t = el.innerText.replace(/\n/g, ' ');
+    if (t.length <= max()) return;
+    el.textContent = t.slice(0, max());
+    const r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+}
+export function caretToStart(el) {
+  el.focus();
+  const r = document.createRange(); r.selectNodeContents(el); r.collapse(true);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
 export function slideDown(el) {
   if (el._closing) { el._closing.cancel(); el._closing = null; }
   el.hidden = false;

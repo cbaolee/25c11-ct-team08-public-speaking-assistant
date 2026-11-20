@@ -5,9 +5,9 @@ import { openBaselineGate } from '../modals/baseline_gate.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { go } from '../nav.js';
 import { requireConsent, startRecorder } from '../recorder.js';
-import { saveScript } from '../screens/script_studio.js';
+import { loadSavedScripts, patchSavedScript, renderSavedLists, saveScriptAs } from '../screens/saved_scripts.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { closeModal, openModal, toast, withBusy } from '../ui.js';
+import { caretToStart, closeModal, editedText, fillParagraphs, guardTitle, openModal, popIn, popOut, setEditable, showSavedTick, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, fmtClock, fmtTime, showErr, wordsOf } from '../utils.js';
 
 /* ---------- Practice ---------- */
@@ -27,29 +27,48 @@ export function pickSample() {
   S.texts.sample = { title: T('practice.sampleTitle', { title: label }), short: label, text, topic: null };
   renderPractice();
 }
-/* Saved scripts (Practice > Mine): GET /api/scripts lists summaries; the text comes from GET /api/scripts/{id}. */
-export function pickSavedScript(id, byUser) {   // byUser: picked in the dropdown (back to step 1); the automatic first pick must not move the stepper
+/* Saved scripts (Practice > Mine): the list on the left, the picked script's text on the right.
+   The list comes from GET /api/scripts (saved_scripts.js); the text from GET /api/scripts/{id}. */
+export function pickSavedScript(id, byUser) {   // byUser: clicked in the list (stays on step 1); the automatic first pick must not move the stepper
   const req = api('/api/scripts/' + encodeURIComponent(id));
   return (byUser ? withBusy(req, T('busy.loading')) : req).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) return;
-    S.texts.mine = { id: s.id, title: T('practice.fromScript', { title: s.title }), short: s.title, text: s.body, topic: s.category || null };
+    if (mineEditId && mineEditId !== s.id) cancelMineEdit();   // another script picked: the open edit is dropped
+    S.texts.mine = { id: s.id, title: s.title, short: s.title, text: s.body, topic: s.category || null, duration_min: s.duration_min || null };
+    renderSavedLists();
     if (S.screen === 'practice') { if (byUser) S.choosing = true; renderPractice(); }
   }).catch(() => {});
 }
-export function loadSavedScripts(pickId) {
-  if (!S.user) return;
-  api('/api/scripts?limit=' + CONFIG.HISTORY_PAGE_SIZE).then(r => r.ok ? r.json() : null).then(d => {
-    const list = (d && d.items) || [], wrap = $('#mineSaved'), sel = $('#mineSel');
-    S.savedScripts = list;
-    if (!wrap || !sel) return;
-    wrap.hidden = !list.length;
-    if (!list.length) return;
-    const curId = pickId || (S.texts.mine && S.texts.mine.id) || sel.value || list[0].id;
-    sel.innerHTML = list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.title + ' (' + s.word_count + 'w)') + '</option>').join('');
-    const chosen = list.find(s => s.id === curId) || list[0];
-    sel.value = chosen.id;
-    if (pickId || !S.texts.mine) pickSavedScript(chosen.id);
-  }).catch(() => {});
+/* "Write my own": the text in the box, as the script to practise. Null (with the error shown) when it cannot be used. */
+function ownTextOrError() {
+  const v = $('#ownText').value.trim(), err = $('#ownErr');
+  if (!v) { showErr(err, T('practice.errOwnEmpty')); $('#ownText').setAttribute('aria-invalid', 'true'); return null; }
+  if (wordsOf(v) > CONFIG.OWN_MAX_WORDS) { showErr(err, T('practice.errOwnMax', { max: CONFIG.OWN_MAX_WORDS })); $('#ownText').setAttribute('aria-invalid', 'true'); return null; }
+  clearErr(err); $('#ownText').removeAttribute('aria-invalid');
+  return v;
+}
+/* Use this script: Mine and Sample already hold their text; Own takes the box as it is now.
+   With an unsaved edit on My script, the last saved version is used (after a notice). */
+export function useScript() {
+  if (S.pickerTab === 'mine' && mineHasUnsavedEdit()) {
+    openConfirmDialog(T('reader.unsavedTitle'), T('reader.unsavedMsg'), T('reader.useLast'), () => { cancelMineEdit(); goStep(2); });
+    return;
+  }
+  if (S.pickerTab === 'mine' && mineEditId) cancelMineEdit();   // nothing changed: leave edit mode quietly
+  if (S.pickerTab === 'own') {
+    const v = ownTextOrError(); if (!v) return;
+    const saved = S.ownSaved && S.ownSaved.text === v ? S.ownSaved : null;   // saved under a name: the session links to it
+    const name = saved ? saved.title : T('practice.ownTitle');
+    S.texts.own = { id: saved ? saved.id : null, title: name, short: name, text: v, topic: null };
+  }
+  goStep(2);
+}
+/* Save script (Own tab): asks for a name, then saves; the text stays in the box. */
+export function saveOwn() {
+  const v = ownTextOrError(); if (!v) return;
+  saveScriptAs({ title: T('practice.ownTitle'), text: v, source: 'written' }).then(j => {
+    if (j) S.ownSaved = { id: j.id, title: j.title, text: v };
+  });
 }
 export function renderPractice() {
   const txt = S.texts[S.pickerTab];
@@ -57,13 +76,18 @@ export function renderPractice() {
     const tab = $('[data-src=' + k + ']'); tab.setAttribute('aria-selected', String(k === S.pickerTab));
     $('#picker' + k.charAt(0).toUpperCase() + k.slice(1) + 'Pane').hidden = k !== S.pickerTab;
   });
+  $('#mineCount').hidden = S.pickerTab !== 'mine';
   const au = S.audio;
   // stepper: a real sequence. 1 = choose text (until "Use this script"), 2 = record, 3 = review. Finished steps can be clicked to go back.
   const cur = S.choosing || !txt ? 1 : !au ? 2 : 3, reach = [true, !!txt, !!au];
   $('#pStep1').hidden = cur !== 1; $('#pStep2').hidden = cur === 1; $('#pStep1Go').hidden = cur !== 1;
   // from step 2: script on the left (the page scrolls it), Voice Input + speed pinned on the right
   $('#practiceWork').classList.toggle('split', cur !== 1);
-  $('#useScript').disabled = !txt; $('#useHint').textContent = txt ? '' : T('practice.hintNoText');
+  const own = S.pickerTab === 'own', ready = own ? !!$('#ownText').value.trim() : !!txt;
+  $('#useScript').disabled = !ready || !!S.rec;
+  // step 1: Mine shows its text beside the list and Own is its own text box, so only Sample uses the big sheet
+  $('#practiceWork').hidden = cur === 1 && S.pickerTab !== 'sample';
+  if (S.pickerTab === 'mine') paintMinePreview();
   const sh = $('#sheet');
   if (txt) {
     sh.className = 'reader reader-wide'; sh.innerHTML = sentHtml(txt.text);
@@ -72,13 +96,13 @@ export function renderPractice() {
     const n = wordsOf(txt.text);
     $('#sheetMeta').textContent = T('practice.words', { n, t: fmtTime(n / CONFIG.SPEAKING_WPM_FOR_ESTIMATE * 60) });
   } else {
-    sh.className = 'reader reader-wide empty'; sh.textContent = T(S.pickerTab === 'mine' ? 'practice.emptyMineT' : S.pickerTab === 'sample' ? 'practice.emptySampleT' : 'practice.emptyOwnT');
+    sh.className = 'reader reader-wide empty'; sh.textContent = T(S.pickerTab === 'mine' ? 'saved.empty' : S.pickerTab === 'sample' ? 'practice.emptySampleT' : 'practice.emptyOwnT');
     $('#sheetTitle').textContent = ''; $('#sheetMeta').textContent = '';
   }
   $('#sampleBtn').textContent = T(S.texts.sample ? 'practice.sampleAnother' : 'practice.sampleBtn');
   updateOwnCount();
   $$('[data-src]').forEach(b => { b.disabled = !!S.rec; });        // the text must not change while recording
-  $('#sampleBtn').disabled = !!S.rec; $('#ownUse').disabled = !!S.rec;
+  $('#sampleBtn').disabled = !!S.rec; $('#ownSave').disabled = !!S.rec || !$('#ownText').value.trim();   // like Use this script
   if (S.rec && S.follow) paintFollow();
   // voice tabs
   const rec = S.voiceTab === 'rec';
@@ -92,8 +116,7 @@ export function renderPractice() {
   $('#recClear').disabled = !au || !!S.rec;
   if (!S.rec) $('#recTimer').textContent = au && au.kind === 'rec' ? fmtClock(au.dur) : '00:00';
   $('#dropText').textContent = au && au.kind === 'file' ? au.name : T('practice.dropText');
-  const ready = !!txt && !!au && !S.rec;
-  $('#evalBtn').disabled = !ready;
+  $('#evalBtn').disabled = !(txt && au && !S.rec);
   // one status line under the recorder (both tabs): what is happening, or what is still missing
   $('#recNote').textContent = S.rec ? T('practice.recordingFollow')
     : !txt ? T('practice.hintNoText')
@@ -133,28 +156,89 @@ function animateStepContent(dir) {
   });
 }
 window.addEventListener('resize', () => moveStepPill(false));
-RENDER.practice = function () { loadSavedScripts(); paintFollowWpm(); renderPractice(); };
+let shownMine = null;     // script shown on the right last, so a new pick can animate
+/* Mine tab, right side: the picked script (saved, or sent from Script Studio without saving), title on top. */
+function paintMinePreview() {
+  const mine = S.texts.mine, box = $('#minePreview');
+  if (mineEditId) return;                           // the text being edited stays as it is
+  const key = mine ? (mine.id || '') + mine.title + mine.text.length : '';
+  if (key !== shownMine) { shownMine = key; popIn($('.mine-view')); }
+  if (!mine) {
+    box.className = 'reader reader-wide empty'; box.textContent = T((S.savedScripts || []).length ? 'saved.pickOne' : 'saved.empty');
+    $('#mineTitle').textContent = '';
+    return;
+  }
+  box.className = 'reader reader-wide'; box.innerHTML = sentHtml(mine.text); box.scrollTop = 0;
+  $('#mineTitle').textContent = mine.title;
+}
+/* The fold button tucks the list away so the text gets the whole width. */
+export function toggleMineList() {
+  const pane = $('#pickerMinePane'), folded = !pane.classList.contains('list-folded'), btn = $('#mineFold');
+  pane.classList.toggle('list-folded', folded);
+  // unfolding: the cards keep their full width (no squeezed names) and slide in to the right one by one
+  if (!folded) $$('#mineList .saved-item').forEach((li, i) => popIn(li, { x: -28, y: 0, duration: 320, delay: 80 + i * 45 }));
+  btn.setAttribute('aria-expanded', String(!folded));
+  btn.setAttribute('aria-label', T(folded ? 'saved.unfoldList' : 'saved.foldList')); btn.title = btn.getAttribute('aria-label');
+}
+
+/* ---- Edit in place (pencil on a saved script): the title and the text keep their look, only a caret appears ---- */
+let mineEditId = null;
+/* `after` runs once Cancel / Save have faded out (the saved tick appears then). */
+function setMineEditing(on, after) {
+  const title = $('#mineTitle'), body = $('#minePreview'), tools = $('#mineEditTools');
+  setEditable(title, on); setEditable(body, on);
+  body.classList.toggle('reader-editing', on);
+  clearErr($('#mineEditError'));
+  popIn(body, { y: 6, duration: 300 });
+  if (on) { tools.hidden = false; popIn(tools, { y: 4, duration: 220 }); } else popOut(tools, after);
+}
+export function startMineEdit(id) {
+  const begin = () => {
+    const mine = S.texts.mine;
+    if (!mine || mine.id !== id) return;
+    mineEditId = id;
+    $('#mineTitle').textContent = mine.title;
+    fillParagraphs($('#minePreview'), mine.text);
+    setMineEditing(true);
+    caretToStart($('#minePreview'));
+  };
+  if (mineEditId) cancelMineEdit();
+  if (S.texts.mine && S.texts.mine.id === id) begin(); else pickSavedScript(id, true).then(begin);
+}
+function mineHasUnsavedEdit() {
+  const mine = S.texts.mine;
+  if (!mineEditId || !mine) return false;
+  return $('#mineTitle').innerText.replace(/\n/g, ' ').trim() !== mine.title || editedText($('#minePreview')) !== mine.text.trim();
+}
+export function cancelMineEdit() {
+  if (!mineEditId) return;
+  mineEditId = null; shownMine = null;
+  paintMinePreview();
+  setMineEditing(false);
+}
+export function saveMineEdit() {
+  const mine = S.texts.mine; if (!mineEditId || !mine) return;
+  const title = $('#mineTitle').innerText.replace(/\n/g, ' ').trim(), text = editedText($('#minePreview')), err = $('#mineEditError');
+  if (!title) { showErr(err, T('saved.errNameEmpty')); $('#mineTitle').focus(); return; }
+  if (!text) { showErr(err, T('saved.errBodyEmpty')); $('#minePreview').focus(); return; }
+  const patch = {};
+  if (title !== mine.title) patch.title = title;
+  if (text !== mine.text.trim()) patch.body = text;
+  const id = mineEditId;
+  const finish = () => { mineEditId = null; shownMine = mine.id + mine.title + mine.text.length; paintMinePreview(); setMineEditing(false, () => showSavedTick($('#mineSavedTick'))); };
+  if (!Object.keys(patch).length) { finish(); return; }
+  patchSavedScript(id, patch, err).then(row => { if (row && mineEditId === id) finish(); });
+}
+export function setupMineTitle() {
+  guardTitle($('#mineTitle'), () => CONFIG.SCRIPT_TITLE_MAX_CHARS, () => caretToStart($('#minePreview')));
+}
+RENDER.practice = function () {
+  renderSavedLists(); paintFollowWpm(); renderPractice();
+  loadSavedScripts().then(() => { if (S.screen === 'practice' && S.pickerTab === 'mine' && !S.texts.mine) paintMinePreview(); });   // the empty-state text depends on the list
+};
 export function updateOwnCount() {
   const n = wordsOf($('#ownText').value);
   $('#ownCnt').textContent = T('practice.ownCounter', { n, max: CONFIG.OWN_MAX_WORDS });
-}
-export function useOwn() {
-  const v = $('#ownText').value.trim(), err = $('#ownErr');
-  if (!v) { showErr(err, T('practice.errOwnEmpty')); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
-  if (wordsOf(v) > CONFIG.OWN_MAX_WORDS) { showErr(err, T('practice.errOwnMax', { max: CONFIG.OWN_MAX_WORDS })); $('#ownText').setAttribute('aria-invalid', 'true'); return; }
-  clearErr(err); $('#ownText').removeAttribute('aria-invalid');
-  const applyOwn = () => {
-    S.choosing = true;
-    S.texts.own = { title: T('practice.ownTitle'), short: T('practice.ownTitle'), text: v, topic: null };
-    renderPractice();
-  };
-  saveScript({ title: T('practice.ownTitle'), text: v, source: 'written' }).then(j => {
-    applyOwn(); S.texts.own.id = j.id; loadSavedScripts();
-  }).catch(e => {
-    if (e && e.code === 'content_rejected') { openModal('safetyAlert'); return; }
-    if (e && e.code) { showErr(err, e.msg || T('eval.errServer')); return; }
-    applyOwn();   // network error: practise without saving
-  });
 }
 /* ---- follow-along (SIM): the highlight moves by TIME, at S.followWpm (slider, default 145; separate from CONFIG.SPEAKING_WPM_FOR_ESTIMATE).
    Following the real voice later needs streaming STT or a local VAD: that is a new ADR ([CAN CHOT]), not part of this demo. ---- */
@@ -376,7 +460,7 @@ export function runEvalReal(txt) {
   if (txt.id) fd.append('script_id', txt.id);
   if (txt.short) fd.append('topic', txt.short);
   const ctrl = new AbortController(), ev = S.evaluation = { timers: [], ctrl, timedOut: false };
-  ev.timers.push(setTimeout(() => { ev.timedOut = true; ctrl.abort(); }, 120000));
+  ev.timers.push(setTimeout(() => { ev.timedOut = true; ctrl.abort(); }, CONFIG.EVALUATE_TIMEOUT_MS));
   $('#ovStep').textContent = T('eval.step1'); $('#ovText').textContent = T('eval.step1Text');
   openModal('evaluatingOverlay', { lock: true, focus: '#ovCancel' });
   const end = () => { ev.timers.forEach(clearTimeout); S.evaluation = null; closeModal('evaluatingOverlay', false); };
