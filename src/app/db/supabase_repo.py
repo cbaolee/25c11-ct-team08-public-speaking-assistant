@@ -135,14 +135,6 @@ class SupabaseBaselineRepo:
         row = _first(resp.data)
         return BaselineRow.model_validate(row) if row else None
 
-    def _set_current(self, user_id: UUID, baseline_id: UUID, is_current: bool) -> None:
-        _execute(
-            self._table()
-            .update({"is_current": is_current})
-            .eq("id", str(baseline_id))
-            .eq("user_id", str(user_id))
-        )
-
     def replace_current_baseline(
         self, user_id: UUID, data: NewBaseline
     ) -> tuple[BaselineRow, BaselineRow | None]:
