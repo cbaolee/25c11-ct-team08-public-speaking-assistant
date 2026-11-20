@@ -150,11 +150,28 @@ button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1
 .box.reader-box { padding: 24px 0 0; }
 .box.reader-box > .row { padding: 0 50px 12px; }
 .box.reader-box .reader { max-width: none; margin: 0; padding: 8px 50px 28px; font-size: clamp(1.25rem, 2vw, 1.625rem); }
-.box.reader-box .reader .para { text-align: justify; hyphens: auto; text-indent: 1.5em; }
+.box.reader-box .reader .para { text-align: justify; hyphens: manual; overflow-wrap: normal; word-break: normal; text-indent: 1.5em; }   /* justified, but a word is never split across lines */
 .box.reader-box .reader .para + .para { margin-top: 1.75em; }   /* one empty line (the line height) */
 .box.reader-box .reader .para .cite { text-indent: 0; }
 .box.reader-box .reader > .note { text-indent: 0; }
 @media (max-width: 560px) { .box.reader-box > .row { padding: 0 20px 12px; } .box.reader-box .reader { padding: 8px 20px 24px; } }
 /* Practice reading text (Record / Review): justified, a blank line between paragraphs, small first-line indent */
-.reader.reader-wide .para { margin: 0; text-align: justify; hyphens: auto; text-indent: 1.5em; }
+.reader.reader-wide .para { margin: 0; text-align: justify; hyphens: manual; overflow-wrap: normal; word-break: normal; text-indent: 1.5em; }   /* justified, but a word is never split across lines */
 .reader.reader-wide .para + .para { margin-top: 1.75em; }   /* one empty line (the line height) */
+
+/* While recording, a sentence can be clicked to move the follow-along highlight there */
+#sheet.following .sent { cursor: pointer; }
+#sheet.following .sent:hover { text-decoration: underline dotted var(--line); text-underline-offset: 4px; }
+
+/* Line numbers beside script text (line_numbers.js). The ::before is a zero-width character at the
+   text size, so the small number shares the text's baseline. */
+.reader.has-ln { position: relative; }
+.reader.has-ln .para { margin-left: 2.4rem; }
+.ln-gutter { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.ln-gutter .ln { position: absolute; white-space: nowrap; text-align: right; font-weight: 400; }
+.ln-gutter .ln::before { content: "\200B"; }
+.ln-gutter .ln::after { content: attr(data-n); font: 500 0.55em var(--sans); font-variant-numeric: tabular-nums; color: var(--muted); letter-spacing: .02em; }
+
+/* Script Studio: the Composer's lists (Category, Duration, Show my scripts) open upward, so the arrow points up */
+#screenScriptStudio .csel-btn svg { transform: rotate(180deg); }
+#screenScriptStudio .csel-btn[aria-expanded="true"] svg { transform: none; }

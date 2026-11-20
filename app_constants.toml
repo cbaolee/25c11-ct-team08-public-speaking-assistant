@@ -66,11 +66,23 @@ exhausted_cooldown_s = 600
 
 [web]
 # Sent to the browser by GET /api/config. No secrets here.
-# Follow-along speed slider: min, max, step and default, in words per minute
-follow_wpm_min = 100
-follow_wpm_max = 180
+# Range a user may pick from in Settings > Reading speed, in words per minute
+follow_wpm_min = 60
+follow_wpm_max = 240
+# Slider range used until the user picks their own (min_choose < max_choose), in words per minute
+follow_wpm_min_choose = 100
+follow_wpm_max_choose = 180
+# Slider step and default speed, in words per minute
 follow_wpm_step = 5
 follow_wpm_default = 145
+# Auto speed (Settings > Reading speed): taps on the sentence being read set the slider.
+# Share of the measured speed mixed into the current one at each tap (0..1)
+follow_auto_weight = 0.4
+# Taps closer than this many seconds or words apart are not measured
+follow_auto_min_s = 1.5
+follow_auto_min_words = 3
+# A tap further ahead than this many sentences is a skip, not reading: not measured
+follow_auto_max_ahead = 4
 # Wait after the last slider move before saving follow_wpm, in milliseconds
 follow_wpm_save_delay_ms = 800
 # Max words in Practice "Own" text
@@ -98,3 +110,5 @@ composer_max_lines = 5.5
 script_poll_interval_ms = 650
 # Longest wait for one evaluation before the UI gives up, in milliseconds (2 min)
 evaluate_timeout_ms = 120_000
+# Wait before a running evaluation moves to the background (user goes to Home), in milliseconds
+evaluate_background_after_ms = 5_000

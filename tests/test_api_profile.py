@@ -111,7 +111,7 @@ def test_patch_preferences_storage_error_returns_503(client, repos, monkeypatch)
 
 
 def test_patch_profile_rejects_follow_wpm_outside_range(client):
-    r = client.patch("/api/profile", json={"preferences": {"follow_wpm": 181}})
+    r = client.patch("/api/profile", json={"preferences": {"follow_wpm": 245}})
     assert r.status_code == 422
 
 
@@ -243,3 +243,35 @@ def test_new_profile_has_no_avatar_and_empty_preferences(client):
     body = client.get("/api/profile").json()
     assert body["avatar_url"] is None
     assert body["preferences"] == {}
+
+
+def test_patch_profile_saves_reading_speed_range(client):
+    r = client.patch(
+        "/api/profile",
+        json={"preferences": {"follow_wpm_min_choose": 80, "follow_wpm_max_choose": 200}},
+    )
+    assert r.status_code == 200
+    assert r.json()["preferences"]["follow_wpm_min_choose"] == 80
+    assert r.json()["preferences"]["follow_wpm_max_choose"] == 200
+
+
+@pytest.mark.parametrize(
+    "prefs",
+    [
+        {"follow_wpm_min_choose": 150, "follow_wpm_max_choose": 150},  # min must be below max
+        {"follow_wpm_min_choose": 100},  # only one end
+        {"follow_wpm_min_choose": 50, "follow_wpm_max_choose": 180},  # below the allowed range
+        {"follow_wpm_min_choose": 100, "follow_wpm_max_choose": 183},  # not a step of 5
+    ],
+)
+def test_patch_profile_rejects_bad_reading_speed_range(client, prefs):
+    r = client.patch("/api/profile", json={"preferences": prefs})
+    assert r.status_code == 422
+
+
+def test_patch_profile_saves_auto_speed(client):
+    r = client.patch("/api/profile", json={"preferences": {"follow_auto_speed": True}})
+    assert r.status_code == 200
+    assert r.json()["preferences"]["follow_auto_speed"] is True
+    bad = client.patch("/api/profile", json={"preferences": {"follow_auto_speed": 1}})
+    assert bad.status_code == 422

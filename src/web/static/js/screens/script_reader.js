@@ -1,6 +1,7 @@
 import { T, TOPICS } from '../i18n.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { go } from '../nav.js';
+import { practiceLocked } from '../screens/practice.js';
 import { patchSavedScript } from '../screens/saved_scripts.js';
 import { refreshChatScript, saveChatScript } from '../screens/script_studio.js';
 import { CONFIG, S } from '../state.js';
@@ -148,6 +149,7 @@ export function closeMenu() {
 /* The script actions, shared by the reader menu and the chat bubble buttons. */
 export function runScriptAction(sc, action) {
   if (action === 'practice') {
+    if (practiceLocked()) return;   // an evaluation runs in the background: leave the Practice text alone
     /* Practice does not save: the text goes to Practice as it is, and only a finished evaluation keeps it
        (sessions.script_snapshot). A script the user saved before still links its session by id. */
     const lbl = sc.cardName || sc.title || TOPICS[sc.topic] || sc.topic;

@@ -95,7 +95,12 @@ export function openModal(id, opts) {
   m._lock = !!opts.lock;
   if (m._closing) { m._closing.forEach(a => a.cancel()); m._closing = null; }   // reopened while it was still closing
   m.classList.add('show');
+  S.modal = S.modal.filter(x => x !== id);   // reopened: it moves to the top of the stack
   S.modal.push(id);
+  // The newest window is always on top, whatever its place in the page (e.g. Save script's name
+  // dialog opened from the Script Reader). Stays under the busy overlay (150) and the toast (200).
+  m.style.zIndex = '';   // read the CSS value, not the one set last time
+  m.style.zIndex = String(Math.max(parseInt(getComputedStyle(m).zIndex, 10) || 100, 100) + S.modal.length * 2);
   lockPageScroll(true);
   const target = (opts.focus && $(opts.focus, m)) || $$(FOCUSABLE, m).filter(usable)[0] || $('.box', m);
   target.focus();

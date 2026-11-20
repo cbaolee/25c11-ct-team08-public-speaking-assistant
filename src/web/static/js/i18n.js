@@ -60,7 +60,7 @@ export const TEXT = {
     feedLabel: 'Conversation', topic: 'Category', duration: 'Duration', attach: 'Attach a PDF', inputLabel: 'Describe your event or paste material',
     placeholder: 'Describe your event, or paste some material...', send: 'Send', fold: 'Make the text box smaller', unfold: 'Show more of your text',
     hint: 'The assistant can make mistakes. Read the script and check names, facts and figures before you practise.',
-    assistant: 'Script assistant',
+    assistant: 'Assistant',
     greeting: 'Hi {name}. Pick a topic, then tell me about your event or attach a PDF with the key points.',
     errFile: 'That file cannot be used. Attach a PDF up to {mb} MB and {pages} pages that is not password-protected.',
     errLong: 'The text is longer than {max} words. Shorten it and send again.',
@@ -94,7 +94,7 @@ export const TEXT = {
     voiceTitle: 'Your voice', tabRec: 'Record', tabUp: 'Upload',
     useScript: 'Use this script',
     followWpmLabel: 'Highlight speed (follow-along only, not scored)', followWpmVal: '{n} words per minute', followWpmShort: '{n} wpm',
-    start: 'Start recording', stop: 'Stop recording', discard: 'Discard',
+    start: 'Start recording', stop: 'Stop recording', pause: 'Pause', resume: 'Resume', pausedNote: 'Paused. Press Resume to go on with the same recording.', discard: 'Discard',
     recording: 'Recording...',
     recordingFollow: 'Recording... Read the text aloud. The highlight follows along.',
     dropText: 'Choose an audio file (mp3, wav, webm, m4a)', errAudio: 'That is not an audio file.',
@@ -143,7 +143,10 @@ export const TEXT = {
   },
 
   eval: {
-    title: 'Analysing your recording', step1: 'Step 1 of 2', step1Text: 'Preparing the audio...',
+    title: 'Analysing your recording',
+    bgToast: 'This is taking a while. Keep using the app: we will tell you when your report is ready.',
+    busyT: 'An evaluation is still running', busyD: 'Practice opens again when your report is ready. Please wait a moment.', busyOk: 'OK',
+    readyT: 'Your report is ready', readyD: 'The evaluation of "{title}" has finished.', readyView: 'View report', step1: 'Step 1 of 2', step1Text: 'Preparing the audio...',
     step2: 'Step 2 of 2', step2Text: 'Transcribing and measuring pace, pauses and pitch...',
     errTitle: 'We could not transcribe your recording', errMsg: 'Nothing was scored or saved. Check your connection and try again.', retry: 'Try again',
     saved: 'Saved to History.', notSaved: 'Could not save to History. Your report is shown below.',
@@ -231,7 +234,8 @@ export const TEXT = {
     errListenNone: 'No baseline recording was found.', errListen: 'Could not load your baseline recording. Please try again.',
     errInsufficient: 'We could not hear enough speech in this recording. Please record again, reading the passage aloud.',
     toastSaved: 'Baseline voice saved.', timerSuffix: ' / {t}', progress: 'Baseline recording progress',
-    okAvatar: 'Photo updated.', okRemoved: 'Photo removed.', errImage: 'Choose an image file.',
+    okAvatar: 'Photo updated.', okRemoved: 'Photo removed.',
+    removeT: 'Remove profile photo?', removeD: 'Your photo will be deleted. Your initial is shown instead.', removeOk: 'Remove', errImage: 'Choose an image file.',
     errAvatarSave: 'Could not save your profile picture. Please try again.',
     errAvatarRemove: 'Could not remove your profile picture. Please try again.'
   },
@@ -254,11 +258,17 @@ export const TEXT = {
     mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
     recVol: 'Recording volume', playVol: 'Playback volume', test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
   },
-  settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', password: 'Change password', delete: 'Delete account' },
+  settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', speed: 'Reading speed', password: 'Change password', delete: 'Delete account' },
   del: {
     title: 'Delete account', sub: 'This deletes your account, your scripts, your recordings and your baseline. It cannot be undone.',
     typeEmail: 'Type your email to confirm', confirm: 'Delete my account', mismatch: 'The email does not match your account.',
     failed: 'Your account could not be deleted right now. Please try again later.', done: 'Your account was deleted.'
+  },
+  speed: {
+    title: 'Reading speed', sub: 'Choose the range of the follow-along speed slider on Practice ({lo}–{hi} words per minute).',
+    min: 'Slowest speed', max: 'Fastest speed',
+    auto: 'Auto speed', autoNote: 'While recording, tap the sentence you have reached: the speed slider adjusts to how fast you read. You can still move it yourself.', wpm: '{n} wpm', reset: 'Use default',
+    errOrder: 'The slowest speed must be lower than the fastest speed.', ok: 'Reading speed saved.', err: 'Could not save the reading speed. Please try again.'
   },
   perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.' },
   overview: {

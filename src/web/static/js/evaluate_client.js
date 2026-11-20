@@ -187,7 +187,33 @@
     return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
   }
 
-  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
+  /* Jump to sentence k at time now: it starts now, later ones follow at this wpm, earlier ones count as already read. */
+  function followJump(segs, k, now, o) {
+    const fresh = followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: k, startTime: now });
+    return fresh.map((g, i) => (i < k ? { start: Math.min(g.start, now - (k - i) * 1e-3), end: Math.min(g.end, now) } : g));
+  }
+
+  /* Auto speed. Two taps (sentence fromK at fromT, then toK at toT, seconds): the speed the user really read at,
+     in wpm, or null when the taps say nothing reliable (backwards, a skip, too close). A speed outside
+     [lo, hi] is taken as lo or hi: reading very fast still pushes the slider to its fastest end.
+     o: { gapS, minS, minWords, maxAhead, lo, hi } */
+  function followMeasureWpm(counts, fromK, fromT, toK, toT, o) {
+    const ahead = toK - fromK;
+    if (!(ahead >= 1) || ahead > o.maxAhead) return null;
+    let words = 0;
+    for (let i = fromK; i < toK; i++) words += counts[i] || 0;
+    const secs = toT - fromT - ahead * (o.gapS || 0);
+    if (toT - fromT < o.minS || words < o.minWords || secs <= 0) return null;
+    const wpm = words * 60 / secs;
+    return Math.min(o.hi, Math.max(o.lo, wpm));
+  }
+  /* The slider value after one measurement: part of the way to it, on the step, inside [min, max]. */
+  function followBlendWpm(cur, measured, weight, limits) {
+    const v = (1 - weight) * cur + weight * measured, step = limits.step || 5;
+    return Math.min(limits.max, Math.max(limits.min, Math.round(v / step) * step));
+  }
+
+  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime, followJump, followMeasureWpm, followBlendWpm };
   root.EvaluateClient = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

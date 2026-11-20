@@ -230,7 +230,18 @@ export function toggleStudioSavedMenu() {
   const menu = $('#studioSavedMenu'), btn = $('#studioSavedButton');
   if (!menu.hidden && !menu._closing) { closeStudioSavedMenu(true); return; }
   const list = $('#studioSavedList');
-  list.innerHTML = ''; list._shown = null;          // start empty: the cards arrive once the list is loaded
+  if (S.savedScripts !== null) {
+    // Already loaded (at log in): the list is in the menu as it rolls out, no waiting. A quiet refresh follows;
+    // the cards only animate if the list has changed meanwhile.
+    renderSavedLists();
+    slideDown(menu);
+    btn.setAttribute('aria-expanded', 'true');
+    const first = $$('#studioSavedList .saved-pick')[0];
+    if (first) first.focus({ preventScroll: true });
+    loadSavedScripts();
+    return;
+  }
+  list.innerHTML = ''; list._shown = null;          // not loaded yet: start empty, the cards arrive once the list is in
   $('#studioSavedEmpty').hidden = true;
   slideDown(menu);                                  // same roll-out as the Category and Duration lists
   btn.setAttribute('aria-expanded', 'true');

@@ -362,6 +362,8 @@ export function drawPitch(s) {
 }
 export function drawVolume(s) {
   const an = s.an, sp = an.words.filter(w => w.start != null && w.vol != null);
+  // A compact (older) session keeps no per-word loudness, so the whole box is left out instead of an empty chart.
+  $('#volBox').hidden = !!s.compact && !sp.length;
   if (!sp.length) { $('#volRead').textContent = T('eval.noVol'); $('#chVol').innerHTML = ''; $('#chVol')._spec = null; return; }
   const hiW = sp.reduce((m, w) => (w.vol > m.vol ? w : m)), loW = sp.reduce((m, w) => (w.vol < m.vol ? w : m));
   $('#volRead').textContent = T('report.volRead', { tHi: fmtTime(hiW.start), hi: hiW.vol.toFixed(0), tLo: fmtTime(loW.start), lo: loW.vol.toFixed(0), r: (hiW.vol - loW.vol).toFixed(0) });
@@ -407,10 +409,25 @@ export function updatePlayer() {
   $('#playBtn').setAttribute('aria-label', T(S.play.on ? 'common.pause' : 'common.play'));
   const cur = s.an.words.find(w => w.status !== 'missing' && w.start <= t && t < w.end);
   $$('#transcriptView .w.now').forEach(e => e.classList.remove('now'));
-  if (cur) { const el = $('#transcriptView [data-i="' + cur.i + '"]'); if (el) { el.classList.add('now'); if (S.play.on && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' }); } }
+  if (cur) {
+    const el = $('#transcriptView [data-i="' + cur.i + '"]');
+    if (el) {
+      el.classList.add('now');
+      // Follow the spoken word only when it changes, and never after the user scrolled away during this playback.
+      if (S.play.on && !followPaused && cur.i !== followedWord && el.scrollIntoView) el.scrollIntoView({ block: 'nearest' });
+      followedWord = cur.i;
+    }
+  }
 }
+/* Auto-follow during playback stops as soon as the user scrolls by hand; Play or a seek turns it back on. */
+let followPaused = false, followedWord = null;
+function pauseFollow() { if (S.play.on) followPaused = true; }
+['wheel', 'touchmove'].forEach(ev => window.addEventListener(ev, pauseFollow, { passive: true }));
+window.addEventListener('keydown', e => { if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key) && !e.target.closest('input, textarea, button, [role=slider]')) pauseFollow(); });
+window.addEventListener('pointerdown', e => { if (e.target === document.documentElement || e.clientX >= document.documentElement.clientWidth) pauseFollow(); });   // the page scrollbar
 export function startPlayback() {
   const s = S.currentSession; if (!s) return;
+  followPaused = false;
   if (hasAudio()) {
     if (S.play.t >= s.an.dur - 0.05) { S.play.t = 0; PA.currentTime = 0; }
     S.play.on = true; PA.play().catch(() => { S.play.on = false; updatePlayer(); }); updatePlayer(); return;
@@ -424,7 +441,7 @@ export function startPlayback() {
   }, 100);
   updatePlayer();
 }
-export function seekTo(t, play) { stopPlayback(); S.play.t = Math.max(0, t); if (hasAudio()) PA.currentTime = S.play.t; if (play) startPlayback(); else updatePlayer(); }
+export function seekTo(t, play) { followPaused = false; stopPlayback(); S.play.t = Math.max(0, t); if (hasAudio()) PA.currentTime = S.play.t; if (play) startPlayback(); else updatePlayer(); }
 export function onTxClick(e) {
   const tb = e.target.closest('.tx-time'), wb = e.target.closest('.w[data-i]');
   if (tb) { seekTo(parseFloat(tb.getAttribute('data-t0')), true); return; }

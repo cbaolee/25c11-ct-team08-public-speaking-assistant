@@ -8,16 +8,23 @@ export const CONFIG = {
   FOLLOW_GAP_S: 0.5,                   // pause added after each sentence (matches a natural stop at a full stop)
   HISTORY_MAX_PAGES: 5,                // 5 pages x 20 = the newest 100 sessions on Home and History
   HISTORY_PAGE_SIZE: 20,               // sessions per /api/sessions page
-  FOLLOW_WPM_MIN: 100,                 // follow-along slider minimum, words per minute
-  FOLLOW_WPM_MAX: 180,                 // follow-along slider maximum, words per minute
+  FOLLOW_WPM_MIN: 60,                  // lowest speed a user may pick in Settings, words per minute
+  FOLLOW_WPM_MAX: 240,                 // highest speed a user may pick in Settings, words per minute
+  FOLLOW_WPM_MIN_CHOOSE: 100,          // slider minimum until the user picks their own, words per minute
+  FOLLOW_WPM_MAX_CHOOSE: 180,          // slider maximum until the user picks their own, words per minute
   FOLLOW_WPM_STEP: 5,                  // slider step, words per minute
   FOLLOW_WPM_DEFAULT: 145,             // used when the profile has no follow_wpm
+  FOLLOW_AUTO_WEIGHT: 0.4,             // share of the measured speed mixed in at each tap (auto speed)
+  FOLLOW_AUTO_MIN_S: 1.5,                // taps closer in time are not measured, seconds
+  FOLLOW_AUTO_MIN_WORDS: 3,            // taps closer in words are not measured
+  FOLLOW_AUTO_MAX_AHEAD: 4,            // a tap further ahead (sentences) is a skip, not measured
   FOLLOW_WPM_SAVE_DELAY_MS: 800,       // wait after the last slider move before PATCH /api/profile, in ms
   CHAT_HISTORY_MAX_MESSAGES: 20,       // most Script Studio chat messages kept in localStorage
   COMPOSER_MAX_WORDS: 3000,            // most words in one Script Studio message
   COMPOSER_MAX_LINES: 5.5,             // the Script Studio text box grows up to this many lines
   SCRIPT_POLL_INTERVAL_MS: 650,        // wait between two status checks of a script being generated
   EVALUATE_TIMEOUT_MS: 120000,         // longest wait for one evaluation
+  EVALUATE_BACKGROUND_AFTER_MS: 5000,  // after this the evaluation goes on in the background and the user is sent Home
   MAX_SAVED_SCRIPTS: 10,               // saved scripts per user (app_constants.toml [storage])
   SCRIPT_TITLE_MAX_CHARS: 70,          // longest saved script name ([storage])
   MAX_PDF_SIZE_BYTES: 26214400,        // largest PDF for Script Studio ([script], 25 MB)

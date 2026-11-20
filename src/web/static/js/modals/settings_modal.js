@@ -3,9 +3,9 @@ import { T } from '../i18n.js';
 import { logout } from './baseline_gate.js';
 import { saveConsent } from './profile_modal.js';
 import { levelAnim } from '../recorder.js';
-import { dropFollowWpm } from '../screens/practice.js';
+import { dropFollowWpm, fitFollowWpm, followLimits, paintFollowWpm } from '../screens/practice.js';
 import { clearChatHistory } from '../screens/script_studio.js';
-import { S } from '../state.js';
+import { CONFIG, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
 
@@ -13,7 +13,7 @@ import { $, $$, clearErr, esc, showErr } from '../utils.js';
    One window: the first screen lists Permissions, Audio, Change password and Delete account.
    Choosing one slides its screen in from the right inside the same box; Back slides the list
    back. The screen that is off to the side is inert, so Tab never lands in it. */
-const PANES = ['permissions', 'audio', 'password', 'delete'];
+const PANES = ['permissions', 'audio', 'speed', 'password', 'delete'];
 let current = null;   // open detail screen, or null when the list is shown
 
 export function openSettings() {
@@ -36,6 +36,7 @@ function showPane(name) {
   PANES.forEach(k => { $('[data-pane="' + k + '"]').hidden = k !== name; });
   if (name === 'permissions') $('#pmChk').checked = S.consent;
   else if (name === 'audio') fillAudio();
+  else if (name === 'speed') fillSpeed();
   else if (name === 'password') fillPassword();
   else if (name === 'delete') fillDelete();
   $('#settingsList').inert = true;
@@ -53,6 +54,38 @@ function savePermissions() {
   if (changed) saveConsent(on);
   toast(T(S.consent ? 'consent.toastOn' : 'consent.toastOff'));
   showList(true);
+}
+
+/* ---- Reading speed: the user's own slider range, kept in profiles.preferences ---- */
+function speedOptions(sel, value) {
+  const opts = [];
+  for (let v = CONFIG.FOLLOW_WPM_MIN; v <= CONFIG.FOLLOW_WPM_MAX; v += CONFIG.FOLLOW_WPM_STEP) opts.push(v);
+  sel.innerHTML = opts.map(v => '<option value="' + v + '"' + (v === value ? ' selected' : '') + '>' + esc(T('speed.wpm', { n: v })) + '</option>').join('');
+}
+function fillSpeed() {
+  const l = followLimits();
+  $('#speedSub').textContent = T('speed.sub', { lo: CONFIG.FOLLOW_WPM_MIN, hi: CONFIG.FOLLOW_WPM_MAX });
+  speedOptions($('#speedMin'), l.min); speedOptions($('#speedMax'), l.max);
+  $('#speedAuto').checked = !!S.autoSpeed;
+  clearErr($('#speedErr'));
+}
+function saveSpeed() {
+  const lo = Number($('#speedMin').value), hi = Number($('#speedMax').value), err = $('#speedErr');
+  if (!(lo < hi)) { showErr(err, T('speed.errOrder')); $('#speedMin').focus(); return; }
+  clearErr(err);
+  const auto = $('#speedAuto').checked, before = S.wpmRange;
+  S.wpmRange = { min: lo, max: hi };
+  const wpm = fitFollowWpm(S.followWpm);
+  S.wpmRange = before;
+  withBusy(api('/api/profile', { method: 'PATCH', json: { preferences: { follow_wpm_min_choose: lo, follow_wpm_max_choose: hi, follow_wpm: wpm, follow_auto_speed: auto } } }), T('busy.saving')).then(r => {
+    if (!r.ok) throw new Error('speed ' + r.status);
+    S.wpmRange = { min: lo, max: hi }; S.followWpm = wpm; S.autoSpeed = auto; paintFollowWpm();
+    toast(T('speed.ok')); showList(true);
+  }).catch(() => showErr(err, T('speed.err')));
+}
+function resetSpeed() {
+  speedOptions($('#speedMin'), CONFIG.FOLLOW_WPM_MIN_CHOOSE); speedOptions($('#speedMax'), CONFIG.FOLLOW_WPM_MAX_CHOOSE);
+  clearErr($('#speedErr'));
 }
 
 /* ---- Audio ---- */
@@ -119,6 +152,8 @@ export function setupSettings() {
   $$('[data-settings-back]').forEach(b => { b.onclick = () => showList(true); });
   $('#permSave').onclick = savePermissions;
   $('#passSave').onclick = savePass;
+  $('#speedSave').onclick = saveSpeed;
+  $('#speedReset').onclick = resetSpeed;
   $('#audioInput').addEventListener('input', e => { $('#audioInputValue').textContent = e.target.value; });
   $('#audioOutput').addEventListener('input', e => { $('#audioOutputValue').textContent = e.target.value; });
   $('#audioTest').onclick = testMic;
