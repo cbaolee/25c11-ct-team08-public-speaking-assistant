@@ -17,13 +17,15 @@ def _use_toml(monkeypatch, tmp_path, retention: int, ttl: int) -> None:
     """Point CONSTANTS at a small TOML file written for the test."""
     toml = tmp_path / "app_constants.toml"
     toml.write_text(
-        f"[storage]\nretention_full_sessions = {retention}\nsigned_url_ttl_s = {ttl}\n",
+        f"[storage]\nretention_full_sessions = {retention}\nsigned_url_ttl_s = {ttl}\n"
+        "max_compact_sessions = 30\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(constants, "CONSTANTS", constants.load_constants(toml))
     monkeypatch.setattr(config, "CONSTANTS", constants.CONSTANTS)
     monkeypatch.delenv("RETENTION_FULL_SESSIONS", raising=False)
     monkeypatch.delenv("SIGNED_URL_TTL_S", raising=False)
+    monkeypatch.delenv("MAX_COMPACT_SESSIONS", raising=False)
 
 
 def test_settings_default_follows_toml(monkeypatch, tmp_path):
@@ -41,6 +43,13 @@ def test_env_overrides_toml(monkeypatch, tmp_path):
     assert s.signed_url_ttl_s == 900  # not overridden: still from TOML
 
 
+def test_max_compact_sessions_follows_toml_and_env(monkeypatch, tmp_path):
+    _use_toml(monkeypatch, tmp_path, retention=5, ttl=900)
+    assert Settings(_env_file=None).max_compact_sessions == 30
+    monkeypatch.setenv("MAX_COMPACT_SESSIONS", "12")
+    assert Settings(_env_file=None).max_compact_sessions == 12
+
+
 def test_module_constants_match_repo_toml():
     data = constants.load_constants()
     assert config.max_audio_seconds == data["audio"]["max_audio_seconds"]
@@ -55,6 +64,9 @@ def test_api_config_returns_web_section():
     assert response.json() == {
         **constants.load_constants()["web"],
         "max_saved_scripts": config.max_saved_scripts,
+        "script_title_max_chars": config.script_title_max_chars,
+        "max_pdf_size_bytes": constants.load_constants()["script"]["max_pdf_size_bytes"],
+        "max_pdf_pages": constants.load_constants()["script"]["max_pdf_pages"],
     }
 
 
@@ -62,3 +74,9 @@ def test_ui_reads_every_web_key():
     ui = UI_FILE.read_text(encoding="utf-8")
     missing = [key for key in constants.CONSTANTS["web"] if "c." + key not in ui]
     assert missing == []
+
+
+def test_static_files_are_revalidated():
+    response = TestClient(main.app).get("/static/css/base.css")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-cache"
