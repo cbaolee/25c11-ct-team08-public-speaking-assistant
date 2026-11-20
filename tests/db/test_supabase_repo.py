@@ -16,7 +16,7 @@ import pytest
 from dotenv import dotenv_values
 from PIL import Image
 
-from src.app.config import settings
+from src.app.config import max_list_page_size, settings
 from src.app.db import factory
 from src.app.db.models import (
     ConflictError,
@@ -68,7 +68,7 @@ def test_newest_page_rejects_bad_limit():
     with pytest.raises(ValueError):
         _newest_page(None, 0, None)
     with pytest.raises(ValueError):
-        _newest_page(None, 21, None)
+        _newest_page(None, max_list_page_size + 1, None)
 
 
 # ---------- integration tests (psc-dev only) ----------

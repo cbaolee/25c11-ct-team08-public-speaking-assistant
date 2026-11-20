@@ -23,6 +23,17 @@ class ConflictError(StorageError):
     """An object or record conflicts with existing data."""
 
 
+class ScriptLimitReachedError(Exception):
+    """The user already has the maximum number of saved scripts."""
+
+    def __init__(self, limit: int, count: int) -> None:
+        self.limit = limit
+        self.count = count
+        super().__init__(
+            f"You have saved the maximum of {limit} scripts. Delete one to save a new script."
+        )
+
+
 class ProfileUpsert(BaseModel):
     target_accent: str
     display_name: str | None = Field(default=None, max_length=50)

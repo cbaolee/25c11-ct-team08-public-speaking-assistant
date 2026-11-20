@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from src.app.config import max_list_page_size
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import (
     ConflictError,
@@ -101,7 +102,7 @@ def test_list_sessions_rejects_out_of_range_limit():
     repos = build_memory_repos()
 
     with pytest.raises(ValueError, match="limit"):
-        repos.sessions.list_sessions(uuid4(), limit=21, cursor=None)
+        repos.sessions.list_sessions(uuid4(), limit=max_list_page_size + 1, cursor=None)
 
 
 def test_insufficient_audio_session_cannot_have_score_or_audio_path():

@@ -4,6 +4,7 @@ from typing import Any
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
+from src.app.config import max_list_page_size
 from src.app.db.models import (
     BaselineRow,
     ConflictError,
@@ -40,8 +41,8 @@ def _now() -> datetime:
 
 
 def _validate_limit(limit: int) -> None:
-    if not 1 <= limit <= 20:
-        raise ValueError("limit must be between 1 and 20")
+    if not 1 <= limit <= max_list_page_size:
+        raise ValueError(f"limit must be between 1 and {max_list_page_size}")
 
 
 def _newest_first(rows):
