@@ -59,6 +59,7 @@ export function loadConfig() {
     CONFIG.FOLLOW_WPM_STEP = c.follow_wpm_step ?? CONFIG.FOLLOW_WPM_STEP;
     CONFIG.FOLLOW_WPM_DEFAULT = c.follow_wpm_default ?? CONFIG.FOLLOW_WPM_DEFAULT;
     CONFIG.FOLLOW_WPM_SAVE_DELAY_MS = c.follow_wpm_save_delay_ms ?? CONFIG.FOLLOW_WPM_SAVE_DELAY_MS;
+    CONFIG.CHAT_HISTORY_MAX_MESSAGES = c.chat_history_max_messages ?? CONFIG.CHAT_HISTORY_MAX_MESSAGES;
   }).catch(() => {});
 }
 export function init() {

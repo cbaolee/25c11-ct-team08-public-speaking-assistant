@@ -1,8 +1,8 @@
-import { api, readJson } from '../api.js';
+import { api, chatHistoryKey, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
 import { go, paintAvatar } from '../nav.js';
 import { loadSavedScripts } from '../screens/practice.js';
-import { RENDER, S } from '../state.js';
+import { CONFIG, RENDER, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, IC, clearErr, esc, showErr, wordsOf } from '../utils.js';
 
@@ -23,6 +23,7 @@ export function saveScript(sc) {
   } }), T('busy.saving')).then(readJson).then(({ ok, j }) => {
     if (!ok) throw Object.assign(new Error('save'), { code: j && j.error_code, msg: j && j.message });
     sc.savedId = j.id;
+    persistChat();
     return j;
   });
 }
@@ -41,7 +42,7 @@ export function fillTopicSelect() {
 }
 /* Chat-app layout: each message is a row with the sender's picture outside the bubble,
    the assistant's logo on the left, the user's avatar (photo or initial) on the right. */
-export function addBubble(cls, html) {
+export function addBubble(cls, html, animate = true) {
   const feed = $('#chatFeed'), row = document.createElement('div'), d = document.createElement('div');
   const mine = cls.split(' ').indexOf('me') >= 0;
   row.className = 'msg-row ' + (mine ? 'me' : 'ai');
@@ -57,7 +58,7 @@ export function addBubble(cls, html) {
   d.remove = () => row.remove();   // callers remove the bubble; take its picture with it
   /* Chat-style entry: the feed glides down to the new message while it rises and fades in */
   const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!calm && d.animate && feed.offsetParent) {
+  if (animate && !calm && d.animate && feed.offsetParent) {
     feed.scrollTo({ top: feed.scrollHeight, behavior: 'smooth' });
     row.animate([{ opacity: 0, transform: 'translateY(24px) scale(.98)' }, { opacity: 1, transform: 'none' }],
       { duration: 420, easing: 'cubic-bezier(.2, .7, .3, 1)' });
@@ -92,6 +93,135 @@ export function renderBlockedBubble(ai) {
     '<p>' + esc(T('script.blockedHarm')) + '</p>' +
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
+function chatMaxMessages() {
+  return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 20);
+}
+function trimChatHistory() {
+  while (S.chatHistory.length > chatMaxMessages()) {
+    const oldest = S.chatHistory.shift();
+    if (oldest.bubble && oldest.bubble.remove) oldest.bubble.remove();
+  }
+}
+function persistedMessage(message) {
+  if (message.role === 'me') {
+    return {
+      role: 'me',
+      text: message.text,
+      topic: message.topic,
+      duration_min: message.duration_min,
+      file_name: message.file_name || null,
+    };
+  }
+  if (message.blocked) return { role: 'ai', blocked: true };
+  const sc = message.script;
+  return {
+    role: 'ai',
+    script: {
+      title: sc.title,
+      cardName: sc.cardName,
+      text: sc.text,
+      topic: sc.topic,
+      duration_min: sc.duration_min,
+      source: sc.source,
+      template_id: sc.template_id || null,
+      models_used: sc.models_used || [],
+      citations: sc.citations || [],
+      savedId: sc.savedId || null,
+      warnings: sc.warnings || [],
+    },
+  };
+}
+export function persistChat() {
+  if (!S.user || !S.user.id || !S.chatHistory.length) return;
+  trimChatHistory();
+  const key = chatHistoryKey(S.user.id);
+  const write = () => localStorage.setItem(key, JSON.stringify(S.chatHistory.map(persistedMessage)));
+  try {
+    write();
+  } catch (e) {
+    if (!e || (e.name !== 'QuotaExceededError' && e.code !== 22 && e.code !== 1014)) return;
+    const oldest = S.chatHistory.shift();
+    if (oldest && oldest.bubble && oldest.bubble.remove) oldest.bubble.remove();
+    try { write(); } catch (retryError) { /* storage is blocked or still full */ }
+  }
+}
+function recordChatMessage(message) {
+  S.chatHistory.push(message);
+  trimChatHistory();
+  persistChat();
+}
+function renderUserMessage(message, animate = false) {
+  const bubble = addBubble('me', '<span></span>', animate);
+  bubble.firstChild.textContent = [
+    message.text || '',
+    message.file_name ? '📎 ' + message.file_name : '',
+  ].filter(Boolean).join('\n');
+  return bubble;
+}
+function scriptCardHtml() {
+  return '<div class="fcard">' + IC.file + '<div class="fc-main"><div class="fc-name"></div><div class="note"></div></div></div>' +
+    '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="view"></button><button class="btn btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
+}
+function fillScriptBubble(ai, sc) {
+  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + scriptCardHtml();
+  $('.fc-name', ai).textContent = sc.cardName;
+  const wc = wordsOf(sc.text);
+  $('.fc-main .note', ai).textContent = sc.duration_min + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + (sc.warnings.length ? ' · ' + T('script.hasNotes') : '');
+  const view = $('[data-a=view]', ai);
+  view.textContent = T('script.viewNow');
+  view.setAttribute('aria-label', T('script.viewAria', { title: sc.cardName }));
+  $('[data-a=practice]', ai).textContent = T('script.practice');
+  $('[data-a=copy]', ai).textContent = T('script.copy');
+  $('[data-a=download]', ai).textContent = T('script.download');
+  const again = $('[data-a=again]', ai);
+  again.textContent = T('script.regenerate');
+  if (!sc.req) again.disabled = true;
+  ai._script = sc;
+}
+export function restoreChat() {
+  if (!S.user || !S.user.id) return false;
+  let saved;
+  try { saved = JSON.parse(localStorage.getItem(chatHistoryKey(S.user.id)) || 'null'); } catch (e) { return false; }
+  if (!Array.isArray(saved)) return false;
+  const history = saved.filter(item =>
+    item && (item.role === 'me' && typeof item.text === 'string'
+      || item.role === 'ai' && (item.blocked === true || item.script && typeof item.script.text === 'string'))
+  ).slice(-chatMaxMessages());
+  if (!history.length) return false;
+  S.chatHistory = history;
+  history.forEach((item, index) => {
+    if (item.role === 'me') {
+      item.bubble = renderUserMessage(item);
+      return;
+    }
+    if (item.blocked) {
+      const bubble = addBubble('ai', '', false);
+      renderBlockedBubble(bubble);
+      item.bubble = bubble;
+      return;
+    }
+    const sc = item.script;
+    sc.title = typeof sc.title === 'string' ? sc.title : '';
+    sc.cardName = typeof sc.cardName === 'string' ? sc.cardName : sc.title;
+    sc.text = typeof sc.text === 'string' ? sc.text : '';
+    sc.topic = typeof sc.topic === 'string' ? sc.topic : '';
+    sc.duration_min = Number.isFinite(sc.duration_min) ? sc.duration_min : 5;
+    sc.source = typeof sc.source === 'string' ? sc.source : 'written';
+    sc.template_id = typeof sc.template_id === 'string' ? sc.template_id : null;
+    sc.savedId = typeof sc.savedId === 'string' ? sc.savedId : null;
+    sc.warnings = Array.isArray(sc.warnings) ? sc.warnings : [];
+    sc.citations = Array.isArray(sc.citations) ? sc.citations : [];
+    sc.models_used = Array.isArray(sc.models_used) ? sc.models_used : [];
+    const previous = history.slice(0, index).reverse().find(entry => entry.role === 'me');
+    sc.req = previous && !previous.file_name
+      ? { txt: previous.text, file: null, topic: previous.topic, tplId: '', tplTitle: '', dur: previous.duration_min }
+      : null;
+    const bubble = addBubble('ai', '', false);
+    fillScriptBubble(bubble, sc);
+    item.bubble = bubble;
+  });
+  return true;
+}
 export function generateScript(req, again) {
   S.chatBusy = true; $('#composerSend').disabled = true;
   const ai = addBubble('ai', '<div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div><p class="note" role="status"></p>');
@@ -107,7 +237,11 @@ export function generateScript(req, again) {
   const failJob = (code, msg) => {
     S.chatBusy = false; $('#composerSend').disabled = false;
     if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#composerError'), msg || T('script.errFile')); return; }
-    if (code === 'content_rejected') { renderBlockedBubble(ai); openModal('safetyAlert'); revealBubble(ai); return; }
+    if (code === 'content_rejected') {
+      renderBlockedBubble(ai);
+      recordChatMessage({ role: 'ai', blocked: true, bubble: ai });
+      openModal('safetyAlert'); revealBubble(ai); return;
+    }
     toast(msg || T('eval.errServer'), true);
     ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note">' + esc(msg || T('eval.errServer')) + '</p><div class="acts"><button class="btn btn-sm" type="button" data-a="again">' + esc(T('script.regenerate')) + '</button></div>';
     ai._script = { req }; revealBubble(ai);
@@ -124,16 +258,10 @@ export function generateScript(req, again) {
     const cardName = req.tplTitle || topicLabel(req.topic), dur = res.duration_min || req.dur || 5;
     /* word_count comes from the result; if the API omits it, count whitespace-separated tokens (wordsOf) */
     const wc = res.word_count || wordsOf(text);
-    let h = '<div class="fcard">' + IC.file + '<div class="fc-main"><div class="fc-name"></div><div class="note"></div></div></div>';
-    h += '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="view"></button><button class="btn btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
-    ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + h;
-    $('.fc-name', ai).textContent = cardName;
-    $('.fc-main .note', ai).textContent = dur + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + ((res.warnings || []).length ? ' · ' + T('script.hasNotes') : '');
-    const vb = $('[data-a=view]', ai); vb.textContent = T('script.viewNow'); vb.setAttribute('aria-label', T('script.viewAria', { title: cardName }));
-    $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
-    $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
     ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
       template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
+    fillScriptBubble(ai, ai._script);
+    recordChatMessage({ role: 'ai', script: ai._script, bubble: ai });
     S.chatBusy = false; $('#composerSend').disabled = false; revealBubble(ai);
   }).catch(() => failJob('net', T('eval.errNet')));
   api('/api/generate-script', { method: 'POST', body: fd }).then(r => r.json().then(j => ({ ok: r.ok, j }))).then(({ ok, j }) => {
@@ -182,8 +310,9 @@ export function sendChat() {
   clearErr(err);
   const tplName = tpl ? (tpl.topic || tpl.title) : '';
   const req = { txt, file: S.chatFile, topic: $('#composerTopic').value, tplId, tplTitle: tplName, dur: +($('#composerDuration') && $('#composerDuration').value || 5) };
-  const me = addBubble('me', '<span></span>');
-  me.firstChild.textContent = [tplName ? '📄 ' + tplName : '', txt, S.chatFile ? '📎 ' + S.chatFile.name : ''].filter(Boolean).join('\n');
+  const message = { role: 'me', text: txt, topic: $('#composerTopic').value, duration_min: req.dur, file_name: S.chatFile ? S.chatFile.name : null };
+  message.bubble = renderUserMessage(message, true);
+  recordChatMessage(message);
   $('#composerInput').value = ''; S.chatFile = null; renderChatFile();
   S.composerFolded = false; fitComposer();   // back to one short line
   S.lastReq = req;

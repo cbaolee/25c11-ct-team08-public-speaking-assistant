@@ -6,7 +6,7 @@ import { heroLightsOn } from '../screens/home.js';
 import { loadHistory } from '../screens/history.js';
 import { setStageAuth } from '../screens/landing.js';
 import { applyFollowWpm } from '../screens/practice.js';
-import { addBubble, fillTopicSelect, renderChatFile } from '../screens/script_studio.js';
+import { addBubble, fillTopicSelect, renderChatFile, restoreChat } from '../screens/script_studio.js';
 import { RENDER, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
@@ -78,7 +78,10 @@ export function openAuth(mode) {
 export function resetChat() {
   const feed = $('#chatFeed');
   feed.innerHTML = '';
-  addBubble('ai', '<p></p>').querySelector('p').textContent = T('script.greeting', { name: S.user.name });
+  S.chatHistory = [];
+  if (!restoreChat()) {
+    addBubble('ai', '<p></p>').querySelector('p').textContent = T('script.greeting', { name: S.user.name });
+  }
   S.chatFile = null; renderChatFile(); $('#composerInput').value = ''; S.composerFolded = false; clearErr($('#composerError'));
 }
 export function enterApp(fresh) {
