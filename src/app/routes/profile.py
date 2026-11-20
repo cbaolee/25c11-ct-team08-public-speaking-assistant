@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
-from src.app.config import avatar_max_bytes, avatar_size_px, settings
+from src.app.config import avatar_max_bytes, avatar_max_side_px, avatar_size_px, settings
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
     ProfilePatch,
@@ -52,20 +52,53 @@ def _not_found() -> JSONResponse:
     return _error(404, "profile_not_found", "This account has no profile.")
 
 
-def _to_payload(row: ProfileRow, user: CurrentUser, repos: Repos | None = None) -> dict:
-    payload = {**row.model_dump(mode="json"), "email": user.email}
-    payload["avatar_url"] = None
-    if row.avatar_path is not None and repos is not None:
-        try:
-            payload["avatar_url"] = repos.files.create_signed_url(
-                user.id,
-                settings.avatars_bucket,
-                row.avatar_path,
-                settings.signed_url_ttl_s,
+class InvalidAvatarError(Exception):
+    """The upload is not a PNG/JPEG/WebP picture we can use."""
+
+
+def _make_avatar(content: bytes) -> bytes:
+    """Check the upload by its content (not its file name) and return a square WebP.
+
+    Sync on purpose: Pillow work is CPU heavy, callers run it via run_in_threadpool.
+    """
+    try:
+        with Image.open(BytesIO(content)) as image:
+            image.verify()
+        with Image.open(BytesIO(content)) as image:  # verify() leaves the image unusable
+            if image.format not in {"PNG", "JPEG", "WEBP"}:
+                raise InvalidAvatarError
+            # Checked from the header, before any pixel is decoded (a tiny PNG can be huge).
+            if max(image.size) > avatar_max_side_px:
+                raise InvalidAvatarError
+            upright = ImageOps.exif_transpose(image)  # phone photos store rotation in EXIF
+            square = ImageOps.fit(
+                upright.convert("RGB"),
+                (avatar_size_px, avatar_size_px),
+                method=Image.Resampling.LANCZOS,
             )
-        except (StorageError, ValueError):
-            payload["avatar_url"] = None
-    return payload
+            output = BytesIO()
+            square.save(output, format="WEBP", quality=88)
+            return output.getvalue()
+    except (UnidentifiedImageError, Image.DecompressionBombError, OSError, ValueError) as err:
+        raise InvalidAvatarError from err
+
+
+def _avatar_url(row: ProfileRow, user: CurrentUser, repos: Repos) -> str | None:
+    """Signed URL of the avatar, or None (no avatar, or Storage failed). Sync: network call."""
+    if row.avatar_path is None:
+        return None
+    try:
+        return repos.files.create_signed_url(
+            user.id, settings.avatars_bucket, row.avatar_path, settings.signed_url_ttl_s
+        )
+    except (StorageError, ValueError):
+        logger.warning("Could not sign avatar URL; showing initials instead")
+        return None
+
+
+async def _to_payload(row: ProfileRow, user: CurrentUser, repos: Repos) -> dict:
+    avatar_url = await run_in_threadpool(_avatar_url, row, user, repos)
+    return {**row.model_dump(mode="json"), "email": user.email, "avatar_url": avatar_url}
 
 
 @router.get("/profile")
@@ -80,7 +113,7 @@ async def get_profile(
         return _unavailable()
     if row is None:
         return _not_found()
-    return _to_payload(row, user, repos)
+    return await _to_payload(row, user, repos)
 
 
 @router.put("/profile/avatar")
@@ -89,24 +122,28 @@ async def upload_avatar(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
 ):
+    """Store the caller's picture as `{user_id}/avatar.webp` (one file per user, upsert)."""
     content = await file.read(avatar_max_bytes + 1)
     if len(content) > avatar_max_bytes:
-        return _error(413, "avatar_too_large", "The profile picture is too large.")
+        mb = avatar_max_bytes / (1024 * 1024)
+        return _error(413, "avatar_too_large", f"The profile picture must be at most {mb:g} MB.")
     try:
-        with Image.open(BytesIO(content)) as image:
-            image.verify()
-        with Image.open(BytesIO(content)) as image:
-            if image.format not in {"PNG", "JPEG", "WEBP"}:
-                return _error(422, "avatar_invalid", "The profile picture format is not supported.")
-            resized = ImageOps.fit(
-                image.convert("RGB"),
-                (avatar_size_px, avatar_size_px),
-                method=Image.Resampling.LANCZOS,
-            )
-            output = BytesIO()
-            resized.save(output, format="WEBP", quality=88)
-    except (UnidentifiedImageError, OSError, ValueError):
-        return _error(422, "avatar_invalid", "The uploaded file is not a valid image.")
+        webp = await run_in_threadpool(_make_avatar, content)
+    except InvalidAvatarError:
+        return _error(
+            422,
+            "avatar_invalid",
+            "Use a PNG, JPEG or WebP picture of at most "
+            f"{avatar_max_side_px} x {avatar_max_side_px} pixels.",
+        )
+
+    try:
+        row = await run_in_threadpool(repos.profiles.get_profile, user.id)
+    except StorageError:
+        logger.exception("Could not load profile for avatar upload")
+        return _unavailable()
+    if row is None:
+        return _not_found()  # checked before upload, so no file is left without a profile
 
     path = build_avatar_path(user.id)
     try:
@@ -115,26 +152,29 @@ async def upload_avatar(
             user.id,
             settings.avatars_bucket,
             path,
-            output.getvalue(),
+            webp,
             "image/webp",
             True,
         )
-        row = await run_in_threadpool(repos.profiles.set_avatar_path, user.id, path)
     except StorageError:
         logger.exception("Could not upload avatar")
         return _unavailable()
-    if row is None:
-        return _not_found()
     try:
-        avatar_url = await run_in_threadpool(
-            repos.files.create_signed_url,
-            user.id,
-            settings.avatars_bucket,
-            path,
-            settings.signed_url_ttl_s,
-        )
-    except (StorageError, ValueError):
-        logger.exception("Could not sign uploaded avatar")
+        row = await run_in_threadpool(repos.profiles.set_avatar_path, user.id, path)
+    except StorageError:
+        logger.exception("Could not save avatar path")
+        row = None
+    if row is None:
+        # Do not leave a file that no profile points to.
+        try:
+            await run_in_threadpool(
+                repos.files.delete_files, user.id, settings.avatars_bucket, [path]
+            )
+        except StorageError:
+            logger.warning("Could not remove avatar file after a failed profile update")
+        return _unavailable()
+    avatar_url = await run_in_threadpool(_avatar_url, row, user, repos)
+    if avatar_url is None:
         return _unavailable()
     return {"avatar_url": avatar_url}
 
@@ -144,28 +184,17 @@ async def delete_avatar(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
 ):
+    """Remove the caller's picture. The fixed path is deleted even if avatar_path is null."""
     try:
-        row = await run_in_threadpool(repos.profiles.get_profile, user.id)
-    except StorageError:
-        logger.exception("Could not load profile for avatar deletion")
-        return _unavailable()
-    if row is None:
-        return _not_found()
-    if row.avatar_path is not None:
-        try:
-            await run_in_threadpool(
-                repos.files.delete_files,
-                user.id,
-                settings.avatars_bucket,
-                [row.avatar_path],
-            )
-        except (StorageError, ValueError):
-            logger.exception("Could not delete avatar file")
-            return _unavailable()
-    try:
+        await run_in_threadpool(
+            repos.files.delete_files,
+            user.id,
+            settings.avatars_bucket,
+            [build_avatar_path(user.id)],  # missing files are ignored
+        )
         row = await run_in_threadpool(repos.profiles.set_avatar_path, user.id, None)
     except StorageError:
-        logger.exception("Could not clear avatar path")
+        logger.exception("Could not delete avatar")
         return _unavailable()
     if row is None:
         return _not_found()
@@ -196,4 +225,4 @@ async def update_profile(
         return _unavailable()
     if row is None:
         return _not_found()
-    return _to_payload(row, user, repos)
+    return await _to_payload(row, user, repos)

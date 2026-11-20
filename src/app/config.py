@@ -27,6 +27,7 @@ max_upload_bytes = _storage["max_upload_bytes"]
 max_saved_scripts = _storage["max_saved_scripts"]
 avatar_max_bytes = _storage["avatar_max_bytes"]
 avatar_size_px = _storage["avatar_size_px"]
+avatar_max_side_px = _storage["avatar_max_side_px"]
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
