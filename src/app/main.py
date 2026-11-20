@@ -584,9 +584,7 @@ async def script_generation_error_handler(_: Request, exc: ScriptGenerationError
 
 
 @app.exception_handler(ScriptLimitReachedError)
-async def script_limit_reached_handler(
-    _: Request, exc: ScriptLimitReachedError
-) -> JSONResponse:
+async def script_limit_reached_handler(_: Request, exc: ScriptLimitReachedError) -> JSONResponse:
     return JSONResponse(
         status_code=409,
         content={
