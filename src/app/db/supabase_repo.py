@@ -13,6 +13,7 @@ from postgrest.exceptions import APIError
 from storage3.exceptions import StorageApiError
 from supabase import Client
 
+from src.app.config import max_list_page_size
 from src.app.db.models import (
     SESSION_METRIC_PATHS,
     BaselineRow,
@@ -61,8 +62,8 @@ def _execute(query):
 
 
 def _validate_limit(limit: int) -> None:
-    if not 1 <= limit <= 20:
-        raise ValueError("limit must be between 1 and 20")
+    if not 1 <= limit <= max_list_page_size:
+        raise ValueError(f"limit must be between 1 and {max_list_page_size}")
 
 
 def _newest_page(query, limit: int, cursor: str | None):

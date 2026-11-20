@@ -25,12 +25,22 @@ max_script_words = _script["max_script_words"]
 max_script_chars = _script["max_script_chars"]
 max_upload_bytes = _storage["max_upload_bytes"]
 max_saved_scripts = _storage["max_saved_scripts"]
+max_list_page_size = _storage["max_list_page_size"]
 avatar_max_bytes = _storage["avatar_max_bytes"]
 avatar_size_px = _storage["avatar_size_px"]
 avatar_max_side_px = _storage["avatar_max_side_px"]
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
+
+
+def validate_list_limits(page_size: int, saved_scripts: int) -> None:
+    if page_size < saved_scripts:
+        raise RuntimeError(
+            "storage.max_list_page_size must be greater than or equal to "
+            "storage.max_saved_scripts"
+        )
+
 
 decode_timeout_s = _audio["decode_timeout_s"]
 duration_cap_margin_s = _audio["duration_cap_margin_s"]

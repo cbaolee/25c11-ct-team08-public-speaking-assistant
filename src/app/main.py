@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import (
+    max_list_page_size,
     max_request_bytes,
     max_saved_scripts,
     max_script_chars,
@@ -32,6 +33,7 @@ from src.app.config import (
     max_upload_bytes,
     missing_required_settings,
     settings,
+    validate_list_limits,
 )
 from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
@@ -39,6 +41,7 @@ from src.app.db.models import (
     NewScript,
     NewSession,
     ScriptDuration,
+    ScriptLimitReachedError,
     ScriptRow,
     ScriptSource,
     SessionRow,
@@ -81,6 +84,7 @@ async def lifespan(_: FastAPI):
     if missing:
         logger.critical("Missing required settings in .env: %s", ", ".join(missing))
         raise RuntimeError("Missing required settings in .env: " + ", ".join(missing))
+    validate_list_limits(max_list_page_size, max_saved_scripts)
     yield
 
 
@@ -134,8 +138,8 @@ async def health_check():
 
 @app.get("/api/config")
 async def web_config() -> dict[str, Any]:
-    """The [web] section of app_constants.toml for the browser (no secrets in it)."""
-    return dict(CONSTANTS["web"])
+    """The [web] section plus shared script limit for the browser (no secrets)."""
+    return {**CONSTANTS["web"], "max_saved_scripts": max_saved_scripts}
 
 
 @app.get("/")
@@ -283,14 +287,14 @@ def _save_result_to_history(
 async def _fetch_page(list_rows, user_id: UUID, limit: int, cursor: str | None):
     """One newest-first page from a repo list function, plus the next cursor (None at the end).
 
-    Asks for `limit + 1` rows to know if another page exists. The repo caps `limit` at 20,
-    so for `limit == 20` one extra 1-row call checks the next page. Raises the repo's
-    StorageError, or ValueError for a bad cursor.
+    Asks for `limit + 1` rows to know if another page exists. The repo caps `limit` at
+    max_list_page_size, so at that limit one extra 1-row call checks the next page.
+    Raises the repo's StorageError, or ValueError for a bad cursor.
     """
-    rows = await run_in_threadpool(list_rows, user_id, min(limit + 1, 20), cursor)
+    rows = await run_in_threadpool(list_rows, user_id, min(limit + 1, max_list_page_size), cursor)
     has_more = len(rows) > limit
     page = rows[:limit]
-    if limit == 20 and len(rows) == limit:
+    if limit == max_list_page_size and len(rows) == limit:
         probe_cursor = encode_cursor(page[-1].created_at, page[-1].id)
         has_more = bool(await run_in_threadpool(list_rows, user_id, 1, probe_cursor))
     next_cursor = encode_cursor(page[-1].created_at, page[-1].id) if has_more and page else None
@@ -301,7 +305,7 @@ async def _fetch_page(list_rows, user_id: UUID, limit: int, cursor: str | None):
 async def list_sessions(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
-    limit: Annotated[int, Query(ge=1, le=20)] = 10,
+    limit: Annotated[int, Query(ge=1, le=max_list_page_size)] = 10,
     cursor: str | None = None,
 ):
     """Return a page of the user's session summaries plus a next cursor when more exist."""
@@ -579,6 +583,21 @@ async def script_generation_error_handler(_: Request, exc: ScriptGenerationError
     return JSONResponse(status_code=exc.status_code, content=exc.to_dict())
 
 
+@app.exception_handler(ScriptLimitReachedError)
+async def script_limit_reached_handler(
+    _: Request, exc: ScriptLimitReachedError
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error_code": "script_limit_reached",
+            "message": str(exc),
+            "limit": exc.limit,
+            "count": exc.count,
+        },
+    )
+
+
 @app.get("/api/topics")
 async def list_topics_endpoint(category: str | None = None) -> dict[str, Any]:
     """Return template topics grouped/filtered by category with `duration_min` (Brief §5.7)."""
@@ -670,12 +689,9 @@ def _save_script_row(repos: Repos, user_id: UUID, data: NewScript) -> tuple[Scri
     existing = repos.scripts.find_script_by_hash(user_id, data.content_hash)
     if existing is not None:
         return existing, False
-    if repos.scripts.count_scripts(user_id) >= max_saved_scripts:
-        raise ScriptGenerationError(
-            "rate_limited",
-            f"Maximum saved scripts limit ({max_saved_scripts}) reached.",
-            status_code=429,
-        )
+    count = repos.scripts.count_scripts(user_id)
+    if count >= max_saved_scripts:
+        raise ScriptLimitReachedError(limit=max_saved_scripts, count=count)
     return repos.scripts.create_script(user_id, data), True
 
 
@@ -686,9 +702,9 @@ async def create_saved_script_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
 ) -> Any:
-    """Save a generated or user-written script after Stage 4 moderation (Brief §5.7, §5.8).
+    """Save a generated or user-written script after Stage 4 moderation.
 
-    201 with the new script; 200 with the existing one when the same text is already saved.
+    201 for a new script; 200 when identical text is already saved; 409 at the per-user cap.
     """
     clean_title = sanitize_text(payload.title).strip() or "Untitled Script"
     clean_body = sanitize_text(payload.body).strip()
@@ -725,18 +741,24 @@ async def create_saved_script_endpoint(
 async def list_saved_scripts_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
-    limit: Annotated[int, Query(ge=1, le=20)] = 20,
+    limit: Annotated[int, Query(ge=1, le=max_saved_scripts)] = max_saved_scripts,
     cursor: str | None = None,
 ) -> Any:
-    """Newest-first page of the user's saved scripts (summaries, no body)."""
+    """Return a newest-first page of saved script summaries, including total and page limit."""
     try:
         page, next_cursor = await _fetch_page(repos.scripts.list_scripts, user.id, limit, cursor)
+        total = await run_in_threadpool(repos.scripts.count_scripts, user.id)
     except StorageError:
         logger.exception("Could not list scripts")
         return _script_storage_unavailable()
     except ValueError:
         return _script_error(400, "invalid_cursor", "The page cursor is not valid.")
-    return {"items": [row.model_dump(mode="json") for row in page], "next_cursor": next_cursor}
+    return {
+        "items": [row.model_dump(mode="json") for row in page],
+        "next_cursor": next_cursor,
+        "total": total,
+        "limit": max_saved_scripts,
+    }
 
 
 @app.get("/api/scripts/{script_id}")

@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from src.app import main as app_main
 from src.app.config import settings
 from src.app.db.factory import build_memory_repos, get_repos
-from src.app.db.models import StorageError
+from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
 from src.text_processing.contracts import (
     GeneratedScript,
@@ -246,13 +246,24 @@ def test_save_script_moderation_rejects_text(script_api) -> None:
     assert repos.scripts.count_scripts(state["user"].id) == 0
 
 
-def test_save_script_cap_returns_429(script_api) -> None:
+def test_save_script_cap_returns_409(script_api) -> None:
     client, _, _ = script_api
     _save(client, "First text.")
     _save(client, "Second text.")
     r = _save(client, "Third text.")
-    assert r.status_code == 429
-    assert r.json()["error_code"] == "rate_limited"
+    assert r.status_code == 409
+    assert r.json()["error_code"] == "script_limit_reached"
+    assert r.json()["limit"] == 2
+    assert r.json()["count"] == 2
+
+
+def test_saving_existing_script_at_cap_returns_existing_row(script_api) -> None:
+    client, _, _ = script_api
+    first = _save(client, "First text.")
+    _save(client, "Second text.")
+    again = _save(client, "First text.", title="Renamed")
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
 
 
 def test_saved_scripts_other_user_cannot_list_read_or_delete(script_api) -> None:
@@ -260,7 +271,12 @@ def test_saved_scripts_other_user_cannot_list_read_or_delete(script_api) -> None
     script_id = _save(client, "Good morning.").json()["id"]
 
     state["user"] = _user("user-b")
-    assert client.get("/api/scripts").json() == {"items": [], "next_cursor": None}
+    assert client.get("/api/scripts").json() == {
+        "items": [],
+        "next_cursor": None,
+        "total": 0,
+        "limit": 2,
+    }
     assert client.get(f"/api/scripts/{script_id}").status_code == 404
     assert client.delete(f"/api/scripts/{script_id}").status_code == 404
 
@@ -282,6 +298,58 @@ def test_list_scripts_returns_summaries_newest_first_with_cursor(script_api, mon
     keys = [(item["created_at"], item["id"]) for item in items]
     assert keys == sorted(keys, reverse=True)
     assert sorted(item["id"] for item in items) == sorted(ids)
+    assert first["total"] == 3
+    assert first["limit"] == 10
+
+
+def test_default_script_list_returns_all_saved_scripts(script_api, monkeypatch) -> None:
+    client, repos, state = script_api
+    monkeypatch.setattr(app_main, "max_saved_scripts", 30)
+    for index in range(30):
+        body = f"Saved script number {index}."
+        repos.scripts.create_script(
+            state["user"].id,
+            NewScript(
+                title=f"Script {index}",
+                body=body,
+                word_count=len(body.split()),
+                source="written",
+                content_hash=build_content_hash(body),
+            ),
+        )
+
+    response = client.get("/api/scripts")
+
+    assert response.status_code == 200
+    assert len(response.json()["items"]) == 30
+    assert response.json()["next_cursor"] is None
+    assert response.json()["total"] == 30
+    assert response.json()["limit"] == 30
+
+
+def test_delete_script_keeps_practiced_session_snapshot(script_api) -> None:
+    client, repos, state = script_api
+    script = _save(client, "Practice this script.").json()
+    session_id = uuid4()
+    repos.sessions.create_session(
+        state["user"].id,
+        NewSession(
+            id=session_id,
+            script_id=UUID(script["id"]),
+            script_snapshot=script["body"],
+            status="ok",
+            result={},
+            result_schema_version="2.1",
+        ),
+    )
+
+    deleted = client.delete(f"/api/scripts/{script['id']}")
+    session = client.get(f"/api/sessions/{session_id}")
+
+    assert deleted.status_code == 200
+    assert session.status_code == 200
+    assert session.json()["script_snapshot"] == script["body"]
+    assert session.json()["script_id"] is None
 
 
 def test_delete_script_removes_it(script_api) -> None:
