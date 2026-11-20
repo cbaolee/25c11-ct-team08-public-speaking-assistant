@@ -148,6 +148,12 @@ export function persistChat() {
     try { localStorage.setItem(key, JSON.stringify(storedChat(1))); } catch (retryError) { /* blocked or still full */ }
   }
 }
+/* A saved script was deleted (Practice > Mine): its chat bubbles must save it again next time. */
+export function forgetSavedScript(id) {
+  let changed = false;
+  S.chatHistory.forEach(m => { if (m.script && m.script.savedId === id) { m.script.savedId = null; changed = true; } });
+  if (changed) persistChat();
+}
 function recordChatMessage(message) {
   S.chatHistory.push(message);
   persistChat();
