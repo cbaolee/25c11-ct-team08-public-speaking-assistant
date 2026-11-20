@@ -66,7 +66,10 @@ document.getElementById('viewApp').addEventListener('click', e => {
   if (!panel || seg._busy || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   e.stopImmediatePropagation(); e.preventDefault();
   seg._busy = true;
-  const after = () => [...seg.parentElement.children].slice([...seg.parentElement.children].indexOf(seg) + 1).filter(el => !el.hidden && el.offsetParent !== null);
+  // the content that changes is what follows the tab bar; a bar that holds fixed buttons too
+  // (Practice: Generate a script) is marked data-tab-bar, and only what follows the whole bar fades
+  const bar = seg.closest('[data-tab-bar]') || seg;
+  const after = () => [...bar.parentElement.children].slice([...bar.parentElement.children].indexOf(bar) + 1).filter(el => !el.hidden && el.offsetParent !== null);
   $$('button', seg).forEach(x => x.setAttribute('aria-selected', String(x === b)));   // pill starts sliding now
   const h0 = panel.offsetHeight, old = after();
   Promise.all(old.map(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-in', fill: 'forwards' }).finished)).then(() => {

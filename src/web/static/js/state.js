@@ -14,6 +14,14 @@ export const CONFIG = {
   FOLLOW_WPM_DEFAULT: 145,             // used when the profile has no follow_wpm
   FOLLOW_WPM_SAVE_DELAY_MS: 800,       // wait after the last slider move before PATCH /api/profile, in ms
   CHAT_HISTORY_MAX_MESSAGES: 20,       // most Script Studio chat messages kept in localStorage
+  COMPOSER_MAX_WORDS: 3000,            // most words in one Script Studio message
+  COMPOSER_MAX_LINES: 5.5,             // the Script Studio text box grows up to this many lines
+  SCRIPT_POLL_INTERVAL_MS: 650,        // wait between two status checks of a script being generated
+  EVALUATE_TIMEOUT_MS: 120000,         // longest wait for one evaluation
+  MAX_SAVED_SCRIPTS: 10,               // saved scripts per user (app_constants.toml [storage])
+  SCRIPT_TITLE_MAX_CHARS: 70,          // longest saved script name ([storage])
+  MAX_PDF_SIZE_BYTES: 26214400,        // largest PDF for Script Studio ([script], 25 MB)
+  MAX_PDF_PAGES: 10,                   // most PDF pages ([script])
 };
 
 
@@ -26,6 +34,7 @@ export const S = {
   texts: { mine: null, sample: null, own: null }, pickerTab: 'mine', sampleN: 0,
   chatFile: null, lastReq: null, chatBusy: false,
   chatHistory: [],
+  savedScripts: null, savedScriptTotal: 0, ownSaved: null, nameDialog: null,
   audio: null, rec: null, brec: null, voiceTab: 'rec',
   sessions: [], currentSession: null, nextId: 1,
   play: { t: 0, on: false, iv: null },

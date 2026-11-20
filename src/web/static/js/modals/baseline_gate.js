@@ -101,6 +101,6 @@ export function logout(expired) {
   S.rec = S.brec = S.grec = null; S.bbusy = null; S.follow = null; S.baselineGate = null; S.afterConsent = null; S.onDeny = null;
   if (S.evaluation) { S.evaluation.timers.forEach(clearTimeout); S.evaluation = null; }
   S.modal.slice().forEach(id => closeModal(id, false));
-  S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.currentSession = null; S.baseline = null; S.consent = false; S.avatar = null; S.savedScripts = null; S.chatHistory = [];
+  S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.currentSession = null; S.baseline = null; S.consent = false; S.avatar = null; S.savedScripts = null; S.savedScriptTotal = 0; S.ownSaved = null; S.readerScript = null; S.chatHistory = [];
   renderAccount(); setStageAuth(false); showView('landing'); window.scrollTo(0, 0);
 }

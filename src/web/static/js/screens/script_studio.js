@@ -1,32 +1,15 @@
-import { api, readJson } from '../api.js';
+import { api } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
-import { go, paintAvatar } from '../nav.js';
-import { loadSavedScripts } from '../screens/practice.js';
+import { paintAvatar } from '../nav.js';
+import { isSavedListFull, openListFull, saveScriptAs } from '../screens/saved_scripts.js';
+import { openReader, runScriptAction } from '../screens/script_reader.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { openModal, toast, withBusy } from '../ui.js';
+import { openModal, popIn, toast } from '../ui.js';
 import { $, $$, IC, clearErr, esc, showErr, wordsOf } from '../utils.js';
 
 /* ---------- Script (Generate Script) ---------- */
 export const CAT_LABELS = Object.assign({}, TOPICS, { free: 'Free topic (LLM)' });
 export const topicLabel = k => CAT_LABELS[k] || TOPICS[k] || k;
-/* GeneratedScript.source ("template" / "llm") -> the scripts.source value the API stores. */
-export const SCRIPT_SOURCE = { template: 'generated_template', llm: 'generated_llm' };
-export const SCRIPT_DURATIONS = [5, 10, 15, 20];
-/* POST /api/scripts. Saving the same text again returns the same id (the server dedupes by content hash). */
-export function saveScript(sc) {
-  if (sc.savedId) return Promise.resolve({ id: sc.savedId });
-  const d = +sc.duration_min;
-  return withBusy(api('/api/scripts', { method: 'POST', json: {
-    title: (sc.title || 'Script').slice(0, 200), body: sc.text, source: SCRIPT_SOURCE[sc.source] || 'written',
-    duration_min: SCRIPT_DURATIONS.indexOf(d) >= 0 ? d : null, topic: sc.title ? sc.title.slice(0, 200) : null,
-    category: sc.topic || null, template_id: sc.template_id || null, models_used: sc.models_used || [], citations: sc.citations || []
-  } }), T('busy.saving')).then(readJson).then(({ ok, j }) => {
-    if (!ok) throw Object.assign(new Error('save'), { code: j && j.error_code, msg: j && j.message });
-    sc.savedId = j.id;
-    persistChat();
-    return j;
-  });
-}
 /* Category select: one of the six fixed categories (no free topic). There is no template choice in the
    UI any more; the request keeps its fields (tplId empty) until the backend is updated. */
 export function fillTopicSelect() {
@@ -148,7 +131,18 @@ export function persistChat() {
     try { localStorage.setItem(key, JSON.stringify(storedChat(1))); } catch (retryError) { /* blocked or still full */ }
   }
 }
-/* A saved script was deleted (Practice > Mine): its chat bubbles must save it again next time. */
+/* A saved script was renamed: the chat bubbles of the same script show the new name. */
+export function renameChatScript(id, title) {
+  let changed = false;
+  S.chatHistory.forEach(m => {
+    if (!m.script || m.script.savedId !== id) return;
+    m.script.title = m.script.cardName = title; changed = true;
+    const name = m.bubble && $('.fc-name', m.bubble);
+    if (name) name.textContent = title;
+  });
+  if (changed) persistChat();
+}
+/* A saved script was deleted: its chat bubbles must save it again next time. */
 export function forgetSavedScript(id) {
   let changed = false;
   S.chatHistory.forEach(m => { if (m.script && m.script.savedId === id) { m.script.savedId = null; changed = true; } });
@@ -166,19 +160,19 @@ function renderUserMessage(message, animate = false) {
   ].filter(Boolean).join('\n');
   return bubble;
 }
+/* The file card itself opens the reader; Practice is the main action. */
 function scriptCardHtml() {
-  return '<div class="fcard">' + IC.file + '<div class="fc-main"><div class="fc-name"></div><div class="note"></div></div></div>' +
-    '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="view"></button><button class="btn btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save">Save script</button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
+  return '<button type="button" class="fcard fcard-open" data-a="view">' + IC.file + '<span class="fc-main"><span class="fc-name"></span><span class="note"></span></span></button>' +
+    '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save"></button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button><button class="btn btn-sm" type="button" data-a="again"></button></div>';
 }
 function fillScriptBubble(ai, sc) {
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + scriptCardHtml();
   $('.fc-name', ai).textContent = sc.cardName;
   const wc = wordsOf(sc.text);
   $('.fc-main .note', ai).textContent = sc.duration_min + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + (sc.warnings.length ? ' · ' + T('script.hasNotes') : '');
-  const view = $('[data-a=view]', ai);
-  view.textContent = T('script.viewNow');
-  view.setAttribute('aria-label', T('script.viewAria', { title: sc.cardName }));
+  $('[data-a=view]', ai).setAttribute('aria-label', T('script.viewAria', { title: sc.cardName }));
   $('[data-a=practice]', ai).textContent = T('script.practice');
+  $('[data-a=save]', ai).textContent = T('saved.saveScript');
   $('[data-a=copy]', ai).textContent = T('script.copy');
   $('[data-a=download]', ai).textContent = T('script.download');
   const again = $('[data-a=again]', ai);
@@ -244,7 +238,7 @@ export function generateScript(req, again) {
   if (req.file && req.file.raw) fd.append('pdf', req.file.raw, req.file.name);
   const failJob = (code, msg) => {
     S.chatBusy = false; $('#composerSend').disabled = false;
-    if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#composerError'), msg || T('script.errFile')); return; }
+    if (code === 'invalid_pdf' || code === 'no_text_layer') { ai.remove(); showErr($('#composerError'), msg || T('script.errFile', { mb: Math.round(CONFIG.MAX_PDF_SIZE_BYTES / (1024 * 1024)), pages: CONFIG.MAX_PDF_PAGES })); return; }
     if (code === 'content_rejected') {
       renderBlockedBubble(ai);
       recordChatMessage({ role: 'ai', blocked: true, bubble: ai });
@@ -258,7 +252,7 @@ export function generateScript(req, again) {
     if (!ok || !j || j.status === 'failed') { failJob(j && j.error_code, j && j.message); return; }
     if (j.status !== 'completed') {
       status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
-      setTimeout(() => poll(id), 650); return;
+      setTimeout(() => poll(id), CONFIG.SCRIPT_POLL_INTERVAL_MS); return;
     }
     const res = j.result || {}, text = res.script || '';
     const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
@@ -282,7 +276,6 @@ export function generateScript(req, again) {
    right of the composer folds it back to the button height (arrow points down) and unfolds it again to
    fit the text, at most 5.5 lines (arrow points up). The arrow only shows when the text is taller than
    that short box, the only time folding changes anything. */
-const COMPOSER_MAX_LINES = 5.5;
 export function fitComposer() {
   const ta = $('#composerInput'), fold = $('#composerFold'); if (!ta) return;
   const st = getComputedStyle(ta), line = parseFloat(st.lineHeight) || 22;
@@ -293,7 +286,7 @@ export function fitComposer() {
   ta.style.transition = 'none'; ta.style.height = '0px';
   const text = ta.scrollHeight - pad;
   ta.style.height = prev + 'px'; void ta.offsetHeight; ta.style.transition = '';
-  const btn = $('#attachBtn'), lo = Math.max(line, ((btn && btn.offsetHeight) || 44) - pad - edge), hi = COMPOSER_MAX_LINES * line;
+  const btn = $('#attachBtn'), lo = Math.max(line, ((btn && btn.offsetHeight) || 44) - pad - edge), hi = CONFIG.COMPOSER_MAX_LINES * line;
   const open = Math.min(hi, Math.max(lo, text));
   const tall = text > lo + 1;
   if (!tall) S.composerFolded = false;                           // nothing to fold any more
@@ -314,7 +307,7 @@ export function sendChat() {
   const txt = $('#composerInput').value.trim(), err = $('#composerError'), tplId = '';   // no template choice in the UI
   const tpl = (S.apiTopics || []).find(t => t.template_id === tplId);
   if (!txt && !S.chatFile && !tplId) return;
-  if (wordsOf(txt) > 3000) { showErr(err, T('script.errLong')); return; }
+  if (wordsOf(txt) > CONFIG.COMPOSER_MAX_WORDS) { showErr(err, T('script.errLong', { max: CONFIG.COMPOSER_MAX_WORDS.toLocaleString('en-US') })); return; }
   clearErr(err);
   const tplName = tpl ? (tpl.topic || tpl.title) : '';
   const req = { txt, file: S.chatFile, topic: $('#composerTopic').value, tplId, tplTitle: tplName, dur: +($('#composerDuration') && $('#composerDuration').value || 5) };
@@ -326,22 +319,18 @@ export function sendChat() {
   S.lastReq = req;
   generateScript(req, false);
 }
-/* Reader window: paragraphs with their citation / uncited badge, then the warnings and the citation note (same content the feed used to show) */
-export function openReader(sc) {
-  const body = $('#mrBody'), paras = sc.text.split(/\n\n+/).filter(Boolean), cites = sc.citations || [], warns = sc.warnings || [];
-  let h = '';
-  paras.forEach((p, i) => {
-    const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
-    const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc((c.heading ? c.heading + ' · ' : '') + (c.page ? T('script.page', { n: c.page }) : 'cited')) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
-    h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
-  });
-  if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';
-  h += '<p class="note" style="margin-top:10px">' + esc(cites.length ? T('script.uncitedHelp') : T('script.citeNone')) + '</p>';
-  body.innerHTML = h;
-  $$('.ptxt', body).forEach((el, i) => { el.textContent = paras[i]; });
-  body.scrollTop = 0;
-  $('#mrTitle').textContent = sc.cardName || sc.title;
-  openModal('scriptReader', { focus: '[data-close]' });
+/* Save from a chat bubble or the reader menu: asks for a name, then the chat copy remembers the saved id. */
+export function saveChatScript(sc) {
+  const known = sc.savedId && (S.savedScripts || []).some(s => s.id === sc.savedId);
+  if (known) { toast(T('saved.already', { title: sc.cardName || sc.title })); return; }
+  if (isSavedListFull()) { openListFull(); return; }
+  saveScriptAs(sc).then(j => { if (j) { sc.savedId = j.id; sc.title = sc.cardName = j.title; renameChatScript(j.id, j.title); persistChat(); } });
+}
+/* A chat script was edited in the reader: redraw its card and keep the change in localStorage. */
+export function refreshChatScript(sc) {
+  const item = S.chatHistory.find(m => m.script === sc);
+  if (item && item.bubble) { fillScriptBubble(item.bubble, sc); popIn($('.fcard', item.bubble)); }
+  persistChat();
 }
 export function onChatAction(e) {
   const b = e.target.closest('[data-a]');
@@ -352,21 +341,8 @@ export function onChatAction(e) {
   if (a === 'view') {
     b.focus();   // some browsers do not focus a button on click; openModal stores document.activeElement as the opener to return to
     openReader(sc);
-  } else if (a === 'practice') {
-    const lbl = sc.title || TOPICS[sc.topic] || sc.topic;
-    const practise = id => { S.texts.mine = { id: id || null, title: T('practice.fromScript', { title: lbl }), short: lbl, text: sc.text, topic: sc.topic }; S.pickerTab = 'mine'; S.choosing = false; go('practice'); };
-    saveScript(sc).then(j => practise(j.id), () => practise(null));   // saved so the session links to it (C2); unsaved still works
-  } else if (a === 'save') {
-    saveScript(sc).then(j => { toast('Script saved.'); loadSavedScripts(j.id); })
-      .catch(e => toast((e && e.msg) || (e && e.code ? T('eval.errServer') : T('eval.errNet')), true));
-  } else if (a === 'copy') {
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(sc.text).then(() => toast(T('script.copied')), () => toast(T('script.copyFail'), true));
-    else toast(T('script.copyFail'), true);
-  } else if (a === 'download') {
-    const url = URL.createObjectURL(new Blob([sc.text], { type: 'text/plain' })), a2 = document.createElement('a');
-    a2.href = url; a2.download = T('script.downloadName'); document.body.appendChild(a2); a2.click(); a2.remove(); setTimeout(() => URL.revokeObjectURL(url), 500);
   } else if (a === 'again') {
     if (!S.chatBusy) generateScript(sc.req, true);
-  }
+  } else runScriptAction(sc, a);
 }
 RENDER.scriptStudio = function () { fillTopicSelect(); };
