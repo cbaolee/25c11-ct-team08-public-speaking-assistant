@@ -26,6 +26,7 @@ from src.app.db.models import (
 )
 from src.app.db.supabase_repo import (
     SupabaseBaselineRepo,
+    _execute,
     _newest_page,
     _validate_object_path,
 )
@@ -71,40 +72,45 @@ def test_newest_page_rejects_bad_limit():
         _newest_page(None, 21, None)
 
 
+class _FakeRpcClient:
+    """Stands in for the Supabase client: records the RPC call, returns fixed data."""
+
+    def __init__(self, data):
+        self.data, self.params = data, None
+
+    def rpc(self, name, params):
+        assert name == "replace_current_baseline"
+        self.params = params
+        data = self.data
+
+        class _Request:
+            def execute(self):
+                return type("Response", (), {"data": data})()
+
+        return _Request()
+
+
+def _baseline_json(baseline_id, user_id, *, is_current: bool) -> dict:
+    return {
+        "id": str(baseline_id),
+        "user_id": str(user_id),
+        "median_pause_s": 0.5,
+        "hesitation_threshold_s": 0.9,
+        "median_f0_hz": 120.0,
+        "mean_loudness_db": 65.0,
+        "flags": [],
+        "audio_path": None,
+        "is_current": is_current,
+        "recorded_at": "2026-11-20T11:00:00+00:00",
+    }
+
+
 def test_replace_baseline_calls_single_rpc_transaction():
-    class FakeRpcRequest:
-        def execute(self):
-            class Response:
-                data = {
-                    "new_row": {
-                        "id": str(new.id),
-                        "user_id": str(user_id),
-                        "median_pause_s": 0.5,
-                        "hesitation_threshold_s": 0.9,
-                        "median_f0_hz": 120.0,
-                        "mean_loudness_db": 65.0,
-                        "flags": [],
-                        "audio_path": None,
-                        "is_current": True,
-                        "recorded_at": "2026-11-20T11:00:00+00:00",
-                    },
-                    "previous_row": None,
-                }
-
-            return Response()
-
-    class FakeClient:
-        def __init__(self):
-            self.params = None
-
-        def rpc(self, name, params):
-            assert name == "replace_current_baseline"
-            self.params = params
-            return FakeRpcRequest()
-
     user_id = uuid4()
     new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
-    client = FakeClient()
+    client = _FakeRpcClient(
+        {"new_row": _baseline_json(new.id, user_id, is_current=True), "previous_row": None}
+    )
     row, previous = SupabaseBaselineRepo(client).replace_current_baseline(user_id, new)
 
     assert row.id == new.id
@@ -112,6 +118,27 @@ def test_replace_baseline_calls_single_rpc_transaction():
     assert previous is None
     assert client.params["p_user_id"] == str(user_id)
     assert client.params["p_id"] == str(new.id)
+
+
+def test_replace_baseline_returns_previous_row():
+    user_id, old_id = uuid4(), uuid4()
+    new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
+    client = _FakeRpcClient(
+        {
+            "new_row": _baseline_json(new.id, user_id, is_current=True),
+            "previous_row": _baseline_json(old_id, user_id, is_current=False),
+        }
+    )
+    _, previous = SupabaseBaselineRepo(client).replace_current_baseline(user_id, new)
+
+    assert previous.id == old_id
+
+
+@pytest.mark.parametrize("data", [{"new_row": None, "previous_row": None}, [], None])
+def test_replace_baseline_without_new_row_raises(data):
+    new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
+    with pytest.raises(StorageError):
+        SupabaseBaselineRepo(_FakeRpcClient(data)).replace_current_baseline(uuid4(), new)
 
 
 # ---------- integration tests (psc-dev only) ----------
@@ -311,13 +338,38 @@ def test_replace_current_baseline_keeps_one_current(env):
     assert previous.id == first.id
     assert repos.baselines.get_current_baseline(owner).id == new_row.id == second.id
 
-    if original is not None:  # give the dev user back the baseline it had before
-        factory.get_supabase_client().table("baselines").update({"is_current": False}).eq(
-            "user_id", str(owner)
-        ).execute()
-        factory.get_supabase_client().table("baselines").update({"is_current": True}).eq(
-            "id", str(original.id)
-        ).execute()
+    _restore_current_baseline(owner, original)
+
+
+def _restore_current_baseline(owner: UUID, original) -> None:
+    """Give the dev user back the baseline it had before the test."""
+    if original is None:
+        return
+    client = factory.get_supabase_client()
+    client.table("baselines").update({"is_current": False}).eq("user_id", str(owner)).execute()
+    client.table("baselines").update({"is_current": True}).eq("id", str(original.id)).execute()
+
+
+@pytest.mark.integration
+def test_replace_baseline_failed_insert_keeps_old_current(env):
+    repos, owner, _, created = env
+    original = repos.baselines.get_current_baseline(owner)
+    keep = NewBaseline(id=uuid4(), hesitation_threshold_s=0.8)
+    created["baselines"].append(keep.id)
+    repos.baselines.replace_current_baseline(owner, keep)
+
+    # hesitation_threshold_s is "not null": the insert inside the function fails,
+    # so Postgres must also undo the "is_current = false" it ran just before.
+    with pytest.raises(StorageError):
+        _execute(
+            factory.get_supabase_client().rpc(
+                "replace_current_baseline",
+                {"p_user_id": str(owner), "p_id": str(uuid4()), "p_hesitation_threshold_s": None},
+            )
+        )
+
+    assert repos.baselines.get_current_baseline(owner).id == keep.id
+    _restore_current_baseline(owner, original)
 
 
 @pytest.mark.integration
