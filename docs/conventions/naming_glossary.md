@@ -65,7 +65,7 @@ Cột **Trong code** là id hoặc class để tìm nhanh trong `src/web/`.
 | ---------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
 | **Profile Modal**      | `#profileModal`      | Sửa tên, giới tính, tuổi, giọng, chủ đề                                                                                         |
 | **Consent Modal**      | `#consentModal`      | Đồng ý ghi âm và lưu dữ liệu                                                                                                    |
-| **Settings Modal**     | `#settingsModal`     | Danh sách 4 mục; chọn mục thì trượt sang trong cùng khung: **Permissions**, **Audio**, **Change Password**, **Delete Account** |
+| **Settings Modal**     | `#settingsModal`     | Danh sách 5 mục; chọn mục thì trượt sang trong cùng khung: **Permissions**, **Audio**, **Reading Speed** (`#settingsSpeed`: khoảng tốc độ, Auto speed), **Change Password**, **Delete Account** |
 | **Safety Alert**       | `#safetyAlert`       | Báo nội dung bị cấm                                                                                                             |
 | **Confirm Dialog**     | `#confirmDialog`     | Xác nhận xoá hoặc thoát                                                                                                         |
 | **Evaluating Overlay** | `#evaluatingOverlay` | Màn hình chờ chấm điểm                                                                                                          |
