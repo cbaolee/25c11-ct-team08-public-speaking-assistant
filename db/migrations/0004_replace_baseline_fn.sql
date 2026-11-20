@@ -3,7 +3,8 @@
 -- Applied: psc-dev 2026-11-20 | psc-prod not yet
 -- Effect: creates or replaces the public.replace_current_baseline SQL function.
 --         The function locks and switches off the old baseline, inserts the new baseline,
---         and returns both rows in one transaction. It changes no existing data.
+--         and returns both rows in one transaction. Callable by the backend (service_role) only.
+--         It changes no existing data.
 --         Running again replaces the function with the same implementation.
 
 create or replace function public.replace_current_baseline(
@@ -73,7 +74,7 @@ $$;
 revoke execute on function public.replace_current_baseline(
   uuid, uuid, double precision, double precision, double precision,
   double precision, text[], text
-) from public, authenticated;
+) from public, anon, authenticated;
 grant execute on function public.replace_current_baseline(
   uuid, uuid, double precision, double precision, double precision,
   double precision, text[], text
