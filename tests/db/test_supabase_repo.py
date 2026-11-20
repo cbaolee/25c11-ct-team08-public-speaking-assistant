@@ -16,6 +16,7 @@ import pytest
 from dotenv import dotenv_values
 from PIL import Image
 
+from src.app import main as app_main
 from src.app.config import max_list_page_size, settings
 from src.app.db import factory
 from src.app.db.models import (
@@ -23,8 +24,10 @@ from src.app.db.models import (
     NewBaseline,
     NewScript,
     NewSession,
+    ScriptLimitReachedError,
     StorageError,
     build_avatar_path,
+    build_content_hash,
     build_object_path,
     encode_cursor,
 )
@@ -352,3 +355,60 @@ def test_merge_preferences_keeps_other_keys(profile_restore):
     row = repos.profiles.merge_preferences(owner, {"follow_wpm": 155})
     assert row.preferences == {"theme": "dark", "follow_wpm": 155}
     assert repos.profiles.get_profile(owner).preferences["follow_wpm"] == 155
+
+
+# ---------- saved-script cap and list (psc-dev) ----------
+
+
+def _new_script(body: str) -> NewScript:
+    return NewScript(
+        title="Integration test script",
+        body=body,
+        word_count=len(body.split()),
+        source="written",
+        content_hash=build_content_hash(body),
+    )
+
+
+@pytest.mark.integration
+def test_list_scripts_returns_more_than_twenty(env):
+    repos, owner, _, created = env
+    before = repos.scripts.count_scripts(owner)
+    for index in range(21):
+        row = repos.scripts.create_script(owner, _new_script(f"List test {uuid4()} {index}."))
+        created["scripts"].append(row.id)
+
+    assert repos.scripts.count_scripts(owner) == before + 21
+    rows = repos.scripts.list_scripts(owner, max_list_page_size, None)
+    assert len(rows) >= 21  # the old repo limit stopped at 20
+
+
+@pytest.mark.integration
+def test_save_script_at_cap_raises_and_duplicate_still_returns(env, monkeypatch):
+    repos, owner, _, created = env
+    first = repos.scripts.create_script(owner, _new_script(f"Cap test {uuid4()}."))
+    created["scripts"].append(first.id)
+    count = repos.scripts.count_scripts(owner)
+    monkeypatch.setattr(app_main, "max_saved_scripts", count)  # the user is now at the cap
+
+    with pytest.raises(ScriptLimitReachedError) as err:
+        app_main._save_script_row(repos, owner, _new_script(f"New text {uuid4()}."))
+    assert (err.value.limit, err.value.count) == (count, count)
+
+    same, created_new = app_main._save_script_row(repos, owner, _new_script(first.body))
+    assert (same.id, created_new) == (first.id, False)  # a duplicate wins even at the cap
+
+
+@pytest.mark.integration
+def test_delete_script_keeps_session_snapshot(env):
+    repos, owner, _, created = env
+    script = repos.scripts.create_script(owner, _new_script(f"Snapshot test {uuid4()}."))
+    session = repos.sessions.create_session(
+        owner, _new_session().model_copy(update={"script_id": script.id})
+    )
+    created["sessions"].append(session.id)
+
+    assert repos.scripts.delete_script(owner, script.id) is True  # deleted here, not in cleanup
+    kept = repos.sessions.get_session(owner, session.id)
+    assert kept.script_id is None  # sessions.script_id is "on delete set null"
+    assert kept.script_snapshot == "Integration test script"
