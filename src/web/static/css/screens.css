@@ -432,6 +432,9 @@ body:has(#screenScriptStudio.active) main { padding-top: 0; padding-bottom: 0; }
 #screenScriptStudio .bubble .reply { white-space: pre-line; }   /* reply_message may hold a short checklist on several lines */
 #screenScriptStudio .sfiles { display: flex; flex-wrap: wrap; gap: 6px; }   /* chips of the files kept in the session, view only */
 #screenScriptStudio .fchip.ro { padding-right: 12px; max-width: 100%; overflow-wrap: anywhere; }
+/* Regenerate feedback (Issue #58): compact box under the script card, textarea above the Confirm button */
+#screenScriptStudio .regen { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 10px; }
+#screenScriptStudio .regen textarea { min-height: 0; font-size: 15px; }
 
 /* ---------- practice: record step ----------
    From step 2 the script is on the left and grows with the page (no inner scroll), so the page

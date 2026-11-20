@@ -35,6 +35,9 @@ const URL_SUGGEST = '/api/script-chat/suggest', URL_SELECT = '/api/script-chat/s
    gathering or after a script. A message that carries a file is never a keyword. */
 const GENERATE_KEYWORDS = new Set(['generate', 'done', 'tạo', 'xong']);
 const TOPIC_MAX_CHARS = 120;                                           // longest free-topic text sent as `topic`
+/* GUESS: the contract sets no limit for `user_feedback`. 500 characters is a soft client limit until Member 2 decides
+   the real one. It is the textarea's maxlength, so the browser cuts a longer paste without any message. */
+const FEEDBACK_MAX_CHARS = 500;
 /* Client-side file limits (a quick check before upload). Keep in sync with parser limits; the server is the source of truth.
    PDF: app_constants.toml [script] min_pdf_size_bytes = 1024 (line 42) and max_pdf_size_bytes = 26_214_400 (line 43).
    .md / .txt: MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024 in the Member 1 parser contract; the smallest allowed size is 1 byte. */
@@ -50,7 +53,7 @@ export function initChatState() {
   Object.assign(S, NO_SESSION, { chatEpoch: 0, chatPollTimer: null, chatAbort: null, chatOwner: null });
 }
 initChatState();
-const setComposerBusy = on => { S.chatBusy = on; $('#composerSend').disabled = on; $$('#chatFeed [data-a=generate]').forEach(b => { b.disabled = on; }); };
+const setComposerBusy = on => { S.chatBusy = on; $('#composerSend').disabled = on; $$('#chatFeed [data-a=generate], #chatFeed [data-a=again], #chatFeed [data-a=regen], #chatFeed [data-a=retry]').forEach(b => { b.disabled = on; }); };
 /* Category and Duration belong to the session once it exists, so they are locked until New chat (disabling the select disables its custom button too) */
 const lockSetup = on => { $('#composerTopic').disabled = on; $('#composerDuration').disabled = on; };
 /* Chips of the files the session holds (names from files_loaded); view only, the contract has no call to remove a file */
@@ -179,9 +182,9 @@ export function renderBlockedBubble(ai) {
    (ai._script.req) gets the retry button; a failed chat turn gives the typed text back (picking a topic is retried by clicking the card again). */
 function renderErrorBubble(ai, text) {
   const retry = ai._script && ai._script.req;
-  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p>' + (retry ? '<div class="acts"><button class="btn btn-sm" type="button" data-a="again"></button></div>' : '');
+  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p>' + (retry ? '<div class="acts"><button class="btn btn-sm" type="button" data-a="retry"></button></div>' : '');   // retry runs again at once; "again" on a script card opens the feedback box
   $('.note', ai).textContent = text;
-  if (retry) $('[data-a=again]', ai).textContent = T('script.regenerate');
+  if (retry) $('[data-a=retry]', ai).textContent = T('script.tryAgain');   // not "Regenerate": that button opens the feedback box
   revealBubble(ai);
 }
 /* Which message group an error belongs to: error_code first, HTTP status only when there is no known code. */
@@ -263,6 +266,7 @@ export function generateScript(req, again) {
   fd.append('topic', req.genTopic);
   fd.append('category', req.topic);
   fd.append('duration_min', String(req.dur || 5));
+  if (req.feedback) fd.append('user_feedback', req.feedback);   // Regenerate only; no field at all means "rewrite"
   /* A stale turn (New chat / other account) stays silent: no render, no busy flag. */
   const fail = (code, msg, httpStatus) => { if (!stale()) { setComposerBusy(false); handleChatError(ai, code, msg, httpStatus); } };
   const failFrom = (j, httpStatus) => fail(errCode(j), j && j.message, httpStatus);
@@ -291,6 +295,7 @@ export function generateScript(req, again) {
     const vb = $('[data-a=view]', ai); vb.textContent = T('script.viewNow'); vb.setAttribute('aria-label', T('script.viewAria', { title: cardName }));
     $('[data-a=practice]', ai).textContent = T('script.practice'); $('[data-a=copy]', ai).textContent = T('script.copy');
     $('[data-a=download]', ai).textContent = T('script.download'); $('[data-a=again]', ai).textContent = T('script.regenerate');
+    $('[data-a=again]', ai).setAttribute('aria-expanded', 'false');
     ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
       template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
     S.chatStage = 'generated'; setComposerBusy(false); revealBubble(ai);   // a failed run never reaches here, so it keeps the earlier stage
@@ -478,8 +483,31 @@ export function onChatAction(e) {
     const url = URL.createObjectURL(new Blob([sc.text], { type: 'text/plain' })), a2 = document.createElement('a');
     a2.href = url; a2.download = T('script.downloadName'); document.body.appendChild(a2); a2.click(); a2.remove(); setTimeout(() => URL.revokeObjectURL(url), 500);
   } else if (a === 'again') {
-    if (!S.chatBusy) generateScript(sc.req, true);
+    if (!S.chatBusy) toggleRegenBox(b);
+  } else if (a === 'regen') {
+    if (!S.chatBusy) confirmRegen(b, sc);
+  } else if (a === 'retry') {
+    if (!S.chatBusy) generateScript(sc.req, true);   // same req, so the feedback of the failed run stays
   }
+}
+/* Regenerate on a script card: open (or close) one inline feedback box under that card. No id, so many cards never clash. */
+function toggleRegenBox(btn) {
+  const bubble = btn.closest('.bubble'), open = $('.regen', bubble);
+  btn.setAttribute('aria-expanded', String(!open));
+  if (open) { open.remove(); return; }
+  const box = document.createElement('div'), ta = document.createElement('textarea'), ok = document.createElement('button');
+  box.className = 'regen'; ta.rows = 2; ta.maxLength = FEEDBACK_MAX_CHARS;
+  ta.placeholder = ta.title = T('script.regenPrompt'); ta.setAttribute('aria-label', T('script.regenPrompt'));
+  ok.type = 'button'; ok.className = 'btn btn-primary btn-sm'; ok.setAttribute('data-a', 'regen'); ok.textContent = T('script.regenConfirm');
+  box.append(ta, ok); bubble.appendChild(box); ta.focus();
+}
+/* Confirm: same req as the card (same session, no new upload) with the NEW feedback only; a blank box sends none. */
+function confirmRegen(btn, sc) {
+  const box = btn.closest('.regen'), text = $('textarea', box).value.trim(), req = Object.assign({}, sc.req);
+  if (text) req.feedback = text; else delete req.feedback;
+  $('[data-a=again]', box.closest('.bubble')).setAttribute('aria-expanded', 'false');
+  box.remove();
+  generateScript(req, true);
 }
 RENDER.scriptStudio = function () {
   fillTopicSelect();
