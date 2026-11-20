@@ -6,7 +6,15 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
 
 from src.app.constants import CONSTANTS
 
@@ -55,18 +63,31 @@ class UserPreferences(BaseModel):
 
     model_config = ConfigDict(extra="forbid")  # unknown keys -> 422
 
-    follow_wpm: StrictInt | None = None  # range checked against follow_wpm_* in app_constants.toml
+    # All three are checked against follow_wpm_min/max/step in app_constants.toml
+    follow_wpm: StrictInt | None = None  # follow-along speed
+    follow_wpm_min_choose: StrictInt | None = None  # the user's slider minimum
+    follow_wpm_max_choose: StrictInt | None = None  # the user's slider maximum
+    follow_auto_speed: StrictBool | None = None  # taps on the sentence being read set the speed
 
-    @field_validator("follow_wpm")
+    @field_validator("follow_wpm", "follow_wpm_min_choose", "follow_wpm_max_choose")
     @classmethod
-    def _check_follow_wpm(cls, value: int | None) -> int | None:
+    def _check_wpm(cls, value: int | None) -> int | None:
         if value is None:
             return value
         web = CONSTANTS["web"]
         low, high, step = web["follow_wpm_min"], web["follow_wpm_max"], web["follow_wpm_step"]
         if not low <= value <= high or value % step != 0:
-            raise ValueError(f"follow_wpm must be {low}-{high} in steps of {step}")
+            raise ValueError(f"speed must be {low}-{high} in steps of {step}")
         return value
+
+    @model_validator(mode="after")
+    def _check_range(self) -> "UserPreferences":
+        low, high = self.follow_wpm_min_choose, self.follow_wpm_max_choose
+        if (low is None) != (high is None):
+            raise ValueError("follow_wpm_min_choose and follow_wpm_max_choose are sent together")
+        if low is not None and low >= high:
+            raise ValueError("follow_wpm_min_choose must be below follow_wpm_max_choose")
+        return self
 
 
 class ProfileRow(ProfileUpsert):

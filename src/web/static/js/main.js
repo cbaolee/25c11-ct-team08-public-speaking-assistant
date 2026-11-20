@@ -31,7 +31,7 @@ import { openSettings, setupSettings } from './modals/settings_modal.js';
 import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, syncHeader, syncScrollThumb } from './nav.js';
 import { deleteSession, openReport } from './screens/history.js';
 import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing.js';
-import { cancelEval, cancelMineEdit, goStep, loadFollowWpm, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, renderPractice, runEval, saveMineEdit, saveOwn, setupMineTitle, toggleMineList, selectPickerTab, toggleRecording, updateOwnCount, useScript } from './screens/practice.js';
+import { cancelEval, togglePause, onSheetClick, cancelMineEdit, goStep, loadFollowWpm, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, renderPractice, runEval, saveMineEdit, saveOwn, setupMineTitle, toggleMineList, selectPickerTab, toggleRecording, updateOwnCount, useScript } from './screens/practice.js';
 import { closeStudioSavedMenu, confirmScriptName, onSavedListClick, paintNameCount, toggleStudioSavedMenu } from './screens/saved_scripts.js';
 import { closeMenu, onMenuClick, onReaderClosed, saveEdit, setupReaderTitle, toggleEdit, toggleMenu } from './screens/script_reader.js';
 import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
@@ -39,6 +39,7 @@ import { bindTxTips, onTxClick, openDetails, openPart, seekTo, seekWord, startPl
 import { fitComposer, onChatAction, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
 import { CONFIG, RENDER, S } from './state.js';
 import { initHeroMic } from './hero_mic.js';
+import { watchLineNumbers } from './line_numbers.js';
 import { closeUserMenu, onUserButtonClick, setupUserMenuHover } from './top_bar.js';
 import { FOCUSABLE, closeModal, focusHeading, openModal, setupPwEyes, setupSelects, toast, usable, withBusy } from './ui.js';
 import { $, $$, clearErr, esc, showErr } from './utils.js';
@@ -62,14 +63,21 @@ export function loadConfig() {
     CONFIG.HISTORY_MAX_PAGES = c.history_max_pages ?? CONFIG.HISTORY_MAX_PAGES;
     CONFIG.FOLLOW_WPM_MIN = c.follow_wpm_min ?? CONFIG.FOLLOW_WPM_MIN;
     CONFIG.FOLLOW_WPM_MAX = c.follow_wpm_max ?? CONFIG.FOLLOW_WPM_MAX;
+    CONFIG.FOLLOW_WPM_MIN_CHOOSE = c.follow_wpm_min_choose ?? CONFIG.FOLLOW_WPM_MIN_CHOOSE;
+    CONFIG.FOLLOW_WPM_MAX_CHOOSE = c.follow_wpm_max_choose ?? CONFIG.FOLLOW_WPM_MAX_CHOOSE;
     CONFIG.FOLLOW_WPM_STEP = c.follow_wpm_step ?? CONFIG.FOLLOW_WPM_STEP;
     CONFIG.FOLLOW_WPM_DEFAULT = c.follow_wpm_default ?? CONFIG.FOLLOW_WPM_DEFAULT;
+    CONFIG.FOLLOW_AUTO_WEIGHT = c.follow_auto_weight ?? CONFIG.FOLLOW_AUTO_WEIGHT;
+    CONFIG.FOLLOW_AUTO_MIN_S = c.follow_auto_min_s ?? CONFIG.FOLLOW_AUTO_MIN_S;
+    CONFIG.FOLLOW_AUTO_MIN_WORDS = c.follow_auto_min_words ?? CONFIG.FOLLOW_AUTO_MIN_WORDS;
+    CONFIG.FOLLOW_AUTO_MAX_AHEAD = c.follow_auto_max_ahead ?? CONFIG.FOLLOW_AUTO_MAX_AHEAD;
     CONFIG.FOLLOW_WPM_SAVE_DELAY_MS = c.follow_wpm_save_delay_ms ?? CONFIG.FOLLOW_WPM_SAVE_DELAY_MS;
     CONFIG.CHAT_HISTORY_MAX_MESSAGES = c.chat_history_max_messages ?? CONFIG.CHAT_HISTORY_MAX_MESSAGES;
     CONFIG.COMPOSER_MAX_WORDS = c.composer_max_words ?? CONFIG.COMPOSER_MAX_WORDS;
     CONFIG.COMPOSER_MAX_LINES = c.composer_max_lines ?? CONFIG.COMPOSER_MAX_LINES;
     CONFIG.SCRIPT_POLL_INTERVAL_MS = c.script_poll_interval_ms ?? CONFIG.SCRIPT_POLL_INTERVAL_MS;
     CONFIG.EVALUATE_TIMEOUT_MS = c.evaluate_timeout_ms ?? CONFIG.EVALUATE_TIMEOUT_MS;
+    CONFIG.EVALUATE_BACKGROUND_AFTER_MS = c.evaluate_background_after_ms ?? CONFIG.EVALUATE_BACKGROUND_AFTER_MS;
     CONFIG.MAX_SAVED_SCRIPTS = c.max_saved_scripts ?? CONFIG.MAX_SAVED_SCRIPTS;
     CONFIG.SCRIPT_TITLE_MAX_CHARS = c.script_title_max_chars ?? CONFIG.SCRIPT_TITLE_MAX_CHARS;
     CONFIG.MAX_PDF_SIZE_BYTES = c.max_pdf_size_bytes ?? CONFIG.MAX_PDF_SIZE_BYTES;
@@ -197,7 +205,10 @@ export function init() {
   $('#mineEditCancel').onclick = cancelMineEdit;
   setupMineTitle();
   $('#mineFold').onclick = toggleMineList;
+  ['#sheet', '#minePreview', '#mrBody'].forEach(id => watchLineNumbers($(id)));   // line numbers on every script text
   $('#sampleBtn').onclick = pickSample;
+  $('#recPause').onclick = togglePause;
+  $('#sheet').addEventListener('click', onSheetClick);
   $('#ownText').addEventListener('input', () => { updateOwnCount(); clearErr($('#ownErr')); $('#ownText').removeAttribute('aria-invalid'); renderPractice(); });
   $('#ownSave').onclick = saveOwn;
   $('#voiceRecordTab').onclick = () => { if (S.rec) return; S.voiceTab = 'rec'; renderPractice(); };
@@ -234,12 +245,12 @@ export function init() {
       S.avatar = j.avatar_url; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okAvatar'));
     })).catch(() => toast(T('profile.errAvatarSave'), true));
   };
-  $('#avRemove').onclick = () => {
+  $('#avRemove').onclick = () => openConfirmDialog(T('profile.removeT'), T('profile.removeD'), T('profile.removeOk'), () => {
     withBusy(api('/api/profile/avatar', { method: 'DELETE' }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
       if (!r.ok) { toast((j && j.message) || T('profile.errAvatarRemove'), true); return; }
       S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved'));
     })).catch(() => toast(T('profile.errAvatarRemove'), true));
-  };
+  });
   $('#profileBaselineStart').onclick = toggleBaseline;
   $('#profileBaselineAgain').onclick = openBaselineRecorder;
   $('#profileBaselineListen').onclick = listenBaseline;

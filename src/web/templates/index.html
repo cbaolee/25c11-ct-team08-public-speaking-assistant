@@ -268,7 +268,7 @@
     </div>
     <div class="prwork" id="practiceWork">
     <div id="pStep2" class="prbar" hidden>
-      <div class="seg" role="tablist" data-t-aria="practice.voiceTitle">
+      <div class="seg" role="tablist" data-t-aria="practice.voiceTitle" data-tab-static>
         <button type="button" role="tab" id="voiceRecordTab" aria-selected="true" data-t="practice.tabRec"></button>
         <button type="button" role="tab" id="voiceUploadTab" aria-selected="false" data-t="practice.tabUp"></button>
       </div>
@@ -277,10 +277,11 @@
         <div class="lvl" id="recLvl" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="row rec-actions">
           <button class="btn btn-record" type="button" id="recBtn"></button>
+          <button class="btn" type="button" id="recPause" hidden></button>
           <button class="btn" type="button" id="recClear" data-t="practice.discard" disabled></button>
         </div>
       </div>
-      <div id="voiceUploadPane" class="prrec" hidden>
+      <div id="voiceUploadPane" class="prrec pane-off" aria-hidden="true" inert>
         <button class="drop" type="button" id="dropBtn"><span id="dropText"></span></button>
         <input type="file" id="fileIn" accept="audio/*" hidden>
         <div class="ferr" id="upErr" role="alert"></div>
@@ -324,7 +325,7 @@
         <input type="range" id="seek" min="0" max="100" value="0" step="1" data-t-aria="report.seek">
         <span class="t" id="playTime">0:00 / 0:00</span>
       </div>
-      <div style="margin-top:16px">
+      <div style="margin-top:16px" id="volBox">
         <div class="chartbox"><h3 data-t="report.cVol"></h3><p class="cap" data-t="report.capVol"></p><div class="chart" id="chVol"></div><p class="note" id="volRead" style="margin-top:8px"></p></div>
       </div>
     </div>
@@ -414,6 +415,7 @@
     <ul class="settings-list">
       <li><button type="button" data-settings="permissions"><span data-t="settings.permissions"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
       <li><button type="button" data-settings="audio"><span data-t="settings.audio"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+      <li><button type="button" data-settings="speed"><span data-t="settings.speed"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
       <li><button type="button" data-settings="password"><span data-t="settings.password"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
       <li><button type="button" data-settings="delete"><span data-t="settings.delete"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
     </ul>
@@ -443,6 +445,21 @@
     <div class="row" style="margin-top:16px"><button class="btn" type="button" id="audioTest" data-t="audio.test"></button><span class="note" id="audioTestNote" aria-live="polite"></span></div>
     <div class="lvl" id="audioLevel" aria-hidden="true" style="margin-top:12px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="actions"><button class="btn btn-primary" type="button" id="audioSave" data-t="common.save"></button></div>
+  </section>
+  <section id="settingsSpeed" data-pane="speed" hidden>
+    <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
+    <h3 data-t="speed.title"></h3>
+    <p class="note" id="speedSub"></p>
+    <label for="speedMin" data-t="speed.min"></label>
+    <select id="speedMin"></select>
+    <label for="speedMax" data-t="speed.max"></label>
+    <select id="speedMax"></select>
+    <div class="switch" style="margin-top:16px">
+    <input type="checkbox" id="speedAuto">
+    <div><label for="speedAuto" data-t="speed.auto"></label><div class="note" data-t="speed.autoNote"></div></div>
+    </div>
+    <div class="ferr" id="speedErr" role="alert"></div>
+    <div class="actions"><button class="btn" type="button" id="speedReset" data-t="speed.reset"></button><button class="btn btn-primary" type="button" id="speedSave" data-t="common.save"></button></div>
   </section>
   <section id="settingsPassword" data-pane="password" hidden>
     <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
