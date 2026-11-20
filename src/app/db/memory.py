@@ -15,6 +15,7 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptPatch,
     ScriptRow,
     ScriptSummary,
     SessionRow,
@@ -223,6 +224,14 @@ class MemoryScriptRepo:
     def count_scripts(self, user_id: UUID) -> int:
         return sum(1 for row in self._state.scripts.values() if row.user_id == user_id)
 
+    def update_script(self, user_id: UUID, script_id: UUID, patch: ScriptPatch) -> ScriptRow | None:
+        row = self._state.scripts.get(script_id)
+        if row is None or row.user_id != user_id:
+            return None
+        renamed = row.model_copy(update=patch.model_dump(exclude_none=True), deep=True)
+        self._state.scripts[script_id] = renamed
+        return renamed.model_copy(deep=True)
+
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         row = self._state.scripts.get(script_id)
         if row is None or row.user_id != user_id:
@@ -288,6 +297,16 @@ class MemorySessionRepo:
             row
             for row in self._state.sessions.values()
             if row.user_id == user_id and not row.is_compact
+        )
+        return [row.model_copy(deep=True) for row in rows[keep:]]
+
+    def list_compact_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]:
+        if keep < 0:
+            raise ValueError("keep must be non-negative")
+        rows = _newest_first(
+            row
+            for row in self._state.sessions.values()
+            if row.user_id == user_id and row.is_compact
         )
         return [row.model_copy(deep=True) for row in rows[keep:]]
 

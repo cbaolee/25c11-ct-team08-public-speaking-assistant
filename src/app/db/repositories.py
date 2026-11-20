@@ -10,6 +10,7 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptPatch,
     ScriptRow,
     ScriptSummary,
     SessionRow,
@@ -54,6 +55,10 @@ class ScriptRepo(Protocol):
 
     def count_scripts(self, user_id: UUID) -> int: ...
 
+    def update_script(
+        self, user_id: UUID, script_id: UUID, patch: ScriptPatch
+    ) -> ScriptRow | None: ...
+
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool: ...
 
 
@@ -69,6 +74,8 @@ class SessionRepo(Protocol):
     def list_score_history(self, user_id: UUID, limit: int) -> list[ScorePoint]: ...
 
     def list_full_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]: ...
+
+    def list_compact_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]: ...
 
     def save_compact_session(
         self,

@@ -10,6 +10,9 @@
 [storage]
 # Number of newest sessions kept with full result, audio and charts (.env: RETENTION_FULL_SESSIONS)
 retention_full_sessions = 10
+# Most compact sessions (script, scores and summary only) kept per user; older ones are deleted
+# (.env: MAX_COMPACT_SESSIONS)
+max_compact_sessions = 30
 # Lifetime of signed audio URLs, in seconds (.env: SIGNED_URL_TTL_S)
 signed_url_ttl_s = 600
 # Largest avatar upload, in bytes (2 MB)
@@ -19,7 +22,9 @@ avatar_size_px = 256
 # Largest avatar width or height before resizing, in pixels; larger pictures are rejected
 avatar_max_side_px = 4096
 # Saved scripts per user; POST /api/scripts returns 409 script_limit_reached at this count
-max_saved_scripts = 30
+max_saved_scripts = 10
+# Longest saved script title, in characters (POST /api/scripts and PATCH /api/scripts/{id})
+script_title_max_chars = 70
 # Most rows one list call may return (sessions and saved scripts); must be >= max_saved_scripts
 max_list_page_size = 50
 # Largest uploaded audio file, in bytes (100 MB)
@@ -85,3 +90,11 @@ history_page_size = 20
 history_max_pages = 5
 # Most chat messages kept in localStorage for the Script Studio chat
 chat_history_max_messages = 20
+# Most words one Script Studio message may have
+composer_max_words = 3000
+# Script Studio text box grows up to this many lines, then scrolls inside
+composer_max_lines = 5.5
+# Wait between two status checks of a script being generated, in milliseconds
+script_poll_interval_ms = 650
+# Longest wait for one evaluation before the UI gives up, in milliseconds (2 min)
+evaluate_timeout_ms = 120_000

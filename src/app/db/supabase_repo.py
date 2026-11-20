@@ -25,6 +25,7 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptPatch,
     ScriptRow,
     ScriptSummary,
     SessionRow,
@@ -38,7 +39,7 @@ from src.app.db.models import (
 UNIQUE_VIOLATION = "23505"
 MAX_BEYOND_ROWS = 1000
 
-SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,created_at"
+SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,duration_min,created_at"
 # PostgREST JSON paths ("alias:result->section->key") read the chart numbers inside result
 SESSION_SUMMARY_COLUMNS = ",".join(
     [
@@ -230,6 +231,16 @@ class SupabaseScriptRepo:
         )
         return resp.count or 0
 
+    def update_script(self, user_id: UUID, script_id: UUID, patch: ScriptPatch) -> ScriptRow | None:
+        values = patch.model_dump(exclude_none=True)
+        if not values:
+            return self.get_script(user_id, script_id)
+        resp = _execute(
+            self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
+        )
+        row = _first(resp.data)
+        return ScriptRow.model_validate(row) if row else None
+
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         # sessions.script_id is set to null by "on delete set null".
         resp = _execute(self._table().delete().eq("id", str(script_id)).eq("user_id", str(user_id)))
@@ -292,6 +303,20 @@ class SupabaseSessionRepo:
             .select("*")
             .eq("user_id", str(user_id))
             .eq("is_compact", False)
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+            .range(keep, keep + MAX_BEYOND_ROWS - 1)
+        )
+        return [SessionRow.model_validate(row) for row in resp.data]
+
+    def list_compact_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]:
+        if keep < 0:
+            raise ValueError("keep must be non-negative")
+        resp = _execute(
+            self._table()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .eq("is_compact", True)
             .order("created_at", desc=True)
             .order("id", desc=True)
             .range(keep, keep + MAX_BEYOND_ROWS - 1)

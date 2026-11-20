@@ -156,6 +156,19 @@ def test_list_full_beyond_skips_newest_full_sessions():
     assert [row.id for row in candidates] == [row.id for row in expected]
 
 
+def test_list_compact_beyond_skips_newest_compact_sessions():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    rows = [repos.sessions.create_session(user_id, _new_session()) for _ in range(4)]
+    for row in rows[:3]:
+        repos.sessions.save_compact_session(user_id, row.id, {}, [])
+
+    candidates = repos.sessions.list_compact_beyond(user_id, keep=1)
+    compact = sorted(rows[:3], key=lambda row: (row.created_at, str(row.id)), reverse=True)
+
+    assert [row.id for row in candidates] == [row.id for row in compact[1:]]
+
+
 def test_save_compact_session_clears_file_paths_and_is_one_time():
     repos = build_memory_repos()
     user_id = uuid4()

@@ -25,6 +25,7 @@ max_script_words = _script["max_script_words"]
 max_script_chars = _script["max_script_chars"]
 max_upload_bytes = _storage["max_upload_bytes"]
 max_saved_scripts = _storage["max_saved_scripts"]
+script_title_max_chars = _storage["script_title_max_chars"]
 max_list_page_size = _storage["max_list_page_size"]
 avatar_max_bytes = _storage["avatar_max_bytes"]
 avatar_size_px = _storage["avatar_size_px"]
@@ -87,6 +88,7 @@ class Settings(BaseSettings):
     retention_full_sessions: int = Field(
         default_factory=_from_toml("storage", "retention_full_sessions")
     )
+    max_compact_sessions: int = Field(default_factory=_from_toml("storage", "max_compact_sessions"))
     signed_url_ttl_s: int = Field(default_factory=_from_toml("storage", "signed_url_ttl_s"))
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
 

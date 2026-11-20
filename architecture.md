@@ -44,6 +44,7 @@ Only folders with a clear owner and current code are listed.
 db/migrations/            SQL migrations, applied in file order
 src/app/
 ├── main.py               FastAPI app: /api/evaluate, /api/scripts*, /api/sessions*, static UI
+│                         (/static is served with Cache-Control: no-cache, so changed CSS/JS is never stale)
 ├── routes/               auth.py (/api/auth/*), profile.py (/api/profile), baselines.py (/api/baseline)
 ├── auth.py               AuthProvider: Supabase Auth, or in-memory accounts in dev
 ├── deps.py               get_current_user: user from the Bearer access token
@@ -63,7 +64,10 @@ src/web/
 └── static/js/            ES modules (no bundler): main.js (init), state.js (S, CONFIG, RENDER),
                           i18n.js (TEXT), api.js, ui.js, nav.js, top_bar.js, utils.js, charts.js,
                           data.js, recorder.js, screens/*.js, modals/*.js;
-                          evaluate_client.js stays a classic script (also used by node tests)
+                          evaluate_client.js stays a classic script (also used by node tests);
+                          screens/saved_scripts.js owns the Saved Scripts list shown on Practice
+                          (My script tab) and in Script Studio (Show my scripts) as file cards, the Script
+                          Name Dialog, Script Edit Dialog, Script List Full popup and delete
 tests/db/                 Repository and helper tests
 ```
 
@@ -86,6 +90,7 @@ tests/db/                 Repository and helper tests
 | `POST /api/scripts`                | Save a script; duplicate text returns the existing row, script cap returns 409 |
 | `GET /api/scripts?limit=&cursor=`  | Page of saved-script summaries with `total`, cap `limit`, and `next_cursor` |
 | `GET /api/scripts/{id}`            | One saved script, including its body                                 |
+| `PATCH /api/scripts/{id}`          | Edit a saved script's `title` and/or `body`; 404 first for a missing script, 409 `script_duplicate` (`duplicate_id`, `duplicate_title`) when the new body equals another saved script; otherwise the same checks and moderation as a new script, and a new body updates `word_count` and `content_hash` |
 | `DELETE /api/scripts/{id}`         | Delete a saved script; linked sessions retain their script snapshot |
 | `GET /api/profile`                 | Profile row plus `email`, `preferences` and a signed `avatar_url` (or `null`) |
 | `PATCH /api/profile`               | Edit profile fields; `preferences` keys are merged into the stored object |
@@ -160,7 +165,7 @@ All buckets are private. The browser plays audio and shows the avatar through a 
 
 ### 4.4 Retention
 
-After each saved session, full sessions beyond the newest `RETENTION_FULL_SESSIONS` (10) are compacted: their audio and series files are deleted, then the row keeps only a summary `result`, the score columns, `script_snapshot` and `mistakes`. If file deletion fails, the row is left full and the next save retries it.
+After each saved session, full sessions beyond the newest `RETENTION_FULL_SESSIONS` (10) are compacted: their audio and series files are deleted, then the row keeps only a summary `result`, the score columns, `script_snapshot` and `mistakes`. If file deletion fails, the row is left full and the next save retries it. Then compact sessions beyond the newest `MAX_COMPACT_SESSIONS` (`storage.max_compact_sessions`, 30) are deleted, so a user keeps at most 10 full + 30 compact sessions.
 
 | Measured size (5-minute recording) | Bytes     | Source                             |
 | ---------------------------------- | --------- | ---------------------------------- |
@@ -264,4 +269,4 @@ Database and storage settings:
 | `src/app/deps.py` | `get_current_user` reads and verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth cannot be reached. |
 | UI | Keeps the tokens in `localStorage` (F5 keeps the login) and swaps the refresh token for a new session after a 401. |
 
-Saved scripts (`/api/scripts*`) live in the `scripts` table, with a per-user cap from `storage.max_saved_scripts`. A duplicate body reuses its existing row even when the user is at the cap; a new script at the cap returns `409 script_limit_reached` with `limit` and `count`. `GET /api/scripts` returns `items`, `next_cursor`, `total`, and the configured cap as `limit`. Deleting a saved script nulls linked session `script_id` values without removing `script_snapshot`. `/api/evaluate` accepts `script_id` and `topic`, and stores the profile's `target_accent` with the session.
+Saved scripts (`/api/scripts*`) live in the `scripts` table, with a per-user cap from `storage.max_saved_scripts`. A duplicate body reuses its existing row even when the user is at the cap; a new script at the cap returns `409 script_limit_reached` with `limit` and `count`. `GET /api/scripts` returns `items`, `next_cursor`, `total`, and the configured cap as `limit`. Deleting a saved script nulls linked session `script_id` values without removing `script_snapshot`. The UI saves a script only through Save (it asks for a name first); Practice sends the text without saving, so a practised but unsaved script is kept only in `sessions.script_snapshot` once a report exists. `GET /api/config` returns `[web]` plus the limits shared with the backend: `max_saved_scripts`, `script_title_max_chars`, `max_pdf_size_bytes`, `max_pdf_pages`. `/api/evaluate` accepts `script_id` and `topic`, and stores the profile's `target_accent` with the session.

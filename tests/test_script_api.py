@@ -13,7 +13,7 @@ from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
-from src.app.config import max_saved_scripts, settings
+from src.app.config import max_saved_scripts, script_title_max_chars, settings
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
@@ -372,6 +372,89 @@ def test_delete_script_removes_it(script_api) -> None:
     r = client.delete(f"/api/scripts/{script_id}")
     assert r.json() == {"deleted": True, "id": script_id}
     assert client.get(f"/api/scripts/{script_id}").status_code == 404
+
+
+def test_rename_script_changes_only_the_title(script_api) -> None:
+    client, _, _ = script_api
+    script = _save(client, "Rename me please.").json()
+    r = client.patch(f"/api/scripts/{script['id']}", json={"title": "  My new name  "})
+    assert r.status_code == 200
+    assert r.json()["title"] == "My new name"
+    assert r.json()["body"] == script["body"]
+    assert client.get(f"/api/scripts/{script['id']}").json()["title"] == "My new name"
+
+
+def test_rename_script_rejects_empty_and_long_titles(script_api) -> None:
+    client, _, _ = script_api
+    script_id = _save(client, "Name rules.").json()["id"]
+    assert client.patch(f"/api/scripts/{script_id}", json={"title": ""}).status_code == 422
+    blank = client.patch(f"/api/scripts/{script_id}", json={"title": "   "})
+    assert blank.status_code == 422
+    assert blank.json()["error_code"] == "script_title_empty"
+    too_long = "x" * (script_title_max_chars + 1)
+    assert client.patch(f"/api/scripts/{script_id}", json={"title": too_long}).status_code == 422
+
+
+def test_edit_script_body_updates_count_and_hash(script_api) -> None:
+    client, repos, state = script_api
+    script = _save(client, "Old body text.").json()
+    r = client.patch(
+        f"/api/scripts/{script['id']}", json={"body": "A brand new body with six words."}
+    )
+    assert r.status_code == 200
+    assert r.json()["body"] == "A brand new body with six words."
+    assert r.json()["word_count"] == 7
+    assert r.json()["title"] == script["title"]
+    new_hash = build_content_hash("A brand new body with six words.")
+    assert repos.scripts.find_script_by_hash(state["user"].id, new_hash).id == UUID(script["id"])
+
+
+def test_edit_script_rejects_empty_body(script_api) -> None:
+    client, _, _ = script_api
+    script_id = _save(client, "Keep me.").json()["id"]
+    r = client.patch(f"/api/scripts/{script_id}", json={"body": "   "})
+    assert r.status_code == 422
+    assert r.json()["error_code"] == "script_empty"
+
+
+def test_edit_script_body_matching_another_script_returns_409(script_api) -> None:
+    client, _, _ = script_api
+    first = _save(client, "First saved text.").json()
+    second = _save(client, "Second saved text.").json()
+    r = client.patch(f"/api/scripts/{second['id']}", json={"body": "First saved text."})
+    assert r.status_code == 409
+    assert r.json()["error_code"] == "script_duplicate"
+    assert r.json()["duplicate_id"] == first["id"]
+    assert r.json()["duplicate_title"] == first["title"]
+    assert client.get(f"/api/scripts/{second['id']}").json()["body"] == "Second saved text."
+
+
+def test_edit_script_keeping_its_own_body_is_allowed(script_api) -> None:
+    client, _, _ = script_api
+    script = _save(client, "Same text kept.").json()
+    r = client.patch(
+        f"/api/scripts/{script['id']}", json={"body": "Same text kept.", "title": "New"}
+    )
+    assert r.status_code == 200
+    assert r.json()["title"] == "New"
+
+
+def test_edit_missing_script_skips_moderation(script_api, monkeypatch) -> None:
+    client, _, _ = script_api
+    calls = []
+    monkeypatch.setattr(
+        app_main.get_script_pipeline().moderator, "assert_safe", lambda *a, **k: calls.append(a)
+    )
+    r = client.patch(f"/api/scripts/{uuid4()}", json={"title": "Nobody"})
+    assert r.status_code == 404
+    assert calls == []
+
+
+def test_rename_missing_script_returns_404(script_api) -> None:
+    client, _, _ = script_api
+    r = client.patch(f"/api/scripts/{uuid4()}", json={"title": "Nobody"})
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "script_not_found"
 
 
 def test_scripts_storage_error_returns_503(script_api, monkeypatch) -> None:

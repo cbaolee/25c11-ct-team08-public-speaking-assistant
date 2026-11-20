@@ -32,6 +32,7 @@ from src.app.config import (
     max_script_words,
     max_upload_bytes,
     missing_required_settings,
+    script_title_max_chars,
     settings,
     validate_list_limits,
 )
@@ -42,6 +43,7 @@ from src.app.db.models import (
     NewSession,
     ScriptDuration,
     ScriptLimitReachedError,
+    ScriptPatch,
     ScriptRow,
     ScriptSource,
     SessionRow,
@@ -90,7 +92,21 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
-app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+
+
+class RevalidatedStaticFiles(StaticFiles):
+    """Static UI files the browser checks again before reuse, so changed CSS/JS is never stale.
+
+    An unchanged file still costs only a 304 (ETag / Last-Modified).
+    """
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+app.mount("/static", RevalidatedStaticFiles(directory=WEB_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
 app.include_router(auth_routes.router)
 app.include_router(profile_routes.router)
@@ -120,7 +136,7 @@ class SaveScriptPayload(BaseModel):
     `GeneratedScript.source` "template" / "llm"), `written` for text the user typed.
     """
 
-    title: str = Field(default="Untitled Script", max_length=200)
+    title: str = Field(default="Untitled Script", max_length=script_title_max_chars)
     body: str
     source: ScriptSource
     duration_min: ScriptDuration | None = None
@@ -138,8 +154,14 @@ async def health_check():
 
 @app.get("/api/config")
 async def web_config() -> dict[str, Any]:
-    """The [web] section plus shared script limit for the browser (no secrets)."""
-    return {**CONSTANTS["web"], "max_saved_scripts": max_saved_scripts}
+    """The [web] section plus the limits shared with the backend (no secrets)."""
+    return {
+        **CONSTANTS["web"],
+        "max_saved_scripts": max_saved_scripts,
+        "script_title_max_chars": script_title_max_chars,
+        "max_pdf_size_bytes": CONSTANTS["script"]["max_pdf_size_bytes"],
+        "max_pdf_pages": CONSTANTS["script"]["max_pdf_pages"],
+    }
 
 
 @app.get("/")
@@ -178,7 +200,7 @@ def _delete_session_files(repos: Repos, user_id: UUID, row: SessionRow) -> None:
 
 
 def _prune_old_sessions(repos: Repos, user_id: UUID) -> None:
-    """Compact older full sessions to keep only the newest full set."""
+    """Compact full sessions beyond the newest full set, then drop compact ones beyond the cap."""
     try:
         rows = repos.sessions.list_full_beyond(user_id, keep=settings.retention_full_sessions)
     except Exception:
@@ -194,6 +216,23 @@ def _prune_old_sessions(repos: Repos, user_id: UUID) -> None:
                 continue
         except Exception:
             logger.exception("Could not prune session %s for user %s", row.id, user_id)
+
+    _delete_old_compact_sessions(repos, user_id)
+
+
+def _delete_old_compact_sessions(repos: Repos, user_id: UUID) -> None:
+    """Delete the oldest compact sessions so at most `max_compact_sessions` remain."""
+    try:
+        rows = repos.sessions.list_compact_beyond(user_id, keep=settings.max_compact_sessions)
+    except Exception:
+        logger.exception("Could not list old compact sessions for user %s", user_id)
+        return
+    for row in rows:
+        try:
+            _delete_session_files(repos, user_id, row)  # normally none left after compaction
+            repos.sessions.delete_session(user_id, row.id)
+        except Exception:
+            logger.exception("Could not delete compact session %s for user %s", row.id, user_id)
 
 
 def _save_result_to_history(
@@ -770,6 +809,70 @@ async def get_saved_script_endpoint(
         row = await run_in_threadpool(repos.scripts.get_script, user.id, script_id)
     except StorageError:
         logger.exception("Could not load script")
+        return _script_storage_unavailable()
+    if row is None:
+        return _script_not_found()
+    return _script_payload(row)
+
+
+class EditScriptPayload(BaseModel):
+    """Request body for `PATCH /api/scripts/{id}`: a new title, a new body, or both."""
+
+    title: str | None = Field(default=None, max_length=script_title_max_chars)
+    body: str | None = None
+
+
+@app.patch("/api/scripts/{script_id}")
+async def edit_saved_script_endpoint(
+    script_id: UUID,
+    payload: EditScriptPayload,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+) -> Any:
+    """Edit a saved script's title and/or body; new text passes the same checks as a new script."""
+    patch = ScriptPatch()
+    checked: list[str] = []
+    if payload.title is not None:
+        patch.title = sanitize_text(payload.title).strip()
+        if not patch.title:
+            return _script_error(422, "script_title_empty", "The script name cannot be empty.")
+        checked.append(patch.title)
+    if payload.body is not None:
+        clean_body = sanitize_text(payload.body).strip()
+        body_error = _validate_script(clean_body)
+        if body_error is not None:
+            return body_error
+        patch.body = clean_body
+        patch.word_count = len(clean_body.split())
+        patch.content_hash = build_content_hash(clean_body)
+        checked.append(clean_body)
+    try:
+        # A missing script (or another user's) answers 404 before any moderation call.
+        if await run_in_threadpool(repos.scripts.get_script, user.id, script_id) is None:
+            return _script_not_found()
+        if patch.content_hash is not None:
+            twin = await run_in_threadpool(
+                repos.scripts.find_script_by_hash, user.id, patch.content_hash
+            )
+            if twin is not None and twin.id != script_id:
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "error_code": "script_duplicate",
+                        "message": f'This text is the same as your saved script "{twin.title}".',
+                        "duplicate_id": str(twin.id),
+                        "duplicate_title": twin.title,
+                    },
+                )
+    except StorageError:
+        logger.exception("Could not check script before edit")
+        return _script_storage_unavailable()
+    if checked:
+        get_script_pipeline().moderator.assert_safe("\n".join(checked), user_id=str(user.id))
+    try:
+        row = await run_in_threadpool(repos.scripts.update_script, user.id, script_id, patch)
+    except StorageError:
+        logger.exception("Could not edit script")
         return _script_storage_unavailable()
     if row is None:
         return _script_not_found()

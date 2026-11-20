@@ -114,7 +114,17 @@ class ScriptSummary(BaseModel):
     topic: str | None
     source: ScriptSource
     word_count: int
+    duration_min: ScriptDuration | None = None
     created_at: datetime
+
+
+class ScriptPatch(BaseModel):
+    """Fields an edit may change. A new body always comes with its word_count and content_hash."""
+
+    title: str | None = None
+    body: str | None = None
+    word_count: int | None = None
+    content_hash: str | None = None
 
 
 class ScriptRow(NewScript):
