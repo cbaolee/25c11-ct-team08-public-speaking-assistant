@@ -445,3 +445,65 @@ def build_followup_reply(
     return format_checklist_fallback(topic, missing_entities, missing_groups)
 
 
+def ingest_upload_file(
+    file_bytes: bytes,
+    filename: str,
+    ocr_runner: Any | None = None,
+) -> list[DocumentChunk]:
+    """Ingest uploaded document into DocumentChunk items and cleanup temp files."""
+    if not file_bytes:
+        raise DocumentParserError("empty_file", "The uploaded file is empty.")
+
+    suffix = Path(filename).suffix.lower()
+
+    if suffix == ".pdf":
+        temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+        try:
+            temp_file.write(file_bytes)
+            temp_file.flush()
+            temp_file.close()
+            chunks = parse_input_to_chunks(pdf_path=temp_file.name, ocr_runner=ocr_runner)
+            return chunks
+        finally:
+            Path(temp_file.name).unlink(missing_ok=True)
+
+    elif suffix in (".md", ".txt"):
+        try:
+            text = file_bytes.decode("utf-8")
+        except UnicodeDecodeError:
+            text = file_bytes.decode("latin-1", errors="replace")
+
+        if not text.strip():
+            raise DocumentParserError("empty_file", "Uploaded text file is empty.")
+
+        return parse_input_to_chunks(raw_text=text)
+
+    else:
+        raise DocumentParserError(
+            "unsupported_file_type",
+            f"Unsupported file format '{suffix}'. Only .pdf, .md, and .txt files are supported.",
+        )
+
+
+__all__ = [
+    "COSINE_SIMILARITY_THRESHOLD",
+    "DEFAULT_STORE_CAPACITY",
+    "DEFAULT_STORE_TTL_SECONDS",
+    "FOLLOWUP_DEFAULT_MODEL",
+    "FOLLOWUP_MAX_TOKENS",
+    "FREE_TOPIC_MIN_WORDS",
+    "GROUP_COUNTER",
+    "GROUP_EVIDENCE",
+    "GROUP_MAIN",
+    "READY_MESSAGE",
+    "ChatSessionState",
+    "ChatSessionStore",
+    "analyze_slot_coverage",
+    "build_followup_reply",
+    "chat_session_store",
+    "check_ready_to_generate",
+    "classify_argument_slot",
+    "format_checklist_fallback",
+    "group_uncovered_slots",
+    "ingest_upload_file",
+]

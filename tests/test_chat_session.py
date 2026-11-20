@@ -512,3 +512,29 @@ class TestBuildFollowupReply:
         assert "Chunk" not in user_msg
 
 
+class TestIngestUploadFile:
+    def test_ingest_empty_bytes_raises_error(self) -> None:
+        with pytest.raises(DocumentParserError, match="empty"):
+            ingest_upload_file(b"", "document.pdf")
+
+    def test_ingest_unsupported_file_extension(self) -> None:
+        with pytest.raises(DocumentParserError, match="Unsupported file format"):
+            ingest_upload_file(b"some content", "data.xlsx")
+
+    def test_ingest_markdown_file(self) -> None:
+        md_bytes = (
+            b"# Introduction to Quantum Computing\n"
+            b"Quantum computers harness qubits to perform complex operations.\n\n"
+            b"# Current Limitations\n"
+            b"Decoherence and thermal noise remain major engineering hurdles."
+        )
+        chunks = ingest_upload_file(md_bytes, "notes.md")
+        assert len(chunks) == 2
+        assert "Quantum Computing" in chunks[0].heading
+        assert "Limitations" in chunks[1].heading
+
+    def test_ingest_txt_file(self) -> None:
+        txt_bytes = b"Public speaking requires deliberate vocal pacing and structured arguments."
+        chunks = ingest_upload_file(txt_bytes, "speech_draft.txt")
+        assert len(chunks) >= 1
+        assert "deliberate vocal pacing" in chunks[0].content
