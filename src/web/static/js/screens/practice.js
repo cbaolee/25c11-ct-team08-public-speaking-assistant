@@ -184,34 +184,55 @@ export function buildFollow(counts) {
   return EvaluateClient.followSchedule({ wordCounts: counts, wpm: S.followWpm, limits: followLimits(), leadS: CONFIG.FOLLOW_LEAD_S, gapS: CONFIG.FOLLOW_GAP_S });
 }
 /* Highlight speed slider. It only moves the demo highlight and is not used by score() (ADR-003 scores 130-160 WPM, unrelated).
-   Saved in profiles.preferences.follow_wpm; localStorage only keeps it when that save fails. */
-export const FOLLOW_WPM_KEY = 'psc.followWpm';
+   Saved in profiles.preferences.follow_wpm. localStorage keeps a value per user only while it is not on the server yet
+   (save failed, or log out / session expiry before the save delay ended); the next log in sends it again. */
+export const FOLLOW_WPM_KEY = 'psc.followWpm';    // old key shared by all accounts; read once to move the value to the profile
+const followWpmKey = userId => FOLLOW_WPM_KEY + '.' + userId;
 let followWpmSaveTimer = null;
 export function followLimits() {                  // slider limits from CONFIG (app_constants.toml [web])
   return { min: CONFIG.FOLLOW_WPM_MIN, max: CONFIG.FOLLOW_WPM_MAX, step: CONFIG.FOLLOW_WPM_STEP, def: CONFIG.FOLLOW_WPM_DEFAULT };
 }
-/* Fallback when the profile has no follow_wpm: the value kept after a failed save, else the default. */
+function readStored(key) {                        // null when missing or storage is blocked
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+function writeStored(key, value) {
+  try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch (e) { /* storage blocked */ }
+}
+/* Before log in: the default speed. */
 export function loadFollowWpm() {
-  try { S.followWpm = EvaluateClient.parseFollowWpm(localStorage.getItem(FOLLOW_WPM_KEY), followLimits()); } catch (e) { S.followWpm = CONFIG.FOLLOW_WPM_DEFAULT; }
+  S.followWpm = EvaluateClient.parseFollowWpm(null, followLimits());
 }
-/* Profile value wins; old accounts (preferences = {}) fall back to loadFollowWpm. */
+/* After log in. Order: a value not saved yet on this device, then the profile, then the old shared key, then the default. */
 export function applyFollowWpm(prefs) {
-  const v = prefs ? prefs.follow_wpm : null;
-  if (v != null) S.followWpm = EvaluateClient.parseFollowWpm(v, followLimits()); else loadFollowWpm();
+  const userId = S.user && S.user.id, limits = followLimits();
+  const pending = userId ? readStored(followWpmKey(userId)) : null;
+  const saved = prefs ? prefs.follow_wpm : null;
+  const legacy = readStored(FOLLOW_WPM_KEY);
+  writeStored(FOLLOW_WPM_KEY, null);              // the old key is never read twice, so another account cannot take it
+  if (pending != null) { S.followWpm = EvaluateClient.parseFollowWpm(pending, limits); saveFollowWpm(); }
+  else if (saved != null) S.followWpm = EvaluateClient.parseFollowWpm(saved, limits);
+  else if (legacy != null) { S.followWpm = EvaluateClient.parseFollowWpm(legacy, limits); saveFollowWpm(); }
+  else S.followWpm = limits.def;
 }
-export function clearFollowWpm() {                // on log out: the next account must not get this value
+/* On log out and session expiry: a save still waiting is kept on this device for the next log in of the same user. */
+export function clearFollowWpm(userId) {
+  if (followWpmSaveTimer !== null && userId) writeStored(followWpmKey(userId), String(S.followWpm));
   clearTimeout(followWpmSaveTimer); followWpmSaveTimer = null;
-  try { localStorage.removeItem(FOLLOW_WPM_KEY); } catch (e) { /* storage blocked */ }
+}
+export function dropFollowWpm(userId) {           // Delete account: nothing of that user stays on this device
+  clearTimeout(followWpmSaveTimer); followWpmSaveTimer = null;
+  if (userId) writeStored(followWpmKey(userId), null);
 }
 function saveFollowWpm() {
-  api('/api/profile', { method: 'PATCH', json: { preferences: { follow_wpm: S.followWpm } } })
+  followWpmSaveTimer = null;
+  const userId = S.user && S.user.id, value = S.followWpm;
+  if (!userId) return;
+  api('/api/profile', { method: 'PATCH', json: { preferences: { follow_wpm: value } } })
     .then(r => {
       if (!r.ok) throw new Error('follow_wpm not saved');
-      try { localStorage.removeItem(FOLLOW_WPM_KEY); } catch (e) { /* storage blocked */ }
+      writeStored(followWpmKey(userId), null);
     })
-    .catch(() => {                                // API down: keep the value on this device
-      try { localStorage.setItem(FOLLOW_WPM_KEY, String(S.followWpm)); } catch (e) { /* private mode: lasts until reload */ }
-    });
+    .catch(() => writeStored(followWpmKey(userId), String(value)));   // API down: send again at the next log in
 }
 export function paintFollowWpm() {
   const sl = $('#followWpm'); if (!sl) return;

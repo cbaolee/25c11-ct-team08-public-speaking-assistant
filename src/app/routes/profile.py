@@ -173,9 +173,9 @@ async def upload_avatar(
         except StorageError:
             logger.warning("Could not remove avatar file after a failed profile update")
         return _unavailable()
+    # The picture is saved at this point. If signing fails, avatar_url is null and the next
+    # GET /api/profile signs it again; a 503 here would wrongly tell the user it was not saved.
     avatar_url = await run_in_threadpool(_avatar_url, row, user, repos)
-    if avatar_url is None:
-        return _unavailable()
     return {"avatar_url": avatar_url}
 
 

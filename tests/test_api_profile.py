@@ -208,6 +208,17 @@ def test_upload_avatar_removes_file_when_path_save_fails(client, repos, monkeypa
     assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
 
 
+def test_upload_avatar_kept_when_signing_fails(client, repos, monkeypatch):
+    def fail(*_args):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.files, "create_signed_url", fail)
+    r = _put_avatar(client, _image_bytes())
+    assert r.status_code == 200
+    assert r.json() == {"avatar_url": None}
+    assert repos.profiles.get_profile(TEST_USER_ID).avatar_path == build_avatar_path(TEST_USER_ID)
+
+
 def test_upload_avatar_without_profile_stores_nothing(repos):
     r = _put_avatar(TestClient(main.app), _image_bytes())
     assert r.status_code == 404

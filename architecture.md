@@ -87,6 +87,10 @@ tests/db/                 Repository and helper tests
 | `GET /api/scripts?limit=&cursor=`  | Page of saved-script summaries with `total`, cap `limit`, and `next_cursor` |
 | `GET /api/scripts/{id}`            | One saved script, including its body                                 |
 | `DELETE /api/scripts/{id}`         | Delete a saved script; linked sessions retain their script snapshot |
+| `GET /api/profile`                 | Profile row plus `email`, `preferences` and a signed `avatar_url` (or `null`) |
+| `PATCH /api/profile`               | Edit profile fields; `preferences` keys are merged into the stored object |
+| `PUT /api/profile/avatar`          | Multipart `file`: check it is PNG/JPEG/WebP by content, resize to a square WebP, store it, return `avatar_url` |
+| `DELETE /api/profile/avatar`       | Delete the avatar file and set `avatar_path` to `null`               |
 
 Error bodies used by these endpoints:
 
@@ -99,6 +103,9 @@ Error bodies used by these endpoints:
 | 400    | `{"error": "invalid_cursor"}`                                         | Malformed cursor                               |
 | 503    | `{"error": "session_storage_unavailable"}`                            | Database or storage error in session endpoints |
 | 409    | `{"error_code": "script_limit_reached", "limit": 30, "count": 30, ...}` | A new saved script would exceed the per-user cap |
+| 413    | `{"error_code": "avatar_too_large", ...}`                            | Avatar larger than `storage.avatar_max_bytes`  |
+| 422    | `{"error_code": "avatar_invalid", ...}`                              | Not a PNG/JPEG/WebP, or a side above `storage.avatar_max_side_px` |
+| 503    | `{"error_code": "profile_unavailable", ...}`                         | Database or storage error in profile endpoints |
 
 ## 4. Database and storage
 
@@ -117,7 +124,7 @@ flowchart TB
 - **Two implementations with the same behaviour:** Supabase for real data, in-memory for tests and local runs without a project. Production can never fall back to memory.
 - **Shared rules:** a missing row and another user's row look the same (`None` / `False`); lists are newest first by `(created_at, id)`; list limits are 1..`storage.max_list_page_size`; library errors become `StorageError` (`ConflictError` for duplicates).
 - List endpoints accept up to `storage.max_list_page_size`; `/api/scripts` defaults to and reports the `storage.max_saved_scripts` cap. Startup rejects a page size smaller than that cap.
-- **Object paths** are built only by `build_object_path` as `{user_id}/{object_id}.webm` or `.series.json`; any other path is rejected.
+- **Object paths** are built only by `build_object_path` as `{user_id}/{object_id}.webm` or `.series.json`, or by `build_avatar_path` as `{user_id}/avatar.webp`; any other path is rejected.
 
 ### 4.2 Data model
 
@@ -135,7 +142,7 @@ erDiagram
 
 | Table       | Holds                     | Notable rules                                                                                |
 | ----------- | ------------------------- | -------------------------------------------------------------------------------------------- |
-| `profiles`  | One row per user          | `id` = `auth.users.id`; deleting it cascades to all child rows                               |
+| `profiles`  | One row per user          | `id` = `auth.users.id`; deleting it cascades to all child rows; `avatar_path`, `preferences` (jsonb, merged by `merge_profile_preferences`) |
 | `baselines` | Voice baseline measures   | One `is_current` row per user (unique partial index)                                         |
 | `scripts`   | Scripts owned by the user | `source`: `generated_template`, `generated_llm`, `written`                                   |
 | `sessions`  | Practice results          | Score columns + `result` JSON + `script_snapshot`; `is_compact`, `mistakes` for old sessions |
@@ -147,8 +154,9 @@ erDiagram
 | `audio`     | Practice recording (Opus/WebM, 32 kbps)       | `{user_id}/{session_id}.webm`        |
 | `series`    | Pitch and loudness series split from `result` | `{user_id}/{session_id}.series.json` |
 | `baselines` | Baseline recording                            | `{user_id}/{baseline_id}.webm`       |
+| `avatars`   | Profile picture (WebP, square)                | `{user_id}/avatar.webp` (one per user, upsert) |
 
-All buckets are private. The browser plays audio through a signed URL that expires after `SIGNED_URL_TTL_S` seconds.
+All buckets are private. The browser plays audio and shows the avatar through a signed URL that expires after `SIGNED_URL_TTL_S` seconds.
 
 ### 4.4 Retention
 
@@ -197,7 +205,7 @@ sequenceDiagram
 
 1. `POST /api/baseline` analyses the sample. Only an `ok` result is stored.
 2. The audio is encoded to Opus and uploaded to `baselines`.
-3. `replace_current_baseline` switches the old row off, inserts the new current row, and restores the old row if the insert fails.
+3. `replace_current_baseline` calls the SQL function of the same name (`db/migrations/0004`) through RPC. In one transaction it locks the old current row, switches it off and inserts the new current row; if the insert fails, nothing changes.
 4. The old baseline audio is deleted; failure only logs a warning.
 5. `POST /api/evaluate` always reads the baseline from the database. A `baseline_profile` sent by the client is ignored.
 
@@ -228,9 +236,9 @@ Database and storage settings:
 | --------------------------------------------------- | ------------------------------ | ----------------------------------------------- |
 | `APP_ENV`                                           | `dev`                          | Enables the dev user and in-memory repos        |
 | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`              | empty                          | Use Supabase when the URL is set                |
-| `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET` | `audio`, `series`, `baselines` | Bucket names                                    |
+| `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET`, `AVATARS_BUCKET` | `audio`, `series`, `baselines`, `avatars` | Bucket names |
 | `RETENTION_FULL_SESSIONS`                           | `10`                           | Full sessions kept per user                     |
-| `SIGNED_URL_TTL_S`                                  | `600`                          | Signed audio URL lifetime                       |
+| `SIGNED_URL_TTL_S`                                  | `600`                          | Signed audio and avatar URL lifetime            |
 | `BASELINE_REQUIRED`                                 | `true`                         | Reject evaluation without a baseline            |
 | `DEV_USER_ID`                                       | empty                          | First test user, read only by integration tests |
 
@@ -252,7 +260,7 @@ Database and storage settings:
 | --- | --- |
 | `src/app/auth.py` | `AuthProvider` in two versions: `SupabaseAuthProvider` (Supabase Auth with the service key, server side only) and `MemoryAuthProvider` (dev without `SUPABASE_URL`, tests). `get_auth()` picks one, like `get_repos()`. |
 | `src/app/routes/auth.py` | `POST /api/auth/signup` creates the account and its `profiles` row (the account is removed again if the profile cannot be saved); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password`. |
-| `src/app/routes/profile.py` | `GET` / `PATCH /api/profile` for the Profile Modal and the recording consent. |
+| `src/app/routes/profile.py` | `GET` / `PATCH /api/profile` for the Profile Modal, the recording consent and `preferences`; `PUT` / `DELETE /api/profile/avatar`. |
 | `src/app/deps.py` | `get_current_user` reads and verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth cannot be reached. |
 | UI | Keeps the tokens in `localStorage` (F5 keeps the login) and swaps the refresh token for a new session after a 401. |
 
