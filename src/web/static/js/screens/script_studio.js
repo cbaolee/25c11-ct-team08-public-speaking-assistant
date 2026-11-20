@@ -102,11 +102,8 @@ export function clearChatHistory(userId) {        // on Log out and Delete accou
 function chatMaxMessages() {
   return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 20);
 }
-function trimChatHistory() {
-  while (S.chatHistory.length > chatMaxMessages()) {
-    const oldest = S.chatHistory.shift();
-    if (oldest.bubble && oldest.bubble.remove) oldest.bubble.remove();
-  }
+function isQuotaError(e) {                        // localStorage is full (name/code differ between browsers)
+  return !!e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
 }
 function persistedMessage(message) {
   if (message.role === 'me') {
@@ -137,23 +134,22 @@ function persistedMessage(message) {
     },
   };
 }
+/* Only the stored copy is capped: the chat on screen keeps every message of this visit. */
+function storedChat(skip) {                       // newest N messages, minus `skip` oldest ones after a quota error
+  return S.chatHistory.slice(-chatMaxMessages()).slice(skip).map(persistedMessage);
+}
 export function persistChat() {
   if (!S.user || !S.user.id || !S.chatHistory.length) return;
-  trimChatHistory();
   const key = chatHistoryKey(S.user.id);
-  const write = () => localStorage.setItem(key, JSON.stringify(S.chatHistory.map(persistedMessage)));
   try {
-    write();
+    localStorage.setItem(key, JSON.stringify(storedChat(0)));
   } catch (e) {
-    if (!e || (e.name !== 'QuotaExceededError' && e.code !== 22 && e.code !== 1014)) return;
-    const oldest = S.chatHistory.shift();
-    if (oldest && oldest.bubble && oldest.bubble.remove) oldest.bubble.remove();
-    try { write(); } catch (retryError) { /* storage is blocked or still full */ }
+    if (!isQuotaError(e)) return;
+    try { localStorage.setItem(key, JSON.stringify(storedChat(1))); } catch (retryError) { /* blocked or still full */ }
   }
 }
 function recordChatMessage(message) {
   S.chatHistory.push(message);
-  trimChatHistory();
   persistChat();
 }
 function renderUserMessage(message, animate = false) {
