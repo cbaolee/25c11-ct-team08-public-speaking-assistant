@@ -6,6 +6,7 @@ All functions are sync; async endpoints call them via run_in_threadpool.
 """
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -118,6 +119,13 @@ class SupabaseProfileRepo:
 
     def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None:
         resp = _execute(self._table().update({"avatar_path": avatar_path}).eq("id", str(user_id)))
+        row = _first(resp.data)
+        return ProfileRow.model_validate(row) if row else None
+
+    def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None:
+        # One SQL statement (db/migrations/0003): keys not in `patch` are kept.
+        params = {"p_user_id": str(user_id), "p_patch": patch}
+        resp = _execute(self._client.rpc("merge_profile_preferences", params))
         row = _first(resp.data)
         return ProfileRow.model_validate(row) if row else None
 

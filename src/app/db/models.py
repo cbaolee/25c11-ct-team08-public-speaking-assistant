@@ -6,7 +6,9 @@ from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
+
+from src.app.constants import CONSTANTS
 
 ScriptSource = Literal["generated_template", "generated_llm", "written"]
 SessionStatus = Literal["ok", "insufficient_audio"]
@@ -35,7 +37,25 @@ class ProfilePatch(BaseModel):
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = None
     topics: list[str] | None = None
-    preferences: dict[str, Any] | None = None
+
+
+class UserPreferences(BaseModel):
+    """Per-user settings in profiles.preferences (jsonb). Only the keys sent are merged in."""
+
+    model_config = ConfigDict(extra="forbid")  # unknown keys -> 422
+
+    follow_wpm: StrictInt | None = None  # range checked against follow_wpm_* in app_constants.toml
+
+    @field_validator("follow_wpm")
+    @classmethod
+    def _check_follow_wpm(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        web = CONSTANTS["web"]
+        low, high, step = web["follow_wpm_min"], web["follow_wpm_max"], web["follow_wpm_step"]
+        if not low <= value <= high or value % step != 0:
+            raise ValueError(f"follow_wpm must be {low}-{high} in steps of {step}")
+        return value
 
 
 class ProfileRow(ProfileUpsert):

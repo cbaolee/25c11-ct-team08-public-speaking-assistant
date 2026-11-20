@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from src.app.db.models import (
@@ -27,6 +27,8 @@ class ProfileRepo(Protocol):
     def set_consent(self, user_id: UUID, consent_recording: bool) -> ProfileRow | None: ...
 
     def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None: ...
+
+    def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None: ...
 
     def delete_profile(self, user_id: UUID) -> bool: ...
 
