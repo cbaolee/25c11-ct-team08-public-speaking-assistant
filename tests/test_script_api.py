@@ -13,7 +13,7 @@ from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
-from src.app.config import settings
+from src.app.config import max_saved_scripts, settings
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
@@ -302,13 +302,12 @@ def test_list_scripts_returns_summaries_newest_first_with_cursor(script_api, mon
     assert first["limit"] == 10
 
 
-def test_default_script_list_returns_all_saved_scripts(script_api, monkeypatch) -> None:
-    client, repos, state = script_api
-    monkeypatch.setattr(app_main, "max_saved_scripts", 30)
-    for index in range(30):
+def _store_scripts(repos, user_id, count: int) -> None:
+    """Put `count` scripts straight into the repo (bypasses the per-user cap)."""
+    for index in range(count):
         body = f"Saved script number {index}."
         repos.scripts.create_script(
-            state["user"].id,
+            user_id,
             NewScript(
                 title=f"Script {index}",
                 body=body,
@@ -318,13 +317,28 @@ def test_default_script_list_returns_all_saved_scripts(script_api, monkeypatch) 
             ),
         )
 
-    response = client.get("/api/scripts")
 
-    assert response.status_code == 200
-    assert len(response.json()["items"]) == 30
-    assert response.json()["next_cursor"] is None
-    assert response.json()["total"] == 30
-    assert response.json()["limit"] == 30
+def test_default_script_list_returns_all_saved_scripts(script_api) -> None:
+    # No monkeypatch here: the Query default for `limit` is bound when main.py is imported,
+    # so it is always config.max_saved_scripts from app_constants.toml.
+    client, repos, state = script_api
+    _store_scripts(repos, state["user"].id, max_saved_scripts)
+
+    body = client.get("/api/scripts").json()  # no limit: the default must cover the cap
+
+    assert len(body["items"]) == max_saved_scripts
+    assert body["next_cursor"] is None
+    assert body["total"] == max_saved_scripts
+
+
+def test_script_list_reports_cap_as_limit(script_api) -> None:
+    # script_api sets max_saved_scripts = 2; `limit` in the body is read at request time.
+    client, repos, state = script_api
+    _store_scripts(repos, state["user"].id, 1)
+
+    body = client.get("/api/scripts?limit=1").json()
+
+    assert (body["total"], body["limit"]) == (1, 2)
 
 
 def test_delete_script_keeps_practiced_session_snapshot(script_api) -> None:

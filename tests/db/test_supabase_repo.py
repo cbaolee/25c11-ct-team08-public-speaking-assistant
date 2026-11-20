@@ -8,11 +8,15 @@ They need SUPABASE_URL, SUPABASE_SERVICE_KEY, DEV_USER_ID and DEV2_USER_ID
 """
 
 import os
+from io import BytesIO
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from dotenv import dotenv_values
+from PIL import Image
 
+from src.app import main as app_main
 from src.app.config import max_list_page_size, settings
 from src.app.db import factory
 from src.app.db.models import (
@@ -20,12 +24,16 @@ from src.app.db.models import (
     NewBaseline,
     NewScript,
     NewSession,
+    ScriptLimitReachedError,
     StorageError,
+    build_avatar_path,
+    build_content_hash,
     build_object_path,
     encode_cursor,
 )
 from src.app.db.supabase_repo import (
     SupabaseBaselineRepo,
+    _execute,
     _newest_page,
     _validate_object_path,
 )
@@ -71,40 +79,45 @@ def test_newest_page_rejects_bad_limit():
         _newest_page(None, max_list_page_size + 1, None)
 
 
+class _FakeRpcClient:
+    """Stands in for the Supabase client: records the RPC call, returns fixed data."""
+
+    def __init__(self, data):
+        self.data, self.params = data, None
+
+    def rpc(self, name, params):
+        assert name == "replace_current_baseline"
+        self.params = params
+        data = self.data
+
+        class _Request:
+            def execute(self):
+                return type("Response", (), {"data": data})()
+
+        return _Request()
+
+
+def _baseline_json(baseline_id, user_id, *, is_current: bool) -> dict:
+    return {
+        "id": str(baseline_id),
+        "user_id": str(user_id),
+        "median_pause_s": 0.5,
+        "hesitation_threshold_s": 0.9,
+        "median_f0_hz": 120.0,
+        "mean_loudness_db": 65.0,
+        "flags": [],
+        "audio_path": None,
+        "is_current": is_current,
+        "recorded_at": "2026-11-20T11:00:00+00:00",
+    }
+
+
 def test_replace_baseline_calls_single_rpc_transaction():
-    class FakeRpcRequest:
-        def execute(self):
-            class Response:
-                data = {
-                    "new_row": {
-                        "id": str(new.id),
-                        "user_id": str(user_id),
-                        "median_pause_s": 0.5,
-                        "hesitation_threshold_s": 0.9,
-                        "median_f0_hz": 120.0,
-                        "mean_loudness_db": 65.0,
-                        "flags": [],
-                        "audio_path": None,
-                        "is_current": True,
-                        "recorded_at": "2026-11-20T11:00:00+00:00",
-                    },
-                    "previous_row": None,
-                }
-
-            return Response()
-
-    class FakeClient:
-        def __init__(self):
-            self.params = None
-
-        def rpc(self, name, params):
-            assert name == "replace_current_baseline"
-            self.params = params
-            return FakeRpcRequest()
-
     user_id = uuid4()
     new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
-    client = FakeClient()
+    client = _FakeRpcClient(
+        {"new_row": _baseline_json(new.id, user_id, is_current=True), "previous_row": None}
+    )
     row, previous = SupabaseBaselineRepo(client).replace_current_baseline(user_id, new)
 
     assert row.id == new.id
@@ -112,6 +125,27 @@ def test_replace_baseline_calls_single_rpc_transaction():
     assert previous is None
     assert client.params["p_user_id"] == str(user_id)
     assert client.params["p_id"] == str(new.id)
+
+
+def test_replace_baseline_returns_previous_row():
+    user_id, old_id = uuid4(), uuid4()
+    new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
+    client = _FakeRpcClient(
+        {
+            "new_row": _baseline_json(new.id, user_id, is_current=True),
+            "previous_row": _baseline_json(old_id, user_id, is_current=False),
+        }
+    )
+    _, previous = SupabaseBaselineRepo(client).replace_current_baseline(user_id, new)
+
+    assert previous.id == old_id
+
+
+@pytest.mark.parametrize("data", [{"new_row": None, "previous_row": None}, [], None])
+def test_replace_baseline_without_new_row_raises(data):
+    new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
+    with pytest.raises(StorageError):
+        SupabaseBaselineRepo(_FakeRpcClient(data)).replace_current_baseline(uuid4(), new)
 
 
 # ---------- integration tests (psc-dev only) ----------
@@ -311,13 +345,38 @@ def test_replace_current_baseline_keeps_one_current(env):
     assert previous.id == first.id
     assert repos.baselines.get_current_baseline(owner).id == new_row.id == second.id
 
-    if original is not None:  # give the dev user back the baseline it had before
-        factory.get_supabase_client().table("baselines").update({"is_current": False}).eq(
-            "user_id", str(owner)
-        ).execute()
-        factory.get_supabase_client().table("baselines").update({"is_current": True}).eq(
-            "id", str(original.id)
-        ).execute()
+    _restore_current_baseline(owner, original)
+
+
+def _restore_current_baseline(owner: UUID, original) -> None:
+    """Give the dev user back the baseline it had before the test."""
+    if original is None:
+        return
+    client = factory.get_supabase_client()
+    client.table("baselines").update({"is_current": False}).eq("user_id", str(owner)).execute()
+    client.table("baselines").update({"is_current": True}).eq("id", str(original.id)).execute()
+
+
+@pytest.mark.integration
+def test_replace_baseline_failed_insert_keeps_old_current(env):
+    repos, owner, _, created = env
+    original = repos.baselines.get_current_baseline(owner)
+    keep = NewBaseline(id=uuid4(), hesitation_threshold_s=0.8)
+    created["baselines"].append(keep.id)
+    repos.baselines.replace_current_baseline(owner, keep)
+
+    # hesitation_threshold_s is "not null": the insert inside the function fails,
+    # so Postgres must also undo the "is_current = false" it ran just before.
+    with pytest.raises(StorageError):
+        _execute(
+            factory.get_supabase_client().rpc(
+                "replace_current_baseline",
+                {"p_user_id": str(owner), "p_id": str(uuid4()), "p_hesitation_threshold_s": None},
+            )
+        )
+
+    assert repos.baselines.get_current_baseline(owner).id == keep.id
+    _restore_current_baseline(owner, original)
 
 
 @pytest.mark.integration
@@ -339,3 +398,116 @@ def test_audio_store_upload_conflict_signed_url_and_delete(env):
     repos.files.delete_files(owner, bucket, [path])  # missing file is ignored
     with pytest.raises(StorageError):
         repos.files.download_file(owner, bucket, path)
+
+
+# ---------- avatar and preferences (psc-dev, needs db/migrations/0003) ----------
+
+
+@pytest.fixture
+def profile_restore(env):
+    """Put the test user's avatar_path and preferences back as they were."""
+    repos, owner, _, _ = env
+    before = repos.profiles.get_profile(owner)
+    yield env
+    client = factory.get_supabase_client()
+    client.table("profiles").update(
+        {"avatar_path": before.avatar_path, "preferences": before.preferences}
+    ).eq("id", str(owner)).execute()
+
+
+def _webp(color: str) -> bytes:
+    out = BytesIO()
+    Image.new("RGB", (8, 8), color).save(out, format="WEBP")
+    return out.getvalue()
+
+
+@pytest.mark.integration
+def test_avatar_upload_twice_sign_and_delete(profile_restore):
+    repos, owner, _, created = profile_restore
+    bucket, path = settings.avatars_bucket, build_avatar_path(owner)
+    created["files"].append((bucket, path))
+
+    repos.files.upload_file(owner, bucket, path, _webp("red"), "image/webp", True)
+    repos.files.upload_file(owner, bucket, path, _webp("blue"), "image/webp", True)
+    listed = factory.get_supabase_client().storage.from_(bucket).list(str(owner))
+    assert [item["name"] for item in listed] == ["avatar.webp"]  # upsert keeps one file
+
+    url = repos.files.create_signed_url(owner, bucket, path, settings.signed_url_ttl_s)
+    assert httpx.get(url, timeout=10).status_code == 200
+
+    assert repos.profiles.set_avatar_path(owner, path).avatar_path == path
+    assert repos.profiles.set_avatar_path(owner, None).avatar_path is None
+
+    repos.files.delete_files(owner, bucket, [path])
+    assert factory.get_supabase_client().storage.from_(bucket).list(str(owner)) == []
+
+
+@pytest.mark.integration
+def test_merge_preferences_keeps_other_keys(profile_restore):
+    repos, owner, _, _ = profile_restore
+    factory.get_supabase_client().table("profiles").update({"preferences": {"theme": "dark"}}).eq(
+        "id", str(owner)
+    ).execute()
+
+    row = repos.profiles.merge_preferences(owner, {"follow_wpm": 150})
+    assert row.preferences == {"theme": "dark", "follow_wpm": 150}
+    row = repos.profiles.merge_preferences(owner, {"follow_wpm": 155})
+    assert row.preferences == {"theme": "dark", "follow_wpm": 155}
+    assert repos.profiles.get_profile(owner).preferences["follow_wpm"] == 155
+
+
+# ---------- saved-script cap and list (psc-dev) ----------
+
+
+def _new_script(body: str) -> NewScript:
+    return NewScript(
+        title="Integration test script",
+        body=body,
+        word_count=len(body.split()),
+        source="written",
+        content_hash=build_content_hash(body),
+    )
+
+
+@pytest.mark.integration
+def test_list_scripts_returns_more_than_twenty(env):
+    repos, owner, _, created = env
+    before = repos.scripts.count_scripts(owner)
+    for index in range(21):
+        row = repos.scripts.create_script(owner, _new_script(f"List test {uuid4()} {index}."))
+        created["scripts"].append(row.id)
+
+    assert repos.scripts.count_scripts(owner) == before + 21
+    rows = repos.scripts.list_scripts(owner, max_list_page_size, None)
+    assert len(rows) >= 21  # the old repo limit stopped at 20
+
+
+@pytest.mark.integration
+def test_save_script_at_cap_raises_and_duplicate_still_returns(env, monkeypatch):
+    repos, owner, _, created = env
+    first = repos.scripts.create_script(owner, _new_script(f"Cap test {uuid4()}."))
+    created["scripts"].append(first.id)
+    count = repos.scripts.count_scripts(owner)
+    monkeypatch.setattr(app_main, "max_saved_scripts", count)  # the user is now at the cap
+
+    with pytest.raises(ScriptLimitReachedError) as err:
+        app_main._save_script_row(repos, owner, _new_script(f"New text {uuid4()}."))
+    assert (err.value.limit, err.value.count) == (count, count)
+
+    same, created_new = app_main._save_script_row(repos, owner, _new_script(first.body))
+    assert (same.id, created_new) == (first.id, False)  # a duplicate wins even at the cap
+
+
+@pytest.mark.integration
+def test_delete_script_keeps_session_snapshot(env):
+    repos, owner, _, created = env
+    script = repos.scripts.create_script(owner, _new_script(f"Snapshot test {uuid4()}."))
+    session = repos.sessions.create_session(
+        owner, _new_session().model_copy(update={"script_id": script.id})
+    )
+    created["sessions"].append(session.id)
+
+    assert repos.scripts.delete_script(owner, script.id) is True  # deleted here, not in cleanup
+    kept = repos.sessions.get_session(owner, session.id)
+    assert kept.script_id is None  # sessions.script_id is "on delete set null"
+    assert kept.script_snapshot == "Integration test script"
