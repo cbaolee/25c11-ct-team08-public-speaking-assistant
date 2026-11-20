@@ -18,8 +18,10 @@ avatar_max_bytes = 2_097_152
 avatar_size_px = 256
 # Largest avatar width or height before resizing, in pixels; larger pictures are rejected
 avatar_max_side_px = 4096
-# Saved scripts per user; POST /api/scripts returns 429 rate_limited above this
+# Saved scripts per user; POST /api/scripts returns 409 script_limit_reached at this count
 max_saved_scripts = 30
+# Most rows one list call may return (sessions and saved scripts); must be >= max_saved_scripts
+max_list_page_size = 50
 # Largest uploaded audio file, in bytes (100 MB)
 max_upload_bytes = 104_857_600
 

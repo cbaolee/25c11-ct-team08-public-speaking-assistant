@@ -83,6 +83,10 @@ tests/db/                 Repository and helper tests
 | `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor`          |
 | `GET /api/sessions/{id}`           | One session: full result and signed audio URL, or compact summary    |
 | `DELETE /api/sessions/{id}`        | Delete the session files, then the row                               |
+| `POST /api/scripts`                | Save a script; duplicate text returns the existing row, script cap returns 409 |
+| `GET /api/scripts?limit=&cursor=`  | Page of saved-script summaries with `total`, cap `limit`, and `next_cursor` |
+| `GET /api/scripts/{id}`            | One saved script, including its body                                 |
+| `DELETE /api/scripts/{id}`         | Delete a saved script; linked sessions retain their script snapshot |
 
 Error bodies used by these endpoints:
 
@@ -94,6 +98,7 @@ Error bodies used by these endpoints:
 | 404    | `{"error": "session_not_found"}`                                      | Unknown session or another user's session      |
 | 400    | `{"error": "invalid_cursor"}`                                         | Malformed cursor                               |
 | 503    | `{"error": "session_storage_unavailable"}`                            | Database or storage error in session endpoints |
+| 409    | `{"error_code": "script_limit_reached", "limit": 30, "count": 30, ...}` | A new saved script would exceed the per-user cap |
 
 ## 4. Database and storage
 
@@ -110,7 +115,8 @@ flowchart TB
 
 - **Interfaces:** `ProfileRepo`, `BaselineRepo`, `ScriptRepo`, `SessionRepo`, `AudioStore`. Every method takes `user_id` first.
 - **Two implementations with the same behaviour:** Supabase for real data, in-memory for tests and local runs without a project. Production can never fall back to memory.
-- **Shared rules:** a missing row and another user's row look the same (`None` / `False`); lists are newest first by `(created_at, id)`; `limit` is 1..20; library errors become `StorageError` (`ConflictError` for duplicates).
+- **Shared rules:** a missing row and another user's row look the same (`None` / `False`); lists are newest first by `(created_at, id)`; list limits are 1..`storage.max_list_page_size`; library errors become `StorageError` (`ConflictError` for duplicates).
+- List endpoints accept up to `storage.max_list_page_size`; `/api/scripts` defaults to and reports the `storage.max_saved_scripts` cap. Startup rejects a page size smaller than that cap.
 - **Object paths** are built only by `build_object_path` as `{user_id}/{object_id}.webm` or `.series.json`; any other path is rejected.
 
 ### 4.2 Data model
@@ -250,4 +256,4 @@ Database and storage settings:
 | `src/app/deps.py` | `get_current_user` reads and verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth cannot be reached. |
 | UI | Keeps the tokens in `localStorage` (F5 keeps the login) and swaps the refresh token for a new session after a 401. |
 
-Saved scripts (`/api/scripts*`) live in the `scripts` table. `/api/evaluate` accepts `script_id` and `topic`, and stores the profile's `target_accent` with the session.
+Saved scripts (`/api/scripts*`) live in the `scripts` table, with a per-user cap from `storage.max_saved_scripts`. A duplicate body reuses its existing row even when the user is at the cap; a new script at the cap returns `409 script_limit_reached` with `limit` and `count`. `GET /api/scripts` returns `items`, `next_cursor`, `total`, and the configured cap as `limit`. Deleting a saved script nulls linked session `script_id` values without removing `script_snapshot`. `/api/evaluate` accepts `script_id` and `topic`, and stores the profile's `target_accent` with the session.
