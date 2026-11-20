@@ -181,14 +181,37 @@ export function followCounts(text) {
   return sentences.map((_, si) => words.filter(w => w.si === si).length);
 }
 export function buildFollow(counts) {
-  return EvaluateClient.followSchedule({ wordCounts: counts, wpm: S.followWpm, leadS: CONFIG.FOLLOW_LEAD_S, gapS: CONFIG.FOLLOW_GAP_S });
+  return EvaluateClient.followSchedule({ wordCounts: counts, wpm: S.followWpm, limits: followLimits(), leadS: CONFIG.FOLLOW_LEAD_S, gapS: CONFIG.FOLLOW_GAP_S });
 }
-/* Highlight speed slider. It only moves the demo highlight: nothing here is sent to /api/* or used by score() (ADR-003 scores 130-160 WPM, unrelated). */
+/* Highlight speed slider. It only moves the demo highlight and is not used by score() (ADR-003 scores 130-160 WPM, unrelated).
+   Saved in profiles.preferences.follow_wpm; localStorage only keeps it when that save fails. */
 export const FOLLOW_WPM_KEY = 'psc.followWpm';
 let followWpmSaveTimer = null;
+export function followLimits() {                  // slider limits from CONFIG (app_constants.toml [web])
+  return { min: CONFIG.FOLLOW_WPM_MIN, max: CONFIG.FOLLOW_WPM_MAX, step: CONFIG.FOLLOW_WPM_STEP, def: CONFIG.FOLLOW_WPM_DEFAULT };
+}
+/* Fallback when the profile has no follow_wpm: the value kept after a failed save, else the default. */
 export function loadFollowWpm() {
-  const limits = { min: CONFIG.FOLLOW_WPM_MIN, max: CONFIG.FOLLOW_WPM_MAX, step: CONFIG.FOLLOW_WPM_STEP, def: CONFIG.FOLLOW_WPM_DEFAULT };
-  try { S.followWpm = EvaluateClient.parseFollowWpm(localStorage.getItem(FOLLOW_WPM_KEY), limits); } catch (e) { S.followWpm = CONFIG.FOLLOW_WPM_DEFAULT; }
+  try { S.followWpm = EvaluateClient.parseFollowWpm(localStorage.getItem(FOLLOW_WPM_KEY), followLimits()); } catch (e) { S.followWpm = CONFIG.FOLLOW_WPM_DEFAULT; }
+}
+/* Profile value wins; old accounts (preferences = {}) fall back to loadFollowWpm. */
+export function applyFollowWpm(prefs) {
+  const v = prefs ? prefs.follow_wpm : null;
+  if (v != null) S.followWpm = EvaluateClient.parseFollowWpm(v, followLimits()); else loadFollowWpm();
+}
+export function clearFollowWpm() {                // on log out: the next account must not get this value
+  clearTimeout(followWpmSaveTimer); followWpmSaveTimer = null;
+  try { localStorage.removeItem(FOLLOW_WPM_KEY); } catch (e) { /* storage blocked */ }
+}
+function saveFollowWpm() {
+  api('/api/profile', { method: 'PATCH', json: { preferences: { follow_wpm: S.followWpm } } })
+    .then(r => {
+      if (!r.ok) throw new Error('follow_wpm not saved');
+      try { localStorage.removeItem(FOLLOW_WPM_KEY); } catch (e) { /* storage blocked */ }
+    })
+    .catch(() => {                                // API down: keep the value on this device
+      try { localStorage.setItem(FOLLOW_WPM_KEY, String(S.followWpm)); } catch (e) { /* private mode: lasts until reload */ }
+    });
 }
 export function paintFollowWpm() {
   const sl = $('#followWpm'); if (!sl) return;
@@ -200,16 +223,13 @@ export function paintFollowWpm() {
   $('#followWpmVal').textContent = T('practice.followWpmShort', { n: S.followWpm });
 }
 export function onFollowWpm() {
-  S.followWpm = EvaluateClient.parseFollowWpm(Number($('#followWpm').value), { min: CONFIG.FOLLOW_WPM_MIN, max: CONFIG.FOLLOW_WPM_MAX, step: CONFIG.FOLLOW_WPM_STEP, def: CONFIG.FOLLOW_WPM_DEFAULT });
-  try { localStorage.setItem(FOLLOW_WPM_KEY, String(S.followWpm)); } catch (e) { /* private mode: lasts until reload */ }
-  paintFollowWpm();
-  if (followWpmSaveTimer) clearTimeout(followWpmSaveTimer);
-  followWpmSaveTimer = setTimeout(() => {
-    api('/api/profile', { method: 'PATCH', json: { preferences: { follow_wpm: S.followWpm } } }).catch(() => {});
-  }, CONFIG.FOLLOW_WPM_SAVE_DELAY_MS);
+  S.followWpm = EvaluateClient.parseFollowWpm(Number($('#followWpm').value), followLimits());
+  paintFollowWpm();                               // the screen updates at once; the save waits for the last move
+  clearTimeout(followWpmSaveTimer);
+  followWpmSaveTimer = setTimeout(saveFollowWpm, CONFIG.FOLLOW_WPM_SAVE_DELAY_MS);
   const f = S.follow;
   if (S.rec && f) {   // keep the current sentence and the part already read; only the rest speeds up or slows down
-    f.segs = EvaluateClient.followRetime(f.segs, f.idx, f.now || 0, { wordCounts: f.counts, wpm: S.followWpm, leadS: CONFIG.FOLLOW_LEAD_S, gapS: CONFIG.FOLLOW_GAP_S });
+    f.segs = EvaluateClient.followRetime(f.segs, f.idx, f.now || 0, { wordCounts: f.counts, wpm: S.followWpm, limits: followLimits(), leadS: CONFIG.FOLLOW_LEAD_S, gapS: CONFIG.FOLLOW_GAP_S });
   }
 }
 export function followTick(s) {

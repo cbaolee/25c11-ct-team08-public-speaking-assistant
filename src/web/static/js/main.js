@@ -202,13 +202,13 @@ export function init() {
     withBusy(api('/api/profile/avatar', { method: 'PUT', body: fd }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
       if (!r.ok) { toast((j && j.message) || T('profile.errImage'), true); return; }
       S.avatar = j.avatar_url; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okAvatar'));
-    })).catch(() => toast(T('profile.errImage'), true));
+    })).catch(() => toast(T('profile.errAvatarSave'), true));
   };
   $('#avRemove').onclick = () => {
     withBusy(api('/api/profile/avatar', { method: 'DELETE' }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
-      if (!r.ok) { toast(T('profile.errImage'), true); return; }
+      if (!r.ok) { toast((j && j.message) || T('profile.errAvatarRemove'), true); return; }
       S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved'));
-    })).catch(() => toast(T('profile.errImage'), true));
+    })).catch(() => toast(T('profile.errAvatarRemove'), true));
   };
   $('#profileBaselineStart').onclick = toggleBaseline;
   $('#profileBaselineAgain').onclick = openBaselineRecorder;
