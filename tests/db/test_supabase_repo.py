@@ -8,10 +8,13 @@ They need SUPABASE_URL, SUPABASE_SERVICE_KEY, DEV_USER_ID and DEV2_USER_ID
 """
 
 import os
+from io import BytesIO
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
 from dotenv import dotenv_values
+from PIL import Image
 
 from src.app.config import settings
 from src.app.db import factory
@@ -21,6 +24,7 @@ from src.app.db.models import (
     NewScript,
     NewSession,
     StorageError,
+    build_avatar_path,
     build_object_path,
     encode_cursor,
 )
@@ -292,3 +296,59 @@ def test_audio_store_upload_conflict_signed_url_and_delete(env):
     repos.files.delete_files(owner, bucket, [path])  # missing file is ignored
     with pytest.raises(StorageError):
         repos.files.download_file(owner, bucket, path)
+
+
+# ---------- avatar and preferences (psc-dev, needs db/migrations/0003) ----------
+
+
+@pytest.fixture
+def profile_restore(env):
+    """Put the test user's avatar_path and preferences back as they were."""
+    repos, owner, _, _ = env
+    before = repos.profiles.get_profile(owner)
+    yield env
+    client = factory.get_supabase_client()
+    client.table("profiles").update(
+        {"avatar_path": before.avatar_path, "preferences": before.preferences}
+    ).eq("id", str(owner)).execute()
+
+
+def _webp(color: str) -> bytes:
+    out = BytesIO()
+    Image.new("RGB", (8, 8), color).save(out, format="WEBP")
+    return out.getvalue()
+
+
+@pytest.mark.integration
+def test_avatar_upload_twice_sign_and_delete(profile_restore):
+    repos, owner, _, created = profile_restore
+    bucket, path = settings.avatars_bucket, build_avatar_path(owner)
+    created["files"].append((bucket, path))
+
+    repos.files.upload_file(owner, bucket, path, _webp("red"), "image/webp", True)
+    repos.files.upload_file(owner, bucket, path, _webp("blue"), "image/webp", True)
+    listed = factory.get_supabase_client().storage.from_(bucket).list(str(owner))
+    assert [item["name"] for item in listed] == ["avatar.webp"]  # upsert keeps one file
+
+    url = repos.files.create_signed_url(owner, bucket, path, settings.signed_url_ttl_s)
+    assert httpx.get(url, timeout=10).status_code == 200
+
+    assert repos.profiles.set_avatar_path(owner, path).avatar_path == path
+    assert repos.profiles.set_avatar_path(owner, None).avatar_path is None
+
+    repos.files.delete_files(owner, bucket, [path])
+    assert factory.get_supabase_client().storage.from_(bucket).list(str(owner)) == []
+
+
+@pytest.mark.integration
+def test_merge_preferences_keeps_other_keys(profile_restore):
+    repos, owner, _, _ = profile_restore
+    factory.get_supabase_client().table("profiles").update({"preferences": {"theme": "dark"}}).eq(
+        "id", str(owner)
+    ).execute()
+
+    row = repos.profiles.merge_preferences(owner, {"follow_wpm": 150})
+    assert row.preferences == {"theme": "dark", "follow_wpm": 150}
+    row = repos.profiles.merge_preferences(owner, {"follow_wpm": 155})
+    assert row.preferences == {"theme": "dark", "follow_wpm": 155}
+    assert repos.profiles.get_profile(owner).preferences["follow_wpm"] == 155
