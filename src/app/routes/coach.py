@@ -33,9 +33,9 @@ async def coach_note(session_id: str, user: Annotated[CurrentUser, Depends(get_c
     if row is None:
         return JSONResponse(status_code=404, content={'error_code': 'session_not_found',
                                                       'message': 'Session not found.'})
-    if row.status != 'ok':
-        return JSONResponse(status_code=409, content={'error_code': 'insufficient_audio',
-                                                      'message': 'Insufficient audio.'})
+    if row.status not in {'ok', 'insufficient_audio'}:
+        return JSONResponse(status_code=409, content={'error_code': 'coach_note_unavailable',
+                                                      'message': 'Coach note unavailable.'})
     note = cache.get(session_uuid)
     if note is None:
         note = await run_in_threadpool(generate_coach_note, row.result, settings)

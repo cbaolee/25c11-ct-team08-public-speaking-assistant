@@ -20,6 +20,7 @@ from src.audio_processing.text_norm import normalize_token, trailing_punct
 # scoring threshold of ADR-003; it only absorbs the time offset between the two sources.
 # Starting value, tune in M7.
 WORD_PAUSE_TOLERANCE_S = 0.1
+MIN_VOICED_RATIO = 0.30
 
 
 @dataclass(frozen=True)
@@ -99,7 +100,7 @@ def check_audio_quality(segments: list[SpeechSegment], duration_s: float) -> Non
     total_speech = sum((seg.end_s - seg.start_s) for seg in segments)
     speech_ratio = total_speech / duration_s
 
-    if speech_ratio < 0.30:
+    if speech_ratio < MIN_VOICED_RATIO:
         raise InsufficientAudio(r"Speech < 30% of audio duration")
 
 

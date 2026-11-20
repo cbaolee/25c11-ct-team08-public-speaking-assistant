@@ -84,6 +84,8 @@ server_grace_s = 2
 max_target_chars = 500
 
 [coach]
+# Heuristic to block implications of a score for insufficient_audio sessions.
+insufficient_banned_words = ["score", "scores", "scored", "scoring", "grade", "grades", "graded", "rating", "ratings", "rated", "ranked", "points", "marks", "out of", "/100", "excellent"]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.3). Calibrate in M7.
 max_error_words = 15
 timeout_s = 20

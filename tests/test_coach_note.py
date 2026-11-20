@@ -191,13 +191,99 @@ def test_endpoint_invalid_uuid(endpoint_env):
     post.assert_not_called()
 
 
-def test_endpoint_insufficient_audio(endpoint_env, result):
+@pytest.fixture
+def insufficient_result():
+    return {"status": "insufficient_audio", "reason": "low_voiced_ratio",
+            "audio": {"duration_s": 12.34, "voiced_ratio": 0.12}, "flags": [],
+            "transcript": "secret transcript", "script": "secret script",
+            "user_id": "secret user", "session_id": "secret session",
+            "email": "secret@example.com", "name": "secret name"}
+
+
+def test_insufficient_payload_is_minimal(insufficient_result):
+    import json
+
+    payload = coach.build_insufficient_payload(insufficient_result)
+    assert set(payload) == {"status", "reason", "duration_s", "voiced_pct",
+                            "min_voiced_pct", "flags"}
+    assert payload["duration_s"] == 12.3
+    assert payload["voiced_pct"] == 12 and payload["min_voiced_pct"] == 30
+    assert all(value not in json.dumps(payload) for value in (
+        "secret transcript", "secret script", "secret user", "secret session",
+        "secret@example.com", "secret name"))
+    assert coach.allowed_numbers(payload) == {Decimal("12.3"), Decimal("12"), Decimal("30")}
+    assert coach.build_insufficient_payload({})["duration_s"] is None
+    assert coach.build_insufficient_payload({})["voiced_pct"] is None
+
+
+@pytest.mark.parametrize("ratio, expected",
+                         [(0.29, 29), (0.57, 57), (0.299, 29), (0.12, 12), (None, None)])
+def test_insufficient_payload_voiced_pct(insufficient_result, ratio, expected):
+    insufficient_result["audio"]["voiced_ratio"] = ratio
+    payload = coach.build_insufficient_payload(insufficient_result)
+    assert payload["voiced_pct"] == expected
+    assert payload["min_voiced_pct"] == 30
+
+
+def test_endpoint_insufficient_audio(endpoint_env, insufficient_result):
+    import json
+
     repos, user_id, post = endpoint_env
-    row = _endpoint_session(repos, user_id, result, status="insufficient_audio")
+    post.return_value = _cerebras_ok(json.dumps(note("Please record again.")))
+    row = _endpoint_session(repos, user_id, insufficient_result, status="insufficient_audio")
+    client = TestClient(app)
+    responses = [client.post(f"/api/sessions/{row.id}/coach-note") for _ in range(2)]
+    assert all(response.status_code == 200 for response in responses)
+    assert {"summary", "next_step", "source"} <= responses[0].json().keys()
+    assert responses[0].json()["source"] == "cerebras"
+    assert responses[1].json() == responses[0].json()
+    post.assert_called_once()
+    messages = post.call_args.kwargs["json"]["messages"]
+    assert messages[0]["content"] == coach._SYSTEM_INSUFFICIENT != coach._SYSTEM
+    assert messages[1]["content"] == coach._data(
+        coach.build_insufficient_payload(insufficient_result))
+
+
+@pytest.mark.parametrize("bad", [note("Your score is available."), note("Result 8/100"),
+                                note("Try 45 times."), {**note("Try again."), "next_step": "  "}])
+def test_insufficient_invalid_output_falls_back(insufficient_result, bad):
+    output = coach.generate_coach_note(insufficient_result, None, cerebras=lambda *a, **kw: bad)
+    assert output["source"] == "rule"
+
+
+@pytest.mark.parametrize("summary", ["Your grades are available.", "Ratings are available.",
+                                     "You ranked highly."])
+def test_insufficient_banned_word_falls_back(insufficient_result, summary):
+    output = coach.generate_coach_note(
+        insufficient_result, None, cerebras=lambda *a, **kw: note(summary))
+    assert output["source"] == "rule"
+
+
+@pytest.mark.parametrize("reason", ["low_voiced_ratio", "empty_transcript", "unknown"])
+def test_insufficient_rule_validates(insufficient_result, reason):
+    insufficient_result["reason"] = reason
+    payload = coach.build_insufficient_payload(insufficient_result)
+    value = coach.rule_based_insufficient_note(payload)
+    moderator = Mock(check_text=Mock(return_value=SimpleNamespace(allowed=True)))
+    assert value["strengths"] == []
+    banned = coach.CONSTANTS["coach"]["insufficient_banned_words"]
+    assert coach.validate_output(value, payload, coach.CONSTANTS["coach"]["max_output_chars"],
+                                 moderator, banned_words=banned, require_next_step=True) == value
+
+
+def test_endpoint_unsupported_status(endpoint_env, insufficient_result, monkeypatch):
+    repos, user_id, post = endpoint_env
+    row = _endpoint_session(repos, user_id, insufficient_result)
+    monkeypatch.setattr(repos.sessions, "get_session",
+                        lambda *args: SimpleNamespace(status="processing"))
     response = TestClient(app).post(f"/api/sessions/{row.id}/coach-note")
     assert response.status_code == 409
-    assert response.json()["error_code"] == "insufficient_audio"
+    assert response.json()["error_code"] == "coach_note_unavailable"
     post.assert_not_called()
+
+
+def test_min_voiced_ratio():
+    assert coach.MIN_VOICED_RATIO == 0.30
 
 
 def test_endpoint_storage_error(endpoint_env, monkeypatch):
