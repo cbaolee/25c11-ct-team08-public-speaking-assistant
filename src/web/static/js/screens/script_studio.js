@@ -100,7 +100,7 @@ export function clearChatHistory(userId) {        // on Log out and Delete accou
   try { localStorage.removeItem(chatHistoryKey(userId)); } catch (e) { /* storage may be unavailable */ }
 }
 function chatMaxMessages() {
-  return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 20);
+  return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 1);   // default lives in CONFIG; 1 only guards a broken value
 }
 function isQuotaError(e) {                        // localStorage is full (name/code differ between browsers)
   return !!e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
