@@ -83,3 +83,5 @@ follow_gap_s = 0.5
 # Sessions per History page, and most pages loaded on Home and History
 history_page_size = 20
 history_max_pages = 5
+# Most chat messages kept in localStorage for the Script Studio chat
+chat_history_max_messages = 20

@@ -13,6 +13,7 @@ export const CONFIG = {
   FOLLOW_WPM_STEP: 5,                  // slider step, words per minute
   FOLLOW_WPM_DEFAULT: 145,             // used when the profile has no follow_wpm
   FOLLOW_WPM_SAVE_DELAY_MS: 800,       // wait after the last slider move before PATCH /api/profile, in ms
+  CHAT_HISTORY_MAX_MESSAGES: 20,
 };
 
 
@@ -24,6 +25,7 @@ export const S = {
   user: null, profile: null, consent: false, baseline: null, avatar: null,
   texts: { mine: null, sample: null, own: null }, pickerTab: 'mine', sampleN: 0,
   chatFile: null, lastReq: null, chatBusy: false,
+  chatHistory: [],
   audio: null, rec: null, brec: null, voiceTab: 'rec',
   sessions: [], currentSession: null, nextId: 1,
   play: { t: 0, on: false, iv: null },
