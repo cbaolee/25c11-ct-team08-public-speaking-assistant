@@ -7,11 +7,6 @@ import { toast } from './ui.js';
    The tokens from POST /api/auth/login are kept in localStorage, so F5 keeps the person logged in.
    api() adds `Authorization: Bearer`, and on a 401 swaps the refresh token for a new session once. */
 export const AUTH_KEY = 'psa.auth';
-export const chatHistoryKey = userId => 'psa.chat.' + userId;
-export function clearChatHistory(userId) {
-  if (!userId) return;
-  try { localStorage.removeItem(chatHistoryKey(userId)); } catch (e) { /* storage may be unavailable */ }
-}
 export const MIN_PASSWORD = 8;   // same rule as the backend (src/app/auth.py)
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const AUTH_ERR = { email_taken: 'auth.errTaken', invalid_email: 'auth.errEmail', weak_password: 'auth.errWeak', invalid_credentials: 'auth.errLogin' };

@@ -1,4 +1,4 @@
-import { api, chatHistoryKey, readJson } from '../api.js';
+import { api, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
 import { go, paintAvatar } from '../nav.js';
 import { loadSavedScripts } from '../screens/practice.js';
@@ -93,14 +93,17 @@ export function renderBlockedBubble(ai) {
     '<p>' + esc(T('script.blockedHarm')) + '</p>' +
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
-function chatMaxMessages() {
-  return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 20);
+/* The latest Script Studio chat, kept in localStorage per user so two accounts on one browser never see each other's chat. */
+const chatHistoryKey = userId => 'psa.chat.' + userId;
+export function clearChatHistory(userId) {        // on Log out and Delete account, not on session expiry
+  if (!userId) return;
+  try { localStorage.removeItem(chatHistoryKey(userId)); } catch (e) { /* storage may be unavailable */ }
 }
-function trimChatHistory() {
-  while (S.chatHistory.length > chatMaxMessages()) {
-    const oldest = S.chatHistory.shift();
-    if (oldest.bubble && oldest.bubble.remove) oldest.bubble.remove();
-  }
+function chatMaxMessages() {
+  return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 1);   // default lives in CONFIG; 1 only guards a broken value
+}
+function isQuotaError(e) {                        // localStorage is full (name/code differ between browsers)
+  return !!e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014);
 }
 function persistedMessage(message) {
   if (message.role === 'me') {
@@ -131,23 +134,28 @@ function persistedMessage(message) {
     },
   };
 }
+/* Only the stored copy is capped: the chat on screen keeps every message of this visit. */
+function storedChat(skip) {                       // newest N messages, minus `skip` oldest ones after a quota error
+  return S.chatHistory.slice(-chatMaxMessages()).slice(skip).map(persistedMessage);
+}
 export function persistChat() {
   if (!S.user || !S.user.id || !S.chatHistory.length) return;
-  trimChatHistory();
   const key = chatHistoryKey(S.user.id);
-  const write = () => localStorage.setItem(key, JSON.stringify(S.chatHistory.map(persistedMessage)));
   try {
-    write();
+    localStorage.setItem(key, JSON.stringify(storedChat(0)));
   } catch (e) {
-    if (!e || (e.name !== 'QuotaExceededError' && e.code !== 22 && e.code !== 1014)) return;
-    const oldest = S.chatHistory.shift();
-    if (oldest && oldest.bubble && oldest.bubble.remove) oldest.bubble.remove();
-    try { write(); } catch (retryError) { /* storage is blocked or still full */ }
+    if (!isQuotaError(e)) return;
+    try { localStorage.setItem(key, JSON.stringify(storedChat(1))); } catch (retryError) { /* blocked or still full */ }
   }
+}
+/* A saved script was deleted (Practice > Mine): its chat bubbles must save it again next time. */
+export function forgetSavedScript(id) {
+  let changed = false;
+  S.chatHistory.forEach(m => { if (m.script && m.script.savedId === id) { m.script.savedId = null; changed = true; } });
+  if (changed) persistChat();
 }
 function recordChatMessage(message) {
   S.chatHistory.push(message);
-  trimChatHistory();
   persistChat();
 }
 function renderUserMessage(message, animate = false) {

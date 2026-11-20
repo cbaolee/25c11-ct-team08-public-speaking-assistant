@@ -3,6 +3,7 @@ import { T } from '../i18n.js';
 import { logout } from './baseline_gate.js';
 import { saveConsent } from './profile_modal.js';
 import { levelAnim } from '../recorder.js';
+import { clearChatHistory } from '../screens/script_studio.js';
 import { S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
@@ -105,6 +106,7 @@ function confirmDelete() {
   deleteAccount().then(r => {
     if (r.status === 401) return;
     if (!r.ok) { $('#delConfirm').disabled = false; showErr(err, T('del.failed')); return; }
+    clearChatHistory(S.user && S.user.id);   // logout(true) keeps the chat, a deleted account must not
     logout(true);
     toast(T('del.done'));
   }).catch(() => { $('#delConfirm').disabled = false; showErr(err, T('del.failed')); });

@@ -34,7 +34,7 @@ import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing
 import { cancelEval, goStep, loadFollowWpm, loadSavedScripts, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, pickSavedScript, renderPractice, runEval, selectPickerTab, toggleRecording, updateOwnCount, useOwn } from './screens/practice.js';
 import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
 import { bindTxTips, onTxClick, openDetails, openPart, seekTo, seekWord, startPlayback, stopPlayback } from './screens/report.js';
-import { fitComposer, onChatAction, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
+import { fitComposer, forgetSavedScript, onChatAction, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
 import { CONFIG, RENDER, S } from './state.js';
 import { initHeroMic } from './hero_mic.js';
 import { closeUserMenu, onUserButtonClick, setupUserMenuHover } from './top_bar.js';
@@ -165,7 +165,7 @@ export function init() {
   $('#mineDel').onclick = () => {
     const id = $('#mineSel').value; if (!id) return;
     withBusy(api('/api/scripts/' + encodeURIComponent(id), { method: 'DELETE' }), T('busy.deleting')).then(r => {
-      if (r.ok) { if (S.texts.mine && S.texts.mine.id === id) S.texts.mine = null; toast('Script deleted.'); loadSavedScripts(); renderPractice(); }
+      if (r.ok) { if (S.texts.mine && S.texts.mine.id === id) S.texts.mine = null; forgetSavedScript(id); toast('Script deleted.'); loadSavedScripts(); renderPractice(); }
     }).catch(() => {});
   };
   $('#sampleBtn').onclick = pickSample;
