@@ -7,8 +7,10 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 import src.app.main as main
+import src.app.routes.profile as profile_routes
+from src.app.config import avatar_size_px, settings
 from src.app.db.factory import get_repos
-from src.app.db.models import ProfileUpsert, StorageError
+from src.app.db.models import ProfileUpsert, StorageError, build_avatar_path
 from tests.conftest import TEST_USER_ID
 
 
@@ -128,3 +130,105 @@ def test_upload_avatar_resizes_and_delete_clears_it(client):
     assert r.status_code == 200
     assert r.json()["avatar_url"] is None
     assert client.get("/api/profile").json()["avatar_path"] is None
+
+
+def _image_bytes(size=(600, 400), fmt="PNG", color="red", exif=None) -> bytes:
+    out = BytesIO()
+    image = Image.new("RGB", size, color)
+    if exif is not None:
+        image.save(out, format=fmt, exif=exif)
+    else:
+        image.save(out, format=fmt)
+    return out.getvalue()
+
+
+def _put_avatar(client, content, name="avatar.png"):
+    return client.put("/api/profile/avatar", files={"file": (name, content, "image/png")})
+
+
+def _stored_avatar(repos) -> Image.Image:
+    data = repos.files._state.files[(settings.avatars_bucket, build_avatar_path(TEST_USER_ID))]
+    return Image.open(BytesIO(data))
+
+
+@pytest.mark.parametrize(
+    "content", [b"hello, not a picture", _image_bytes(fmt="GIF")], ids=["renamed_text", "gif"]
+)
+def test_upload_avatar_rejects_non_picture(client, content):
+    r = _put_avatar(client, content)
+    assert r.status_code == 422
+    assert r.json()["error_code"] == "avatar_invalid"
+
+
+def test_upload_avatar_too_large_returns_413(client, monkeypatch):
+    monkeypatch.setattr(profile_routes, "avatar_max_bytes", 100)
+    r = _put_avatar(client, _image_bytes())
+    assert r.status_code == 413
+    assert r.json()["error_code"] == "avatar_too_large"
+
+
+def test_upload_avatar_too_many_pixels_returns_422(client, monkeypatch):
+    monkeypatch.setattr(profile_routes, "avatar_max_side_px", 500)
+    r = _put_avatar(client, _image_bytes(size=(600, 400)))
+    assert r.status_code == 422
+    assert r.json()["error_code"] == "avatar_invalid"
+
+
+def test_uploaded_avatar_is_one_square_webp(client, repos):
+    assert _put_avatar(client, _image_bytes()).status_code == 200
+    assert _put_avatar(client, _image_bytes(color="blue")).status_code == 200
+    keys = [k for k in repos.files._state.files if k[0] == settings.avatars_bucket]
+    assert keys == [(settings.avatars_bucket, build_avatar_path(TEST_USER_ID))]
+    stored = _stored_avatar(repos)
+    assert stored.format == "WEBP"
+    assert stored.size == (avatar_size_px, avatar_size_px)
+
+
+def test_upload_avatar_follows_exif_rotation(client, repos):
+    # 400x200: left half red, right half blue; EXIF 6 = shown rotated 90 degrees clockwise,
+    # so after rotation red must be on top.
+    image = Image.new("RGB", (400, 200), "blue")
+    image.paste((255, 0, 0), (0, 0, 200, 200))
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    out = BytesIO()
+    image.save(out, format="JPEG", exif=exif)
+    assert _put_avatar(client, out.getvalue(), "photo.jpg").status_code == 200
+    top = _stored_avatar(repos).convert("RGB").getpixel((avatar_size_px // 2, 5))
+    assert top[0] > 200 and top[2] < 60
+
+
+def test_upload_avatar_removes_file_when_path_save_fails(client, repos, monkeypatch):
+    def fail(*_args):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.profiles, "set_avatar_path", fail)
+    r = _put_avatar(client, _image_bytes())
+    assert r.status_code == 503
+    assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
+
+
+def test_upload_avatar_without_profile_stores_nothing(repos):
+    r = _put_avatar(TestClient(main.app), _image_bytes())
+    assert r.status_code == 404
+    assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
+
+
+def test_delete_avatar_removes_file_even_if_path_is_null(client, repos):
+    assert _put_avatar(client, _image_bytes()).status_code == 200
+    repos.profiles.set_avatar_path(TEST_USER_ID, None)
+    r = client.delete("/api/profile/avatar")
+    assert r.status_code == 200
+    assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
+
+
+def test_delete_avatar_when_none(client):
+    r = client.delete("/api/profile/avatar")
+    assert r.status_code == 200
+    assert r.json()["avatar_url"] is None
+
+
+def test_new_profile_has_no_avatar_and_empty_preferences(client):
+    body = client.get("/api/profile").json()
+    assert body["avatar_url"] is None
+    assert body["preferences"] == {}

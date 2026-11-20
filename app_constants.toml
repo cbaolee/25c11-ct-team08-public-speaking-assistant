@@ -16,6 +16,8 @@ signed_url_ttl_s = 600
 avatar_max_bytes = 2_097_152
 # Avatar is resized to a square of this size, in pixels
 avatar_size_px = 256
+# Largest avatar width or height before resizing, in pixels; larger pictures are rejected
+avatar_max_side_px = 4096
 # Saved scripts per user; POST /api/scripts returns 429 rate_limited above this
 max_saved_scripts = 30
 # Largest uploaded audio file, in bytes (100 MB)
