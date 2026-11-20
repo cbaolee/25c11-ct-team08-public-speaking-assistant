@@ -439,3 +439,234 @@ class TestScenario1TopicSuggestions:
 # ---------------------------------------------------------------------------
 # Scenario 2: Interactive Gathering Reaching ready_to_generate=True
 # ---------------------------------------------------------------------------
+
+
+class TestScenario2InteractiveGathering:
+    """Scenario 2: Template selection -> bot asks for missing entities -> user responds -> ready."""
+
+    def test_interactive_gathering_flow_reaches_ready(self, scenario_setup) -> None:
+        client: TestClient = scenario_setup["client"]
+        user_id = str(scenario_setup["user"].id)
+
+        # 1. Start chat session
+        suggest_res = client.post(
+            "/api/script-chat/suggest",
+            data={"category": "wildlife", "duration_min": 5},
+        )
+        session_id = suggest_res.json()["session_id"]
+
+        # 2. Select template that has missing entity and argument slots
+        select_res = client.post(
+            "/api/script-chat/select-topic",
+            json={"session_id": session_id, "template_id": "wildlife/keystone_5m"},
+        )
+        assert select_res.status_code == 200
+        select_body = select_res.json()
+        assert select_body["selected_template_id"] == "wildlife/keystone_5m"
+        assert select_body["ready_to_generate"] is False
+        assert "entity_audience_type" in select_body["missing_entities"]
+        assert select_body["reply_message"] != READY_MESSAGE
+
+        # 3. User provides message covering missing entities and file covering argument slots
+        reference_doc = (
+            b"# Core Foundation\n"
+            b"First examining core foundation shows that core mechanism of predators.\n\n"
+            b"# Case Evidence\n"
+            b"Furthermore real-world case studies illustrate that case evidence from wolves.\n\n"
+            b"# Counter Perspective\n"
+            b"On the other hand critics argue that counter perspective of ranchers.\n\n"
+            b"# Synthesis\n"
+            b"In conclusion synthesizing dimensions reveals that synthesis confirms value.\n"
+        )
+
+        msg_res = client.post(
+            "/api/script-chat/message",
+            data={
+                "session_id": session_id,
+                "message": (
+                    "The audience type is undergraduate university students in biology. "
+                    "Our focus is on trophic cascades and ecosystem stabilization."
+                ),
+            },
+            files={"file": ("reference.txt", io.BytesIO(reference_doc), "text/plain")},
+        )
+        assert msg_res.status_code == 200
+        msg_body = msg_res.json()
+
+        # Stop condition met: missing_entities empty, coverage_ratio >= 0.7
+        assert msg_body["missing_entities"] == []
+        assert msg_body["coverage_ratio"] >= 0.7
+        assert msg_body["ready_to_generate"] is True
+        assert msg_body["reply_message"] == READY_MESSAGE
+
+        # Check session state in store
+        session = chat_session_store.get(session_id, user_id=user_id)
+        assert session is not None
+        assert session.ready_to_generate is True
+
+
+# ---------------------------------------------------------------------------
+# Scenario 3: Hard 2-Turn Gathering Cap (gather_turns == 2)
+# ---------------------------------------------------------------------------
+
+
+class TestScenario3GatherTurnsCap:
+    """Scenario 3: Hard 2-turn gathering cap (gather_turns == 2) -> stops asking."""
+
+    def test_hard_2_turn_cap_stops_asking(self, scenario_setup) -> None:
+        client: TestClient = scenario_setup["client"]
+
+        # 1. Start session & select template
+        suggest_res = client.post(
+            "/api/script-chat/suggest",
+            data={"category": "wildlife", "duration_min": 5},
+        )
+        session_id = suggest_res.json()["session_id"]
+        client.post(
+            "/api/script-chat/select-topic",
+            json={"session_id": session_id, "template_id": "wildlife/keystone_5m"},
+        )
+
+        # 2. Turn 1: user provides vague answer, bot continues asking
+        turn1_res = client.post(
+            "/api/script-chat/message",
+            data={"session_id": session_id, "message": "I am not quite sure yet."},
+        )
+        assert turn1_res.status_code == 200
+        turn1_body = turn1_res.json()
+        assert turn1_body["gather_turns"] == 1
+        assert turn1_body["ready_to_generate"] is False
+        assert turn1_body["reply_message"] != READY_MESSAGE
+
+        # 3. Turn 2: second vague answer reaches gather_turns == 2
+        turn2_res = client.post(
+            "/api/script-chat/message",
+            data={"session_id": session_id, "message": "Still thinking about it."},
+        )
+        assert turn2_res.status_code == 200
+        turn2_body = turn2_res.json()
+        assert turn2_body["gather_turns"] == 2
+
+        # Hard cap triggered: ready_to_generate becomes True and bot returns READY_MESSAGE
+        assert turn2_body["ready_to_generate"] is True
+        assert turn2_body["reply_message"] == READY_MESSAGE
+
+    def test_unit_check_ready_to_generate_layer2_cap(self) -> None:
+        # Layer 2 cap fires even if coverage is 0.0 and missing_entities remain
+        ready = check_ready_to_generate(
+            selected_template_id="wildlife/keystone_5m",
+            missing_entities=["entity_audience_type", "entity_location"],
+            coverage_ratio=0.0,
+            gather_turns=2,
+        )
+        assert ready is True
+
+
+# ---------------------------------------------------------------------------
+# Scenario 4: Template Generation (6T) with polish_script_paragraphs
+# ---------------------------------------------------------------------------
+
+
+class TestScenario4TemplateGenerationAndPolishing:
+    """Scenario 4: Template generation (6T) with polish_script_paragraphs."""
+
+    def test_polish_script_paragraphs_preserves_count_and_citations(self) -> None:
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        payload = json.dumps(
+            {
+                "paragraphs": [
+                    "Welcome everyone to our presentation on ecology [citation: 1].",
+                    "The underlying mechanism illustrates keystone stability.",
+                    "In conclusion, conservation preserves our collective future.",
+                ]
+            }
+        )
+        mock_response.choices = [MagicMock(message=MagicMock(content=payload))]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        assembled = (
+            "Welcome everyone to our presentation on ecology [citation: 1].\n\n"
+            "The underlying mechanism illustrates keystone stability.\n\n"
+            "In conclusion, conservation preserves our collective future."
+        )
+
+        polished = polish_script_paragraphs(
+            assembled=assembled,
+            topic="Keystone Species Conservation",
+            client=mock_client,
+            limiter=TokenBucketLimiter(),
+        )
+
+        assert polished != ""
+        assert len(polished.split("\n\n")) == 3
+        assert "[citation: 1]" in polished
+        assert "Welcome everyone" in polished
+
+    def test_polish_script_paragraphs_fallback_on_mismatch_or_error(self) -> None:
+        # Test count mismatch fallback
+        mismatch_client = MagicMock()
+        mismatch_resp = MagicMock()
+        mismatch_payload = json.dumps({"paragraphs": ["Only one paragraph."]})
+        mismatch_resp.choices = [MagicMock(message=MagicMock(content=mismatch_payload))]
+        mismatch_client.chat.completions.create.return_value = mismatch_resp
+
+        original = "Paragraph 1.\n\nParagraph 2.\n\nParagraph 3."
+        res = polish_script_paragraphs(
+            assembled=original,
+            topic="Topic",
+            client=mismatch_client,
+        )
+        assert res == original
+
+        # Test exception fallback
+        error_client = MagicMock()
+        error_client.chat.completions.create.side_effect = RuntimeError("API down")
+        res_err = polish_script_paragraphs(
+            assembled=original,
+            topic="Topic",
+            client=error_client,
+        )
+        assert res_err == original
+
+    def test_pipeline_6t_generation_with_zero_unresolved_slots(self, scenario_setup) -> None:
+        pipeline: ScriptGenerationPipeline = scenario_setup["pipeline"]
+
+        # Mock template_engine slot filling to fill all slots with words that meet word count
+        filler_text = " ".join(["conservation"] * 140)
+        mock_engine = MagicMock()
+        mock_engine.fill_template.return_value = GeneratedScript(
+            script=(
+                f"Welcome biology students to today's keynote.\n\n"
+                f"First, examining the core foundation shows that {filler_text}.\n\n"
+                f"Furthermore, real-world case studies illustrate that {filler_text}.\n\n"
+                f"On the other hand, critics argue that {filler_text}.\n\n"
+                f"In conclusion, synthesizing these dimensions reveals that {filler_text}."
+            ),
+            word_count=580,
+            duration_min=5,
+            source="template",
+            template_id="wildlife/keystone_5m",
+            models_used=["mock-model"],
+            citations=[ParagraphCitation(paragraph=2, heading=None, page=None, status="uncited")],
+        )
+        pipeline.template_engine = mock_engine
+
+        req = ScriptGenerationRequest(
+            topic="Keystone Species Conservation",
+            category="Wildlife",
+            duration_min=5,
+            user_id="test-user",
+        )
+        result = pipeline.run(req)
+
+        assert result.source == "template"
+        assert result.template_id == "wildlife/keystone_5m"
+        assert "{{" not in result.script
+        assert "}}" not in result.script
+        assert len(result.citations) > 0
+
+
+# ---------------------------------------------------------------------------
+# Scenario 5: Free-Topic Generation (6L) & Regenerate with user_feedback
+# ---------------------------------------------------------------------------
