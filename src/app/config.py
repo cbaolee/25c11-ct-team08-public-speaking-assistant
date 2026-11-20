@@ -33,15 +33,6 @@ avatar_max_side_px = _storage["avatar_max_side_px"]
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
 
-
-def validate_list_limits(page_size: int, saved_scripts: int) -> None:
-    if page_size < saved_scripts:
-        raise RuntimeError(
-            "storage.max_list_page_size must be greater than or equal to "
-            "storage.max_saved_scripts"
-        )
-
-
 decode_timeout_s = _audio["decode_timeout_s"]
 duration_cap_margin_s = _audio["duration_cap_margin_s"]
 
@@ -49,6 +40,15 @@ MIN_PAUSE_S = _audio["min_pause_s"]
 
 stt_connect_timeout_s = _audio["stt_connect_timeout_s"]
 stt_read_timeout_s = _audio["stt_read_timeout_s"]
+
+
+def validate_list_limits(page_size: int, saved_scripts: int) -> None:
+    """Stop start-up when one list call could not return every saved script."""
+    if page_size < saved_scripts:
+        raise RuntimeError(
+            f"storage.max_list_page_size ({page_size}) must be >= "
+            f"storage.max_saved_scripts ({saved_scripts}) in app_constants.toml"
+        )
 
 
 def _from_toml(section: str, key: str):
