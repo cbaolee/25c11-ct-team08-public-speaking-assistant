@@ -48,6 +48,7 @@ export function loadConfig() {
     if (!c) return;
     const job = c.evaluate_job || {};
     CONFIG.EVAL_JOB = { pollMs: job.poll_interval_ms ?? CONFIG.EVAL_JOB.pollMs, maxWaitS: job.max_wait_s ?? CONFIG.EVAL_JOB.maxWaitS, weights: job.stage_weights ?? CONFIG.EVAL_JOB.weights, tauS: job.stt_estimate_tau_s ?? CONFIG.EVAL_JOB.tauS, closeDelayMs: job.done_close_delay_ms ?? CONFIG.EVAL_JOB.closeDelayMs, announcePct: job.announce_step_pct ?? CONFIG.EVAL_JOB.announcePct };
+    CONFIG.RETENTION = { insufficientDays: (c.retention || {}).insufficient_days ?? CONFIG.RETENTION.insufficientDays };
     CONFIG.COACH = { maxFocus: (c.coach || {}).max_focus_items ?? CONFIG.COACH.maxFocus };
     const retry = c.retry || {};
     CONFIG.RETRY = { minRatio: retry.sentence_min_error_ratio ?? CONFIG.RETRY.minRatio, wordMax: retry.word_max_seconds ?? CONFIG.RETRY.wordMax, sentenceMax: retry.sentence_max_seconds ?? CONFIG.RETRY.sentenceMax, clipPad: retry.clip_pad_s ?? CONFIG.RETRY.clipPad };

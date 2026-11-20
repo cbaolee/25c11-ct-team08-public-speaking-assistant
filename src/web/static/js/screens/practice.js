@@ -393,7 +393,7 @@ export function runEvalReal(txt) {
 }
 export function finishEvalReal(j, txt) {
   const m = EvaluateClient.mapResult(j, txt.text), base = { ts: Date.now(), title: txt.short, topicKey: txt.topic, an: m.an, sc: m.sc, dur: m.an.dur, accent: S.profile ? S.profile.accent : null, demo: false, raw: j };
-  if (m.sc.status !== 'ok') { S.audio = null; S.currentSession = Object.assign({ id: 'local-' + S.nextId++ }, base); go('report'); return; }   // insufficient_audio: shown, not in History
+  if (m.sc.status !== 'ok') { S.audio = null; S.currentSession = Object.assign(j.saved && j.session_id ? { id: j.session_id, remote: true } : { id: 'local-' + S.nextId++ }, base); go('report'); return; }   // insufficient_audio: shown, not in History
   const ses = Object.assign({ id: j.saved && j.session_id ? j.session_id : 'local-' + S.nextId++, audioUrl: URL.createObjectURL(S.audio.blob || S.audio.file), fresh: true, remote: !!j.saved }, base);
   S.audio = null; S.currentSession = ses;
   if (j.saved) S.sessions.push(ses);   // D-06: only saved sessions are in History (they come back after F5)

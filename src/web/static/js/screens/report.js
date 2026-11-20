@@ -1,3 +1,4 @@
+import { coachNoteMode } from './coach_mode.js';
 import { api, readJson } from '../api.js';
 import { chart, hideTip, showTip } from '../charts.js';
 import { ADR, adviceList, fx, hasBase, paceWindows, progressDelta, sh } from '../data.js';
@@ -83,9 +84,9 @@ export function coachNote(s) {
 }
 const coachCache = new Map();
 const coachPending = new Map();
-function renderCoachNote(el, note) {
+function renderCoachNote(el, note, s) {
   el.replaceChildren();
-  const label = document.createElement('div'); label.className = 'cn-label'; label.textContent = T(note.source === 'rule' ? 'overview.ruleLabel' : 'overview.aiLabel'); el.append(label);
+  const label = document.createElement('div'); label.className = 'cn-label'; label.textContent = T(note.source === 'rule' ? (s.sc.status === 'insufficient_audio' ? 'overview.ruleLabelNoScore' : 'overview.ruleLabel') : (s.sc.status === 'insufficient_audio' ? 'overview.aiLabelNoScore' : 'overview.aiLabel')); el.append(label);
   const summary = document.createElement('div'); summary.textContent = note.summary; el.append(summary);
   if (note.focus.length) {
     const list = document.createElement('ul'); list.className = 'cn-list';
@@ -95,10 +96,15 @@ function renderCoachNote(el, note) {
   const next = document.createElement('div'); next.className = 'cn-next'; next.textContent = T('overview.nextStep') + ': ' + note.next_step; el.append(next);
   el.removeAttribute('aria-busy');
 }
+function insufficientCoachNote(s) {
+  const key = s.sc.reason === 'low_voiced_ratio' ? 'overview.insLow' : 'overview.insEmpty';
+  return { source: 'rule', summary: T(key + 'Summary'), focus: [T(key + 'Focus1'), T(key + 'Focus2')], next_step: T(key + 'Next') };
+}
 export async function loadCoachNote(s) {
-  if (!s.remote || !s.sc || s.sc.status !== 'ok' || s.demo) return;
+  const mode = coachNoteMode(s); if (mode === 'none') return;
   const el = $('#repCoachNote'); if (!el) return;
-  if (coachCache.has(s.id)) { renderCoachNote(el, coachCache.get(s.id)); return; }
+  if (mode === 'client-rule') { renderCoachNote(el, insufficientCoachNote(s), s); return; }
+  if (coachCache.has(s.id)) { renderCoachNote(el, coachCache.get(s.id), s); return; }
   el.replaceChildren(); el.setAttribute('aria-busy', 'true');
   for (let i = 0; i < 3; i++) { const bar = document.createElement('span'); bar.className = 'skel cn-skel'; el.append(bar); }
   try {
@@ -112,9 +118,9 @@ export async function loadCoachNote(s) {
       coachPending.set(s.id, pending);
     }
     const j = await coachPending.get(s.id);
-    if (S.currentSession === s && $('#repCoachNote') === el) renderCoachNote(el, j);
+    if (S.currentSession === s && $('#repCoachNote') === el) renderCoachNote(el, j, s);
   } catch (_) {
-    if (S.currentSession === s && $('#repCoachNote') === el) { el.textContent = coachNote(s); el.removeAttribute('aria-busy'); }
+    if (S.currentSession === s && $('#repCoachNote') === el) { if (s.sc.status === 'insufficient_audio') renderCoachNote(el, insufficientCoachNote(s), s); else { el.textContent = coachNote(s); el.removeAttribute('aria-busy'); } }
   }
 }
 const OV_IC = {
@@ -180,7 +186,8 @@ RENDER.report = function () {
   $('#repHeadActions').hidden = !bad;   // normally the two buttons sit at the top of the pinned right column
   hideTip();
   if (bad) {
-    $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(sc.reason === 'empty_transcript' ? T('eval.insEmpty') : T('report.stInsD', { p: Math.round((sc.voicedRatio || 0) * 100) })) + '</p><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
+    $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(sc.reason === 'empty_transcript' ? T('eval.insEmpty') : T('report.stInsD', { p: Math.floor(Math.round((sc.voicedRatio || 0) * 100 * 1e6) / 1e6) })) + ' ' + esc(T('report.stInsNotScored')) + (s.remote ? ' ' + esc(T('report.stInsKept', { n: CONFIG.RETENTION.insufficientDays })) : '') + '</p><div class="ov-coach"><span class="ov-coach-av" aria-hidden="true">' + IC.ai + '</span><div class="ov-coach-in"><p class="ov-coach-who">' + esc(T('overview.coachWho')) + '</p><div class="ov-coach-text" id="repCoachNote"></div></div></div><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
+    loadCoachNote(s);
     return;
   }
   $('#repOverview').innerHTML = overviewHtml(s);

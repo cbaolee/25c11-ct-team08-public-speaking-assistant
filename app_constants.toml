@@ -118,3 +118,6 @@ fluency = 5
 pitch = 10
 semantic = 10
 save = 5
+
+[retention]
+insufficient_days = 7

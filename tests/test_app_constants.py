@@ -55,6 +55,9 @@ def test_api_config_returns_web_section():
     assert all(
         response.json()[key] == value for key, value in constants.load_constants()["web"].items()
     )
+    assert response.json()["retention"]["insufficient_days"] == (
+        constants.CONSTANTS["retention"]["insufficient_days"]
+    ) == 7
     assert response.json()["retry"]["sentence_min_error_ratio"] == 0.30
     job = response.json()["evaluate_job"]
     for key in ("stt_estimate_tau_s", "done_close_delay_ms", "announce_step_pct"):

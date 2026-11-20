@@ -276,6 +276,7 @@ table.t tr:last-child td { border-bottom: 0; }
 .ov h2.ov-verdict { margin: 10px 0 0; font: 500 30px/1.2 var(--serif); color: #fff; max-width: 30ch; }
 .ov-coach { display: flex; gap: 14px; align-items: flex-start; margin-top: 20px; padding: 16px 18px; border-radius: 16px;
   background: #fff; color: var(--ink); border-left: 4px solid #3C6DF0; box-shadow: 0 6px 18px -10px rgba(0, 0, 0, .45); }
+.state .ov-coach { align-self: stretch; margin-top: 0; box-shadow: none; background: var(--accent-soft); }
 .ov-coach-av { flex: none; display: block; width: 40px; height: 40px; }
 .ov-coach-av svg { display: block; width: 40px; height: 40px; border-radius: 12px; }
 .ov-coach-who { margin: 0; font: 700 14px var(--sans); color: #1D4ED8; display: flex; align-items: center; gap: 8px; }
