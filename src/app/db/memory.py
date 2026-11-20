@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
@@ -116,6 +117,15 @@ class MemoryProfileRepo:
         if existing is None:
             return None
         row = existing.model_copy(update={"avatar_path": avatar_path}, deep=True)
+        self._state.profiles[user_id] = row
+        return row.model_copy(deep=True)
+
+    def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None:
+        existing = self._state.profiles.get(user_id)
+        if existing is None:
+            return None
+        merged = {**existing.preferences, **patch}
+        row = existing.model_copy(update={"preferences": merged}, deep=True)
         self._state.profiles[user_id] = row
         return row.model_copy(deep=True)
 

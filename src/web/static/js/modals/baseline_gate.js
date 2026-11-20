@@ -5,7 +5,7 @@ import { stopAudioTest } from '../modals/settings_modal.js';
 import { renderAccount, showView } from '../nav.js';
 import { requireConsent, startRecorder } from '../recorder.js';
 import { setStageAuth } from '../screens/landing.js';
-import { EVAL_ERR, EXT_BY_MIME } from '../screens/practice.js';
+import { EVAL_ERR, EXT_BY_MIME, clearFollowWpm } from '../screens/practice.js';
 import { resetBaselineAudio } from '../screens/profile.js';
 import { revokeAudio, stopPlayback } from '../screens/report.js';
 import { CONFIG, RENDER, S } from '../state.js';
@@ -91,6 +91,7 @@ export function onGateAgree() {
 export function logout(expired) {
   if (!expired && S.auth) api('/api/auth/logout', { method: 'POST' }).catch(() => {});   // best effort: revoke on the server
   storeAuth(null);
+  clearFollowWpm();
   hideTip(); stopPlayback(); resetBaselineAudio();   // no signed URL of this user may survive for the next one
   [S.rec, S.brec, S.grec].forEach(r => { if (r) r.cancel(); });
   stopAudioTest();

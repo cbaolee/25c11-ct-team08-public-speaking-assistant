@@ -5,8 +5,9 @@ import { go, moveNavPill, moveSegPills, renderAccount, showView, slideIn, syncHe
 import { heroLightsOn } from '../screens/home.js';
 import { loadHistory } from '../screens/history.js';
 import { setStageAuth } from '../screens/landing.js';
+import { applyFollowWpm } from '../screens/practice.js';
 import { addBubble, fillTopicSelect, renderChatFile } from '../screens/script_studio.js';
-import { CONFIG, RENDER, S } from '../state.js';
+import { RENDER, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
 
@@ -96,9 +97,7 @@ export function applyProfile(p) {
   S.profile = { displayName: p.display_name || null, gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent, topics: p.topics || [] };
   S.consent = !!p.consent_recording;
   S.avatar = p.avatar_url || null;
-  S.followWpm = p.preferences && typeof p.preferences.follow_wpm === 'number'
-    ? p.preferences.follow_wpm
-    : CONFIG.FOLLOW_WPM_DEFAULT;
+  applyFollowWpm(p.preferences);
 }
 /* After log in, and on page load when tokens are stored: profile -> app -> baseline (F1) + history (F2). */
 /* Full-screen loading screen shown between log in and a fully loaded Home. */

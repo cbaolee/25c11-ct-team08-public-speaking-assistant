@@ -8,11 +8,11 @@ export const CONFIG = {
   FOLLOW_GAP_S: 0.5,                   // pause added after each sentence (matches a natural stop at a full stop)
   HISTORY_MAX_PAGES: 5,                // 5 pages x 20 = the newest 100 sessions on Home and History
   HISTORY_PAGE_SIZE: 20,               // sessions per /api/sessions page
-  FOLLOW_WPM_MIN: 100,
-  FOLLOW_WPM_MAX: 180,
-  FOLLOW_WPM_STEP: 5,
-  FOLLOW_WPM_DEFAULT: 145,
-  FOLLOW_WPM_SAVE_DELAY_MS: 800,
+  FOLLOW_WPM_MIN: 100,                 // follow-along slider minimum, words per minute
+  FOLLOW_WPM_MAX: 180,                 // follow-along slider maximum, words per minute
+  FOLLOW_WPM_STEP: 5,                  // slider step, words per minute
+  FOLLOW_WPM_DEFAULT: 145,             // used when the profile has no follow_wpm
+  FOLLOW_WPM_SAVE_DELAY_MS: 800,       // wait after the last slider move before PATCH /api/profile, in ms
 };
 
 
