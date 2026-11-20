@@ -161,27 +161,35 @@ class SupabaseBaselineRepo:
     def replace_current_baseline(
         self, user_id: UUID, data: NewBaseline
     ) -> tuple[BaselineRow, BaselineRow | None]:
-        # The unique index baselines_one_current allows one current row per user,
-        # so the old row must be switched off before the new row is inserted.
-        previous = self.get_current_baseline(user_id)
-        if previous is not None:
-            self._set_current(user_id, previous.id, False)
-
-        values = {
-            **data.model_dump(mode="json"),
-            "user_id": str(user_id),
-            "is_current": True,
-        }
-        try:
-            resp = _execute(self._table().insert(values))
-        except StorageError:
-            if previous is not None:
-                self._set_current(user_id, previous.id, True)  # best-effort rollback
-            raise
-        row = _first(resp.data)
-        if row is None:
+        values = data.model_dump(mode="json")
+        resp = _execute(
+            self._client.rpc(
+                "replace_current_baseline",
+                {
+                    "p_user_id": str(user_id),
+                    "p_id": str(values["id"]),
+                    "p_hesitation_threshold_s": values["hesitation_threshold_s"],
+                    "p_median_pause_s": values.get("median_pause_s"),
+                    "p_median_f0_hz": values.get("median_f0_hz"),
+                    "p_mean_loudness_db": values.get("mean_loudness_db"),
+                    "p_flags": values["flags"],
+                    "p_audio_path": values.get("audio_path"),
+                },
+            )
+        )
+        payload = resp.data
+        if isinstance(payload, list):
+            payload = payload[0] if payload else None
+        if not isinstance(payload, dict):
             raise StorageError("Baseline insert returned no row")
-        return BaselineRow.model_validate(row), previous
+        new_row = payload.get("new_row")
+        previous_row = payload.get("previous_row")
+        if not isinstance(new_row, dict):
+            raise StorageError("Baseline insert returned no row")
+        return (
+            BaselineRow.model_validate(new_row),
+            BaselineRow.model_validate(previous_row) if isinstance(previous_row, dict) else None,
+        )
 
 
 class SupabaseScriptRepo:

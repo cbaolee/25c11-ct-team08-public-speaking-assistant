@@ -24,7 +24,11 @@ from src.app.db.models import (
     build_object_path,
     encode_cursor,
 )
-from src.app.db.supabase_repo import _newest_page, _validate_object_path
+from src.app.db.supabase_repo import (
+    SupabaseBaselineRepo,
+    _newest_page,
+    _validate_object_path,
+)
 
 # ---------- offline unit tests ----------
 
@@ -65,6 +69,49 @@ def test_newest_page_rejects_bad_limit():
         _newest_page(None, 0, None)
     with pytest.raises(ValueError):
         _newest_page(None, max_list_page_size + 1, None)
+
+
+def test_replace_baseline_calls_single_rpc_transaction():
+    class FakeRpcRequest:
+        def execute(self):
+            class Response:
+                data = {
+                    "new_row": {
+                        "id": str(new.id),
+                        "user_id": str(user_id),
+                        "median_pause_s": 0.5,
+                        "hesitation_threshold_s": 0.9,
+                        "median_f0_hz": 120.0,
+                        "mean_loudness_db": 65.0,
+                        "flags": [],
+                        "audio_path": None,
+                        "is_current": True,
+                        "recorded_at": "2026-11-20T11:00:00+00:00",
+                    },
+                    "previous_row": None,
+                }
+
+            return Response()
+
+    class FakeClient:
+        def __init__(self):
+            self.params = None
+
+        def rpc(self, name, params):
+            assert name == "replace_current_baseline"
+            self.params = params
+            return FakeRpcRequest()
+
+    user_id = uuid4()
+    new = NewBaseline(id=uuid4(), hesitation_threshold_s=0.9)
+    client = FakeClient()
+    row, previous = SupabaseBaselineRepo(client).replace_current_baseline(user_id, new)
+
+    assert row.id == new.id
+    assert row.is_current is True
+    assert previous is None
+    assert client.params["p_user_id"] == str(user_id)
+    assert client.params["p_id"] == str(new.id)
 
 
 # ---------- integration tests (psc-dev only) ----------
