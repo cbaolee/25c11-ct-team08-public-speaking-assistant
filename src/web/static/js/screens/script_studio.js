@@ -207,8 +207,10 @@ export function handleChatError(ai, code, message, status) {
     if (ai._file) { S.chatFile = ai._file; renderChatFile(); }   // startNewChat dropped the attachment: give it back too
     return;
   }
-  if (!(ai._script && ai._script.req)) giveBackDraft(ai);   // chat turn only: a script turn keeps its own Retry button
-  const text = Object.hasOwn(ERR_TEXT, kind) ? T(ERR_TEXT[kind]) : (message || T('script.errGeneric'));   // fail-closed moderation never opens safetyAlert
+  const scriptTurn = !!(ai._script && ai._script.req);
+  if (!scriptTurn) giveBackDraft(ai);   // chat turn only: a script turn keeps its own Retry button
+  /* The fallback says "writing your script" only for a script turn; a chat turn (topics, message) gets a neutral line */
+  const text = Object.hasOwn(ERR_TEXT, kind) ? T(ERR_TEXT[kind]) : (message || T(scriptTurn ? 'script.errGeneric' : 'script.errChat'));   // fail-closed moderation never opens safetyAlert
   toast(text, true);
   renderErrorBubble(ai, text);
 }

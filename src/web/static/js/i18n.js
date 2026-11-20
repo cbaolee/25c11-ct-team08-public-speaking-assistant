@@ -67,6 +67,7 @@ export const TEXT = {
     errRate: 'Too many requests right now. Please wait a moment and try again.',
     errModeration: 'The safety check is not available right now, so no script was written. Please try again in a few minutes.',
     errGeneric: 'Something went wrong while writing your script. Please try again.',
+    errChat: 'Something went wrong. Please try again.',
     greeting: 'Hi {name}. Pick a topic, then tell me about your event or attach a PDF, Markdown or text file with the key points.',
     errFile: 'That file cannot be used. Attach a PDF (up to 25 MB and 10 pages, not password-protected) or a .md or .txt file (up to 2 MB).',
     errFileType: 'Only .pdf, .md and .txt files can be attached.',
