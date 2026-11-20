@@ -231,3 +231,114 @@ class ChatSessionStore:
 chat_session_store = ChatSessionStore()
 
 
+def analyze_slot_coverage(
+    template_document: str | TemplateDocument,
+    chunks: list[DocumentChunk],
+    chunk_embeddings: Any | None,
+    retriever: SemanticRetriever | None,
+    prompt: str = "",
+    user_notes: list[str] | None = None,
+) -> tuple[float, list[str], list[str]]:
+    """Perform deterministic 0-token slot coverage analysis.
+
+    Returns:
+        tuple of (coverage_ratio, missing_entities, missing_groups)
+    """
+    if isinstance(template_document, str):
+        template = TemplateDocument(
+            metadata=TopicMetadata(
+                template_id="virtual/custom",
+                category_slug="custom",
+                category="Custom",
+                topic="Custom Topic",
+                topic_slug="custom_topic",
+                duration_min=5,
+            ),
+            body=template_document,
+            file_path="",
+        )
+    else:
+        template = template_document
+
+    slots = parse_slots(template)
+    argument_slots = [
+        s for s in slots if s.name.startswith("argument_") or s.slot_type == "argument"
+    ]
+    entity_slots = [
+        s for s in slots if not (s.name.startswith("argument_") or s.slot_type == "argument")
+    ]
+
+    # Check argument slot coverage
+    uncovered_arguments: list[TemplateSlot] = []
+    if not argument_slots:
+        coverage_ratio = 1.0
+    elif not chunks or chunk_embeddings is None:
+        coverage_ratio = 0.0
+        uncovered_arguments = list(argument_slots)
+    else:
+        model = retriever.get_model() if retriever is not None else None
+        covered_count = 0
+
+        for slot in argument_slots:
+            query = f"{slot.lead_in} {slot.name.replace('_', ' ')}".strip()
+            max_cosine = 0.0
+
+            if model is not None:
+                query_vec = retriever._encode(model, [query])
+                scores = (chunk_embeddings @ query_vec.T).squeeze()
+                scores_arr = np.atleast_1d(scores)
+                max_cosine = float(np.max(scores_arr)) if scores_arr.size > 0 else 0.0
+            else:
+                # Deterministic word overlap fallback when model is None
+                query_words = set(re.findall(r"\w+", query.lower()))
+                for chunk in chunks:
+                    chunk_words = set(re.findall(r"\w+", chunk.content.lower()))
+                    if query_words and chunk_words:
+                        overlap = len(query_words & chunk_words) / len(query_words)
+                        if overlap > max_cosine:
+                            max_cosine = overlap
+
+            if max_cosine >= COSINE_SIMILARITY_THRESHOLD:
+                covered_count += 1
+            else:
+                uncovered_arguments.append(slot)
+
+        coverage_ratio = covered_count / len(argument_slots)
+
+    missing_groups = group_uncovered_slots(uncovered_arguments)
+
+    # Check entity slot coverage
+    missing_entities: list[str] = []
+    notes_list = user_notes or []
+    user_context = f"{prompt} {' '.join(notes_list)}".lower()
+
+    model = retriever.get_model() if retriever is not None else None
+    has_embeddings = chunks and chunk_embeddings is not None and model is not None
+
+    for slot in entity_slots:
+        clean_name = slot.name.removeprefix("entity_").replace("_", " ").lower().strip()
+        tokens = [t for t in re.findall(r"\w+", clean_name) if len(t) >= 3]
+
+        # 1. Direct match in prompt or user notes
+        is_in_text = clean_name in user_context or (
+            tokens and all(token in user_context for token in tokens)
+        )
+        if is_in_text:
+            continue
+
+        # 2. Check semantic similarity against chunks if available
+        is_in_chunks = False
+        if has_embeddings:
+            query_vec = retriever._encode(model, [clean_name])
+            scores = (chunk_embeddings @ query_vec.T).squeeze()
+            scores_arr = np.atleast_1d(scores)
+            max_sim = float(np.max(scores_arr)) if scores_arr.size > 0 else 0.0
+            if max_sim >= COSINE_SIMILARITY_THRESHOLD:
+                is_in_chunks = True
+
+        if not is_in_chunks:
+            missing_entities.append(slot.name)
+
+    return coverage_ratio, missing_entities, missing_groups
+
+
