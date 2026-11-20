@@ -34,7 +34,7 @@ import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing
 import { cancelEval, goStep, loadFollowWpm, loadSavedScripts, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, pickSavedScript, renderPractice, runEval, selectPickerTab, toggleRecording, updateOwnCount, useOwn } from './screens/practice.js';
 import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
 import { bindTxTips, onTxClick, openDetails, openPart, seekTo, seekWord, startPlayback, stopPlayback } from './screens/report.js';
-import { fitComposer, onChatAction, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
+import { fitComposer, onChatAction, onComposerFile, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
 import { CONFIG, RENDER, S } from './state.js';
 import { initHeroMic } from './hero_mic.js';
 import { closeUserMenu, onUserButtonClick, setupUserMenuHover } from './top_bar.js';
@@ -133,13 +133,7 @@ export function init() {
 
   // script
   $('#attachBtn').onclick = () => $('#composerFileInput').click();
-  $('#composerFileInput').onchange = e => {
-    const f = e.target.files && e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    const okType = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-    if (!okType || f.size > 25 * 1024 * 1024) { showErr($('#composerError'), T('script.errFile')); return; }
-    clearErr($('#composerError')); S.chatFile = { name: f.name, size: f.size, raw: f }; renderChatFile();
-  };
+  $('#composerFileInput').onchange = onComposerFile;
   $('#composerFile').addEventListener('click', e => { if (e.target.closest('#chatFileX')) { S.chatFile = null; renderChatFile(); $('#attachBtn').focus(); } });
   $('#composerSend').onclick = sendChat;
   $('#composerInput').addEventListener('input', fitComposer);   // grows with the text (1.5 to 5.5 lines)
