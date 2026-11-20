@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the **current** structure of Public Speaking Coach: what the parts are, how they talk to each other, and where each piece of code lives. It does not keep a change history; decisions and their reasons live in [`docs/adr/`](docs/adr/).
+Current structure of Public Speaking Coach: parts, responsibilities, data and the reason for each design choice. Decisions with alternatives are in [`docs/adr/`](docs/adr/).
 
 ## Contents
 
@@ -9,10 +9,11 @@ This document describes the **current** structure of Public Speaking Coach: what
 3. [Backend application](#3-backend-application)
 4. [Database and storage](#4-database-and-storage)
 5. [Main flows](#5-main-flows)
-6. [Security](#6-security)
-7. [Configuration](#7-configuration)
-8. [Testing](#8-testing)
-9. [Decision records](#9-decision-records)
+6. [Browser state](#6-browser-state)
+7. [Security](#7-security)
+8. [Configuration](#8-configuration)
+9. [Testing](#9-testing)
+10. [Decision records](#10-decision-records)
 
 ## 1. System overview
 
@@ -21,96 +22,118 @@ flowchart LR
     Browser["Browser<br/>(index.html + ES modules)"] -->|HTTP / JSON| API["FastAPI app<br/>src/app"]
     API --> Audio["Evaluate / Baseline Pipeline<br/>src/audio_processing"]
     API --> Text["Script Pipeline<br/>src/text_processing"]
-    Audio -->|speech-to-text| STT["STT providers"]
+    Audio -->|speech-to-text| STT["Deepgram, Gladia"]
     Text -->|LLM| Groq["Groq API"]
     API -->|repository layer| DB[("Supabase PostgreSQL")]
     API -->|repository layer| Store[("Supabase Storage")]
+    API -->|accounts| AuthSvc["Supabase Auth"]
 ```
 
-| Part                         | Technology                | Responsibility                                |
-| ---------------------------- | ------------------------- | --------------------------------------------- |
-| Frontend                     | HTML, Tailwind CSS        | UI served by FastAPI from `src/web/`          |
-| Backend                      | Python 3.12, FastAPI      | HTTP API, request validation, orchestration   |
-| Evaluate / Baseline Pipeline | FFmpeg, Silero VAD, jiwer | Score a recording, analyse a voice baseline   |
-| Script Pipeline              | PyMuPDF4LLM, Groq         | Generate an MC script from user content       |
-| Database                     | Supabase PostgreSQL       | Profiles, baselines, scripts, session results |
-| Object storage               | Supabase Storage          | Audio recordings and chart series             |
+| Part                         | Technology                       | Responsibility                                          |
+| ---------------------------- | -------------------------------- | ------------------------------------------------------- |
+| Frontend                     | HTML, CSS, ES modules (no build) | UI served by FastAPI from `src/web/`                    |
+| Backend                      | Python 3.12, FastAPI             | HTTP API, validation, orchestration                     |
+| Evaluate / Baseline Pipeline | FFmpeg, Silero VAD, jiwer        | Score a recording, analyse a voice baseline             |
+| Script Pipeline              | PyMuPDF4LLM, Groq                | Generate an MC script from user content                 |
+| Database                     | Supabase PostgreSQL              | Profiles, preferences, baselines, scripts, sessions     |
+| Object storage               | Supabase Storage                 | Recordings, chart series, avatars                       |
+| Accounts                     | Supabase Auth                    | Sign up, log in, token refresh, password change         |
 
 ## 2. Code map
 
-Only folders with a clear owner and current code are listed.
-
 ```
-db/migrations/            SQL migrations, applied in file order
+db/migrations/              SQL migrations, applied in file order (see 4.5)
 src/app/
-├── main.py               FastAPI app: /api/evaluate, /api/scripts*, /api/sessions*, static UI
-│                         (/static is served with Cache-Control: no-cache, so changed CSS/JS is never stale)
-├── routes/               auth.py (/api/auth/*), profile.py (/api/profile), baselines.py (/api/baseline)
-├── auth.py               AuthProvider: Supabase Auth, or in-memory accounts in dev
-├── deps.py               get_current_user: user from the Bearer access token
-├── config.py             Settings loaded from .env
+├── main.py                 FastAPI app: /api/config, /api/evaluate, /api/scripts*, /api/sessions*,
+│                           /api/generate-script*, /api/topics, static UI (Cache-Control: no-cache)
+├── routes/                 auth.py (/api/auth/*), profile.py (/api/profile*), baselines.py (/api/baseline*)
+├── auth.py                 AuthProvider: Supabase Auth, or in-memory accounts in dev
+├── deps.py                 get_current_user: user from the Bearer access token
+├── config.py               Settings from .env; limits from app_constants.toml; start-up checks
+├── constants.py            Loads app_constants.toml
+├── key_pool.py             Several API keys per service with automatic switching
 └── db/
-    ├── models.py         Pydantic models, errors, object paths, cursor encoding
-    ├── repositories.py   Repository interfaces (typing.Protocol)
-    ├── supabase_repo.py  Supabase implementation
-    ├── memory.py         In-memory implementation for tests and local dev
-    ├── factory.py        Repos container and get_repos(): picks the implementation
-    └── session_helpers.py Pure helpers: Opus encode, split/merge series, compaction
-src/audio_processing/     Evaluate and Baseline Pipeline
-src/text_processing/      Script Pipeline
+    ├── models.py           Pydantic models, UserPreferences, errors, object paths, cursor encoding
+    ├── repositories.py     Repository interfaces (typing.Protocol)
+    ├── supabase_repo.py    Supabase implementation
+    ├── memory.py           In-memory implementation (tests, local dev)
+    ├── factory.py          Repos container; get_repos() picks the implementation
+    └── session_helpers.py  Opus encoding, series split/merge, compaction
+src/audio_processing/       Evaluate and Baseline Pipeline
+src/text_processing/        Script Pipeline
 src/web/
-├── templates/index.html  Page markup only; loads the CSS files and static/js/main.js
-├── static/css/           base, layout, components, screens (loaded in this order)
-└── static/js/            ES modules (no bundler): main.js (init), state.js (S, CONFIG, RENDER),
-                          i18n.js (TEXT), api.js, ui.js, nav.js, top_bar.js, utils.js, charts.js,
-                          data.js, recorder.js, screens/*.js, modals/*.js;
-                          evaluate_client.js stays a classic script (also used by node tests);
-                          screens/saved_scripts.js owns the Saved Scripts list shown on Practice
-                          (My script tab) and in Script Studio (Show my scripts) as file cards, the Script
-                          Name Dialog, Script Edit Dialog, Script List Full popup and delete
-tests/db/                 Repository and helper tests
+├── templates/index.html    Markup only; loads CSS and static/js/main.js
+├── static/css/             base, layout, components, screens (in this order)
+└── static/js/              ES modules, no bundler
+    ├── main.js             Start-up, event binding, loadConfig() (GET /api/config -> CONFIG)
+    ├── state.js            S (app state), CONFIG (defaults for every [web] key), RENDER
+    ├── api.js              fetch wrapper: Bearer token, refresh after 401
+    ├── evaluate_client.js  Result mapping and follow-along maths; classic script, also run by node tests
+    ├── line_numbers.js     Line numbers beside script text
+    ├── screens/            home, practice, report, history, profile, landing, script_studio,
+    │                       saved_scripts, script_reader
+    └── modals/             auth_panel, baseline_gate, settings_modal, profile_modal, confirm
+tests/                      pytest (tests/db: repositories and helpers); tests/web: node tests
 ```
 
 ## 3. Backend application
 
-- Endpoints get the caller with `Depends(get_current_user)` and storage with `Depends(get_repos)`. They never import `supabase` directly.
-- Repository and storage calls are synchronous; async endpoints run them through `run_in_threadpool`.
+- Endpoints get the caller with `Depends(get_current_user)` and storage with `Depends(get_repos)`; they never import `supabase` directly. Reason: one place for identity and one swap point between Supabase and memory.
+- Repository and storage calls are synchronous; async endpoints run them through `run_in_threadpool`, so network I/O and Pillow work never block the event loop.
 - `user_id` comes only from `get_current_user`, never from the request body or query.
+- Start-up stops when required settings are missing or `max_list_page_size < max_saved_scripts` (one list call must return every saved script).
 
-### Endpoints backed by the database
+### 3.1 Endpoints backed by the database
 
-| Method and path                    | Purpose                                                              |
-| ---------------------------------- | -------------------------------------------------------------------- |
-| `POST /api/baseline`               | Analyse a voice sample; on `ok`, store it as the current baseline    |
-| `GET /api/baseline`                | Current baseline, or `null`                                          |
-| `POST /api/evaluate`               | Score a recording against the stored baseline, then save the session |
-| `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor`          |
-| `GET /api/sessions/{id}`           | One session: full result and signed audio URL, or compact summary    |
-| `DELETE /api/sessions/{id}`        | Delete the session files, then the row                               |
-| `POST /api/scripts`                | Save a script; duplicate text returns the existing row, script cap returns 409 |
-| `GET /api/scripts?limit=&cursor=`  | Page of saved-script summaries with `total`, cap `limit`, and `next_cursor` |
-| `GET /api/scripts/{id}`            | One saved script, including its body                                 |
-| `PATCH /api/scripts/{id}`          | Edit a saved script's `title` and/or `body`; 404 first for a missing script, 409 `script_duplicate` (`duplicate_id`, `duplicate_title`) when the new body equals another saved script; otherwise the same checks and moderation as a new script, and a new body updates `word_count` and `content_hash` |
-| `DELETE /api/scripts/{id}`         | Delete a saved script; linked sessions retain their script snapshot |
-| `GET /api/profile`                 | Profile row plus `email`, `preferences` and a signed `avatar_url` (or `null`) |
-| `PATCH /api/profile`               | Edit profile fields; `preferences` keys are merged into the stored object |
-| `PUT /api/profile/avatar`          | Multipart `file`: check it is PNG/JPEG/WebP by content, resize to a square WebP, store it, return `avatar_url` |
-| `DELETE /api/profile/avatar`       | Delete the avatar file and set `avatar_path` to `null`               |
+| Method and path                    | Purpose                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------- |
+| `POST /api/baseline`               | Analyse a voice sample; on `ok`, store it as the current baseline            |
+| `GET /api/baseline`                | Current baseline, or `null`                                                  |
+| `GET /api/baseline/audio`          | Signed URL of the current baseline recording                                 |
+| `POST /api/evaluate`               | Score a recording against the stored baseline, then save the session         |
+| `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor`                  |
+| `GET /api/sessions/{id}`           | One session: full result and signed audio URL, or compact summary            |
+| `DELETE /api/sessions/{id}`        | Delete the session files, then the row                                       |
+| `POST /api/scripts`                | Save a script; same body returns the existing row (200); cap returns 409     |
+| `GET /api/scripts?limit=&cursor=`  | Saved-script summaries with `total`, cap `limit`, `next_cursor`              |
+| `GET /api/scripts/{id}`            | One saved script with its body                                               |
+| `PATCH /api/scripts/{id}`          | Edit `title` and/or `body`; body equal to another saved script returns 409 `script_duplicate` |
+| `DELETE /api/scripts/{id}`         | Delete a saved script; linked sessions keep `script_snapshot`               |
+| `GET /api/profile`                 | Profile row, `email`, `preferences`, signed `avatar_url` or `null`           |
+| `PATCH /api/profile`               | Edit profile fields; `preferences` keys are merged, not replaced             |
+| `PUT /api/profile/avatar`          | Multipart `file`; checked by content, resized to a square WebP, stored       |
+| `DELETE /api/profile/avatar`       | Delete the avatar file, set `avatar_path` to `null`                          |
 
-Error bodies used by these endpoints:
+`GET /api/config` returns the `[web]` section plus limits shared with the backend (`max_saved_scripts`, `script_title_max_chars`, `max_pdf_size_bytes`, `max_pdf_pages`), so each number is declared once.
 
-| Status | Body                                                                  | When                                           |
-| ------ | --------------------------------------------------------------------- | ---------------------------------------------- |
-| 401    | `{"detail": "not_authenticated"}`                                     | No valid current user                          |
-| 409    | `{"error_code": "baseline_required", ...}`                            | Evaluate without a baseline                    |
-| 503    | `{"error_code": "baseline_not_saved" \| "baseline_unavailable", ...}` | Baseline could not be saved / loaded           |
-| 404    | `{"error": "session_not_found"}`                                      | Unknown session or another user's session      |
-| 400    | `{"error": "invalid_cursor"}`                                         | Malformed cursor                               |
-| 503    | `{"error": "session_storage_unavailable"}`                            | Database or storage error in session endpoints |
-| 409    | `{"error_code": "script_limit_reached", "limit": 30, "count": 30, ...}` | A new saved script would exceed the per-user cap |
-| 413    | `{"error_code": "avatar_too_large", ...}`                            | Avatar larger than `storage.avatar_max_bytes`  |
-| 422    | `{"error_code": "avatar_invalid", ...}`                              | Not a PNG/JPEG/WebP, or a side above `storage.avatar_max_side_px` |
-| 503    | `{"error_code": "profile_unavailable", ...}`                         | Database or storage error in profile endpoints |
+### 3.2 Profile preferences
+
+`profiles.preferences` (jsonb) holds per-user UI settings. `UserPreferences` (`db/models.py`) rejects unknown keys and checks ranges against `app_constants.toml`.
+
+| Key                                              | Type | Rule                                                   | Used by                          |
+| ------------------------------------------------ | ---- | ------------------------------------------------------ | -------------------------------- |
+| `follow_wpm`                                     | int  | `follow_wpm_min..follow_wpm_max`, multiple of the step | Practice follow-along speed      |
+| `follow_wpm_min_choose`, `follow_wpm_max_choose` | int  | Same range and step; sent together; min < max          | Slider range (Settings)          |
+| `follow_auto_speed`                              | bool | Strict boolean                                         | Auto speed on sentence taps      |
+
+Merging uses the SQL function `merge_profile_preferences` (one `update ... set preferences = preferences || patch`), so two saves close together never drop each other's keys.
+
+### 3.3 Error bodies
+
+| Status | Body                                                                     | When                                               |
+| ------ | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| 401    | `{"detail": "not_authenticated"}`                                        | No valid current user                              |
+| 400    | `{"error": "invalid_cursor"}`                                            | Malformed cursor                                   |
+| 404    | `{"error": "session_not_found"}`                                         | Unknown session or another user's session          |
+| 409    | `{"error_code": "baseline_required", ...}`                               | Evaluate without a baseline                        |
+| 409    | `{"error_code": "script_limit_reached", "limit": N, "count": N, ...}`    | New saved script at the per-user cap               |
+| 409    | `{"error_code": "script_duplicate", "duplicate_id", "duplicate_title"}` | Edited body equals another saved script            |
+| 413    | `{"error_code": "avatar_too_large", ...}`                                | Avatar above `storage.avatar_max_bytes`            |
+| 422    | `{"error_code": "avatar_invalid", ...}`                                  | Not PNG/JPEG/WebP, or a side above `avatar_max_side_px` |
+| 422    | Validation error                                                         | Bad `preferences` value                            |
+| 503    | `{"error_code": "baseline_not_saved" \| "baseline_unavailable", ...}`   | Baseline could not be saved / loaded               |
+| 503    | `{"error": "session_storage_unavailable"}`                               | Database or storage error in session endpoints     |
+| 503    | `{"error_code": "profile_unavailable", ...}`                             | Database or storage error in profile endpoints     |
 
 ## 4. Database and storage
 
@@ -125,15 +148,19 @@ flowchart TB
     Factory -->|otherwise| Err["StorageError"]
 ```
 
-- **Interfaces:** `ProfileRepo`, `BaselineRepo`, `ScriptRepo`, `SessionRepo`, `AudioStore`. Every method takes `user_id` first.
-- **Two implementations with the same behaviour:** Supabase for real data, in-memory for tests and local runs without a project. Production can never fall back to memory.
-- **Shared rules:** a missing row and another user's row look the same (`None` / `False`); lists are newest first by `(created_at, id)`; list limits are 1..`storage.max_list_page_size`; library errors become `StorageError` (`ConflictError` for duplicates).
-- List endpoints accept up to `storage.max_list_page_size`; `/api/scripts` defaults to and reports the `storage.max_saved_scripts` cap. Startup rejects a page size smaller than that cap.
-- **Object paths** are built only by `build_object_path` as `{user_id}/{object_id}.webm` or `.series.json`, or by `build_avatar_path` as `{user_id}/avatar.webp`; any other path is rejected.
+| Rule                                   | Reason                                                                 |
+| -------------------------------------- | ---------------------------------------------------------------------- |
+| Interfaces `ProfileRepo`, `BaselineRepo`, `ScriptRepo`, `SessionRepo`, `AudioStore`; every method takes `user_id` first | Ownership is part of every call |
+| Supabase and memory versions behave the same | Unit tests and local runs need no project; production never falls back to memory |
+| Missing row and another user's row both return `None` / `False` | No way to probe other users' ids |
+| Lists newest first by `(created_at, id)`, cursor based | Stable pages while rows are added |
+| List limit `1..storage.max_list_page_size` | Bounded queries; one call returns all saved scripts |
+| Library errors become `StorageError` (`ConflictError` for duplicates) | Endpoints map one error type to 503 |
+| Object paths only from `build_object_path` (`{user_id}/{id}.webm`, `.series.json`) and `build_avatar_path` (`{user_id}/avatar.webp`) | Every file sits in its owner's folder; other paths are rejected |
 
 ### 4.2 Data model
 
-Four tables, all with row level security. Full rationale in [ADR-001](docs/adr/ADR-001.md).
+Four tables, all with row level security. Rationale in [ADR-001](docs/adr/ADR-001.md).
 
 ```mermaid
 erDiagram
@@ -145,34 +172,60 @@ erDiagram
     BASELINES |o--o{ SESSIONS : "baseline_id (set null)"
 ```
 
-| Table       | Holds                     | Notable rules                                                                                |
-| ----------- | ------------------------- | -------------------------------------------------------------------------------------------- |
-| `profiles`  | One row per user          | `id` = `auth.users.id`; deleting it cascades to all child rows; `avatar_path`, `preferences` (jsonb, merged by `merge_profile_preferences`) |
-| `baselines` | Voice baseline measures   | One `is_current` row per user (unique partial index)                                         |
-| `scripts`   | Scripts owned by the user | `source`: `generated_template`, `generated_llm`, `written`                                   |
-| `sessions`  | Practice results          | Score columns + `result` JSON + `script_snapshot`; `is_compact`, `mistakes` for old sessions |
+| Table       | Holds                     | Rules                                                                                     |
+| ----------- | ------------------------- | ----------------------------------------------------------------------------------------- |
+| `profiles`  | One row per user          | `id` = `auth.users.id`; delete cascades to all child rows; `avatar_path`; `preferences` jsonb |
+| `baselines` | Voice baseline measures   | One `is_current` row per user (unique partial index)                                      |
+| `scripts`   | Saved scripts             | Cap `storage.max_saved_scripts` per user; `content_hash` finds duplicates; `source`: `generated_template`, `generated_llm`, `written` |
+| `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions |
 
-### 4.3 Object storage
+### 4.3 SQL functions
 
-| Bucket      | Content                                       | Path                                 |
-| ----------- | --------------------------------------------- | ------------------------------------ |
-| `audio`     | Practice recording (Opus/WebM, 32 kbps)       | `{user_id}/{session_id}.webm`        |
-| `series`    | Pitch and loudness series split from `result` | `{user_id}/{session_id}.series.json` |
-| `baselines` | Baseline recording                            | `{user_id}/{baseline_id}.webm`       |
-| `avatars`   | Profile picture (WebP, square)                | `{user_id}/avatar.webp` (one per user, upsert) |
+| Function                    | Migration | Effect                                                                  | Reason                                       |
+| --------------------------- | --------- | ----------------------------------------------------------------------- | -------------------------------------------- |
+| `merge_profile_preferences` | `0003`    | Merges a jsonb patch into `profiles.preferences`, returns the row       | Atomic per-key merge                         |
+| `replace_current_baseline`  | `0004`    | Locks the current baseline, switches it off, inserts the new one, returns both | One transaction: a failed insert leaves the old baseline current |
 
-All buckets are private. The browser plays audio and shows the avatar through a signed URL that expires after `SIGNED_URL_TTL_S` seconds.
+Both are `execute` for `service_role` only (revoked from `public`, `anon`, `authenticated`) and take `user_id` as a parameter, because the service key bypasses RLS.
 
-### 4.4 Retention
+### 4.4 Object storage
 
-After each saved session, full sessions beyond the newest `RETENTION_FULL_SESSIONS` (10) are compacted: their audio and series files are deleted, then the row keeps only a summary `result`, the score columns, `script_snapshot` and `mistakes`. If file deletion fails, the row is left full and the next save retries it. Then compact sessions beyond the newest `MAX_COMPACT_SESSIONS` (`storage.max_compact_sessions`, 30) are deleted, so a user keeps at most 10 full + 30 compact sessions.
+| Bucket      | Content                                | Path                                           |
+| ----------- | -------------------------------------- | ---------------------------------------------- |
+| `audio`     | Practice recording (Opus/WebM, 32 kbps) | `{user_id}/{session_id}.webm`                 |
+| `series`    | Pitch and loudness series from `result` | `{user_id}/{session_id}.series.json`          |
+| `baselines` | Baseline recording                     | `{user_id}/{baseline_id}.webm`                 |
+| `avatars`   | Profile picture, square WebP           | `{user_id}/avatar.webp` (one file, upsert)     |
 
-| Measured size (5-minute recording) | Bytes     | Source                             |
-| ---------------------------------- | --------- | ---------------------------------- |
-| Full `result` (300 s)              | 1,353,556 | PR 8, `octet_length(result::text)` |
-| Compact `result`                   | 1,356     | PR 9                               |
-| Compact `mistakes`                 | 74,320    | PR 9                               |
-| Whole compact row                  | 742,714   | PR 9                               |
+All buckets are private. Files reach the browser only as signed URLs valid for `SIGNED_URL_TTL_S` seconds. The fixed avatar path means a new upload replaces the old file and nothing needs cleaning up.
+
+### 4.5 Migrations
+
+Run by hand in the Supabase SQL Editor, in file order. Each file starts with `Run:` (`once` or `any time`), `Applied:` (database and date) and `Effect:` lines.
+
+| File                                   | Run      | Creates                                                              |
+| -------------------------------------- | -------- | -------------------------------------------------------------------- |
+| `0001_init.sql`                        | once     | Tables, indexes, RLS policies, grants                                |
+| `0002_storage.sql`                     | once     | Buckets `audio`, `series`, `baselines` and folder policies           |
+| `0003_profile_avatar_preferences.sql`  | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, `merge_profile_preferences` |
+| `0004_replace_baseline_fn.sql`         | any time | `replace_current_baseline`                                           |
+
+Merged migrations are never edited; a schema change is a new file. The backend is deployed only after its migrations have run.
+
+### 4.6 Retention
+
+| Step | Rule | Reason |
+| ---- | ---- | ------ |
+| Compact | After each saved session, full sessions beyond the newest `retention_full_sessions` (10) lose audio and series files; the row keeps score columns, a summary `result`, `script_snapshot`, `mistakes` | Free-plan storage; history and progress need only the summary |
+| Delete | Compact sessions beyond the newest `max_compact_sessions` (30) are deleted | Bounded rows per user: at most 10 full + 30 compact |
+| Retry | If file deletion fails the row stays full; the next save retries | No row points to a missing file |
+
+| Measured size (5-minute recording) | Bytes     |
+| ---------------------------------- | --------- |
+| Full `result` (300 s)              | 1,353,556 |
+| Compact `result`                   | 1,356     |
+| Compact `mistakes`                 | 74,320    |
+| Whole compact row                  | 742,714   |
 
 ## 5. Main flows
 
@@ -184,7 +237,7 @@ sequenceDiagram
     participant API as POST /api/evaluate
     participant P as Evaluate Pipeline
     participant R as Repos
-    UI->>API: audio + script
+    UI->>API: audio + script (+ script_id, topic)
     API->>R: get_current_baseline(user)
     alt no baseline and BASELINE_REQUIRED
         API-->>UI: 409 baseline_required
@@ -194,7 +247,7 @@ sequenceDiagram
     API->>API: encode_opus, split_series
     API->>R: upload audio + series
     API->>R: create_session(row)
-    API->>R: compact sessions beyond 10
+    API->>R: compact beyond 10, delete compact beyond 30
     alt save failed
         API->>R: delete uploaded files
         API-->>UI: 200 result, saved=false, session_id=null
@@ -203,70 +256,96 @@ sequenceDiagram
     end
 ```
 
-- A save error never hides the score ([ADR-002](docs/adr/ADR-002.md)). A compaction error does not change `saved`.
-- `insufficient_audio` results are saved as a row without audio.
+- A save error never hides the score ([ADR-002](docs/adr/ADR-002.md)); a compaction error does not change `saved`.
+- `insufficient_audio` results are saved without audio.
+- The UI waits `evaluate_background_after_ms` (5 s). After that the request continues in the background: the user is sent Home, Practice is locked, and a dialog offers the report when it arrives. A page reload loses the dialog; the saved session still appears in History.
 
 ### 5.2 Baseline
 
-1. `POST /api/baseline` analyses the sample. Only an `ok` result is stored.
+1. `POST /api/baseline` analyses the sample; only an `ok` result is stored.
 2. The audio is encoded to Opus and uploaded to `baselines`.
-3. `replace_current_baseline` calls the SQL function of the same name (`db/migrations/0004`) through RPC. In one transaction it locks the old current row, switches it off and inserts the new current row; if the insert fails, nothing changes.
-4. The old baseline audio is deleted; failure only logs a warning.
-5. `POST /api/evaluate` always reads the baseline from the database. A `baseline_profile` sent by the client is ignored.
+3. `replace_current_baseline` (SQL function, RPC) swaps the current row in one transaction.
+4. The old baseline audio is deleted; a failure only logs a warning.
+5. `POST /api/evaluate` reads the baseline from the database; a client-sent baseline is ignored.
 
-### 5.3 Open and delete history
+### 5.3 History
 
-- `GET /api/sessions/{id}` merges the series back into `result` and adds `audio_url` for full sessions. `media_available` is `false` for compact sessions or when files cannot be read.
-- `DELETE /api/sessions/{id}` deletes files first and the row second, so a failed file delete never leaves orphan files.
+- `GET /api/sessions/{id}` merges the series back into `result` and adds `audio_url` for full sessions. `media_available` is `false` for compact sessions or unreadable files; the Report then hides charts that need the series (for example voice loudness).
+- `DELETE /api/sessions/{id}` deletes files first, row second, so a failed file delete never leaves orphan files.
 
-## 6. Security
+### 5.4 Saved scripts
 
-| Layer       | Mechanism                                                                                                                                                                                |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Identity    | `get_current_user` in `src/app/deps.py` verifies the `Authorization: Bearer` access token (Supabase Auth, or in-memory accounts in dev without Supabase); 401 `not_authenticated`. |
-| Application | The backend uses the service key, which bypasses RLS, so every query filters by `user_id` in code. Other users' rows return 404.                                                         |
-| Database    | RLS on all four tables: owner-only policies (`auth.uid()`). Tables are granted to `authenticated` and `service_role`, not `anon`.                                                        |
-| Storage     | Private buckets; policies restrict each user to the folder `{user_id}/`.                                                                                                                 |
-| Secrets     | Keys only in `.env` (git-ignored); `.env.example` lists names without values.                                                                                                            |
+- A script reaches the `scripts` table only through Save. Practice sends the text without saving; an unsaved script survives only as `sessions.script_snapshot`.
+- The same body returns the existing row even at the cap; a new script at the cap returns `409 script_limit_reached`.
+- Deleting a script sets linked `sessions.script_id` to null and keeps `script_snapshot`, so reports still open.
 
-## 7. Configuration
+### 5.5 Log in
 
-Settings are read from `.env` by `src/app/config.py`; tunable defaults come from `app_constants.toml`.
+One loading screen covers the password check and all first data: profile, history with the latest full scores, baseline, saved-script list, web fonts. Home is drawn once after all of them, so nothing on it changes after it appears.
 
-API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS` and `GROQ_API_KEYS` each hold one or more comma-separated keys (all required). `src/app/key_pool.py` keeps one `KeyPool` per service: on HTTP 429/402 the key is locked for `exhausted_cooldown_s` and the same request is retried with the next key; on 401/403 the key is locked until restart; other errors move on to the next provider or model. STT tries every Deepgram key, then every Gladia key, then returns `503 stt_unavailable`. Groq (`src/text_processing/groq_pool.py`) tries every key for one model before the fallback model (quota is counted per model), then returns `generation_unavailable`. Logs show only the key position (`key #2`).
+## 6. Browser state
 
-Database and storage settings:
+| Store            | Key                       | Content                                             | Cleared                                  |
+| ---------------- | ------------------------- | --------------------------------------------------- | ---------------------------------------- |
+| `localStorage`   | `psa.auth`                | Access and refresh tokens (F5 keeps the login)      | Log out, session end                      |
+| `localStorage`   | `psa.chat.<user_id>`      | Latest Script Studio chat (data, not HTML), newest `chat_history_max_messages` | Log out, account deletion |
+| `localStorage`   | `psc.followWpm.<user_id>` | Follow-along speed not yet saved to the profile     | After a successful save                   |
+| Profile (server) | `preferences`             | Speed, slider range, auto speed (see 3.2)           | Account deletion                          |
 
-| Setting                                             | Default                        | Meaning                                         |
-| --------------------------------------------------- | ------------------------------ | ----------------------------------------------- |
-| `APP_ENV`                                           | `dev`                          | Enables the dev user and in-memory repos        |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`              | empty                          | Use Supabase when the URL is set                |
-| `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET`, `AVATARS_BUCKET` | `audio`, `series`, `baselines`, `avatars` | Bucket names |
-| `RETENTION_FULL_SESSIONS`                           | `10`                           | Full sessions kept per user                     |
-| `SIGNED_URL_TTL_S`                                  | `600`                          | Signed audio and avatar URL lifetime            |
-| `BASELINE_REQUIRED`                                 | `true`                         | Reject evaluation without a baseline            |
-| `DEV_USER_ID`                                       | empty                          | First test user, read only by integration tests |
+Per-user keys keep two accounts on one browser apart. Every `localStorage` access is wrapped in `try/catch`, so blocked storage only loses the convenience.
 
-## 8. Testing
+## 7. Security
 
-- Unit tests use `build_memory_repos()` and `app.dependency_overrides` for `get_repos` and `get_current_user`; they need no network or keys.
-- Tests that hit a real Supabase project are marked `integration` and skipped by default: `uv run pytest -m integration` (on `psc-dev` only).
+| Layer       | Mechanism                                                                                                   |
+| ----------- | ----------------------------------------------------------------------------------------------------------- |
+| Identity    | `get_current_user` verifies the `Authorization: Bearer` token (Supabase Auth, or memory accounts in dev); 401 `not_authenticated`. |
+| Application | The service key bypasses RLS, so every query and SQL function filters by `user_id` in code. Other users' rows return 404. |
+| Database    | RLS on all four tables with owner-only policies (`auth.uid()`); tables granted to `authenticated` and `service_role`, not `anon`; SQL functions executable by `service_role` only. |
+| Storage     | Private buckets; policies limit each user to the folder `{user_id}/`.                                       |
+| Uploads     | Avatars checked by content (Pillow), size and pixel limits, re-encoded to WebP; audio size capped before reading. |
+| Secrets     | Keys only in `.env` (git-ignored); `.env.example` lists names without values.                                |
 
-## 9. Decision records
+## 8. Configuration
+
+`.env` holds secrets and per-environment values, read by `src/app/config.py`. `app_constants.toml` holds every tunable number, one comment each; `.env` wins for the keys marked `(.env)` there. The `[web]` section goes to the browser through `GET /api/config`; `main.js:loadConfig()` copies it into `CONFIG`, and `state.js` holds the fallback for each key.
+
+API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS`, `GROQ_API_KEYS`, each one or more comma-separated keys. `key_pool.py` locks a key for `exhausted_cooldown_s` on HTTP 429/402 and until restart on 401/403, then tries the next key or provider. Logs show only the key position.
+
+| Setting                                                              | Default                                   | Meaning                                  |
+| -------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
+| `APP_ENV`                                                            | `dev`                                     | `dev` allows in-memory repos and accounts |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`                               | empty                                     | Use Supabase when the URL is set         |
+| `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET`, `AVATARS_BUCKET` | `audio`, `series`, `baselines`, `avatars` | Bucket names                             |
+| `RETENTION_FULL_SESSIONS`                                            | `10`                                      | Full sessions kept per user              |
+| `MAX_COMPACT_SESSIONS`                                               | `30`                                      | Compact sessions kept per user           |
+| `SIGNED_URL_TTL_S`                                                   | `600`                                     | Signed URL lifetime, seconds             |
+| `BASELINE_REQUIRED`                                                  | `true`                                    | Reject evaluation without a baseline     |
+| `DEV_USER_ID`, `DEV2_USER_ID`                                        | empty                                     | Test users, read only by integration tests |
+
+Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `script_title_max_chars` (70), `max_list_page_size` (50), `avatar_max_bytes` (2 MB), `avatar_size_px` (256), `avatar_max_side_px` (4096), `max_upload_bytes` (100 MB).
+
+## 9. Testing
+
+| Command                          | Covers                                                                            |
+| -------------------------------- | --------------------------------------------------------------------------------- |
+| `uv run pytest`                  | Unit tests with `build_memory_repos()` and dependency overrides; no network or keys |
+| `uv run pytest -m integration`   | Real Supabase tests on `psc-dev` (repositories, SQL functions, buckets)            |
+| `node --test tests/web/evaluate_client.test.js` | `evaluate_client.js`: result mapping, follow-along schedule, auto speed            |
+| `uv run ruff check .`            | Lint and import order                                                             |
+
+## 10. Decision records
 
 | ADR                            | Title                                                             |
 | ------------------------------ | ----------------------------------------------------------------- |
 | [ADR-001](docs/adr/ADR-001.md) | Data model for profiles, baselines, scripts and practice sessions |
 | [ADR-002](docs/adr/ADR-002.md) | Report save status in the `/api/evaluate` response (schema 2.1)   |
+| [ADR-006](docs/adr/ADR-006.md) | Moderation layer 2 (Llama Guard via Ollama)                       |
 
-## Accounts and login
+## Accounts
 
-| Part | What it does |
-| --- | --- |
-| `src/app/auth.py` | `AuthProvider` in two versions: `SupabaseAuthProvider` (Supabase Auth with the service key, server side only) and `MemoryAuthProvider` (dev without `SUPABASE_URL`, tests). `get_auth()` picks one, like `get_repos()`. |
-| `src/app/routes/auth.py` | `POST /api/auth/signup` creates the account and its `profiles` row (the account is removed again if the profile cannot be saved); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password`. |
-| `src/app/routes/profile.py` | `GET` / `PATCH /api/profile` for the Profile Modal, the recording consent and `preferences`; `PUT` / `DELETE /api/profile/avatar`. |
-| `src/app/deps.py` | `get_current_user` reads and verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth cannot be reached. |
-| UI | Keeps the tokens in `localStorage` (F5 keeps the login) and swaps the refresh token for a new session after a 401. |
-
-Saved scripts (`/api/scripts*`) live in the `scripts` table, with a per-user cap from `storage.max_saved_scripts`. A duplicate body reuses its existing row even when the user is at the cap; a new script at the cap returns `409 script_limit_reached` with `limit` and `count`. `GET /api/scripts` returns `items`, `next_cursor`, `total`, and the configured cap as `limit`. Deleting a saved script nulls linked session `script_id` values without removing `script_snapshot`. The UI saves a script only through Save (it asks for a name first); Practice sends the text without saving, so a practised but unsaved script is kept only in `sessions.script_snapshot` once a report exists. `GET /api/config` returns `[web]` plus the limits shared with the backend: `max_saved_scripts`, `script_title_max_chars`, `max_pdf_size_bytes`, `max_pdf_pages`. `/api/evaluate` accepts `script_id` and `topic`, and stores the profile's `target_accent` with the session.
+| Part                        | Role                                                                                                     |
+| --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `src/app/auth.py`           | `SupabaseAuthProvider` (service key, server side) and `MemoryAuthProvider` (dev, tests); `get_auth()` picks one like `get_repos()` |
+| `src/app/routes/auth.py`    | `POST /api/auth/signup` creates the account and its `profiles` row (account removed if the profile fails); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password` |
+| `src/app/routes/profile.py` | Profile, consent, `preferences`, avatar                                                                  |
+| `src/app/deps.py`           | Verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth is unreachable                      |
