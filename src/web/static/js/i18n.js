@@ -208,7 +208,9 @@ export const TEXT = {
     errListenNone: 'No baseline recording was found.', errListen: 'Could not load your baseline recording. Please try again.',
     errInsufficient: 'We could not hear enough speech in this recording. Please record again, reading the passage aloud.',
     toastSaved: 'Baseline voice saved.', timerSuffix: ' / {t}', progress: 'Baseline recording progress',
-    okAvatar: 'Photo updated.', okRemoved: 'Photo removed.', errImage: 'Choose an image file.'
+    okAvatar: 'Photo updated.', okRemoved: 'Photo removed.', errImage: 'Choose an image file.',
+    errAvatarSave: 'Could not save your profile picture. Please try again.',
+    errAvatarRemove: 'Could not remove your profile picture. Please try again.'
   },
 
   pm: {

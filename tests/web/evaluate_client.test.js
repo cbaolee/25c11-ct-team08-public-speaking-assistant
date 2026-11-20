@@ -234,6 +234,16 @@ test('clampFollowWpm / parseFollowWpm', () => {
   for (const bad of [null, undefined, '', 'abc', '97', '146', '95', '185', '145.5', NaN, 1e9]) assert.equal(parseFollowWpm(bad), 145, String(bad));
 });
 
+test('clampFollowWpm / parseFollowWpm: limits from /api/config', () => {
+  const lim = { min: 120, max: 200, step: 10, def: 160 };
+  assert.equal(parseFollowWpm('200', lim), 200); assert.equal(parseFollowWpm(190, lim), 190);
+  for (const bad of ['205', '110', 145, null]) assert.equal(parseFollowWpm(bad, lim), 160, String(bad));
+  assert.equal(clampFollowWpm(250, lim), 200); assert.equal(clampFollowWpm(50, lim), 120); assert.equal(clampFollowWpm(null, lim), 160);
+  assert.equal(parseFollowWpm('180', { max: 200 }), 180);       // missing limits fall back to FOLLOW_WPM
+  const segs = followSchedule({ wordCounts: [4], wpm: 240, limits: { max: 240 } });
+  assert.equal(segs[0].end, 1);                                  // 4 words at 240 wpm, not clamped to 180
+});
+
 test('followRetime: edge cases (gap, last sentence, empty sentence, now past old end)', () => {
   const o = { wordCounts: [4, 2, 6], leadS: 1, gapS: 0.5 };
   const segs = followSchedule({ ...o, wpm: 120 });            // [1,3] [3.5,4.5] [5,8]

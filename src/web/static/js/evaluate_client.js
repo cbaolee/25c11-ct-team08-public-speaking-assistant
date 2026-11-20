@@ -140,19 +140,25 @@
   }
 
   /* ---- Practice follow-along schedule (demo: highlight moves by TIME, not by the real voice; NOT part of scoring) ---- */
+  // Fallback slider limits, used only when /api/config fails. Real values: app_constants.toml [web] follow_wpm_*.
   const FOLLOW_WPM = { min: 100, max: 180, step: 5, def: 145 };
-  function clampFollowWpm(w) {                     // out of range -> clamp; not a finite number -> default
-    const n = typeof w === 'number' ? w : (w == null || w === '' ? NaN : Number(w));   // Number(null) would be 0
-    if (!Number.isFinite(n)) return FOLLOW_WPM.def;
-    return Math.min(FOLLOW_WPM.max, Math.max(FOLLOW_WPM.min, n));
+  function followLimitsOr(limits) {                // fill the limits not given from FOLLOW_WPM
+    const l = limits || {};
+    return {
+      min: l.min != null ? l.min : FOLLOW_WPM.min, max: l.max != null ? l.max : FOLLOW_WPM.max,
+      step: l.step != null ? l.step : FOLLOW_WPM.step, def: l.def != null ? l.def : FOLLOW_WPM.def
+    };
   }
-  function parseFollowWpm(raw, limits) {            // stored value (string/number): must be an integer multiple of the configured step in range, else default
-    const min = limits && limits.min != null ? limits.min : FOLLOW_WPM.min;
-    const max = limits && limits.max != null ? limits.max : FOLLOW_WPM.max;
-    const step = limits && limits.step != null ? limits.step : FOLLOW_WPM.step;
-    const def = limits && limits.def != null ? limits.def : FOLLOW_WPM.def;
+  function clampFollowWpm(w, limits) {             // out of range -> clamp; not a finite number -> default
+    const l = followLimitsOr(limits);
+    const n = typeof w === 'number' ? w : (w == null || w === '' ? NaN : Number(w));   // Number(null) would be 0
+    if (!Number.isFinite(n)) return l.def;
+    return Math.min(l.max, Math.max(l.min, n));
+  }
+  function parseFollowWpm(raw, limits) {           // stored value (string/number): must be an integer multiple of step in range, else default
+    const l = followLimitsOr(limits);
     const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
-    if (typeof n !== 'number' || !Number.isInteger(n) || n < min || n > max || n % step !== 0) return def;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < l.min || n > l.max || n % l.step !== 0) return l.def;
     return n;
   }
   /* wordCounts[i] = words in sentence i. Sentence i lasts n_i * 60 / wpm seconds; leadS before the first, gapS after each.
@@ -161,7 +167,7 @@
   function followSchedule(o) {
     o = o || {};
     const counts = Array.isArray(o.wordCounts) ? o.wordCounts : [];
-    const per = 60 / clampFollowWpm(o.wpm), lead = o.leadS == null ? 0 : o.leadS, gap = o.gapS == null ? 0 : o.gapS;
+    const per = 60 / clampFollowWpm(o.wpm, o.limits), lead = o.leadS == null ? 0 : o.leadS, gap = o.gapS == null ? 0 : o.gapS;
     const k = Number.isInteger(o.startIndex) ? o.startIndex : -1, prev = o.prev || [];
     let t = lead;
     return counts.map((n, i) => {
@@ -175,10 +181,10 @@
      (so the highlight does not jump back), later ones are recomputed. idx < 0 (still in the lead-in): only the sentences move. */
   function followRetime(segs, idx, now, o) {
     if (!segs || !segs.length) return [];
-    if (idx < 0) return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: 0, startTime: segs[0].start });
+    if (idx < 0) return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: 0, startTime: segs[0].start });
     const old = segs[idx], dOld = old.end - old.start, frac = dOld > 0 ? Math.min(1, Math.max(0, (now - old.start) / dOld)) : 0;
-    const dNew = (o.wordCounts[idx] || 0) * 60 / clampFollowWpm(o.wpm);
-    return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
+    const dNew = (o.wordCounts[idx] || 0) * 60 / clampFollowWpm(o.wpm, o.limits);
+    return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
   }
 
   const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
