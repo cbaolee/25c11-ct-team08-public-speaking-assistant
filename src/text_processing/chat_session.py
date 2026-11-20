@@ -342,3 +342,106 @@ def analyze_slot_coverage(
     return coverage_ratio, missing_entities, missing_groups
 
 
+def check_ready_to_generate(
+    *,
+    selected_template_id: str | None,
+    missing_entities: list[str],
+    coverage_ratio: float,
+    gather_turns: int,
+    files_loaded: list[str] | None = None,
+    prompt: str = "",
+    user_notes: list[str] | None = None,
+) -> bool:
+    """Evaluate 3-layer deterministic stop condition for generation readiness."""
+    # Layer 1: Sufficient Document & Slot Coverage
+    if len(missing_entities) == 0 and coverage_ratio >= 0.7:
+        return True
+
+    # Layer 2: Hard Interaction Cap
+    if gather_turns >= 2:
+        return True
+
+    # Layer 3: Free-Topic Mode Fallback
+    if selected_template_id is None:
+        has_files = bool(files_loaded and len(files_loaded) > 0)
+        all_text = f"{prompt} {' '.join(user_notes or [])}".strip()
+        word_count = len(all_text.split())
+        if has_files or word_count >= FREE_TOPIC_MIN_WORDS:
+            return True
+
+    return False
+
+
+def format_checklist_fallback(
+    topic: str,
+    missing_entities: list[str],
+    missing_groups: list[str],
+) -> str:
+    """Generate a deterministic 0-token checklist when LLM is unavailable or fails."""
+    lines = [f"To help craft your speech on '{topic}', please provide a bit more detail on:"]
+    if missing_entities:
+        clean_entities = [e.removeprefix("entity_").replace("_", " ") for e in missing_entities]
+        lines.append(f"- Specific details: {', '.join(clean_entities)}")
+    if missing_groups:
+        lines.append(f"- Key areas: {', '.join(missing_groups)}")
+    return "\n".join(lines)
+
+
+def build_followup_reply(
+    topic: str,
+    ready_to_generate: bool,
+    missing_entities: list[str],
+    missing_groups: list[str],
+    gather_turns: int = 0,
+    client: Any | None = None,
+    model: str | None = None,
+) -> str:
+    """Build follow-up message using minimal tokens (or 0 tokens on ready / fallback)."""
+    if ready_to_generate:
+        return READY_MESSAGE
+
+    if gather_turns >= 2:
+        return READY_MESSAGE
+
+    # If client is None, fallback immediately to 0-token checklist
+    if client is None:
+        return format_checklist_fallback(topic, missing_entities, missing_groups)
+
+    target_model = (
+        model
+        or getattr(settings, "groq_llm_fallback_model_2", FOLLOWUP_DEFAULT_MODEL)
+        or FOLLOWUP_DEFAULT_MODEL
+    )
+
+    system_prompt = (
+        "You are an expert speech coach helping a speaker prepare their presentation. "
+        "Ask 1-2 focused, conversational follow-up questions to gather missing speech elements. "
+        "Keep your response concise (under 75 words). Do not include pleasantries or greetings."
+    )
+    user_prompt = (
+        f"Topic: {topic}\n"
+        f"Missing specific details: {', '.join(missing_entities) if missing_entities else 'None'}\n"
+        f"Missing key content areas: {', '.join(missing_groups) if missing_groups else 'None'}"
+    )
+
+    try:
+        resp = client.chat.completions.create(
+            model=target_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.5,
+            max_tokens=FOLLOWUP_MAX_TOKENS,
+        )
+        reply = resp.choices[0].message.content.strip()
+        if reply:
+            return reply
+    except Exception as exc:
+        logger.warning(
+            "Groq follow-up question generation failed (%s), using fallback checklist.", exc
+        )
+
+    return format_checklist_fallback(topic, missing_entities, missing_groups)
+
+
