@@ -344,3 +344,171 @@ class TestAnalyzeSlotCoverage:
         assert GROUP_EVIDENCE in missing_groups
 
 
+class Test3LayerStopRule:
+    def test_layer_1_sufficient_coverage(self) -> None:
+        # Layer 1 holds: 0 missing entities and coverage >= 0.7
+        is_ready = check_ready_to_generate(
+            selected_template_id="sports/sample",
+            missing_entities=[],
+            coverage_ratio=0.75,
+            gather_turns=0,
+        )
+        assert is_ready is True
+
+    def test_layer_1_unmet_when_entities_missing(self) -> None:
+        # Coverage is high but missing entity blocks Layer 1
+        is_ready = check_ready_to_generate(
+            selected_template_id="sports/sample",
+            missing_entities=["entity_guest_name"],
+            coverage_ratio=1.0,
+            gather_turns=1,
+        )
+        assert is_ready is False
+
+    def test_layer_1_unmet_when_coverage_low(self) -> None:
+        is_ready = check_ready_to_generate(
+            selected_template_id="sports/sample",
+            missing_entities=[],
+            coverage_ratio=0.69,
+            gather_turns=1,
+        )
+        assert is_ready is False
+
+    def test_layer_2_hard_interaction_cap(self) -> None:
+        # Even with 0 coverage and missing entities, 2 turns triggers ready
+        is_ready = check_ready_to_generate(
+            selected_template_id="sports/sample",
+            missing_entities=["entity_target", "entity_name"],
+            coverage_ratio=0.1,
+            gather_turns=2,
+        )
+        assert is_ready is True
+
+    def test_layer_3_free_topic_with_uploaded_file(self) -> None:
+        is_ready = check_ready_to_generate(
+            selected_template_id=None,
+            missing_entities=[],
+            coverage_ratio=0.0,
+            gather_turns=0,
+            files_loaded=["research_paper.pdf"],
+            prompt="Short topic",
+        )
+        assert is_ready is True
+
+    def test_layer_3_free_topic_with_sufficient_words(self) -> None:
+        long_notes = ["word " * 50, "word " * 60, "word " * 45]  # > 150 words
+        is_ready = check_ready_to_generate(
+            selected_template_id=None,
+            missing_entities=[],
+            coverage_ratio=0.0,
+            gather_turns=0,
+            files_loaded=[],
+            prompt="Initial prompt",
+            user_notes=long_notes,
+        )
+        assert is_ready is True
+
+    def test_layer_3_free_topic_insufficient(self) -> None:
+        is_ready = check_ready_to_generate(
+            selected_template_id=None,
+            missing_entities=[],
+            coverage_ratio=0.0,
+            gather_turns=0,
+            files_loaded=[],
+            prompt="Short prompt with few words",
+            user_notes=["Just a note"],
+        )
+        assert is_ready is False
+
+    def test_template_mode_does_not_trigger_layer_3(self) -> None:
+        # Layer 3 is only for selected_template_id is None
+        is_ready = check_ready_to_generate(
+            selected_template_id="sports/sample",
+            missing_entities=["entity_name"],
+            coverage_ratio=0.4,
+            gather_turns=0,
+            files_loaded=["research.pdf"],
+        )
+        assert is_ready is False
+
+
+class TestBuildFollowupReply:
+    def test_ready_to_generate_returns_deterministic_message(self) -> None:
+        reply = build_followup_reply(
+            topic="Marathon Pacing",
+            ready_to_generate=True,
+            missing_entities=["entity_name"],
+            missing_groups=[GROUP_MAIN],
+            gather_turns=0,
+        )
+        assert reply == READY_MESSAGE
+
+    def test_gather_turns_cap_returns_ready_message(self) -> None:
+        reply = build_followup_reply(
+            topic="Marathon Pacing",
+            ready_to_generate=False,
+            missing_entities=["entity_name"],
+            missing_groups=[GROUP_MAIN],
+            gather_turns=2,
+        )
+        assert reply == READY_MESSAGE
+
+    def test_client_none_falls_back_to_checklist(self) -> None:
+        reply = build_followup_reply(
+            topic="Space Exploration",
+            ready_to_generate=False,
+            missing_entities=["entity_mission_name"],
+            missing_groups=[GROUP_EVIDENCE, GROUP_COUNTER],
+            gather_turns=0,
+            client=None,
+        )
+        assert "Space Exploration" in reply
+        assert "mission name" in reply
+        assert GROUP_EVIDENCE in reply
+        assert GROUP_COUNTER in reply
+
+    def test_client_exception_falls_back_to_checklist(self) -> None:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = RuntimeError("Groq 429 Rate Limited")
+
+        reply = build_followup_reply(
+            topic="Renewable Energy",
+            ready_to_generate=False,
+            missing_entities=["entity_region"],
+            missing_groups=[GROUP_MAIN],
+            gather_turns=1,
+            client=mock_client,
+        )
+        assert "Renewable Energy" in reply
+        assert "region" in reply
+        assert GROUP_MAIN in reply
+
+    def test_groq_mock_success(self) -> None:
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content="Could you share a specific real-world example or case study?"
+                )
+            )
+        ]
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        reply = build_followup_reply(
+            topic="Autonomous Vehicles",
+            ready_to_generate=False,
+            missing_entities=[],
+            missing_groups=[GROUP_EVIDENCE],
+            gather_turns=0,
+            client=mock_client,
+        )
+        assert reply == "Could you share a specific real-world example or case study?"
+
+        # Verify no document chunks were passed to the LLM
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        user_msg = call_kwargs["messages"][1]["content"]
+        assert "Autonomous Vehicles" in user_msg
+        assert "Chunk" not in user_msg
+
+
