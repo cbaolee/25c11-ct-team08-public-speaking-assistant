@@ -5,6 +5,7 @@ import re
 import warnings
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any
 
 from src.app.constants import CONSTANTS
@@ -32,6 +33,9 @@ PDF_MAGIC_BYTES = b"%PDF-"
 MIN_PDF_SIZE_BYTES = CONSTANTS["script"]["min_pdf_size_bytes"]
 MAX_PDF_SIZE_BYTES = CONSTANTS["script"]["max_pdf_size_bytes"]
 MAX_POC_PAGES = CONSTANTS["script"]["max_pdf_pages"]
+MAX_TEXT_FILE_BYTES = CONSTANTS["script"]["max_text_file_bytes"]
+MAX_TEXT_FILE_WORDS = CONSTANTS["script"]["max_text_file_words"]
+ALLOWED_DOC_EXTENSIONS = frozenset({".pdf", ".md", ".txt"})
 HEADING_PATTERN = re.compile(r"^(#{1,4})\s+(.+)$")
 
 
@@ -147,3 +151,60 @@ def _extract_pdf_pages(
     if not any(ch.isalnum() for item in pages for ch in (item["text"] or "")):
         raise DocumentParserError("no_text_layer", "PDF has no extractable text (scanned?).")
     return pages
+
+
+def validate_text_file(
+    file_path: str,
+    max_bytes: int = MAX_TEXT_FILE_BYTES,
+    max_words: int = MAX_TEXT_FILE_WORDS,
+) -> str:
+    """Validate an uploaded .md/.txt file (size, non-binary, UTF-8, word cap) and return text."""
+    if not file_path or not os.path.exists(file_path):
+        raise DocumentParserError("file_not_found", f"File not found: {file_path}")
+    size_bytes = os.path.getsize(file_path)
+    if size_bytes <= 0:
+        raise DocumentParserError("file_too_small", "Text file is empty.")
+    if size_bytes > max_bytes:
+        raise DocumentParserError(
+            "file_too_large", f"Size ({size_bytes}B) exceeds {max_bytes} bytes."
+        )
+    raw_bytes = Path(file_path).read_bytes()
+    if b"\x00" in raw_bytes:
+        raise DocumentParserError("invalid_text_file", "Binary content is not allowed.")
+    try:
+        text = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise DocumentParserError(
+            "invalid_text_encoding", "Text file must be valid UTF-8."
+        ) from exc
+    if not any(ch.isalnum() for ch in text):
+        raise DocumentParserError("empty_document", "Document contains no extractable text.")
+    word_count = len(text.split())
+    if word_count > max_words:
+        raise DocumentParserError(
+            "text_too_long", f"Document has {word_count} words (limit: {max_words})."
+        )
+    return text
+
+
+def validate_and_parse_document(
+    file_path: str,
+    filename: str,
+    ocr_runner: Callable[[bytes, int], str] | None = None,
+) -> list[DocumentChunk]:
+    """Validate and parse an uploaded .pdf, .md, or .txt document into heading chunks."""
+    ext = Path(filename or file_path).suffix.lower()
+    if ext not in ALLOWED_DOC_EXTENSIONS:
+        raise DocumentParserError(
+            "unsupported_file_type",
+            f"Unsupported file type '{ext}'. Allowed: .pdf, .md, .txt.",
+        )
+    if ext == ".pdf":
+        validate_pdf_file(file_path)
+        return parse_input_to_chunks(pdf_path=file_path, ocr_runner=ocr_runner)
+    text = validate_text_file(file_path)
+    chunks = parse_input_to_chunks(raw_text=text)
+    if not chunks:
+        heading = Path(filename or file_path).stem or "Document"
+        chunks = [DocumentChunk(1, heading, 1, text.strip())]
+    return chunks
