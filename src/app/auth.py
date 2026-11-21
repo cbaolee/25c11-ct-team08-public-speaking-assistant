@@ -119,6 +119,9 @@ class AuthProvider(Protocol):
 
     def update_password(self, user_id: UUID, password: str) -> None: ...
 
+    # Re-auth for sensitive actions (ADR-011): True only when the password is the account's.
+    def verify_password(self, email: str, password: str) -> bool: ...
+
 
 # ---------- in-memory provider (dev without Supabase, tests) ----------
 
@@ -305,6 +308,15 @@ class MemoryAuthProvider:
                 raise InvalidCredentialsError()
             account.salt = secrets.token_bytes(16)
             account.password_hash = self._hash(password, account.salt)
+
+    def verify_password(self, email: str, password: str) -> bool:
+        """Check a password without creating a session (re-auth before a sensitive action)."""
+        with self._lock:
+            account = self._accounts.get(email.strip().lower())
+            if account is None:
+                return False
+            # Constant-time compare: the time taken does not tell how much of the hash matched.
+            return hmac.compare_digest(account.password_hash, self._hash(password, account.salt))
 
 
 # ---------- Supabase Auth provider ----------
@@ -511,6 +523,22 @@ class SupabaseAuthProvider:
             raise AuthUnavailableError("Could not change the password") from err
         except Exception as err:
             raise AuthUnavailableError("Could not change the password") from err
+
+    def verify_password(self, email: str, password: str) -> bool:
+        """Re-auth: sign in on a throwaway client, then revoke the session it created at once.
+
+        A new client is used so the user's own session (and its refresh token) is untouched.
+        """
+        try:
+            resp = self._new_client().sign_in_with_password({"email": email, "password": password})
+        except Exception as err:
+            if _is_rate_limited(err):
+                raise AuthRateLimitedError() from err
+            if isinstance(err, AuthError) and not _is_unavailable(err):
+                return False  # invalid_credentials (email_not_confirmed cannot happen: logged in)
+            raise AuthUnavailableError("Could not check the password") from err
+        self._revoke_response_session(resp)
+        return True
 
 
 @lru_cache(maxsize=1)
