@@ -15,6 +15,7 @@ import logging
 import secrets
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Protocol
@@ -23,9 +24,10 @@ from uuid import UUID, uuid4
 import httpx
 from pydantic import BaseModel
 from supabase_auth import SyncGoTrueClient
-from supabase_auth.errors import AuthApiError, AuthError, AuthRetryableError
+from supabase_auth.errors import AuthApiError, AuthError, AuthRetryableError, AuthWeakPasswordError
 
 from src.app.config import settings
+from src.app.constants import CONSTANTS
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +49,39 @@ class EmailTakenError(AuthProviderError):
     """An account with this email already exists."""
 
 
+class InvalidEmailError(AuthProviderError):
+    """The email address is invalid."""
+
+
 class WeakPasswordError(AuthProviderError):
     """The account service refused the password."""
 
 
 class AuthUnavailableError(AuthProviderError):
     """The account service could not be reached or answered with an unexpected error."""
+
+
+class EmailNotConfirmedError(AuthProviderError):
+    """The account has not confirmed its email."""
+
+
+class OtpInvalidError(AuthProviderError):
+    """The verification code is invalid."""
+
+
+class OtpExpiredError(AuthProviderError):
+    """The verification code has expired."""
+
+
+class AuthRateLimitedError(AuthProviderError):
+    """The account service rate limit was reached."""
+
+
+@dataclass(frozen=True)
+class SignUpResult:
+    user_id: str
+    needs_verification: bool
+    created: bool
 
 
 class AuthSession(BaseModel):
@@ -69,6 +98,12 @@ class TokenUser:
 
 
 class AuthProvider(Protocol):
+    def sign_up(self, email: str, password: str) -> SignUpResult: ...
+
+    def verify_signup_otp(self, email: str, token: str) -> None: ...
+
+    def resend_signup_otp(self, email: str) -> None: ...
+
     def create_user(self, email: str, password: str) -> UUID: ...
 
     def delete_user(self, user_id: UUID) -> None: ...
@@ -93,10 +128,45 @@ class _MemoryAccount:
     email: str
     salt: bytes
     password_hash: bytes
+    confirmed: bool = True
+    otp_hash: str | None = None
+    otp_expires_at: float = 0
+    otp_attempts: int = 0
+
+
+def _mask_email(email: str) -> str:
+    """Hide the local part of an email address."""
+    local, _, domain = email.partition("@")
+    return f"{local[:1]}***@{domain}"
 
 
 class MemoryAuthProvider:
-    def __init__(self, token_ttl_s: int = MEMORY_TOKEN_TTL_S) -> None:
+    def __init__(
+        self,
+        token_ttl_s: int = MEMORY_TOKEN_TTL_S,
+        *,
+        require_email_otp: bool | None = None,
+        otp_length: int | None = None,
+        otp_ttl_s: int | None = None,
+        max_attempts: int | None = None,
+        code_factory: Callable[[], str] | None = None,
+        clock: Callable[[], float] = time.monotonic,
+        log_codes: bool = False,
+    ) -> None:
+        config = CONSTANTS["auth"]
+        self._require_email_otp = (
+            config["require_email_otp"] if require_email_otp is None else require_email_otp
+        )
+        self._otp_length = config["otp_length"] if otp_length is None else otp_length
+        self._otp_ttl_s = config["otp_ttl_s"] if otp_ttl_s is None else otp_ttl_s
+        self._max_attempts = (
+            config["verify_attempts_per_window"] if max_attempts is None else max_attempts
+        )
+        self._code_factory = code_factory or (
+            lambda: "".join(str(secrets.randbelow(10)) for _ in range(self._otp_length))
+        )
+        self._clock = clock
+        self._log_codes = log_codes
         self._token_ttl_s = token_ttl_s
         self._lock = threading.Lock()
         self._accounts: dict[str, _MemoryAccount] = {}  # key: email
@@ -130,6 +200,58 @@ class MemoryAuthProvider:
             self._accounts[email] = account
             return account.id
 
+    def _issue_otp(self, account: _MemoryAccount) -> None:
+        code = self._code_factory()
+        account.otp_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+        account.otp_expires_at = self._clock() + self._otp_ttl_s
+        account.otp_attempts = 0
+        if self._log_codes:
+            logger.info("dev OTP for %s : %s", _mask_email(account.email), code)
+
+    def sign_up(self, email: str, password: str) -> SignUpResult:
+        email = email.strip().lower()
+        if len(password) < MIN_PASSWORD_LENGTH:
+            raise WeakPasswordError()
+        with self._lock:
+            account = self._accounts.get(email)
+            if account is not None:
+                if account.confirmed:
+                    raise EmailTakenError()
+                self._issue_otp(account)
+                return SignUpResult(str(account.id), True, False)
+            salt = secrets.token_bytes(16)
+            account = _MemoryAccount(
+                uuid4(), email, salt, self._hash(password, salt), not self._require_email_otp
+            )
+            self._accounts[email] = account
+            if not account.confirmed:
+                self._issue_otp(account)
+            return SignUpResult(str(account.id), not account.confirmed, True)
+
+    def verify_signup_otp(self, email: str, token: str) -> None:
+        """Confirm an account; confirmed accounts also return invalid to hide their status."""
+        with self._lock:
+            account = self._accounts.get(email.strip().lower())
+            if account is None or account.confirmed or account.otp_hash is None:
+                raise OtpInvalidError()
+            if self._clock() >= account.otp_expires_at:
+                account.otp_hash = None
+                raise OtpExpiredError()
+            digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            if not hmac.compare_digest(account.otp_hash, digest):
+                account.otp_attempts += 1
+                if account.otp_attempts >= self._max_attempts:
+                    account.otp_hash = None
+                raise OtpInvalidError()
+            account.confirmed = True
+            account.otp_hash = None
+
+    def resend_signup_otp(self, email: str) -> None:
+        with self._lock:
+            account = self._accounts.get(email.strip().lower())
+            if account is not None and not account.confirmed:
+                self._issue_otp(account)
+
     def delete_user(self, user_id: UUID) -> None:
         with self._lock:
             account = self._account_by_id(user_id)
@@ -145,6 +267,8 @@ class MemoryAuthProvider:
                 account.password_hash, self._hash(password, account.salt)
             ):
                 raise InvalidCredentialsError()
+            if not account.confirmed:
+                raise EmailNotConfirmedError()
             return self._new_session(account.id)
 
     def refresh(self, refresh_token: str) -> AuthSession:
@@ -192,6 +316,23 @@ def _is_unavailable(err: Exception) -> bool:
     return isinstance(status, int) and status >= 500
 
 
+def _created_by_this_call(user) -> bool:
+    """Infer creation only from sufficiently close server timestamps."""
+    ref = user.confirmation_sent_at or user.email_confirmed_at
+    if ref is None or user.created_at is None:
+        return False
+    try:
+        return 0 <= (ref - user.created_at).total_seconds() < 5
+    except (TypeError, ValueError):
+        return False
+
+
+def _is_rate_limited(err: Exception) -> bool:
+    return getattr(err, "status", None) == 429 or getattr(err, "code", None) in {
+        "over_email_send_rate_limit", "over_request_rate_limit"
+    }
+
+
 class SupabaseAuthProvider:
     """Supabase Auth through its REST API, with the service key (server side only).
 
@@ -199,7 +340,13 @@ class SupabaseAuthProvider:
     receives, and a shared one would mix sessions of different users.
     """
 
-    def __init__(self, url: str, service_key: str) -> None:
+    def __init__(
+        self, url: str, service_key: str, *, require_email_otp: bool | None = None
+    ) -> None:
+        self._require_email_otp = (
+            CONSTANTS["auth"]["require_email_otp"]
+            if require_email_otp is None else require_email_otp
+        )
         self._url = f"{url.rstrip('/')}/auth/v1"
         self._headers = {"apikey": service_key, "Authorization": f"Bearer {service_key}"}
         self._admin_client = self._new_client()  # admin calls and token checks, no session
@@ -241,6 +388,63 @@ class SupabaseAuthProvider:
             raise AuthUnavailableError("Could not create the account") from err
         return UUID(resp.user.id)
 
+    def _revoke_response_session(self, resp) -> None:
+        session = getattr(resp, "session", None)
+        if session is not None:
+            try:
+                self._admin_client.admin.sign_out(session.access_token, scope="local")
+            except Exception:
+                pass  # Best effort; never expose the session.
+
+    def sign_up(self, email: str, password: str) -> SignUpResult:
+        if not self._require_email_otp:
+            return SignUpResult(str(self.create_user(email, password)), False, True)
+        try:
+            resp = self._new_client().sign_up({"email": email, "password": password})
+        except AuthWeakPasswordError as err:
+            raise WeakPasswordError() from err
+        except Exception as err:
+            if _is_rate_limited(err):
+                raise AuthRateLimitedError() from err
+            if isinstance(err, AuthApiError) and err.code in {
+                "email_exists", "user_already_exists"
+            }:
+                raise EmailTakenError() from err
+            if isinstance(err, AuthApiError) and err.code == "email_address_invalid":
+                raise InvalidEmailError() from err
+            raise AuthUnavailableError("Could not create the account") from err
+        user = resp.user
+        self._revoke_response_session(resp)
+        if user is None:
+            raise AuthUnavailableError("Could not create the account")
+        if user.identities == []:
+            raise EmailTakenError()
+        return SignUpResult(
+            user.id, resp.session is None or user.email_confirmed_at is None,
+            _created_by_this_call(user),
+        )
+
+    def verify_signup_otp(self, email: str, token: str) -> None:
+        try:
+            resp = self._new_client().verify_otp({"email": email, "token": token, "type": "signup"})
+        except Exception as err:
+            if _is_rate_limited(err):
+                raise AuthRateLimitedError() from err
+            if isinstance(err, AuthApiError) and 400 <= err.status < 500:
+                raise OtpInvalidError() from err
+            raise AuthUnavailableError("Could not verify the account") from err
+        self._revoke_response_session(resp)
+
+    def resend_signup_otp(self, email: str) -> None:
+        try:
+            self._new_client().resend({"type": "signup", "email": email})
+        except Exception as err:
+            if _is_rate_limited(err):
+                raise AuthRateLimitedError() from err
+            if isinstance(err, AuthApiError) and 400 <= err.status < 500:
+                return
+            raise AuthUnavailableError("Could not resend the code") from err
+
     def delete_user(self, user_id: UUID) -> None:
         try:
             self._admin_client.admin.delete_user(str(user_id))
@@ -251,6 +455,8 @@ class SupabaseAuthProvider:
         try:
             resp = self._new_client().sign_in_with_password({"email": email, "password": password})
         except Exception as err:
+            if isinstance(err, AuthApiError) and err.code == "email_not_confirmed":
+                raise EmailNotConfirmedError() from err
             if isinstance(err, AuthError) and not _is_unavailable(err):
                 raise InvalidCredentialsError() from err
             raise AuthUnavailableError("Could not sign in") from err
@@ -306,5 +512,5 @@ def get_auth() -> AuthProvider:
     if settings.supabase_url:
         return SupabaseAuthProvider(settings.supabase_url, settings.supabase_service_key)
     if settings.app_env == "dev":
-        return MemoryAuthProvider()
+        return MemoryAuthProvider(log_codes=True)
     raise AuthUnavailableError("Auth is not configured")

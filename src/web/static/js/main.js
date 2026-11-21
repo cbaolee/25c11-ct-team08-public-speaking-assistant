@@ -49,6 +49,7 @@ import { $, $$, clearErr, esc, showErr } from './utils.js';
 export function loadConfig() {
   return fetch('/api/config').then(r => (r.ok ? r.json() : null)).then(c => {
     if (!c) return;
+    CONFIG.auth = c.auth ?? CONFIG.auth;
     CONFIG.OWN_MAX_WORDS = c.own_max_words ?? CONFIG.OWN_MAX_WORDS;
     CONFIG.BASELINE_SECONDS = c.baseline_seconds ?? CONFIG.BASELINE_SECONDS;
     CONFIG.BASELINE_MIN_SECONDS = c.baseline_min_seconds ?? CONFIG.BASELINE_MIN_SECONDS;

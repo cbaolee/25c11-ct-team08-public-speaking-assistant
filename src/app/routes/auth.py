@@ -3,9 +3,11 @@
 Errors use `{error_code, message}` like the baseline and script endpoints.
 """
 
+import hashlib
 import logging
 import re
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
@@ -17,15 +19,22 @@ from src.app.auth import (
     MIN_PASSWORD_LENGTH,
     AuthProvider,
     AuthProviderError,
+    AuthRateLimitedError,
     AuthUnavailableError,
+    EmailNotConfirmedError,
     EmailTakenError,
     InvalidCredentialsError,
+    InvalidEmailError,
+    OtpExpiredError,
+    OtpInvalidError,
     WeakPasswordError,
     get_auth,
 )
+from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import ProfileUpsert, StorageError
 from src.app.deps import CurrentUser, get_bearer_token, get_current_user
+from src.app.rate_limit import SlidingWindowLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +43,20 @@ router = APIRouter(prefix="/api/auth")
 # Light check only (one "@", a dot in the domain, no spaces); Supabase Auth checks again.
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MAX_EMAIL_LENGTH = 254
+_auth_config = CONSTANTS["auth"]
+_resend_limiter = SlidingWindowLimiter(1, _auth_config["resend_cooldown_s"])
+_verify_limiter = SlidingWindowLimiter(
+    _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
+)
+
+
+def reset_auth_limiters() -> None:
+    _resend_limiter.reset()
+    _verify_limiter.reset()
+
+
+def _email_key(email: str) -> str:
+    return hashlib.sha256(email.encode()).hexdigest()
 
 
 class SignupPayload(BaseModel):
@@ -50,6 +73,14 @@ class SignupPayload(BaseModel):
 class LoginPayload(BaseModel):
     email: str = Field(max_length=MAX_EMAIL_LENGTH)
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class OtpEmailPayload(BaseModel):
+    email: str = Field(max_length=MAX_EMAIL_LENGTH)
+
+
+class VerifyOtpPayload(OtpEmailPayload):
+    token: str = Field(max_length=32)
 
 
 class RefreshPayload(BaseModel):
@@ -82,16 +113,20 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def _rollback_account(auth: AuthProvider, repos: Repos, user_id) -> None:
-    """Undo a half-finished sign up so the email can be used again."""
-    try:
-        repos.profiles.delete_profile(user_id)  # Supabase also cascades from auth.users
-    except StorageError:
-        logger.warning("Could not delete the profile of a failed sign up")
-    try:
-        auth.delete_user(user_id)
-    except AuthProviderError:
-        logger.exception("Could not delete the account of a failed sign up")
+def _rollback_account(
+    auth: AuthProvider, repos: Repos, user_id, *, delete_profile: bool, delete_user: bool
+) -> None:
+    """Delete only request-owned data: deleting an auth user cascades to all their data."""
+    if delete_profile:
+        try:
+            repos.profiles.delete_profile(user_id)
+        except StorageError:
+            logger.warning("Could not delete the profile of a failed sign up")
+    if delete_user:
+        try:
+            auth.delete_user(user_id)
+        except AuthProviderError:
+            logger.warning("Could not delete the account of a failed sign up")
 
 
 @router.post("/signup", status_code=201)
@@ -100,44 +135,112 @@ async def sign_up(
     auth: Annotated[AuthProvider, Depends(get_auth)],
     repos: Annotated[Repos, Depends(get_repos)],
 ):
-    """Create the account, then its `profiles` row (every saved row needs it).
-
-    If the profile cannot be saved, the account is deleted again and 503 is returned,
-    so the person can simply try again with the same email.
-    """
+    """Create or resume signup without overwriting existing data."""
     email = _normalize_email(payload.email)
     if not _EMAIL_RE.match(email):
         return _error(422, "invalid_email", "Enter a valid email address.")
     if len(payload.password) < MIN_PASSWORD_LENGTH:
         return _weak_password()
     try:
-        user_id = await run_in_threadpool(auth.create_user, email, payload.password)
+        result = await run_in_threadpool(auth.sign_up, email, payload.password)
     except EmailTakenError:
         return _error(409, "email_taken", "An account with this email already exists.")
     except WeakPasswordError:
         return _weak_password()
+    except InvalidEmailError:
+        return _error(422, "invalid_email", "Enter a valid email address.")
+    except AuthRateLimitedError:
+        return _rate_limited()
     except AuthUnavailableError:
-        logger.exception("Sign up failed at the account service")
+        logger.warning("Sign up failed at the account service")
         return _auth_unavailable()
 
-    profile = ProfileUpsert(
-        target_accent=payload.target_accent.strip(),
-        display_name=(payload.display_name or "").strip() or email.split("@")[0][:50],
-        age=payload.age,
-        gender=payload.gender,
-        topics=payload.topics,
-    )
+    user_id = UUID(str(result.user_id))
     try:
-        await run_in_threadpool(repos.profiles.upsert_profile, user_id, profile)
-        if payload.consent_recording:
-            await run_in_threadpool(repos.profiles.set_consent, user_id, True)
+        existing = await run_in_threadpool(repos.profiles.get_profile, user_id)
     except StorageError:
-        logger.exception("Could not save the profile of a new account")
-        await run_in_threadpool(_rollback_account, auth, repos, user_id)
-        return _error(
-            503, "profile_not_saved", "The account could not be created. Please try again."
+        logger.warning("Could not read the profile of a sign up")
+        return _profile_not_saved()
+    if existing is None:
+        profile = ProfileUpsert(
+            target_accent=payload.target_accent.strip(),
+            display_name=(payload.display_name or "").strip() or email.split("@")[0][:50],
+            age=payload.age,
+            gender=payload.gender,
+            topics=payload.topics,
         )
-    return {"user_id": str(user_id)}
+        profile_created_here = False
+        try:
+            await run_in_threadpool(repos.profiles.upsert_profile, user_id, profile)
+            profile_created_here = True
+            if payload.consent_recording:
+                await run_in_threadpool(repos.profiles.set_consent, user_id, True)
+        except StorageError:
+            if result.created and result.needs_verification:
+                await run_in_threadpool(
+                    _rollback_account, auth, repos, user_id, delete_profile=True, delete_user=True
+                )
+            else:
+                if profile_created_here:
+                    await run_in_threadpool(
+                        _rollback_account, auth, repos, user_id,
+                        delete_profile=True, delete_user=False,
+                    )
+                logger.warning("Profile save failed; preserving existing account and data")
+            return _profile_not_saved()
+    if result.needs_verification or not result.created:
+        _resend_limiter.hit(_email_key(email))
+    return JSONResponse(status_code=201 if result.created else 200, content={
+        "user_id": str(user_id),
+        "verification_required": result.needs_verification if result.created else True,
+    })
+
+
+def _profile_not_saved() -> JSONResponse:
+    return _error(503, "profile_not_saved", "The account could not be created. Please try again.")
+
+
+def _rate_limited() -> JSONResponse:
+    return _error(429, "rate_limited", "Too many attempts. Please try again later.")
+
+
+@router.post("/verify-otp")
+async def verify_otp(payload: VerifyOtpPayload, auth: Annotated[AuthProvider, Depends(get_auth)]):
+    email = _normalize_email(payload.email)
+    if not _EMAIL_RE.match(email):
+        return _error(422, "invalid_email", "Enter a valid email address.")
+    token = payload.token.strip()
+    if not re.fullmatch(rf"[0-9]{{{_auth_config['otp_length']}}}", token):
+        return _error(422, "otp_invalid", "Enter a valid verification code.")
+    if not _verify_limiter.hit(_email_key(email)):
+        return _rate_limited()
+    try:
+        await run_in_threadpool(auth.verify_signup_otp, email, token)
+    except OtpInvalidError:
+        return _error(422, "otp_invalid", "The verification code is invalid.")
+    except OtpExpiredError:
+        return _error(422, "otp_expired", "The verification code has expired.")
+    except AuthRateLimitedError:
+        return _rate_limited()
+    except AuthUnavailableError:
+        return _auth_unavailable()
+    return {"verified": True}
+
+
+@router.post("/resend-otp")
+async def resend_otp(payload: OtpEmailPayload, auth: Annotated[AuthProvider, Depends(get_auth)]):
+    email = _normalize_email(payload.email)
+    if not _EMAIL_RE.match(email):
+        return _error(422, "invalid_email", "Enter a valid email address.")
+    if not _resend_limiter.hit(_email_key(email)):
+        return _rate_limited()
+    try:
+        await run_in_threadpool(auth.resend_signup_otp, email)
+    except AuthRateLimitedError:
+        return _rate_limited()
+    except AuthUnavailableError:
+        return _auth_unavailable()
+    return {"sent": True}
 
 
 @router.post("/login")
@@ -146,6 +249,11 @@ async def log_in(payload: LoginPayload, auth: Annotated[AuthProvider, Depends(ge
     try:
         session = await run_in_threadpool(
             auth.sign_in, _normalize_email(payload.email), payload.password
+        )
+    except EmailNotConfirmedError:
+        return _error(
+            403, "email_not_confirmed",
+            "Confirm your email with the code we sent before logging in.",
         )
     except InvalidCredentialsError:
         return _error(401, "invalid_credentials", "Wrong email or password.")

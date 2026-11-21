@@ -180,13 +180,14 @@ async def health_check():
 
 @app.get("/api/config")
 async def web_config() -> dict[str, Any]:
-    """The [web] section plus the limits shared with the backend (no secrets)."""
+    """The [web] section, the limits shared with the backend and the public OTP settings (no secrets)."""
     return {
         **CONSTANTS["web"],
         "max_saved_scripts": max_saved_scripts,
         "script_title_max_chars": script_title_max_chars,
         "max_pdf_size_bytes": CONSTANTS["script"]["max_pdf_size_bytes"],
         "max_pdf_pages": CONSTANTS["script"]["max_pdf_pages"],
+        "auth": {key: CONSTANTS["auth"][key] for key in ("otp_length", "resend_cooldown_s")},
     }
 
 

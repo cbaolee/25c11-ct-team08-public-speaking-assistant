@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
+from conftest import TEST_OTP
 from fastapi.testclient import TestClient
 
 import src.app.main as main
@@ -49,6 +50,15 @@ def _auth():
     return main.app.dependency_overrides[get_auth]()
 
 
+# OTP: accounts must verify before login (ADR-010)
+def _signup_and_verify(client):
+    client.post("/api/auth/signup", json=SIGNUP)
+    response = client.post(
+        "/api/auth/verify-otp", json={"email": SIGNUP["email"], "token": TEST_OTP}
+    )
+    assert response.status_code == 200
+
+
 def _login(client, email="ana@example.com", password="correct-horse"):
     return client.post("/api/auth/login", json={"email": email, "password": password})
 
@@ -69,7 +79,7 @@ def test_signup_creates_account_and_profile(client):
 
 
 def test_signup_same_email_returns_409(client):
-    client.post("/api/auth/signup", json=SIGNUP)
+    _signup_and_verify(client)
     r = client.post("/api/auth/signup", json={**SIGNUP, "email": "ana@example.com"})
     assert r.status_code == 409
     assert r.json()["error_code"] == "email_taken"
@@ -99,7 +109,7 @@ def test_signup_profile_failure_removes_account(client, monkeypatch):
 
 
 def test_login_returns_tokens_that_open_the_api(client):
-    client.post("/api/auth/signup", json=SIGNUP)
+    _signup_and_verify(client)
     r = _login(client, email=" ANA@example.com ")
     assert r.status_code == 200
     body = r.json()
@@ -110,7 +120,7 @@ def test_login_returns_tokens_that_open_the_api(client):
 
 
 def test_login_wrong_password_returns_401(client):
-    client.post("/api/auth/signup", json=SIGNUP)
+    _signup_and_verify(client)
     r = _login(client, password="wrong-password")
     assert r.status_code == 401
     assert r.json()["error_code"] == "invalid_credentials"
@@ -124,7 +134,7 @@ def test_api_without_token_returns_401(client):
 
 
 def test_refresh_gives_new_session_and_old_refresh_token_stops_working(client):
-    client.post("/api/auth/signup", json=SIGNUP)
+    _signup_and_verify(client)
     first = _login(client).json()
     r = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
     assert r.status_code == 200
@@ -135,14 +145,14 @@ def test_refresh_gives_new_session_and_old_refresh_token_stops_working(client):
 
 
 def test_logout_revokes_the_access_token(client):
-    client.post("/api/auth/signup", json=SIGNUP)
+    _signup_and_verify(client)
     token = _login(client).json()["access_token"]
     assert client.post("/api/auth/logout", headers=_bearer(token)).json() == {"logged_out": True}
     assert client.get("/api/profile", headers=_bearer(token)).status_code == 401
 
 
 def test_change_password_then_login_with_new_one(client):
-    client.post("/api/auth/signup", json=SIGNUP)
+    _signup_and_verify(client)
     token = _login(client).json()["access_token"]
     short = client.put("/api/auth/password", json={"password": "short"}, headers=_bearer(token))
     assert short.status_code == 422

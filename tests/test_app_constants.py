@@ -61,12 +61,15 @@ def test_module_constants_match_repo_toml():
 def test_api_config_returns_web_section():
     response = TestClient(main.app).get("/api/config")
     assert response.status_code == 200
-    assert response.json() == {
-        **constants.load_constants()["web"],
-        "max_saved_scripts": config.max_saved_scripts,
-        "script_title_max_chars": config.script_title_max_chars,
-        "max_pdf_size_bytes": constants.load_constants()["script"]["max_pdf_size_bytes"],
-        "max_pdf_pages": constants.load_constants()["script"]["max_pdf_pages"],
+    body = response.json()
+    data = constants.load_constants()
+    assert all(body[key] == value for key, value in data["web"].items())
+    assert body["max_saved_scripts"] == config.max_saved_scripts
+    assert body["script_title_max_chars"] == config.script_title_max_chars
+    assert body["max_pdf_size_bytes"] == data["script"]["max_pdf_size_bytes"]
+    assert body["max_pdf_pages"] == data["script"]["max_pdf_pages"]
+    assert body["auth"] == {
+        key: data["auth"][key] for key in ("otp_length", "resend_cooldown_s")
     }
 
 

@@ -119,3 +119,12 @@ script_poll_interval_ms = 650
 evaluate_timeout_ms = 120_000
 # Wait before a running evaluation moves to the background (user goes to Home), in milliseconds
 evaluate_background_after_ms = 5_000
+
+[auth]
+# Provisional, not measured.
+otp_length = 6  # must match Supabase "Email OTP Length"
+otp_ttl_s = 600  # MemoryAuth only; Supabase uses its own expiry
+resend_cooldown_s = 60
+verify_attempts_per_window = 5
+verify_window_s = 600
+require_email_otp = true
