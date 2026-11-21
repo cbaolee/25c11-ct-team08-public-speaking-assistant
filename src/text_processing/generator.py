@@ -87,7 +87,9 @@ class ScriptGenerator:
             for i in raw_citations
             if isinstance(i, dict) and i.get("page") in valid and i.get("heading")
         ]
-        return verified or [{"heading": chunks[0].heading, "page": chunks[0].page}]
+        if verified:
+            return verified
+        return [{"heading": chunks[0].heading, "page": chunks[0].page}] if chunks else []
 
     def generate_script(self, chunks: list[DocumentChunk], topic: str) -> ScriptResult:
         """Call Groq LLM in JSON mode to produce a 120-150 word English script."""
@@ -200,6 +202,7 @@ class ScriptGenerator:
                 paragraphs = self._parse_section_paragraphs(data)
                 if not paragraphs:
                     raise ValueError("Empty paragraphs returned by LLM.")
+                self.limiter.consume(model_id, estimated_tokens)
                 return model_id, paragraphs
             except Exception as exc:
                 last_err = exc
