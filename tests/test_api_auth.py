@@ -152,12 +152,19 @@ def test_logout_revokes_the_access_token(client):
 def test_change_password_then_login_with_new_one(client):
     _signup_and_verify(client)
     token = _login(client).json()["access_token"]
-    short = client.put("/api/auth/password", json={"password": "short"}, headers=_bearer(token))
+    short = client.put(
+        "/api/auth/password",
+        json={"current_password": "correct-horse", "new_password": "short"},
+        headers=_bearer(token),
+    )
     assert short.status_code == 422
     r = client.put(
-        "/api/auth/password", json={"password": "new-password-9"}, headers=_bearer(token)
+        "/api/auth/password",
+        json={"current_password": "correct-horse", "new_password": "new-password-9"},
+        headers=_bearer(token),
     )
     assert r.json() == {"updated": True}
+    assert client.get("/api/profile", headers=_bearer(token)).status_code == 200  # session kept
     assert _login(client).status_code == 401
     assert _login(client, password="new-password-9").status_code == 200
 
