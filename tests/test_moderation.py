@@ -916,3 +916,23 @@ def test_layer2_openai_compat_with_bearer_token(
         "llama_guard",
         expected_codes,
     )
+
+
+def test_use_layer2_false_runs_layer1_only_without_poisoning_cache() -> None:
+    fake = FakeOllama(_ollama_reply("unsafe\nS6"))
+    mod = _moderator(fake)
+
+    # Layer 1 still blocks profanity even when use_layer2=False
+    blocked = mod.check_text("this is bullshit", user_id="u1", use_layer2=False)
+    assert (blocked.allowed, blocked.layer) == (False, "regex")
+    assert len(fake.requests) == 0
+
+    # Benign text skips Layer 2 and is not cached as Layer-2-verified
+    allowed = mod.check_text("Long wildlife conservation speech.", user_id="u1", use_layer2=False)
+    assert (allowed.allowed, allowed.layer) == (True, "regex")
+    assert len(fake.requests) == 0
+
+    # A subsequent full check still calls Layer 2
+    full = mod.check_text("Long wildlife conservation speech.", user_id="u1", use_layer2=True)
+    assert (full.allowed, full.layer, full.flagged_terms) == (False, "llama_guard", ["S6"])
+    assert len(fake.requests) == 1

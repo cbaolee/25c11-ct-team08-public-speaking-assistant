@@ -4,11 +4,13 @@ Saved scripts live in the `scripts` table (`/api/scripts*` in src/app/main.py), 
 """
 
 import hashlib
+import logging
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
 
+from .chat_session import ChatSessionStore, chat_session_store
 from .contracts import (
     DocumentChunk,
     GeneratedScript,
@@ -21,8 +23,14 @@ from .generator import ScriptGenerator
 from .moderation import ContentModerator
 from .parser import DocumentParserError, parse_input_to_chunks, validate_pdf_file
 from .sanitizer import sanitize_chunks, sanitize_text
-from .template_engine import TemplateEngine, validate_assembled_script
+from .template_engine import (
+    TemplateEngine,
+    polish_script_paragraphs,
+    validate_assembled_script,
+)
 from .template_store import TemplateStore
+
+logger = logging.getLogger(__name__)
 
 
 class ScriptGenerationPipeline:
@@ -34,6 +42,7 @@ class ScriptGenerationPipeline:
         moderator: ContentModerator | None = None,
         template_engine: TemplateEngine | None = None,
         llm_generator: ScriptGenerator | None = None,
+        session_store: ChatSessionStore | None = None,
         max_cache_size: int = 64,
     ) -> None:
         if template_store is None:
@@ -45,15 +54,29 @@ class ScriptGenerationPipeline:
         self.moderator = moderator or ContentModerator()
         self.template_engine = template_engine or TemplateEngine()
         self.llm_generator = llm_generator or ScriptGenerator()
+        self.session_store = session_store or chat_session_store
         self.max_cache_size = max_cache_size
-        self._jobs: dict[str, ScriptJobState] = {}
+        self.max_jobs_capacity = 128
+        self._jobs: OrderedDict[str, ScriptJobState] = OrderedDict()
         self._cache: OrderedDict[str, GeneratedScript] = OrderedDict()
+
+    def _evict_jobs_if_needed(self) -> None:
+        """Evict oldest finished jobs when self._jobs exceeds max capacity (128)."""
+        while len(self._jobs) > self.max_jobs_capacity:
+            finished_keys = [
+                jid for jid, j in self._jobs.items() if j.status in ("completed", "failed")
+            ]
+            if finished_keys:
+                del self._jobs[finished_keys[0]]
+            else:
+                self._jobs.popitem(last=False)
 
     def create_job(self, user_id: str = "anonymous") -> ScriptJobState:
         """Create and register a new background job state in memory (Brief §5.5)."""
         job_id = str(uuid.uuid4())
         job = ScriptJobState(job_id=job_id, user_id=user_id, status="queued", progress=0)
         self._jobs[job_id] = job
+        self._evict_jobs_if_needed()
         return job
 
     def get_job(self, job_id: str) -> ScriptJobState | None:
@@ -77,6 +100,7 @@ class ScriptGenerationPipeline:
                 str(request.duration_min),
                 (request.greeting or "").strip(),
                 chunk_text,
+                (request.user_feedback or "").strip().lower(),
             ]
         )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -91,6 +115,25 @@ class ScriptGenerationPipeline:
         # Stage 1, 2, 3: Validate, Parse, and Sanitize input document (if provided)
         self._update_job(job_id, "extracting", 15)
         chunks: list[DocumentChunk] = []
+        force_free_topic = False
+        if request.session_id:
+            sess = self.session_store.get(request.session_id, user_id=request.user_id)
+            if sess:
+                force_free_topic = sess.selected_template_id is None
+                if sess.chunks:
+                    chunks.extend(sess.chunks)
+                if sess.user_notes:
+                    notes_text = sanitize_text("\n".join(sess.user_notes)).strip()
+                    if notes_text:
+                        chunks.append(
+                            DocumentChunk(
+                                chunk_id=len(chunks) + 1,
+                                heading="User Notes",
+                                page=1,
+                                content=notes_text,
+                            )
+                        )
+
         if request.pdf_path or request.raw_text:
             try:
                 if request.pdf_path:
@@ -99,13 +142,14 @@ class ScriptGenerationPipeline:
                     pdf_path=request.pdf_path,
                     raw_text=request.raw_text,
                 )
-                chunks = sanitize_chunks(raw_chunks)
-                if not chunks:
+                sanitized = sanitize_chunks(raw_chunks)
+                if not sanitized and not chunks:
                     raise ScriptGenerationError(
                         error_code="no_text_layer",
                         message="No extractable text found in the provided document.",
                         status_code=422,
                     )
+                chunks.extend(sanitized)
             except DocumentParserError as exc:
                 no_text = exc.error_code in ("empty_pdf", "no_text_layer")
                 error_code = "no_text_layer" if no_text else "invalid_pdf"
@@ -115,11 +159,13 @@ class ScriptGenerationPipeline:
                     status_code=422,
                 ) from exc
 
-        # Stage 4: Content Moderation on topic, greeting, and extracted chunks
+        # Stage 4: Content Moderation on topic, greeting, user_feedback, and extracted chunks
         self._update_job(job_id, "moderating", 35)
         parts = [sanitize_text(request.topic)]
         if request.greeting:
             parts.append(sanitize_text(request.greeting))
+        if request.user_feedback:
+            parts.append(sanitize_text(request.user_feedback))
         parts.extend(c.content for c in chunks[:20])
         self.moderator.assert_safe("\n".join(parts), user_id=request.user_id)
 
@@ -131,24 +177,81 @@ class ScriptGenerationPipeline:
 
         # Stage 5 & 6: Route between Template Branch (6T) and Free-Topic LLM Branch (6L)
         self._update_job(job_id, "generating", 65)
-        template_doc = self.template_store.get(request.topic)
-        if template_doc is not None and request.category:
-            cat_norm = request.category.strip().lower()
-            if cat_norm not in (
-                template_doc.metadata.category.lower(),
-                template_doc.metadata.category_slug.lower(),
-            ):
-                template_doc = None
+        template_doc = None
+        if (
+            not force_free_topic
+            and request.category
+            and request.category.strip().lower() != "free"
+        ):
+            template_doc = self.template_store.get(request.topic)
+            if template_doc is not None:
+                cat_norm = request.category.strip().lower()
+                if cat_norm not in (
+                    template_doc.metadata.category.lower(),
+                    template_doc.metadata.category_slug.lower(),
+                ):
+                    template_doc = None
 
         if template_doc is not None:
-            result = self.template_engine.fill_template(template_doc, chunks=chunks or None)
+            kwargs = {}
+            if request.user_feedback:
+                kwargs["user_feedback"] = request.user_feedback
+            try:
+                result = self.template_engine.fill_template(
+                    template_doc, chunks=chunks or None, **kwargs
+                )
+            except TypeError:
+                result = self.template_engine.fill_template(template_doc, chunks=chunks or None)
+
+            client = getattr(self.template_engine, "client", None)
+            if client is None:
+                try:
+                    from .template_engine import _get_groq_client
+
+                    client = _get_groq_client()
+                except Exception:
+                    pass
+            model_chain = getattr(self.template_engine, "model_chain", None)
+            if model_chain is None:
+                try:
+                    from .template_engine import _get_model_chain
+
+                    model_chain = _get_model_chain()
+                except Exception:
+                    pass
+            limiter = getattr(self.template_engine, "limiter", None)
+            try:
+                polished = polish_script_paragraphs(
+                    result.script,
+                    request.topic,
+                    client=client,
+                    model_chain=model_chain,
+                    limiter=limiter,
+                )
+                if polished and polished.strip() and polished != result.script:
+                    result.script = polished
+                    result.word_count = len(polished.split())
+            except Exception as exc:
+                logger.warning("Failed to polish script paragraphs: %s", exc)
         else:
-            result = self.llm_generator.generate_free_topic_script(
-                topic=request.topic,
-                duration_min=request.duration_min,
-                chunks=chunks or None,
-                greeting=request.greeting,
-            )
+            kwargs = {}
+            if request.user_feedback:
+                kwargs["user_feedback"] = request.user_feedback
+            try:
+                result = self.llm_generator.generate_free_topic_script(
+                    topic=request.topic,
+                    duration_min=request.duration_min,
+                    chunks=chunks or None,
+                    greeting=request.greeting,
+                    **kwargs,
+                )
+            except TypeError:
+                result = self.llm_generator.generate_free_topic_script(
+                    topic=request.topic,
+                    duration_min=request.duration_min,
+                    chunks=chunks or None,
+                    greeting=request.greeting,
+                )
 
         # Stage 7: Post-validation and D-13 20-minute audio evaluation warning
         eff_duration = result.duration_min or request.duration_min
@@ -186,6 +289,7 @@ class ScriptGenerationPipeline:
         if job is None:
             job = ScriptJobState(job_id=job_id, user_id=request.user_id)
             self._jobs[job_id] = job
+            self._evict_jobs_if_needed()
         try:
             result = self.run(request, job_id=job_id)
             job.status = "completed"

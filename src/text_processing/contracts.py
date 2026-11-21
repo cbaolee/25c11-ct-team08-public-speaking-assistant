@@ -157,6 +157,8 @@ class ScriptGenerationRequest:
     raw_text: str | None = None
     greeting: str | None = None
     user_id: str = "anonymous"
+    session_id: str | None = None
+    user_feedback: str | None = None
 
 
 @dataclass

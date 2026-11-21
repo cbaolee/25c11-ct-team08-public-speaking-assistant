@@ -16,6 +16,7 @@ from src.text_processing.limiter import TokenBucketLimiter
 from src.text_processing.template_engine import (
     TemplateEngine,
     _call_llm_with_fallback,
+    _compute_slot_budgets,
     _group_slots_into_batches,
     assemble_template,
     parse_slots,
@@ -232,3 +233,75 @@ class TestTemplateEngine:
 
         assert "uncited" in result.flags
         assert all(c.status == "uncited" for c in result.citations)
+
+
+class TestInlineFactSlotsAndDynamicBudgets:
+    def test_inline_fact_slots_get_short_budget_and_no_mid_sentence_period(self) -> None:
+        body = (
+            "There is a film clip from {{ argument_film_year }} at the "
+            "{{ argument_zoo_location_name }} Zoo showing the "
+            "{{ argument_target_extinct_marsupial }}.\n\n"
+            "The last {{ argument_target_extinct_marsupial }} died in captivity."
+        )
+        doc = TemplateDocument(
+            metadata=TopicMetadata(
+                template_id="wildlife/tasmanian_10m",
+                category_slug="wildlife",
+                category="Wildlife",
+                topic="The Tasmanian Tiger",
+                topic_slug="tasmanian_10m",
+                duration_min=10,
+            ),
+            body=body,
+            file_path="data/templates/wildlife/tasmanian_10m.md",
+        )
+        slots = parse_slots(doc)
+        occurrences: dict[str, int] = {}
+        unique = []
+        for s in slots:
+            occurrences[s.name] = occurrences.get(s.name, 0) + 1
+            if occurrences[s.name] == 1:
+                unique.append(s)
+
+        budgets = _compute_slot_budgets(doc, unique, occurrences)
+        assert budgets["argument_film_year"] == (1, 6)
+        assert budgets["argument_zoo_location_name"] == (1, 6)
+        assert budgets["argument_target_extinct_marsupial"] == (1, 6)
+
+        assembled = assemble_template(
+            body,
+            {
+                "argument_film_year": "1933.",
+                "argument_zoo_location_name": "Beaumaris",
+                "argument_target_extinct_marsupial": "thylacine",
+            },
+        )
+        assert "from 1933 at the Beaumaris Zoo showing the thylacine." in assembled
+        assert "1933." not in assembled
+        assert "Beaumaris." not in assembled
+
+    def test_dense_template_scales_down_long_slot_budget(self) -> None:
+        fixed_prose = " ".join(["software"] * 1100)
+        body = (
+            f"Good {{{{ argument_time_of_day }}}}, everyone. {fixed_prose}\n\n"
+            + "\n\n".join(f"Point {i} explains {{{{ argument_point_{i} }}}}." for i in range(1, 11))
+        )
+        doc = TemplateDocument(
+            metadata=TopicMetadata(
+                template_id="information_technology/dense_10m",
+                category_slug="information_technology",
+                category="Information Technology",
+                topic="Agile vs Waterfall",
+                topic_slug="dense_10m",
+                duration_min=10,
+            ),
+            body=body,
+            file_path="data/templates/information_technology/dense_10m.md",
+        )
+        slots = parse_slots(doc)
+        occurrences = {s.name: 1 for s in slots}
+        budgets = _compute_slot_budgets(doc, slots, occurrences)
+        assert budgets["argument_time_of_day"] == (1, 6)
+        lo, hi = budgets["argument_point_1"]
+        assert hi <= 50
+        assert lo >= 15

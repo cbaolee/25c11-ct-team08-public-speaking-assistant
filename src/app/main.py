@@ -1,6 +1,8 @@
 import json
 import logging
+import os
 import tempfile
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
@@ -65,18 +67,40 @@ from src.app.routes import profile as profile_routes
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.pipeline import evaluate_session
+from src.text_processing.chat_session import (
+    READY_MESSAGE,
+    ChatSessionState,
+    analyze_slot_coverage,
+    build_followup_reply,
+    chat_session_store,
+    check_ready_to_generate,
+    ingest_upload_file,
+)
 from src.text_processing.contracts import (
     CATEGORY_SLUG_MAP,
+    DocumentChunk,
     ScriptGenerationError,
     ScriptGenerationRequest,
 )
 from src.text_processing.moderation import DEFAULT_LLAMA_GUARD_MODEL, ContentModerator
+from src.text_processing.parser import DocumentParserError
 from src.text_processing.pipeline import ScriptGenerationPipeline
-from src.text_processing.sanitizer import sanitize_text
+from src.text_processing.sanitizer import sanitize_chunks, sanitize_text
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 
 logger = logging.getLogger(__name__)
+
+
+def _warmup_script_pipeline() -> None:
+    """Pre-load TemplateStore and the local embedding model in the background at startup."""
+    try:
+        pipeline = get_script_pipeline()
+        retriever = getattr(pipeline.template_engine, "retriever", None)
+        if retriever is not None:
+            retriever.get_model()
+    except Exception:
+        logger.debug("Background script pipeline warm-up skipped.", exc_info=True)
 
 
 @asynccontextmanager
@@ -87,6 +111,8 @@ async def lifespan(_: FastAPI):
         logger.critical("Missing required settings in .env: %s", ", ".join(missing))
         raise RuntimeError("Missing required settings in .env: " + ", ".join(missing))
     validate_list_limits(max_list_page_size, max_saved_scripts)
+    if not os.getenv("PYTEST_CURRENT_TEST"):
+        threading.Thread(target=_warmup_script_pipeline, daemon=True).start()
     yield
 
 
@@ -652,12 +678,14 @@ async def list_topics_endpoint(category: str | None = None) -> dict[str, Any]:
 async def generate_script_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     background_tasks: BackgroundTasks,
-    topic: Annotated[str, Form(...)],
+    topic: Annotated[str, Form()] = "",
     category: Annotated[str, Form()] = "",
     duration_min: Annotated[int, Form()] = 5,
     greeting: Annotated[str, Form()] = "",
     raw_text: Annotated[str, Form()] = "",
     pdf: Annotated[UploadFile | None, File()] = None,
+    session_id: Annotated[str, Form()] = "",
+    user_feedback: Annotated[str, Form()] = "",
 ) -> dict[str, Any]:
     """Queue a background script generation job and return `202 {job_id, status}` (Brief §5.5)."""
     pipeline = get_script_pipeline()
@@ -671,18 +699,329 @@ async def generate_script_endpoint(
             save_upload_limited, pdf, Path(pdf_path), max_bytes=max_upload_bytes
         )
 
+    clean_topic = topic.strip()
+    clean_session_id = session_id.strip() or None
+    clean_feedback = user_feedback.strip() or None
+
+    store = getattr(pipeline, "session_store", chat_session_store)
+    if clean_session_id:
+        sess = store.get(clean_session_id, user_id=user_id)
+        if sess:
+            if not clean_topic:
+                clean_topic = getattr(sess, "topic", None) or sess.initial_prompt or ""
+            if not category and sess.category:
+                category = sess.category
+            if duration_min == 5 and sess.duration_min:
+                duration_min = sess.duration_min
+
     req = ScriptGenerationRequest(
-        topic=topic,
+        topic=clean_topic,
         category=category or None,
         duration_min=duration_min,
         pdf_path=pdf_path,
         raw_text=raw_text or None,
         greeting=greeting or None,
         user_id=user_id,
+        session_id=clean_session_id,
+        user_feedback=clean_feedback,
     )
     job = pipeline.create_job(user_id=user_id)
     background_tasks.add_task(pipeline.run_job, job.job_id, req, True)
     return {"job_id": job.job_id, "status": job.status}
+
+
+class SelectTopicPayload(BaseModel):
+    session_id: str
+    template_id: str | None = None
+
+
+@app.post("/api/script-chat/suggest")
+async def script_chat_suggest_endpoint(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    category: Annotated[str, Form()] = "",
+    duration_min: Annotated[int, Form()] = 5,
+    prompt: Annotated[str, Form()] = "",
+    file: Annotated[UploadFile | None, File()] = None,
+    session_id: Annotated[str, Form()] = "",
+) -> dict[str, Any]:
+    """Suggest 4-5 templates from category, duration, and optional prompt/document."""
+    pipeline = get_script_pipeline()
+    user_id = str(user.id)
+    store = getattr(pipeline, "session_store", chat_session_store)
+
+    clean_prompt = sanitize_text(prompt).strip() if prompt else ""
+    if clean_prompt:
+        pipeline.moderator.assert_safe(clean_prompt, user_id=user_id)
+
+    file_chunks: list[DocumentChunk] = []
+    filename: str = ""
+    if file is not None and file.filename:
+        filename = file.filename
+        file_bytes = await file.read()
+        try:
+            raw_chunks = ingest_upload_file(file_bytes, filename)
+            file_chunks = sanitize_chunks(raw_chunks)
+        except DocumentParserError as exc:
+            raise ScriptGenerationError(
+                error_code=exc.error_code,
+                message=exc.message,
+                status_code=422,
+            ) from exc
+        file_text = "\n".join(c.content for c in file_chunks[:20])
+        if file_text:
+            pipeline.moderator.assert_safe(file_text, user_id=user_id)
+
+    clean_session_id = session_id.strip()
+    session = None
+    if clean_session_id:
+        session = store.get(clean_session_id, user_id=user_id)
+        if session is None:
+            raise ScriptGenerationError(
+                error_code="session_not_found",
+                message="Session not found or access denied.",
+                status_code=404,
+            )
+
+    if session is None:
+        session = ChatSessionState(
+            session_id=str(uuid4()),
+            user_id=user_id,
+            category=category,
+            duration_min=duration_min,
+            initial_prompt=clean_prompt,
+        )
+    else:
+        if category:
+            session.category = category
+        if duration_min:
+            session.duration_min = duration_min
+        if clean_prompt:
+            session.initial_prompt = clean_prompt
+
+    if file_chunks:
+        session.files_loaded.append(filename)
+        session.chunks.extend(file_chunks)
+        retriever = getattr(pipeline.template_engine, "retriever", None)
+        if retriever is not None:
+            session.chunk_embeddings = retriever.encode_chunks(session.chunks)
+
+    store.put(session)
+
+    query = clean_prompt
+    if not query and session.chunks:
+        query = " ".join(c.content for c in session.chunks[:3])
+
+    suggestion_res = pipeline.template_store.suggest_topics(
+        category_slug=session.category,
+        duration_min=session.duration_min,
+        query=query,
+        retriever=getattr(pipeline.template_engine, "retriever", None),
+    )
+    res = suggestion_res.to_dict()
+    res["session_id"] = session.session_id
+    res["topics"] = list(res["suggestions"])
+    res["files_loaded"] = list(session.files_loaded)
+    return res
+
+
+@app.post("/api/script-chat/select-topic")
+async def script_chat_select_topic_endpoint(
+    payload: SelectTopicPayload,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> dict[str, Any]:
+    """Store selected template ID and analyze slot coverage or enter free-topic mode."""
+    pipeline = get_script_pipeline()
+    user_id = str(user.id)
+    store = getattr(pipeline, "session_store", chat_session_store)
+    session = store.get(payload.session_id, user_id=user_id)
+    if session is None:
+        raise ScriptGenerationError(
+            error_code="session_not_found",
+            message=f"Session '{payload.session_id}' not found.",
+            status_code=404,
+        )
+
+    session.selected_template_id = payload.template_id
+    retriever = getattr(pipeline.template_engine, "retriever", None)
+
+    if payload.template_id:
+        template_doc = pipeline.template_store.get(payload.template_id)
+        if template_doc is None:
+            raise ScriptGenerationError(
+                error_code="template_not_found",
+                message=f"Template '{payload.template_id}' not found.",
+                status_code=404,
+            )
+        session.topic = template_doc.metadata.topic
+        cov_ratio, missing_entities, missing_groups = analyze_slot_coverage(
+            template_document=template_doc,
+            chunks=session.chunks,
+            chunk_embeddings=session.chunk_embeddings,
+            retriever=retriever,
+            prompt=session.initial_prompt,
+            user_notes=session.user_notes,
+        )
+        session.coverage_ratio = cov_ratio
+        session.missing_entities = missing_entities
+        session.missing_groups = missing_groups
+        session.ready_to_generate = check_ready_to_generate(
+            selected_template_id=session.selected_template_id,
+            missing_entities=session.missing_entities,
+            coverage_ratio=session.coverage_ratio,
+            gather_turns=session.gather_turns,
+            files_loaded=session.files_loaded,
+            prompt=session.initial_prompt,
+            user_notes=session.user_notes,
+        )
+        client = getattr(pipeline.template_engine, "client", None)
+        reply = build_followup_reply(
+            topic=session.topic,
+            ready_to_generate=session.ready_to_generate,
+            missing_entities=session.missing_entities,
+            missing_groups=session.missing_groups,
+            gather_turns=session.gather_turns,
+            client=client,
+        )
+    else:
+        session.selected_template_id = None
+        if not session.topic:
+            session.topic = session.initial_prompt or session.category or "Custom Speech"
+        session.missing_entities = []
+        session.missing_groups = []
+        session.coverage_ratio = 0.0
+        session.ready_to_generate = check_ready_to_generate(
+            selected_template_id=None,
+            missing_entities=[],
+            coverage_ratio=0.0,
+            gather_turns=session.gather_turns,
+            files_loaded=session.files_loaded,
+            prompt=session.initial_prompt,
+            user_notes=session.user_notes,
+        )
+        if session.ready_to_generate:
+            reply = READY_MESSAGE
+        else:
+            reply = (
+                "To help craft your free-topic speech, please share your main ideas or "
+                "upload reference material (notes or document)."
+            )
+
+    store.put(session)
+    return {
+        "session_id": session.session_id,
+        "template_id": session.selected_template_id,
+        "selected_template_id": session.selected_template_id,
+        "ready_to_generate": session.ready_to_generate, "coverage_ratio": session.coverage_ratio,
+        "missing_entities": session.missing_entities, "missing_groups": session.missing_groups,
+        "reply_message": reply,
+    }
+
+
+@app.post("/api/script-chat/message")
+async def script_chat_message_endpoint(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    session_id: Annotated[str, Form(...)],
+    message: Annotated[str, Form()] = "",
+    file: Annotated[UploadFile | None, File()] = None,
+) -> dict[str, Any]:
+    """Add user notes/documents, re-evaluate slot coverage and 3-layer stop condition."""
+    pipeline = get_script_pipeline()
+    user_id = str(user.id)
+    store = getattr(pipeline, "session_store", chat_session_store)
+    session = store.get(session_id, user_id=user_id)
+    if session is None:
+        raise ScriptGenerationError(
+            error_code="session_not_found",
+            message=f"Session '{session_id}' not found.",
+            status_code=404,
+        )
+
+    clean_msg = sanitize_text(message).strip() if message else ""
+    if clean_msg:
+        pipeline.moderator.assert_safe(clean_msg, user_id=user_id)
+
+    file_chunks: list[DocumentChunk] = []
+    if file is not None and file.filename:
+        file_bytes = await file.read()
+        try:
+            raw_chunks = ingest_upload_file(file_bytes, file.filename)
+            file_chunks = sanitize_chunks(raw_chunks)
+        except DocumentParserError as exc:
+            raise ScriptGenerationError(
+                error_code=exc.error_code,
+                message=exc.message,
+                status_code=422,
+            ) from exc
+        file_text = "\n".join(c.content for c in file_chunks[:20])
+        if file_text:
+            pipeline.moderator.assert_safe(file_text, user_id=user_id)
+
+    if not clean_msg and not file_chunks:
+        raise ScriptGenerationError(
+            error_code="empty_input",
+            message="Please provide a message or a document.",
+            status_code=422,
+        )
+
+    if clean_msg:
+        session.user_notes.append(clean_msg)
+    if file_chunks:
+        session.files_loaded.append(file.filename)
+        session.chunks.extend(file_chunks)
+        retriever = getattr(pipeline.template_engine, "retriever", None)
+        if retriever is not None:
+            session.chunk_embeddings = retriever.encode_chunks(session.chunks)
+
+    session.gather_turns += 1
+
+    retriever = getattr(pipeline.template_engine, "retriever", None)
+    client = getattr(pipeline.template_engine, "client", None)
+
+    if session.selected_template_id:
+        template_doc = pipeline.template_store.get(session.selected_template_id)
+        if template_doc:
+            session.topic = template_doc.metadata.topic
+            cov_ratio, missing_entities, missing_groups = analyze_slot_coverage(
+                template_document=template_doc, chunks=session.chunks,
+                chunk_embeddings=session.chunk_embeddings, retriever=retriever,
+                prompt=session.initial_prompt, user_notes=session.user_notes,
+            )
+            session.coverage_ratio = cov_ratio
+            session.missing_entities = missing_entities
+            session.missing_groups = missing_groups
+
+    session.ready_to_generate = check_ready_to_generate(
+        selected_template_id=session.selected_template_id,
+        missing_entities=session.missing_entities,
+        coverage_ratio=session.coverage_ratio,
+        gather_turns=session.gather_turns,
+        files_loaded=session.files_loaded,
+        prompt=session.initial_prompt,
+        user_notes=session.user_notes,
+    )
+
+    topic = getattr(session, "topic", None) or session.initial_prompt or "your speech"
+    if session.selected_template_id:
+        reply = build_followup_reply(
+            topic=topic, ready_to_generate=session.ready_to_generate,
+            missing_entities=session.missing_entities, missing_groups=session.missing_groups,
+            gather_turns=session.gather_turns, client=client,
+        )
+    else:
+        if session.ready_to_generate:
+            reply = READY_MESSAGE
+        else:
+            reply = (
+                "Thanks! Please provide more details or upload notes to help prepare your speech."
+            )
+
+    store.put(session)
+    return {
+        "session_id": session.session_id, "reply_message": reply,
+        "ready_to_generate": session.ready_to_generate, "coverage_ratio": session.coverage_ratio,
+        "missing_entities": session.missing_entities, "missing_groups": session.missing_groups,
+        "gather_turns": session.gather_turns, "files_loaded": list(session.files_loaded),
+    }
 
 
 @app.get("/api/generate-script/{job_id}")
@@ -748,8 +1087,13 @@ async def create_saved_script_endpoint(
     body_error = _validate_script(clean_body)
     if body_error is not None:
         return body_error
+    # User-written scripts go through full Layer 1 + Layer 2 moderation.
+    # Pipeline-generated scripts already passed Stage 4 input moderation; running Layer 2
+    # again on long AI-generated prose causes frequent false positives in llama-guard3:1b.
     get_script_pipeline().moderator.assert_safe(
-        f"{clean_title}\n{clean_body}", user_id=str(user.id)
+        f"{clean_title}\n{clean_body}",
+        user_id=str(user.id),
+        use_layer2=(payload.source == "written"),
     )
     data = NewScript(
         title=clean_title,
