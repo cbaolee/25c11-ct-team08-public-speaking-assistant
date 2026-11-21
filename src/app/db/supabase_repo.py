@@ -40,6 +40,8 @@ from src.app.db.models import (
 
 UNIQUE_VIOLATION = "23505"
 MAX_BEYOND_ROWS = 1000
+STORAGE_LIST_PAGE = 100  # objects per Storage list call (and per remove call)
+MAX_STORAGE_LIST_CALLS = 1000  # guard against a listing that never ends
 
 SCRIPT_SUMMARY_COLUMNS = "id,title,body,created_at"
 # PostgREST JSON paths ("alias:result->section->key") read the chart numbers inside result
@@ -486,3 +488,54 @@ class SupabaseAudioStore:
         if not url:
             raise StorageError(f"Object not found: {bucket}/{path}")
         return url
+
+    def list_user_files(self, user_id: UUID, bucket: str) -> list[str]:
+        """All object paths under `{user_id}/`, page by page (Storage returns `limit` per call).
+
+        A listing returns files (with an id) and sub-folders (id is null); sub-folders are
+        listed too, so nothing is missed even though our own paths are flat.
+        """
+        root = str(user_id)
+        folders, paths, calls = [root], [], 0
+        while folders:
+            folder, offset = folders.pop(), 0
+            while True:
+                calls += 1
+                if calls > MAX_STORAGE_LIST_CALLS:
+                    raise StorageError(f"Listing did not end in bucket {bucket}")
+                options = {
+                    "limit": STORAGE_LIST_PAGE,
+                    "offset": offset,
+                    "sortBy": {"column": "name", "order": "asc"},
+                }
+                try:
+                    page = self._bucket(bucket).list(folder, options)
+                except Exception as err:
+                    raise StorageError(f"List failed in bucket {bucket}") from err
+                for entry in page or []:
+                    name = entry.get("name") if isinstance(entry, dict) else None
+                    if not name or "/" in name or name in {".", ".."}:
+                        continue
+                    child = f"{folder}/{name}"
+                    (paths if entry.get("id") is not None else folders).append(child)
+                if len(page or []) < STORAGE_LIST_PAGE:
+                    break
+                offset += STORAGE_LIST_PAGE
+        return sorted(paths)
+
+    def delete_user_folder(self, user_id: UUID, bucket: str) -> None:
+        """Delete the whole `{user_id}/` folder in batches, then check it is empty.
+
+        Idempotent: running it again after a failure deletes what is left.
+        """
+        paths = self.list_user_files(user_id, bucket)
+        prefix = f"{user_id}/"
+        if any(not p.startswith(prefix) for p in paths):
+            raise StorageError("Object path must be scoped to the current user")
+        for start in range(0, len(paths), STORAGE_LIST_PAGE):
+            try:
+                self._bucket(bucket).remove(paths[start : start + STORAGE_LIST_PAGE])
+            except Exception as err:
+                raise StorageError(f"Delete failed in bucket {bucket}") from err
+        if self.list_user_files(user_id, bucket):
+            raise StorageError(f"Folder not empty after delete in bucket {bucket}")
