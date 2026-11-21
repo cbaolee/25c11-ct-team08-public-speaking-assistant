@@ -126,6 +126,7 @@ class ChatSessionState:
     initial_prompt: str = ""
     topic: str = ""
     selected_template_id: str | None = None
+    topic: str | None = None
     files_loaded: list[str] = field(default_factory=list)
     chunks: list[DocumentChunk] = field(default_factory=list)
     chunk_embeddings: Any | None = None  # NDArray[np.float32] normalized
@@ -385,6 +386,8 @@ def format_checklist_fallback(
         lines.append(f"- Specific details: {', '.join(clean_entities)}")
     if missing_groups:
         lines.append(f"- Key areas: {', '.join(missing_groups)}")
+    if not missing_entities and not missing_groups:
+        lines.append("- Key concepts, supporting arguments, or examples for your speech.")
     return "\n".join(lines)
 
 
@@ -454,6 +457,14 @@ def ingest_upload_file(
     """Ingest uploaded .pdf, .md, or .txt document into DocumentChunks and clean up temp file."""
     if not file_bytes:
         raise DocumentParserError("empty_file", "The uploaded file is empty.")
+
+    if len(file_bytes) > 2 * 1024 * 1024:
+        raise DocumentParserError("file_too_large", "Uploaded file exceeds 2MB limit.")
+
+    if b"\x00" in file_bytes:
+        raise DocumentParserError(
+            "invalid_text_file", "Binary content with null bytes is not allowed."
+        )
 
     suffix = Path(filename).suffix.lower()
     if suffix not in (".pdf", ".md", ".txt"):

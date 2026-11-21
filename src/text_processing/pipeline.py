@@ -56,14 +56,27 @@ class ScriptGenerationPipeline:
         self.llm_generator = llm_generator or ScriptGenerator()
         self.session_store = session_store or chat_session_store
         self.max_cache_size = max_cache_size
-        self._jobs: dict[str, ScriptJobState] = {}
+        self.max_jobs_capacity = 128
+        self._jobs: OrderedDict[str, ScriptJobState] = OrderedDict()
         self._cache: OrderedDict[str, GeneratedScript] = OrderedDict()
+
+    def _evict_jobs_if_needed(self) -> None:
+        """Evict oldest finished jobs when self._jobs exceeds max capacity (128)."""
+        while len(self._jobs) > self.max_jobs_capacity:
+            finished_keys = [
+                jid for jid, j in self._jobs.items() if j.status in ("completed", "failed")
+            ]
+            if finished_keys:
+                del self._jobs[finished_keys[0]]
+            else:
+                self._jobs.popitem(last=False)
 
     def create_job(self, user_id: str = "anonymous") -> ScriptJobState:
         """Create and register a new background job state in memory (Brief §5.5)."""
         job_id = str(uuid.uuid4())
         job = ScriptJobState(job_id=job_id, user_id=user_id, status="queued", progress=0)
         self._jobs[job_id] = job
+        self._evict_jobs_if_needed()
         return job
 
     def get_job(self, job_id: str) -> ScriptJobState | None:
@@ -276,6 +289,7 @@ class ScriptGenerationPipeline:
         if job is None:
             job = ScriptJobState(job_id=job_id, user_id=request.user_id)
             self._jobs[job_id] = job
+            self._evict_jobs_if_needed()
         try:
             result = self.run(request, job_id=job_id)
             job.status = "completed"

@@ -637,7 +637,7 @@ async def generate_script_endpoint(
         sess = store.get(clean_session_id, user_id=user_id)
         if sess:
             if not clean_topic:
-                clean_topic = sess.topic or sess.initial_prompt or ""
+                clean_topic = getattr(sess, "topic", None) or sess.initial_prompt or ""
             if not category and sess.category:
                 category = sess.category
             if duration_min == 5 and sess.duration_min:
@@ -701,12 +701,19 @@ async def script_chat_suggest_endpoint(
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
     clean_session_id = session_id.strip()
-    session = store.get(clean_session_id, user_id=user_id) if clean_session_id else None
+    session = None
+    if clean_session_id:
+        session = store.get(clean_session_id, user_id=user_id)
+        if session is None:
+            raise ScriptGenerationError(
+                error_code="session_not_found",
+                message="Session not found or access denied.",
+                status_code=404,
+            )
 
     if session is None:
-        sid = clean_session_id or str(uuid4())
         session = ChatSessionState(
-            session_id=sid,
+            session_id=str(uuid4()),
             user_id=user_id,
             category=category,
             duration_min=duration_min,
@@ -878,6 +885,13 @@ async def script_chat_message_endpoint(
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
+    if not clean_msg and not file_chunks:
+        raise ScriptGenerationError(
+            error_code="empty_input",
+            message="Please provide a message or a document.",
+            status_code=422,
+        )
+
     if clean_msg:
         session.user_notes.append(clean_msg)
     if file_chunks:
@@ -915,7 +929,7 @@ async def script_chat_message_endpoint(
         user_notes=session.user_notes,
     )
 
-    topic = session.topic or session.initial_prompt or "your speech"
+    topic = getattr(session, "topic", None) or session.initial_prompt or "your speech"
     if session.selected_template_id:
         reply = build_followup_reply(
             topic=topic, ready_to_generate=session.ready_to_generate,

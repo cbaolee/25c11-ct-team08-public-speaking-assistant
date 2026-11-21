@@ -34,7 +34,7 @@ from .retrieval import SemanticRetriever, verify_paragraph_citation
 
 logger = logging.getLogger(__name__)
 
-SLOT_PATTERN = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
+SLOT_PATTERN = re.compile(r"\{\{\s*([a-zA-Z0-9_]+)\s*\}\}")
 _TOKENS_PER_WORD = 1.35
 _DEFAULT_MODEL_CHAIN: tuple[str, ...] = (
     "openai/gpt-oss-120b",
@@ -95,10 +95,14 @@ def assemble_template(template_body: str, slot_values: dict[str, str]) -> str:
         val = slot_values[slot_name].strip()
         after_pos = match.end()
         has_trailing_punct = after_pos < len(template_body) and template_body[after_pos] in ".!?,;:"
+        is_end_of_block = (after_pos >= len(template_body)) or (
+            template_body[after_pos] in "\n\r"
+        )
+        is_entity = slot_name.startswith("entity_")
         if has_trailing_punct:
             while val and val[-1] in ".!?,;:":
                 val = val[:-1].rstrip()
-        else:
+        elif is_end_of_block or (not is_entity and slot_name.startswith("argument_")):
             if val and val[-1] not in ".!?":
                 val += "."
         return val
