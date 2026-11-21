@@ -127,8 +127,10 @@ async def health_check():
 
 @app.get("/api/config")
 async def web_config() -> dict[str, Any]:
-    """The [web] section of app_constants.toml for the browser (no secrets in it)."""
-    return dict(CONSTANTS["web"])
+    """Return browser configuration and public OTP settings."""
+    return {**CONSTANTS["web"], "auth": {
+        key: CONSTANTS["auth"][key] for key in ("otp_length", "resend_cooldown_s")
+    }}
 
 
 @app.get("/")

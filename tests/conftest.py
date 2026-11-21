@@ -16,7 +16,9 @@ from src.app.config import settings
 from src.app.db.factory import build_memory_repos, get_repos, get_supabase_client
 from src.app.deps import CurrentUser, get_current_user
 from src.app.main import app
+from src.app.routes.auth import reset_auth_limiters
 
+TEST_OTP = "123456"
 TEST_USER_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
@@ -30,7 +32,8 @@ def isolated_app(request, monkeypatch):
     monkeypatch.setattr(settings, "supabase_service_key", "")
     for cached in (get_repos, get_auth, get_supabase_client):
         cached.cache_clear()
-    repos, auth = build_memory_repos(), MemoryAuthProvider()
+    reset_auth_limiters()
+    repos, auth = build_memory_repos(), MemoryAuthProvider(code_factory=lambda: TEST_OTP)
     app.dependency_overrides[get_repos] = lambda: repos
     app.dependency_overrides[get_auth] = lambda: auth
     app.dependency_overrides[get_current_user] = lambda: CurrentUser(

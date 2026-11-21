@@ -49,6 +49,10 @@ class EmailTakenError(AuthProviderError):
     """An account with this email already exists."""
 
 
+class InvalidEmailError(AuthProviderError):
+    """The email address is invalid."""
+
+
 class WeakPasswordError(AuthProviderError):
     """The account service refused the password."""
 
@@ -406,12 +410,13 @@ class SupabaseAuthProvider:
                 "email_exists", "user_already_exists"
             }:
                 raise EmailTakenError() from err
+            if isinstance(err, AuthApiError) and err.code == "email_address_invalid":
+                raise InvalidEmailError() from err
             raise AuthUnavailableError("Could not create the account") from err
         user = resp.user
-        if user is None:
-            self._revoke_response_session(resp)
-            raise AuthUnavailableError("Could not create the account")
         self._revoke_response_session(resp)
+        if user is None:
+            raise AuthUnavailableError("Could not create the account")
         if user.identities == []:
             raise EmailTakenError()
         return SignUpResult(

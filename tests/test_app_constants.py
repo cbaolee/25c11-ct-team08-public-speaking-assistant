@@ -52,7 +52,12 @@ def test_module_constants_match_repo_toml():
 def test_api_config_returns_web_section():
     response = TestClient(main.app).get("/api/config")
     assert response.status_code == 200
-    assert response.json() == constants.load_constants()["web"]
+    body = response.json()
+    data = constants.load_constants()
+    assert all(body[key] == value for key, value in data["web"].items())
+    assert body["auth"] == {
+        key: data["auth"][key] for key in ("otp_length", "resend_cooldown_s")
+    }
 
 
 def test_ui_reads_every_web_key():

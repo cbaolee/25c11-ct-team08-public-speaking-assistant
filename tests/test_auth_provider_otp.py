@@ -12,6 +12,7 @@ from src.app.auth import (
     EmailNotConfirmedError,
     EmailTakenError,
     InvalidCredentialsError,
+    InvalidEmailError,
     MemoryAuthProvider,
     OtpExpiredError,
     OtpInvalidError,
@@ -157,7 +158,7 @@ def test_creation_timestamps(supabase):
     (AuthApiError("exists", 422, "user_already_exists"), EmailTakenError),
     (AuthApiError("rate", 429, "over_email_send_rate_limit"), AuthRateLimitedError),
     (AuthRetryableError("timeout", 0), AuthUnavailableError),
-    (AuthApiError("bad", 400, "email_address_invalid"), AuthUnavailableError),
+    (AuthApiError("bad", 400, "email_address_invalid"), InvalidEmailError),
 ])
 def test_supabase_signup_errors(supabase, error, expected):
     provider, client = supabase
@@ -201,3 +202,28 @@ def test_supabase_sign_in_errors(supabase, code, expected):
     client.sign_in_with_password.side_effect = AuthApiError("error", 400, code)
     with pytest.raises(expected):
         provider.sign_in(EMAIL, PASSWORD)
+
+
+@pytest.mark.parametrize("error", [
+    AuthRetryableError("timeout", 0), AuthApiError("down", 500, "internal")
+])
+def test_verify_outage(supabase, error):
+    provider, client = supabase
+    client.verify_otp.side_effect = error
+    with pytest.raises(AuthUnavailableError):
+        provider.verify_signup_otp(EMAIL, "123456")
+
+
+def test_resend_outage(supabase):
+    provider, client = supabase
+    client.resend.side_effect = AuthRetryableError("timeout", 0)
+    with pytest.raises(AuthUnavailableError):
+        provider.resend_signup_otp(EMAIL)
+
+
+def test_signup_session_unconfirmed(supabase):
+    provider, client = supabase
+    client.sign_up.return_value = SimpleNamespace(
+        user=user(email_confirmed_at=None), session=SimpleNamespace(access_token="token")
+    )
+    assert provider.sign_up(EMAIL, PASSWORD).needs_verification
