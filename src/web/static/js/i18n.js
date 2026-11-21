@@ -29,7 +29,7 @@ export const TEXT = {
     otpTitle: 'Check your email', otpSent: 'We sent a {n}-digit code to {email}.', otpSentLogin: 'Confirm your email first. We sent a {n}-digit code to {email}.',
     otpLabel: 'Verification code', otpVerify: 'Verify email', otpResend: 'Resend code', otpResendIn: 'Resend code in {t}', otpResending: 'Sending…', otpResent: 'We sent a new code.', otpBack: 'Use a different email',
     errOtpFormat: 'Enter the {n}-digit code from the email.', errOtpInvalid: "That code doesn't match. Use the latest email, or send a new code.", errOtpExpired: 'This code has expired. Send a new one.', errRateLimited: 'Too many tries. Wait a moment, then try again.',
-    hintVerified: 'Email verified. Log in to continue.', okVerified: 'Email verified.', okVerifiedOff: 'Email verified. Recording is off: you can turn it on in Permissions after you log in.',
+    hintVerified: 'Email verified. Log in to continue.', hintVerifiedOldPassword: 'Email verified, but your new password could not be saved. Log in with the password you set first.', okVerified: 'Email verified.', okVerifiedOff: 'Email verified. Recording is off: you can turn it on in Permissions after you log in.',
     tabLogin: 'Log in', tabSignup: 'Sign up', btnLogin: 'Log in', btnSignup: 'Create account',
     username: 'Email', password: 'Password', show: 'Show', hide: 'Hide',
     errEmpty: 'Enter your email and a password.', errEmail: 'Enter a valid email address.',

@@ -35,7 +35,11 @@ def test_signup_verify_login(client):
     for token in ("000000", "12ab56", "12345"):
         response = verify(client, token)
         assert response.status_code == 422 and response.json()["error_code"] == "otp_invalid"
-    assert verify(client).json() == {"verified": True}
+    assert verify(client).json() == {
+        "verified": True,
+        "password_updated": None,  # no sign-up form sent with the code
+        "profile_updated": None,
+    }
     assert client.post("/api/auth/login", json=PAYLOAD).status_code == 200
 
 

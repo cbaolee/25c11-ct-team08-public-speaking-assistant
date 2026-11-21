@@ -79,8 +79,22 @@ class OtpEmailPayload(BaseModel):
     email: str = Field(max_length=MAX_EMAIL_LENGTH)
 
 
+class SignupDetails(BaseModel):
+    """The profile part of the sign-up form, sent again with the code (see verify_otp)."""
+
+    target_accent: str = Field(min_length=1, max_length=50)
+    display_name: str | None = Field(default=None, max_length=50)
+    age: int | None = Field(default=None, ge=1, le=120)
+    gender: str | None = Field(default=None, max_length=50)
+    topics: list[str] = Field(default_factory=list, max_length=20)
+    consent_recording: bool = False
+
+
 class VerifyOtpPayload(OtpEmailPayload):
     token: str = Field(max_length=32)
+    # Latest sign-up form (ADR-010 D3, amended 21/11): applied only after the code is accepted.
+    password: str | None = Field(default=None, max_length=MAX_PASSWORD_LENGTH)
+    profile: SignupDetails | None = None
 
 
 class RefreshPayload(BaseModel):
@@ -204,18 +218,57 @@ def _rate_limited() -> JSONResponse:
     return _error(429, "rate_limited", "Too many attempts. Please try again later.")
 
 
+def _apply_password(auth: AuthProvider, user_id: UUID, password: str) -> bool:
+    try:
+        auth.update_password(user_id, password)
+    except (AuthProviderError, ValueError):
+        logger.warning("Verified account: the new password could not be saved")
+        return False
+    return True
+
+
+def _apply_profile(repos: Repos, user_id: UUID, details: SignupDetails, email: str) -> bool:
+    profile = ProfileUpsert(
+        target_accent=details.target_accent.strip(),
+        display_name=(details.display_name or "").strip() or email.split("@")[0][:50],
+        age=details.age,
+        gender=details.gender,
+        topics=details.topics,
+    )
+    try:
+        repos.profiles.upsert_profile(user_id, profile)
+        repos.profiles.set_consent(user_id, details.consent_recording)
+    except StorageError:
+        logger.warning("Verified account: the latest sign-up profile could not be saved")
+        return False
+    return True
+
+
 @router.post("/verify-otp")
-async def verify_otp(payload: VerifyOtpPayload, auth: Annotated[AuthProvider, Depends(get_auth)]):
+async def verify_otp(
+    payload: VerifyOtpPayload,
+    auth: Annotated[AuthProvider, Depends(get_auth)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Confirm the email, then apply the latest sign-up form (password, profile) if it came with it.
+
+    Signing up again with an email that is still unconfirmed keeps the first password and profile
+    (GoTrue only sends a new code). Whoever enters the code owns the inbox, so the form they sent
+    last is saved here, after the code is accepted. A confirmed account cannot reach this point:
+    verifying it again is `otp_invalid`.
+    """
     email = _normalize_email(payload.email)
     if not _EMAIL_RE.match(email):
         return _error(422, "invalid_email", "Enter a valid email address.")
     token = payload.token.strip()
     if not re.fullmatch(rf"[0-9]{{{_auth_config['otp_length']}}}", token):
         return _error(422, "otp_invalid", "Enter a valid verification code.")
+    if payload.password is not None and len(payload.password) < MIN_PASSWORD_LENGTH:
+        return _weak_password()  # checked first, so a bad password never uses up the code
     if not _verify_limiter.hit(_email_key(email)):
         return _rate_limited()
     try:
-        await run_in_threadpool(auth.verify_signup_otp, email, token)
+        user_id = await run_in_threadpool(auth.verify_signup_otp, email, token)
     except OtpInvalidError:
         return _error(422, "otp_invalid", "The verification code is invalid.")
     except OtpExpiredError:
@@ -224,7 +277,20 @@ async def verify_otp(payload: VerifyOtpPayload, auth: Annotated[AuthProvider, De
         return _rate_limited()
     except AuthUnavailableError:
         return _auth_unavailable()
-    return {"verified": True}
+    password_updated = profile_updated = None
+    if payload.password is not None:
+        password_updated = user_id is not None and await run_in_threadpool(
+            _apply_password, auth, user_id, payload.password
+        )
+    if payload.profile is not None:
+        profile_updated = user_id is not None and await run_in_threadpool(
+            _apply_profile, repos, user_id, payload.profile, email
+        )
+    return {
+        "verified": True,
+        "password_updated": password_updated,
+        "profile_updated": profile_updated,
+    }
 
 
 @router.post("/resend-otp")

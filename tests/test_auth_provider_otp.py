@@ -185,6 +185,11 @@ def test_supabase_verify_and_resend(supabase):
     client.verify_otp.side_effect = None
     client.verify_otp.return_value = SimpleNamespace(session=SimpleNamespace(access_token="token"))
     assert provider.verify_signup_otp(EMAIL, "123456") is None
+    user_id = "11111111-1111-4111-8111-111111111111"
+    client.verify_otp.return_value = SimpleNamespace(
+        session=SimpleNamespace(access_token="token"), user=SimpleNamespace(id=user_id)
+    )
+    assert str(provider.verify_signup_otp(EMAIL, "123456")) == user_id
     provider._admin_client.admin.sign_out.assert_called_with("token", scope="local")
     client.resend.side_effect = AuthApiError("bad", 400, "validation_failed")
     assert provider.resend_signup_otp(EMAIL) is None

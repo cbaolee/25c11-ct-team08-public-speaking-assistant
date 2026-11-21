@@ -100,7 +100,8 @@ class TokenUser:
 class AuthProvider(Protocol):
     def sign_up(self, email: str, password: str) -> SignUpResult: ...
 
-    def verify_signup_otp(self, email: str, token: str) -> None: ...
+    # Returns the id of the account the code confirmed (None when the provider does not say).
+    def verify_signup_otp(self, email: str, token: str) -> UUID | None: ...
 
     def resend_signup_otp(self, email: str) -> None: ...
 
@@ -228,7 +229,7 @@ class MemoryAuthProvider:
                 self._issue_otp(account)
             return SignUpResult(str(account.id), not account.confirmed, True)
 
-    def verify_signup_otp(self, email: str, token: str) -> None:
+    def verify_signup_otp(self, email: str, token: str) -> UUID | None:
         """Confirm an account; confirmed accounts also return invalid to hide their status."""
         with self._lock:
             account = self._accounts.get(email.strip().lower())
@@ -245,6 +246,7 @@ class MemoryAuthProvider:
                 raise OtpInvalidError()
             account.confirmed = True
             account.otp_hash = None
+            return account.id
 
     def resend_signup_otp(self, email: str) -> None:
         with self._lock:
@@ -424,7 +426,7 @@ class SupabaseAuthProvider:
             _created_by_this_call(user),
         )
 
-    def verify_signup_otp(self, email: str, token: str) -> None:
+    def verify_signup_otp(self, email: str, token: str) -> UUID | None:
         try:
             resp = self._new_client().verify_otp({"email": email, "token": token, "type": "signup"})
         except Exception as err:
@@ -434,6 +436,11 @@ class SupabaseAuthProvider:
                 raise OtpInvalidError() from err
             raise AuthUnavailableError("Could not verify the account") from err
         self._revoke_response_session(resp)
+        user = getattr(resp, "user", None)
+        try:
+            return UUID(str(user.id)) if user is not None and user.id else None
+        except ValueError:
+            return None
 
     def resend_signup_otp(self, email: str) -> None:
         try:

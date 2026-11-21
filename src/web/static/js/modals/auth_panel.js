@@ -218,7 +218,7 @@ export function finishSignup(consent) {
       }
       if (j && j.verification_required === true) {
         $('#authPassword').value = ''; $('#authPassword2').value = '';
-        openOtpStep(d.email, { from: 'up', consent });
+        openOtpStep(d.email, { from: 'up', consent, draft: d });   // the form goes with the code: a repeat sign-up keeps its new password
         return;
       }
       $('#authPassword').value = ''; $('#authPassword').removeAttribute('aria-invalid'); $('#authEmail').removeAttribute('aria-invalid');
@@ -301,10 +301,10 @@ function startOtpCountdown() {
   clearInterval(otp.timer); otp.timer = null; updateOtpCountdown();
   if (otp && window.OtpUtils.cooldownLeft(otp.sentAt, Date.now(), otpConfig().resend_cooldown_s) > 0) otp.timer = setInterval(updateOtpCountdown, 1000);
 }
-function openOtpStep(email, { from, consent, resend }) {
+function openOtpStep(email, { from, consent, resend, draft }) {
   initOtp();
   if (otp) clearInterval(otp.timer);
-  otp = { email, from, consent, sentAt: resend ? null : Date.now(), timer: null };
+  otp = { email, from, consent, draft: draft || null, sentAt: resend ? null : Date.now(), timer: null };
   const current = otp, n = otpConfig().otp_length, input = $('#otpCode'), step = $('#otpStep'), a = $('#lAuth');
   $('#otpSentTo').textContent = T(from === 'in' ? 'auth.otpSentLogin' : 'auth.otpSent', { n, email });
   input.maxLength = n; input.style.setProperty('--otp-len', n); input.value = ''; input.removeAttribute('aria-invalid');
@@ -343,14 +343,18 @@ async function submitOtp(e) {
   if (!window.OtpUtils.isCompleteOtp(input.value, n)) { showErr(error, T('auth.errOtpFormat', { n })); input.setAttribute('aria-invalid', 'true'); input.focus(); return; }
   otpBusy = true; button.disabled = true; button.setAttribute('aria-busy', 'true'); clearErr(error);
   try {
-    const { ok, j } = await readJson(await withBusy(fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: current.email, token: input.value }) }), T('busy.verifying')));
+    /* From Sign up the latest form goes with the code (ADR-010 D3, amended): signing up again with an email that is
+       not confirmed yet keeps the first password otherwise. The server applies it only after the code is accepted. */
+    const body = { email: current.email, token: input.value }, d = current.draft;
+    if (d) Object.assign(body, { password: d.password, profile: { display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: current.consent === true } });
+    const { ok, j } = await readJson(await withBusy(fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), T('busy.verifying')));
     if (otp !== current) return;
     if (ok) {
       if (current.from === 'up') fillSignupForm(true);
       await closeOtpStep('in');
       if (otp) return;
       $('#authEmail').value = current.email; $('#authPassword').value = ''; $('#authPassword2').value = '';
-      $('#loginHint').textContent = T('auth.hintVerified'); $('#loginHint').hidden = false;
+      $('#loginHint').textContent = T(j && j.password_updated === false ? 'auth.hintVerifiedOldPassword' : 'auth.hintVerified'); $('#loginHint').hidden = false;
       toast(T(current.consent === false ? 'auth.okVerifiedOff' : 'auth.okVerified')); $('#authPassword').focus();
     } else {
       const code = j && j.error_code;
