@@ -23,6 +23,7 @@ export function openSettings() {
 
 function showList(focus) {
   stopAudioTest();
+  if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange);
   $('.settings-box').classList.remove('detail');
   $('#settingsList').inert = false;
   $('#settingsDetail').inert = true;
@@ -88,11 +89,31 @@ function resetSpeed() {
   clearErr($('#speedErr'));
 }
 
-/* ---- Audio ---- */
+/* ---- Audio: choose the real microphone (mic_device.js, ADR-011); Save keeps it in this browser ---- */
 export let audioTestStop = null;
+const micLabels = () => ({ def: T('audio.micDefault'), nth: n => T('audio.micN', { n }) });
+function audioPaneOpen() { return current === 'audio' && $('#settingsModal').classList.contains('show'); }
+/* Fill the list; keep the device picked in the list if it is still there, else the saved one, else the default. */
+function fillMics(keepPick) {
+  const sel = $('#audioMic'), M = window.MicDevice, want = keepPick ? sel.value : M.getSavedMicId(S.user && S.user.id);
+  return M.listMics(navigator.mediaDevices, micLabels()).then(({ mics, unnamed }) => {
+    if (current !== 'audio') return;
+    sel.innerHTML = mics.map(m => '<option value="' + esc(m.id) + '">' + esc(m.label) + '</option>').join('');
+    sel.value = mics.some(m => m.id === want) ? want : '';
+    $('#audioMicHint').textContent = unnamed ? T('audio.micHint') : '';
+  });
+}
+function onDeviceChange() {
+  if (!audioPaneOpen()) { navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange); return; }
+  fillMics(true);
+}
 function fillAudio() {
-  $('#audioMic').innerHTML = T('audio.mics').map((m, i) => '<option value="' + i + '">' + esc(m) + '</option>').join('');
   $('#audioTestNote').textContent = '';
+  fillMics(false);
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange);
+    navigator.mediaDevices.addEventListener('devicechange', onDeviceChange);   // removed when the pane is left
+  }
 }
 export function testMic() {
   if (audioTestStop) return;
@@ -101,8 +122,14 @@ export function testMic() {
     if (audioTestStop) { audioTestStop(); audioTestStop = null; }
     const n = e && e.name;
     $('#audioTestNote').textContent = T('practice.mic' + (n === 'NotAllowedError' || n === 'SecurityError' ? 'Denied' : n === 'unsupported' ? 'Unsupported' : 'Nodevice'));
-  });
+    if (window.MicDevice.isMissingDevice(e)) fillMics(false);   // the picked device was unplugged
+  }, { micId: $('#audioMic').value, onOpen: () => { if (audioPaneOpen()) fillMics(true); } });   // permission given: names can now be shown
   setTimeout(() => { if (audioTestStop) { audioTestStop(); audioTestStop = null; $('#audioTestNote').textContent = T('audio.testOk'); } }, 1800);
+}
+function saveAudio() {
+  stopAudioTest();
+  window.MicDevice.saveMicId(S.user && S.user.id, $('#audioMic').value);
+  toast(T('audio.ok')); showList(true);
 }
 /* Stop the microphone test if it is running (also used by the Baseline Gate). */
 export function stopAudioTest() { if (audioTestStop) { audioTestStop(); audioTestStop = null; } }
@@ -160,6 +187,7 @@ function confirmDelete() {
     $('#delPassword').value = '';
     clearChatHistory(S.user && S.user.id);   // logout(true) keeps the chat, a deleted account must not
     dropFollowWpm(S.user && S.user.id);
+    window.MicDevice.saveMicId(S.user && S.user.id, '');
     logout(true);
     toast(T('del.done'));
   }).catch(() => { $('#delConfirm').disabled = !$('#delPassword').value; showErr(err, T('del.failed')); });
@@ -173,7 +201,7 @@ export function setupSettings() {
   $('#speedSave').onclick = saveSpeed;
   $('#speedReset').onclick = resetSpeed;
   $('#audioTest').onclick = testMic;
-  $('#audioSave').onclick = () => { stopAudioTest(); toast(T('audio.ok')); showList(true); };
+  $('#audioSave').onclick = saveAudio;
   $('#delPassword').addEventListener('input', () => { $('#delConfirm').disabled = !$('#delPassword').value; clearErr($('#delErr')); });
   $('#delPassword').addEventListener('keydown', e => { if (e.key === 'Enter' && $('#delPassword').value) confirmDelete(); });
   $('#delCancel').onclick = cancelDelete;
