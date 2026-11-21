@@ -48,11 +48,16 @@ _resend_limiter = SlidingWindowLimiter(1, _auth_config["resend_cooldown_s"])
 _verify_limiter = SlidingWindowLimiter(
     _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
 )
+# Re-auth (change password, delete account): own limiter, same budget as the OTP check (ADR-011)
+_reauth_limiter = SlidingWindowLimiter(
+    _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
+)
 
 
 def reset_auth_limiters() -> None:
     _resend_limiter.reset()
     _verify_limiter.reset()
+    _reauth_limiter.reset()
 
 
 def _email_key(email: str) -> str:
@@ -99,7 +104,12 @@ class RefreshPayload(BaseModel):
     refresh_token: str = Field(min_length=1, max_length=4096)
 
 
-class PasswordPayload(BaseModel):
+class PasswordChangePayload(BaseModel):
+    current_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+    new_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+class DeleteAccountPayload(BaseModel):
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
@@ -349,16 +359,50 @@ async def log_out(
     return {"logged_out": True}
 
 
+def _user_key(user_id: UUID) -> str:
+    return hashlib.sha256(str(user_id).encode()).hexdigest()
+
+
+async def _check_current_password(
+    auth: AuthProvider, user: CurrentUser, password: str
+) -> JSONResponse | None:
+    """Re-auth before a sensitive action. None when the password is right, else the error.
+
+    A wrong password is 403, not 401: the browser treats every 401 as "session ended"
+    (api.js refreshes the token and logs out), but the session is still valid here.
+    """
+    if not _reauth_limiter.hit(_user_key(user.id)):
+        return _rate_limited()
+    if not user.email:
+        return _auth_unavailable()  # the token carries no email: cannot re-check the password
+    try:
+        ok = await run_in_threadpool(auth.verify_password, user.email, password)
+    except AuthRateLimitedError:
+        return _rate_limited()
+    except AuthUnavailableError:
+        logger.warning("Re-auth failed at the account service")
+        return _auth_unavailable()
+    if not ok:
+        return _error(403, "wrong_password", "The current password is not correct.")
+    return None
+
+
 @router.put("/password")
 async def change_password(
-    payload: PasswordPayload,
+    payload: PasswordChangePayload,
     user: Annotated[CurrentUser, Depends(get_current_user)],
     auth: Annotated[AuthProvider, Depends(get_auth)],
 ):
-    if len(payload.password) < MIN_PASSWORD_LENGTH:
+    """Change the password after re-checking the current one; the session stays logged in."""
+    if len(payload.new_password) < MIN_PASSWORD_LENGTH:
         return _weak_password()
+    if payload.new_password == payload.current_password:
+        return _error(422, "same_password", "Choose a password different from the current one.")
+    denied = await _check_current_password(auth, user, payload.current_password)
+    if denied is not None:
+        return denied
     try:
-        await run_in_threadpool(auth.update_password, user.id, payload.password)
+        await run_in_threadpool(auth.update_password, user.id, payload.new_password)
     except WeakPasswordError:
         return _weak_password()
     except AuthProviderError:

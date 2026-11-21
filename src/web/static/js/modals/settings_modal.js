@@ -107,20 +107,29 @@ export function testMic() {
 /* Stop the microphone test if it is running (also used by the Baseline Gate). */
 export function stopAudioTest() { if (audioTestStop) { audioTestStop(); audioTestStop = null; } }
 
-/* ---- Change password ---- */
+/* ---- Change password: needs the current password (re-auth, ADR-011); the session stays ---- */
+const PASS_ERR = { wrong_password: 'pass.errWrong', same_password: 'pass.errSame', rate_limited: 'pass.errRate', weak_password: 'auth.errWeak' };
+function clearPassFields() { ['#mpCurrent', '#mpNew', '#mpNew2'].forEach(id => { $(id).value = ''; }); }
 function fillPassword() {
-  $('#mpUser').value = S.user.email || ''; $('#mpNew').value = ''; $('#mpNew2').value = ''; clearErr($('#mpErr'));
+  $('#mpUser').value = S.user.email || ''; clearPassFields(); clearErr($('#mpErr'));
 }
 export function savePass() {
-  const a = $('#mpNew').value, b = $('#mpNew2').value, err = $('#mpErr');
-  if (!a || !b) { showErr(err, T('pass.errEmpty')); return; }
-  if (a.length < MIN_PASSWORD) { showErr(err, T('auth.errWeak')); $('#mpNew').focus(); return; }
+  const cur = $('#mpCurrent').value, a = $('#mpNew').value, b = $('#mpNew2').value, err = $('#mpErr');
+  if (!cur || !a || !b) { showErr(err, T('pass.errEmpty')); $(!cur ? '#mpCurrent' : !a ? '#mpNew' : '#mpNew2').focus(); return; }
   if (a !== b) { showErr(err, T('pass.errMismatch')); $('#mpNew2').focus(); return; }
+  if (a.length < MIN_PASSWORD) { showErr(err, T('auth.errWeak')); $('#mpNew').focus(); return; }
+  if (a === cur) { showErr(err, T('pass.errSame')); $('#mpNew').focus(); return; }
   $('#passSave').disabled = true;
-  withBusy(api('/api/auth/password', { method: 'PUT', json: { password: a } }), T('busy.saving')).then(readJson).then(({ ok, status, j }) => {
+  withBusy(api('/api/auth/password', { method: 'PUT', json: { current_password: cur, new_password: a } }), T('busy.saving')).then(readJson).then(({ ok, status, j }) => {
     $('#passSave').disabled = false;
-    if (status === 401) return;
-    if (!ok) { showErr(err, j && j.error_code === 'weak_password' ? T('auth.errWeak') : T('auth.errServer')); return; }
+    if (status === 401) return;   // session ended: api() already logged out
+    if (!ok) {
+      const code = j && j.error_code;
+      showErr(err, T(PASS_ERR[code] || 'auth.errServer'));
+      if (code === 'wrong_password') { $('#mpCurrent').value = ''; $('#mpCurrent').focus(); }
+      return;
+    }
+    clearPassFields();
     toast(T('pass.ok'));
     showList(true);
   }).catch(() => { $('#passSave').disabled = false; showErr(err, T('auth.errServer')); });

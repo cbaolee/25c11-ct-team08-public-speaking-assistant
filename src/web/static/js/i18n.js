@@ -276,7 +276,13 @@ export const TEXT = {
     errAge: 'Enter an age between 1 and 120, or leave it empty.', errAccent: 'Choose one accent.',
     saved: 'Details saved.', saveErr: 'Could not save your details. Please try again.'
   },
-  pass: { title: 'Change password', sub: 'Choose a new password for your account.', username: 'Email', newPass: 'New password', newPass2: 'Repeat new password', errEmpty: 'Fill in both password fields.', errMismatch: 'The two passwords do not match.', ok: 'Password changed.' },
+  pass: {
+    title: 'Change password', sub: 'Enter your current password, then choose a new one. You stay logged in.', username: 'Email',
+    current: 'Current password', newPass: 'New password', newPass2: 'Repeat new password',
+    errEmpty: 'Fill in all three password fields.', errMismatch: 'The two new passwords do not match.',
+    errSame: 'The new password must be different from the current one.', errWrong: 'The current password is not correct.',
+    errRate: 'Too many attempts. Please wait a few minutes and try again.', ok: 'Password changed.'
+  },
   audio: {
     title: 'Audio settings', sub: 'Choose your microphone and volume.', mic: 'Microphone',
     mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
