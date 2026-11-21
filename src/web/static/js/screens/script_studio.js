@@ -23,10 +23,12 @@ const FALLBACK_USER_NAME = 'you';                                      // same f
    text_too_long come from DocumentParserError in the Member 1 brief; no document says which HTTP status or response body
    carries them, so the error_code is read first (GUESS: they reach the chat routes as error_code). */
 const ERR_KIND = { invalid_pdf: 'file', no_text_layer: 'file', unsupported_file_type: 'file', file_too_large: 'file', file_too_small: 'file',
-  invalid_text_encoding: 'file', text_too_long: 'file', content_rejected: 'blocked', session_not_found: 'session',
+  invalid_text_encoding: 'file', invalid_text_file: 'file', empty_file: 'file', empty_document: 'file', text_too_long: 'file',
+  content_rejected: 'blocked', session_not_found: 'session',
   rate_limited: 'rate', moderation_unavailable: 'moderation', generation_unavailable: 'generation', net: 'net' };
 const ERR_TEXT = { rate: 'script.errRate', moderation: 'script.errModeration', net: 'eval.errNet' };   // other groups: server message, else script.errGeneric
 const FILE_ERR_TEXT = { unsupported_file_type: 'script.errFileType', file_too_large: 'script.errFileBig', file_too_small: 'script.errFileSmall',
+  empty_file: 'script.errFileSmall', empty_document: 'script.errFileSmall', invalid_text_file: 'script.errFileEncoding',
   invalid_text_encoding: 'script.errFileEncoding', text_too_long: 'script.errFileWords', no_text_layer: 'script.errFileNoText' };   // other file codes: script.errFile
 
 /* Chat endpoints (Member 2 contract). */
@@ -261,8 +263,10 @@ export function generateScript(req, again) {
   const fd = new FormData(), status = $('.note', ai);
   fd.append('session_id', req.sid);
   fd.append('topic', req.genTopic);
-  fd.append('category', req.topic);
+  fd.append('category', req.tplId ? req.topic : 'free');
   fd.append('duration_min', String(req.dur || 5));
+  if (req.feedback) fd.append('user_feedback', req.feedback);
+  else if (again) fd.append('user_feedback', 'Write a fresh variation of this speech.');
   /* A stale turn (New chat / other account) stays silent: no render, no busy flag. */
   const fail = (code, msg, httpStatus) => { if (!stale()) { setComposerBusy(false); handleChatError(ai, code, msg, httpStatus); } };
   const failFrom = (j, httpStatus) => fail(errCode(j), j && j.message, httpStatus);
@@ -478,7 +482,25 @@ export function onChatAction(e) {
     const url = URL.createObjectURL(new Blob([sc.text], { type: 'text/plain' })), a2 = document.createElement('a');
     a2.href = url; a2.download = T('script.downloadName'); document.body.appendChild(a2); a2.click(); a2.remove(); setTimeout(() => URL.revokeObjectURL(url), 500);
   } else if (a === 'again') {
-    if (!S.chatBusy) generateScript(sc.req, true);
+    if (S.chatBusy) return;
+    if (!sc.text) { generateScript(sc.req, true); return; }   // failed turn retry button: run right away
+    const bubble = b.closest('.bubble');
+    let box = $('.regen-box', bubble);
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'row regen-box'; box.style.marginTop = '10px';
+      box.innerHTML = '<input type="text" class="regen-in" style="flex:1;min-width:180px"><button class="btn btn-primary btn-sm" type="button" data-a="regen-go"></button>';
+      const inp = $('.regen-in', box), goBtn = $('[data-a=regen-go]', box);
+      inp.placeholder = T('script.regenPlaceholder'); inp.setAttribute('aria-label', T('script.regenPlaceholder'));
+      goBtn.textContent = T('script.regenConfirm');
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); goBtn.click(); } });
+      bubble.appendChild(box);
+    } else box.hidden = !box.hidden;
+    if (!box.hidden) $('.regen-in', box).focus();
+  } else if (a === 'regen-go') {
+    if (S.chatBusy) return;
+    const bubble = b.closest('.bubble'), inp = $('.regen-in', bubble), fb = inp ? inp.value.trim() : '';
+    generateScript(Object.assign({}, sc.req, { feedback: fb }), true);
   }
 }
 RENDER.scriptStudio = function () {
