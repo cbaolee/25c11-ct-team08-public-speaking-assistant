@@ -441,3 +441,13 @@ class MemoryAudioStore:
         if (bucket, path) not in self._state.files:
             raise StorageError(f"Object not found: {bucket}/{path}")
         return f"memory://{quote(bucket, safe='')}/{quote(path, safe='/')}?ttl={ttl_s}"
+
+    def list_user_files(self, user_id: UUID, bucket: str) -> list[str]:
+        prefix = f"{user_id}/"
+        return sorted(p for b, p in self._state.files if b == bucket and p.startswith(prefix))
+
+    def delete_user_folder(self, user_id: UUID, bucket: str) -> None:
+        for path in self.list_user_files(user_id, bucket):
+            self._state.files.pop((bucket, path), None)
+        if self.list_user_files(user_id, bucket):
+            raise StorageError(f"Folder not empty after delete in bucket {bucket}")
