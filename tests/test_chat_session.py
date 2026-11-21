@@ -8,6 +8,7 @@ import threading
 import time
 import types
 import zlib
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -33,7 +34,10 @@ from src.text_processing.contracts import (
     TopicMetadata,
 )
 from src.text_processing.parser import DocumentParserError
+from src.text_processing.pipeline import ScriptGenerationPipeline
 from src.text_processing.retrieval import SemanticRetriever
+from src.text_processing.template_engine import assemble_template
+from src.text_processing.template_store import TemplateStore
 
 
 class MockSentenceTransformer:
@@ -538,3 +542,56 @@ class TestIngestUploadFile:
         chunks = ingest_upload_file(txt_bytes, "speech_draft.txt")
         assert len(chunks) >= 1
         assert "deliberate vocal pacing" in chunks[0].content
+
+    def test_ingest_file_exceeding_2mb_raises_error(self) -> None:
+        large_bytes = b"x" * (2 * 1024 * 1024 + 1)
+        with pytest.raises(DocumentParserError) as exc_info:
+            ingest_upload_file(large_bytes, "large.txt")
+        assert exc_info.value.error_code == "file_too_large"
+        assert "2MB" in exc_info.value.message
+
+    def test_ingest_null_bytes_raises_error(self) -> None:
+        binary_bytes = b"hello\x00world"
+        with pytest.raises(DocumentParserError) as exc_info:
+            ingest_upload_file(binary_bytes, "binary.txt")
+        assert exc_info.value.error_code == "invalid_text_file"
+        assert "null bytes" in exc_info.value.message
+
+
+class TestAssembleTemplateEdgeCases:
+    def test_assemble_template_mid_sentence_entity_slot_no_unwanted_period(self) -> None:
+        body = "Welcome {{ entity_audience_type }} to today's keynote."
+        slot_values = {"entity_audience_type": "College Students"}
+        assembled = assemble_template(body, slot_values)
+        assert assembled == "Welcome College Students to today's keynote."
+        assert "College Students." not in assembled
+
+    def test_assemble_template_end_of_block_argument_slot_adds_period(self) -> None:
+        body = "Welcome everyone.\n\nFirst, {{ argument_core_mechanism }}\n\nConclusion."
+        slot_values = {"argument_core_mechanism": "trophic cascades regulate the balance"}
+        assembled = assemble_template(body, slot_values)
+        assert "First, trophic cascades regulate the balance.\n\n" in assembled
+
+
+class TestPipelineJobCapacityEviction:
+    def test_evict_jobs_if_needed_removes_oldest_finished_jobs(self) -> None:
+        pipeline = ScriptGenerationPipeline(
+            template_store=TemplateStore(Path("nonexistent")),
+        )
+        pipeline.max_jobs_capacity = 3
+
+        job1 = pipeline.create_job("user1")
+        job1.status = "completed"
+        job2 = pipeline.create_job("user1")
+        job2.status = "queued"
+        job3 = pipeline.create_job("user1")
+        job3.status = "failed"
+
+        assert len(pipeline._jobs) == 3
+
+        job4 = pipeline.create_job("user1")
+        assert len(pipeline._jobs) == 3
+        assert job1.job_id not in pipeline._jobs
+        assert job2.job_id in pipeline._jobs
+        assert job3.job_id in pipeline._jobs
+        assert job4.job_id in pipeline._jobs

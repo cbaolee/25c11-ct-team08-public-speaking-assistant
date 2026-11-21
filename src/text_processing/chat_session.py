@@ -454,6 +454,14 @@ def ingest_upload_file(
     if not file_bytes:
         raise DocumentParserError("empty_file", "The uploaded file is empty.")
 
+    if len(file_bytes) > 2 * 1024 * 1024:
+        raise DocumentParserError("file_too_large", "Uploaded file exceeds 2MB limit.")
+
+    if b"\x00" in file_bytes:
+        raise DocumentParserError(
+            "invalid_text_file", "Binary content with null bytes is not allowed."
+        )
+
     suffix = Path(filename).suffix.lower()
 
     if suffix == ".pdf":
