@@ -172,8 +172,6 @@ export function setupSettings() {
   $('#passSave').onclick = savePass;
   $('#speedSave').onclick = saveSpeed;
   $('#speedReset').onclick = resetSpeed;
-  $('#audioInput').addEventListener('input', e => { $('#audioInputValue').textContent = e.target.value; });
-  $('#audioOutput').addEventListener('input', e => { $('#audioOutputValue').textContent = e.target.value; });
   $('#audioTest').onclick = testMic;
   $('#audioSave').onclick = () => { stopAudioTest(); toast(T('audio.ok')); showList(true); };
   $('#delPassword').addEventListener('input', () => { $('#delConfirm').disabled = !$('#delPassword').value; clearErr($('#delErr')); });
