@@ -3,10 +3,20 @@ import binascii
 import hashlib
 import json
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    field_validator,
+    model_validator,
+)
+
+from src.app.constants import CONSTANTS
 
 ScriptSource = Literal["generated_template", "generated_llm", "written"]
 SessionStatus = Literal["ok", "insufficient_audio"]
@@ -19,6 +29,17 @@ class StorageError(Exception):
 
 class ConflictError(StorageError):
     """An object or record conflicts with existing data."""
+
+
+class ScriptLimitReachedError(Exception):
+    """The user already has the maximum number of saved scripts."""
+
+    def __init__(self, limit: int, count: int) -> None:
+        self.limit = limit
+        self.count = count
+        super().__init__(
+            f"You have saved the maximum of {limit} scripts. Delete one to save a new script."
+        )
 
 
 class ProfileUpsert(BaseModel):
@@ -37,8 +58,42 @@ class ProfilePatch(BaseModel):
     topics: list[str] | None = None
 
 
+class UserPreferences(BaseModel):
+    """Per-user settings in profiles.preferences (jsonb). Only the keys sent are merged in."""
+
+    model_config = ConfigDict(extra="forbid")  # unknown keys -> 422
+
+    # All three are checked against follow_wpm_min/max/step in app_constants.toml
+    follow_wpm: StrictInt | None = None  # follow-along speed
+    follow_wpm_min_choose: StrictInt | None = None  # the user's slider minimum
+    follow_wpm_max_choose: StrictInt | None = None  # the user's slider maximum
+    follow_auto_speed: StrictBool | None = None  # taps on the sentence being read set the speed
+
+    @field_validator("follow_wpm", "follow_wpm_min_choose", "follow_wpm_max_choose")
+    @classmethod
+    def _check_wpm(cls, value: int | None) -> int | None:
+        if value is None:
+            return value
+        web = CONSTANTS["web"]
+        low, high, step = web["follow_wpm_min"], web["follow_wpm_max"], web["follow_wpm_step"]
+        if not low <= value <= high or value % step != 0:
+            raise ValueError(f"speed must be {low}-{high} in steps of {step}")
+        return value
+
+    @model_validator(mode="after")
+    def _check_range(self) -> "UserPreferences":
+        low, high = self.follow_wpm_min_choose, self.follow_wpm_max_choose
+        if (low is None) != (high is None):
+            raise ValueError("follow_wpm_min_choose and follow_wpm_max_choose are sent together")
+        if low is not None and low >= high:
+            raise ValueError("follow_wpm_min_choose must be below follow_wpm_max_choose")
+        return self
+
+
 class ProfileRow(ProfileUpsert):
     id: UUID
+    avatar_path: str | None = None
+    preferences: dict[str, Any] = Field(default_factory=dict)
     consent_recording: bool
     consent_updated_at: datetime | None
     created_at: datetime
@@ -80,7 +135,17 @@ class ScriptSummary(BaseModel):
     topic: str | None
     source: ScriptSource
     word_count: int
+    duration_min: ScriptDuration | None = None
     created_at: datetime
+
+
+class ScriptPatch(BaseModel):
+    """Fields an edit may change. A new body always comes with its word_count and content_hash."""
+
+    title: str | None = None
+    body: str | None = None
+    word_count: int | None = None
+    content_hash: str | None = None
 
 
 class ScriptRow(NewScript):
@@ -174,6 +239,10 @@ def build_object_path(user_id: UUID, object_id: UUID, suffix: str) -> str:
     if suffix not in {".webm", ".series.json"}:
         raise ValueError("Unsupported object suffix")
     return f"{user_id}/{object_id}{suffix}"
+
+
+def build_avatar_path(user_id: UUID) -> str:
+    return f"{user_id}/avatar.webp"
 
 
 def encode_cursor(created_at: datetime, row_id: UUID) -> str:

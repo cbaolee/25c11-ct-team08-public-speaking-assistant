@@ -60,10 +60,10 @@ export const TEXT = {
     feedLabel: 'Conversation', topic: 'Category', duration: 'Duration', attach: 'Attach a PDF', inputLabel: 'Describe your event or paste material',
     placeholder: 'Describe your event, or paste some material...', send: 'Send', fold: 'Make the text box smaller', unfold: 'Show more of your text',
     hint: 'The assistant can make mistakes. Read the script and check names, facts and figures before you practise.',
-    assistant: 'Script assistant',
+    assistant: 'Assistant',
     greeting: 'Hi {name}. Pick a topic, then tell me about your event or attach a PDF with the key points.',
-    errFile: 'That file cannot be used. Attach a PDF up to 25 MB and 10 pages that is not password-protected.',
-    errLong: 'The text is longer than 3,000 words. Shorten it and send again.',
+    errFile: 'That file cannot be used. Attach a PDF up to {mb} MB and {pages} pages that is not password-protected.',
+    errLong: 'The text is longer than {max} words. Shorten it and send again.',
     extracting: 'Reading your material and checking it is safe to use...',
     generating: 'Writing your script...', regenerating: 'Writing another version...',
     scriptHeader: 'Script · {title}',
@@ -83,18 +83,18 @@ export const TEXT = {
   practice: {
     title: 'Practice', sub: 'Get your text, read it aloud, then record or upload your audio.', stepsLabel: 'Progress',
     step1: 'Choose text', step2: 'Record', step3: 'Review',
-    textTitle: 'Text to read', tabMine: 'My script', tabSample: 'Sample', tabOwn: 'Write my own',
+    tabsLabel: 'Text to read', tabMine: 'My script', tabSample: 'Sample', tabOwn: 'Write my own',
     sheetLabel: 'Text to read aloud',
-    emptyMineT: 'You have not generated a script yet.', makeScript: 'Generate a script',
+    makeScript: 'Generate a script',
     emptySampleT: 'No sample chosen yet.', sampleBtn: 'Show a sample', sampleAnother: 'Show another sample', sampleNote: 'Picked from your topics.',
-    emptyOwnT: 'Type your text below, then choose Use this text.',
-    ownLabel: 'Your text', ownUse: 'Use this text', ownCounter: '{n} / {max} words', errOwnMax: 'Keep the text to {max} words or fewer.', errOwnEmpty: 'Type some text first.',
-    fromScript: 'From Generate Script · {title}', sampleTitle: 'Sample · {title}', ownTitle: 'Your own text',
-    words: '{n} words · about {t} at a steady pace',
+    emptyOwnT: 'Type your text in the box, then choose Use this script.',
+    ownLabel: 'Your text', ownCounter: '{n} / {max} words', errOwnMax: 'Keep the text to {max} words or fewer.', errOwnEmpty: 'Type some text first.',
+    fromScript: 'From Script · {title}', sampleTitle: 'Sample · {title}', ownTitle: 'Your own text',
+    words: '{n} words · about {t} at a steady pace', readTime: 'about {t} at a steady pace',
     voiceTitle: 'Your voice', tabRec: 'Record', tabUp: 'Upload',
     useScript: 'Use this script',
     followWpmLabel: 'Highlight speed (follow-along only, not scored)', followWpmVal: '{n} words per minute', followWpmShort: '{n} wpm',
-    start: 'Start recording', stop: 'Stop recording', discard: 'Discard',
+    start: 'Start recording', stop: 'Stop recording', pause: 'Pause', resume: 'Resume', pausedNote: 'Paused. Press Resume to go on with the same recording.', discard: 'Discard',
     recording: 'Recording...',
     recordingFollow: 'Recording... Read the text aloud. The highlight follows along.',
     dropText: 'Choose an audio file (mp3, wav, webm, m4a)', errAudio: 'That is not an audio file.',
@@ -103,9 +103,32 @@ export const TEXT = {
     micUnsupported: 'This browser cannot record audio here. Upload an audio file instead.',
     noAudio: 'No audio yet.',
     audioReady: 'Recording ready ({time}).', fileReady: 'File ready: {name}',
-    evaluate: 'Evaluate', hintNoText: 'Choose the text to read first.', hintNoAudio: 'Record or upload your audio.',
+    evaluate: 'Evaluate', hintNoText: 'Choose the text to read first.', hintNoOwn: 'Type your text first.', hintNoAudio: 'Record or upload your audio.',
     stepBackT: 'Go back and discard this audio?', stepBackD: 'Your recording belongs to the current text, so it will be removed. You can record again.',
     discardT: 'Discard this audio?', discardD: 'The recording will be removed. You can record again.', discardOk: 'Discard audio'
+  },
+
+  /* Script Reader: edit in place and the slide-out menu */
+  reader: {
+    more: 'More actions', editSaved: 'Changes kept in this chat.',
+    unsavedTitle: 'Your edits are not saved', unsavedMsg: 'This uses the script as it was before your edits. Save your edits first to use the new version.',
+    useLast: 'Use the last saved version'
+  },
+
+  /* Saved Scripts: the user's own list on Practice (My script) and in Script Studio (Show my scripts) */
+  saved: {
+    title: 'My scripts', count: '{n} / {max}', countLong: '{n} / {max} scripts saved', words: '{n} words', showMine: 'Show my scripts',
+    empty: 'No saved scripts yet. Save a script in Script, or write your own and save it.',
+    pickOne: 'No script chosen yet. Choose a script on the left to see its text here.', notSaved: 'Not saved',
+    saveScript: 'Save script', saveTitle: 'Save script', nameLabel: 'Script name', errNameEmpty: 'Enter a name for the script.',
+    saved: 'Saved as "{title}".', already: 'This script is already in your list as "{title}".',
+    nameCount: '{n} / {max} characters', foldList: 'Hide the script list', unfoldList: 'Show the script list',
+    edit: 'Edit', editTitle: 'Edit script', editAria: 'Edit {title}', bodyLabel: 'Script text', errBodyEmpty: 'The script text cannot be empty.', edited: 'Script updated.',
+    meta: '{d} min · {n} words',
+    deleteAria: 'Delete {title}', deleteTitle: 'Delete this script?', deleteMsg: '"{title}" will be removed from your list. Reports of sessions you practised with it stay.',
+    deleted: 'Script deleted.',
+    duplicateTitle: 'This script already exists', duplicateMsg: 'The text you wrote is the same as your saved script "{title}". Change the text, or keep using that script.',
+    fullTitle: 'Your script list is full', fullMsg: 'You can keep up to {max} saved scripts. Delete one before you save another.'
   },
 
   consent: {
@@ -120,7 +143,10 @@ export const TEXT = {
   },
 
   eval: {
-    title: 'Analysing your recording', step1: 'Step 1 of 2', step1Text: 'Preparing the audio...',
+    title: 'Analysing your recording',
+    bgToast: 'This is taking a while. Keep using the app: we will tell you when your report is ready.',
+    busyT: 'An evaluation is still running', busyD: 'Practice opens again when your report is ready. Please wait a moment.', busyOk: 'OK',
+    readyT: 'Your report is ready', readyD: 'The evaluation of "{title}" has finished.', readyView: 'View report', step1: 'Step 1 of 2', step1Text: 'Preparing the audio...',
     step2: 'Step 2 of 2', step2Text: 'Transcribing and measuring pace, pauses and pitch...',
     errTitle: 'We could not transcribe your recording', errMsg: 'Nothing was scored or saved. Check your connection and try again.', retry: 'Try again',
     saved: 'Saved to History.', notSaved: 'Could not save to History. Your report is shown below.',
@@ -208,7 +234,10 @@ export const TEXT = {
     errListenNone: 'No baseline recording was found.', errListen: 'Could not load your baseline recording. Please try again.',
     errInsufficient: 'We could not hear enough speech in this recording. Please record again, reading the passage aloud.',
     toastSaved: 'Baseline voice saved.', timerSuffix: ' / {t}', progress: 'Baseline recording progress',
-    okAvatar: 'Photo updated.', okRemoved: 'Photo removed.', errImage: 'Choose an image file.'
+    okAvatar: 'Photo updated.', okRemoved: 'Photo removed.',
+    removeT: 'Remove profile photo?', removeD: 'Your photo will be deleted. Your initial is shown instead.', removeOk: 'Remove', errImage: 'Choose an image file.',
+    errAvatarSave: 'Could not save your profile picture. Please try again.',
+    errAvatarRemove: 'Could not remove your profile picture. Please try again.'
   },
 
   pm: {
@@ -229,11 +258,17 @@ export const TEXT = {
     mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
     recVol: 'Recording volume', playVol: 'Playback volume', test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
   },
-  settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', password: 'Change password', delete: 'Delete account' },
+  settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', speed: 'Reading speed', password: 'Change password', delete: 'Delete account' },
   del: {
     title: 'Delete account', sub: 'This deletes your account, your scripts, your recordings and your baseline. It cannot be undone.',
     typeEmail: 'Type your email to confirm', confirm: 'Delete my account', mismatch: 'The email does not match your account.',
     failed: 'Your account could not be deleted right now. Please try again later.', done: 'Your account was deleted.'
+  },
+  speed: {
+    title: 'Reading speed', sub: 'Choose the range of the follow-along speed slider on Practice ({lo}–{hi} words per minute).',
+    min: 'Slowest speed', max: 'Fastest speed',
+    auto: 'Auto speed', autoNote: 'While recording, tap the sentence you have reached: the speed slider adjusts to how fast you read. You can still move it yourself.', wpm: '{n} wpm', reset: 'Use default',
+    errOrder: 'The slowest speed must be lower than the fastest speed.', ok: 'Reading speed saved.', err: 'Could not save the reading speed. Please try again.'
   },
   perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.' },
   overview: {

@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { mapResult, displayRound, pickBaselineProfile, expandCompact, clampFollowWpm, parseFollowWpm, followSchedule, followRetime } = require('../../src/web/static/js/evaluate_client.js');
+const { mapResult, displayRound, pickBaselineProfile, expandCompact, clampFollowWpm, parseFollowWpm, followSchedule, followRetime, followJump } = require('../../src/web/static/js/evaluate_client.js');
 
 const load = n => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', n), 'utf8'));
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -234,6 +234,16 @@ test('clampFollowWpm / parseFollowWpm', () => {
   for (const bad of [null, undefined, '', 'abc', '97', '146', '95', '185', '145.5', NaN, 1e9]) assert.equal(parseFollowWpm(bad), 145, String(bad));
 });
 
+test('clampFollowWpm / parseFollowWpm: limits from /api/config', () => {
+  const lim = { min: 120, max: 200, step: 10, def: 160 };
+  assert.equal(parseFollowWpm('200', lim), 200); assert.equal(parseFollowWpm(190, lim), 190);
+  for (const bad of ['205', '110', 145, null]) assert.equal(parseFollowWpm(bad, lim), 160, String(bad));
+  assert.equal(clampFollowWpm(250, lim), 200); assert.equal(clampFollowWpm(50, lim), 120); assert.equal(clampFollowWpm(null, lim), 160);
+  assert.equal(parseFollowWpm('180', { max: 200 }), 180);       // missing limits fall back to FOLLOW_WPM
+  const segs = followSchedule({ wordCounts: [4], wpm: 240, limits: { max: 240 } });
+  assert.equal(segs[0].end, 1);                                  // 4 words at 240 wpm, not clamped to 180
+});
+
 test('followRetime: edge cases (gap, last sentence, empty sentence, now past old end)', () => {
   const o = { wordCounts: [4, 2, 6], leadS: 1, gapS: 0.5 };
   const segs = followSchedule({ ...o, wpm: 120 });            // [1,3] [3.5,4.5] [5,8]
@@ -259,4 +269,28 @@ test('followRetime: edge cases (gap, last sentence, empty sentence, now past old
 test('followSchedule(undefined) does not throw', () => {
   assert.deepEqual(followSchedule(undefined), []);
   assert.deepEqual(followSchedule(null), []);
+});
+
+test('followJump: the clicked sentence starts now, earlier ones are done, later ones follow', () => {
+  const o = { wordCounts: [4, 2, 6], wpm: 120, leadS: 1, gapS: 0.5 };
+  const segs = followSchedule(o);                                   // [1,3] [3.5,4.5] [5,8]
+  const back = followJump(segs, 0, 6, o);                           // jump back to sentence 0 at t = 6
+  assert.equal(back[0].start, 6); assert.equal(back[0].end, 8); assert.equal(back[1].start, 8.5);
+  const fwd = followJump(segs, 2, 2, o);                            // jump ahead to sentence 2 at t = 2
+  assert.equal(fwd[2].start, 2); assert.ok(fwd[0].start < 2 && fwd[1].start < 2 && fwd[1].end <= 2);
+});
+
+test('followMeasureWpm / followBlendWpm: auto speed from two taps', () => {
+  const { followMeasureWpm, followBlendWpm } = require('../../src/web/static/js/evaluate_client.js');
+  const o = { gapS: 0.5, minS: 3, minWords: 5, maxAhead: 4, lo: 60, hi: 240 };
+  const counts = [10, 10, 10, 10, 10, 10, 10];
+  assert.equal(followMeasureWpm(counts, 0, 0, 2, 11, o), 120);       // 20 words in 10 s (+2 gaps of 0.5 s)
+  assert.equal(followMeasureWpm(counts, 2, 0, 1, 5, o), null);       // backwards
+  assert.equal(followMeasureWpm(counts, 0, 0, 6, 30, o), null);      // skipped 6 sentences
+  assert.equal(followMeasureWpm(counts, 0, 0, 1, 2, { ...o, minS: 3 }), null);   // under minS
+  assert.equal(followMeasureWpm(counts, 0, 0, 1, 3.5, o), 200);
+  assert.equal(followMeasureWpm(counts, 0, 0, 2, 4, o), 240);        // 20 words in 3 s = 400 wpm: taken as the fastest
+  const lim = { min: 100, max: 180, step: 5 };
+  assert.equal(followBlendWpm(145, 120, 0.4, lim), 135);
+  assert.equal(followBlendWpm(170, 240, 1, lim), 180);
 });

@@ -198,6 +198,14 @@
         <select id="composerTopic" style="width:auto;min-width:180px"></select>
         <label for="composerDuration" style="margin:0 0 0 6px" data-t="script.duration"></label>
         <select id="composerDuration" style="width:auto;min-width:105px"><option value="5">5 min</option><option value="10">10 min</option><option value="15">15 min</option><option value="20">20 min</option></select>
+        <div class="studio-saved">
+          <button class="csel-btn studio-saved-btn" type="button" id="studioSavedButton" aria-expanded="false" aria-controls="studioSavedMenu"><span class="v" data-t="saved.showMine"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div class="studio-saved-menu" id="studioSavedMenu" hidden>
+            <div class="row between saved-head"><strong id="studioSavedTitle" data-t="saved.title"></strong><span class="pill num" id="studioSavedCount"></span></div>
+            <ul class="saved-list" id="studioSavedList" aria-labelledby="studioSavedTitle"></ul>
+            <p class="note saved-empty" id="studioSavedEmpty" data-t="saved.empty" hidden></p>
+          </div>
+        </div>
       </div>
       <div class="row">
         <button class="btn iconbtn" type="button" id="attachBtn" data-t-aria="script.attach" data-t-title="script.attach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button>
@@ -213,32 +221,54 @@
 
 <!-- PRACTICE -->
 <section class="screen" id="screenPractice" aria-labelledby="practiceH">
-  <div class="head"><div><h1 id="practiceH" data-t="practice.title"></h1><p class="sub" data-t="practice.sub"></p></div></div>
+  <div class="head practice-head"><h1 id="practiceH" data-t="practice.title"></h1>
   <ol class="steps" id="steps" data-t-aria="practice.stepsLabel">
     <li id="st1"><button type="button" data-step="1"><span class="n">1</span><span data-t="practice.step1"></span></button></li>
     <li id="st2"><button type="button" data-step="2"><span class="n">2</span><span data-t="practice.step2"></span></button></li>
     <li id="st3"><button type="button" data-step="3"><span class="n">3</span><span data-t="practice.step3"></span></button></li>
-  </ol>
+  </ol></div>
   <div class="panel" id="practicePanel">
     <div id="pStep1">
-      <h3 data-t="practice.textTitle"></h3>
-      <div class="seg" role="tablist" data-t-aria="practice.textTitle" style="margin-top:12px">
-        <button type="button" role="tab" id="pickerMineTab" data-src="mine" data-t="practice.tabMine"></button>
-        <button type="button" role="tab" id="pickerSampleTab" data-src="sample" data-t="practice.tabSample"></button>
-        <button type="button" role="tab" id="pickerOwnTab" data-src="own" data-t="practice.tabOwn"></button>
+      <div class="row between picker-bar" data-tab-bar>
+        <div class="seg" role="tablist" data-t-aria="practice.tabsLabel">
+          <button type="button" role="tab" id="pickerMineTab" data-src="mine" data-t="practice.tabMine"></button>
+          <button type="button" role="tab" id="pickerSampleTab" data-src="sample" data-t="practice.tabSample"></button>
+          <button type="button" role="tab" id="pickerOwnTab" data-src="own" data-t="practice.tabOwn"></button>
+        </div>
+        <button class="btn" type="button" id="goScript" data-t="practice.makeScript"></button>
       </div>
-      <div id="pickerMinePane" class="row" style="margin-top:14px"><button class="btn btn-primary" type="button" id="goScript" data-t="practice.makeScript"></button><span id="mineSaved" class="row" hidden><select id="mineSel" style="width:auto;min-width:200px" aria-label="Saved scripts"></select><button class="btn btn-danger-ghost btn-sm" type="button" id="mineDel" data-t="common.delete"></button></span></div>
-      <div id="pickerSamplePane" class="row" style="margin-top:14px"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button><span class="note" data-t="practice.sampleNote"></span></div>
+      <div id="pStep1Go" class="row between use-row">
+        <div class="use-left">
+          <span class="pill num" id="mineCount"></span>
+          <div id="pickerSamplePane" class="row"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button><span class="note" data-t="practice.sampleNote"></span></div>
+        </div>
+        <button class="btn btn-primary" type="button" id="useScript" data-t="practice.useScript" disabled></button>
+      </div>
+      <div id="pickerMinePane" class="mine-pane">
+        <div class="mine-side">
+          <button class="btn btn-ghost iconbtn mine-fold" type="button" id="mineFold" aria-expanded="true" aria-controls="mineList" data-t-aria="saved.foldList" data-t-title="saved.foldList"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+          <ul class="saved-list" id="mineList" data-t-aria="saved.title"></ul>
+          <div class="saved-empty" id="mineEmpty" hidden><p class="note" data-t="saved.empty"></p></div>
+        </div>
+        <div class="mine-view">
+          <div class="row between mine-view-head">
+            <h3 id="mineTitle" spellcheck="false"></h3>
+            <span class="saved-tick" id="mineSavedTick" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3.2 3.2L17 9"/></svg></span><div class="row edit-tools" id="mineEditTools" hidden><button class="btn btn-sm" type="button" id="mineEditCancel" data-t="common.cancel"></button><button class="btn btn-primary btn-sm" type="button" id="mineEditSave" data-t="common.save"></button></div>
+          </div>
+          <div class="reader reader-wide" id="minePreview" tabindex="0" data-t-aria="practice.sheetLabel"></div>
+          <div class="ferr" id="mineEditError" role="alert"></div>
+        </div>
+      </div>
       <div id="pickerOwnPane" style="margin-top:14px">
         <label for="ownText" style="margin-top:0" data-t="practice.ownLabel"></label>
-        <textarea id="ownText" rows="3"></textarea>
-        <div class="row between" style="margin-top:8px"><span class="note num" id="ownCnt"></span><button class="btn btn-primary btn-sm" type="button" id="ownUse" data-t="practice.ownUse"></button></div>
+        <textarea id="ownText" rows="8"></textarea>
+        <div class="row between" style="margin-top:8px"><span class="note num" id="ownCnt"></span><button class="btn btn-sm" type="button" id="ownSave" data-t="saved.saveScript" disabled></button></div>
         <div class="ferr" id="ownErr" role="alert"></div>
       </div>
     </div>
     <div class="prwork" id="practiceWork">
     <div id="pStep2" class="prbar" hidden>
-      <div class="seg" role="tablist" data-t-aria="practice.voiceTitle">
+      <div class="seg" role="tablist" data-t-aria="practice.voiceTitle" data-tab-static>
         <button type="button" role="tab" id="voiceRecordTab" aria-selected="true" data-t="practice.tabRec"></button>
         <button type="button" role="tab" id="voiceUploadTab" aria-selected="false" data-t="practice.tabUp"></button>
       </div>
@@ -247,10 +277,11 @@
         <div class="lvl" id="recLvl" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
         <div class="row rec-actions">
           <button class="btn btn-record" type="button" id="recBtn"></button>
+          <button class="btn" type="button" id="recPause" hidden></button>
           <button class="btn" type="button" id="recClear" data-t="practice.discard" disabled></button>
         </div>
       </div>
-      <div id="voiceUploadPane" class="prrec" hidden>
+      <div id="voiceUploadPane" class="prrec pane-off" aria-hidden="true" inert>
         <button class="drop" type="button" id="dropBtn"><span id="dropText"></span></button>
         <input type="file" id="fileIn" accept="audio/*" hidden>
         <div class="ferr" id="upErr" role="alert"></div>
@@ -270,7 +301,6 @@
     <div class="reader reader-wide" id="sheet" tabindex="0" data-t-aria="practice.sheetLabel"></div>
     </div>
     </div>
-    <div id="pStep1Go" class="row between" style="margin-top:14px"><span class="note" id="useHint"></span><button class="btn btn-primary" type="button" id="useScript" data-t="practice.useScript" disabled></button></div>
   </div>
 </section>
 
@@ -295,7 +325,7 @@
         <input type="range" id="seek" min="0" max="100" value="0" step="1" data-t-aria="report.seek">
         <span class="t" id="playTime">0:00 / 0:00</span>
       </div>
-      <div style="margin-top:16px">
+      <div style="margin-top:16px" id="volBox">
         <div class="chartbox"><h3 data-t="report.cVol"></h3><p class="cap" data-t="report.capVol"></p><div class="chart" id="chVol"></div><p class="note" id="volRead" style="margin-top:8px"></p></div>
       </div>
     </div>
@@ -385,6 +415,7 @@
     <ul class="settings-list">
       <li><button type="button" data-settings="permissions"><span data-t="settings.permissions"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
       <li><button type="button" data-settings="audio"><span data-t="settings.audio"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
+      <li><button type="button" data-settings="speed"><span data-t="settings.speed"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
       <li><button type="button" data-settings="password"><span data-t="settings.password"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
       <li><button type="button" data-settings="delete"><span data-t="settings.delete"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button></li>
     </ul>
@@ -414,6 +445,21 @@
     <div class="row" style="margin-top:16px"><button class="btn" type="button" id="audioTest" data-t="audio.test"></button><span class="note" id="audioTestNote" aria-live="polite"></span></div>
     <div class="lvl" id="audioLevel" aria-hidden="true" style="margin-top:12px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="actions"><button class="btn btn-primary" type="button" id="audioSave" data-t="common.save"></button></div>
+  </section>
+  <section id="settingsSpeed" data-pane="speed" hidden>
+    <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
+    <h3 data-t="speed.title"></h3>
+    <p class="note" id="speedSub"></p>
+    <label for="speedMin" data-t="speed.min"></label>
+    <select id="speedMin"></select>
+    <label for="speedMax" data-t="speed.max"></label>
+    <select id="speedMax"></select>
+    <div class="switch" style="margin-top:16px">
+    <input type="checkbox" id="speedAuto">
+    <div><label for="speedAuto" data-t="speed.auto"></label><div class="note" data-t="speed.autoNote"></div></div>
+    </div>
+    <div class="ferr" id="speedErr" role="alert"></div>
+    <div class="actions"><button class="btn" type="button" id="speedReset" data-t="speed.reset"></button><button class="btn btn-primary" type="button" id="speedSave" data-t="common.save"></button></div>
   </section>
   <section id="settingsPassword" data-pane="password" hidden>
     <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
@@ -451,6 +497,21 @@
   <h2 id="mcfTitle"></h2>
   <p id="mcfMsg" class="mute"></p>
   <div class="actions"><button class="btn" type="button" data-close data-t="common.cancel"></button><button class="btn btn-record" type="button" id="mcfOk"></button></div>
+</div></div>
+
+<div class="mbg" id="scriptNameDialog" role="dialog" aria-modal="true" aria-labelledby="scriptNameTitle"><div class="box">
+  <h2 id="scriptNameTitle"></h2>
+  <label for="scriptNameInput" data-t="saved.nameLabel"></label>
+  <input type="text" id="scriptNameInput" autocomplete="off" aria-describedby="scriptNameCount">
+  <p class="note num name-count" id="scriptNameCount"></p>
+  <div class="ferr" id="scriptNameError" role="alert"></div>
+  <div class="actions"><button class="btn" type="button" data-close data-t="common.cancel"></button><button class="btn btn-primary" type="button" id="scriptNameOk"></button></div>
+</div></div>
+
+<div class="mbg" id="scriptListFull" role="alertdialog" aria-modal="true" aria-labelledby="scriptListFullTitle" aria-describedby="scriptListFullMessage"><div class="box">
+  <h2 id="scriptListFullTitle"></h2>
+  <p id="scriptListFullMessage"></p>
+  <div class="actions"><button class="btn btn-primary" type="button" data-close data-t="common.close"></button></div>
 </div></div>
 
 <div class="mbg" id="evaluatingOverlay" role="dialog" aria-modal="true" aria-labelledby="ovTitle"><div class="box center">
@@ -508,8 +569,24 @@
 </div></div>
 
 <div class="mbg" id="scriptReader" role="dialog" aria-modal="true" aria-labelledby="mrTitle"><div class="box reader-box">
-  <div class="row between"><h2 id="mrTitle"></h2><button class="btn btn-primary" type="button" data-close data-t="common.close"></button></div>
+  <div class="row between reader-head">
+    <h2 id="mrTitle" spellcheck="false"></h2>
+    <div class="row reader-tools">
+      <span class="saved-tick" id="mrSavedTick" aria-hidden="true" hidden><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M7 12.5l3.2 3.2L17 9"/></svg></span>
+      <button class="btn" type="button" id="mrEdit" data-t="saved.edit"></button>
+      <button class="btn btn-primary" type="button" id="mrSave" data-t="common.save" hidden></button>
+      <button class="btn" type="button" data-close data-t="common.close"></button>
+      <button class="btn iconbtn reader-more-btn" type="button" id="mrMoreButton" aria-haspopup="menu" aria-expanded="false" aria-controls="mrMenu" data-t-aria="reader.more" data-t-title="reader.more"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    </div>
+  </div>
+  <div class="ferr reader-error" id="mrError" role="alert"></div>
   <div class="reader" id="mrBody" role="region" tabindex="0" data-t-aria="script.readerLabel"></div>
+  <div class="reader-menu" id="mrMenu" role="menu" aria-labelledby="mrMoreButton">
+    <button type="button" role="menuitem" data-ra="save" data-t="saved.saveScript"></button>
+    <button type="button" role="menuitem" data-ra="copy" data-t="script.copy"></button>
+    <button type="button" role="menuitem" data-ra="download" data-t="script.download"></button>
+    <button type="button" role="menuitem" data-ra="practice" data-t="script.practice"></button>
+  </div>
 </div></div>
 
 <div class="app-loader" id="appLoader" role="status" aria-live="polite" hidden>

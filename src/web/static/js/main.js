@@ -31,16 +31,23 @@ import { openSettings, setupSettings } from './modals/settings_modal.js';
 import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, syncHeader, syncScrollThumb } from './nav.js';
 import { deleteSession, openReport } from './screens/history.js';
 import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing.js';
-import { cancelEval, goStep, loadFollowWpm, loadSavedScripts, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, pickSavedScript, renderPractice, runEval, selectPickerTab, toggleRecording, updateOwnCount, useOwn } from './screens/practice.js';
+import { cancelEval, togglePause, onSheetClick, cancelMineEdit, goStep, loadFollowWpm, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, renderPractice, runEval, saveMineEdit, saveOwn, setupMineTitle, toggleMineList, selectPickerTab, toggleRecording, updateOwnCount, useScript } from './screens/practice.js';
+import { closeStudioSavedMenu, confirmScriptName, onSavedListClick, paintNameCount, toggleStudioSavedMenu } from './screens/saved_scripts.js';
+import { closeMenu, onMenuClick, onReaderClosed, saveEdit, setupReaderTitle, toggleEdit, toggleMenu } from './screens/script_reader.js';
 import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
 import { bindTxTips, onTxClick, openDetails, openPart, seekTo, seekWord, startPlayback, stopPlayback } from './screens/report.js';
 import { fitComposer, onChatAction, renderChatFile, sendChat, toggleComposerFold } from './screens/script_studio.js';
 import { CONFIG, RENDER, S } from './state.js';
 import { initHeroMic } from './hero_mic.js';
+import { watchLineNumbers } from './line_numbers.js';
 import { closeUserMenu, onUserButtonClick, setupUserMenuHover } from './top_bar.js';
 import { FOCUSABLE, closeModal, focusHeading, openModal, setupPwEyes, setupSelects, toast, usable, withBusy } from './ui.js';
 import { $, $$, clearErr, esc, showErr } from './utils.js';
 
+/* "PDF up to 25 MB and 10 pages", from the limits the backend sends. */
+function pdfError() {
+  return T('script.errFile', { mb: Math.round(CONFIG.MAX_PDF_SIZE_BYTES / (1024 * 1024)), pages: CONFIG.MAX_PDF_PAGES });
+}
 /* ---------- init / events ---------- */
 /* Tunable values from app_constants.toml [web] (GET /api/config). The defaults above stay if the call fails. */
 export function loadConfig() {
@@ -54,6 +61,27 @@ export function loadConfig() {
     CONFIG.FOLLOW_GAP_S = c.follow_gap_s ?? CONFIG.FOLLOW_GAP_S;
     CONFIG.HISTORY_PAGE_SIZE = c.history_page_size ?? CONFIG.HISTORY_PAGE_SIZE;
     CONFIG.HISTORY_MAX_PAGES = c.history_max_pages ?? CONFIG.HISTORY_MAX_PAGES;
+    CONFIG.FOLLOW_WPM_MIN = c.follow_wpm_min ?? CONFIG.FOLLOW_WPM_MIN;
+    CONFIG.FOLLOW_WPM_MAX = c.follow_wpm_max ?? CONFIG.FOLLOW_WPM_MAX;
+    CONFIG.FOLLOW_WPM_MIN_CHOOSE = c.follow_wpm_min_choose ?? CONFIG.FOLLOW_WPM_MIN_CHOOSE;
+    CONFIG.FOLLOW_WPM_MAX_CHOOSE = c.follow_wpm_max_choose ?? CONFIG.FOLLOW_WPM_MAX_CHOOSE;
+    CONFIG.FOLLOW_WPM_STEP = c.follow_wpm_step ?? CONFIG.FOLLOW_WPM_STEP;
+    CONFIG.FOLLOW_WPM_DEFAULT = c.follow_wpm_default ?? CONFIG.FOLLOW_WPM_DEFAULT;
+    CONFIG.FOLLOW_AUTO_WEIGHT = c.follow_auto_weight ?? CONFIG.FOLLOW_AUTO_WEIGHT;
+    CONFIG.FOLLOW_AUTO_MIN_S = c.follow_auto_min_s ?? CONFIG.FOLLOW_AUTO_MIN_S;
+    CONFIG.FOLLOW_AUTO_MIN_WORDS = c.follow_auto_min_words ?? CONFIG.FOLLOW_AUTO_MIN_WORDS;
+    CONFIG.FOLLOW_AUTO_MAX_AHEAD = c.follow_auto_max_ahead ?? CONFIG.FOLLOW_AUTO_MAX_AHEAD;
+    CONFIG.FOLLOW_WPM_SAVE_DELAY_MS = c.follow_wpm_save_delay_ms ?? CONFIG.FOLLOW_WPM_SAVE_DELAY_MS;
+    CONFIG.CHAT_HISTORY_MAX_MESSAGES = c.chat_history_max_messages ?? CONFIG.CHAT_HISTORY_MAX_MESSAGES;
+    CONFIG.COMPOSER_MAX_WORDS = c.composer_max_words ?? CONFIG.COMPOSER_MAX_WORDS;
+    CONFIG.COMPOSER_MAX_LINES = c.composer_max_lines ?? CONFIG.COMPOSER_MAX_LINES;
+    CONFIG.SCRIPT_POLL_INTERVAL_MS = c.script_poll_interval_ms ?? CONFIG.SCRIPT_POLL_INTERVAL_MS;
+    CONFIG.EVALUATE_TIMEOUT_MS = c.evaluate_timeout_ms ?? CONFIG.EVALUATE_TIMEOUT_MS;
+    CONFIG.EVALUATE_BACKGROUND_AFTER_MS = c.evaluate_background_after_ms ?? CONFIG.EVALUATE_BACKGROUND_AFTER_MS;
+    CONFIG.MAX_SAVED_SCRIPTS = c.max_saved_scripts ?? CONFIG.MAX_SAVED_SCRIPTS;
+    CONFIG.SCRIPT_TITLE_MAX_CHARS = c.script_title_max_chars ?? CONFIG.SCRIPT_TITLE_MAX_CHARS;
+    CONFIG.MAX_PDF_SIZE_BYTES = c.max_pdf_size_bytes ?? CONFIG.MAX_PDF_SIZE_BYTES;
+    CONFIG.MAX_PDF_PAGES = c.max_pdf_pages ?? CONFIG.MAX_PDF_PAGES;
   }).catch(() => {});
 }
 export function init() {
@@ -137,7 +165,7 @@ export function init() {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
     if (!f) return;
     const okType = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
-    if (!okType || f.size > 25 * 1024 * 1024) { showErr($('#composerError'), T('script.errFile')); return; }
+    if (!okType || f.size > CONFIG.MAX_PDF_SIZE_BYTES) { showErr($('#composerError'), pdfError()); return; }
     clearErr($('#composerError')); S.chatFile = { name: f.name, size: f.size, raw: f }; renderChatFile();
   };
   $('#composerFile').addEventListener('click', e => { if (e.target.closest('#chatFileX')) { S.chatFile = null; renderChatFile(); $('#attachBtn').focus(); } });
@@ -148,23 +176,41 @@ export function init() {
   fitComposer();
   $('#composerInput').addEventListener('keydown', e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); sendChat(); } });
   $('#chatFeed').addEventListener('click', onChatAction);
+  $('#studioSavedButton').onclick = toggleStudioSavedMenu;
+  $('#studioSavedList').addEventListener('click', e => onSavedListClick(e, 'studio'));
+  $('#studioSavedMenu').addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); closeStudioSavedMenu(true); } });
+  document.addEventListener('click', e => { if (!e.target.closest('.studio-saved') && !e.target.closest('.mbg')) closeStudioSavedMenu(false); });
+  // Saved Scripts dialogs
+  $('#scriptNameOk').onclick = confirmScriptName;
+  $('#scriptNameInput').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); confirmScriptName(); } });
+  $('#scriptNameInput').addEventListener('input', () => { clearErr($('#scriptNameError')); $('#scriptNameInput').removeAttribute('aria-invalid'); paintNameCount(); });
+  // Script Reader: edit in place, Save, and the slide-out menu
+  $('#mrEdit').onclick = toggleEdit;
+  $('#mrSave').onclick = saveEdit;
+  setupReaderTitle();
+  $('#mrMoreButton').onclick = toggleMenu;
+  $('#mrMenu').addEventListener('click', onMenuClick);
+  $('#scriptReader').addEventListener('mouseleave', closeMenu);
+  new MutationObserver(() => { if (!$('#scriptReader').classList.contains('show')) { onReaderClosed(); closeMenu(); } })
+    .observe($('#scriptReader'), { attributes: true, attributeFilter: ['class'] });
 
   // practice
   $$('[data-src]').forEach(b => { b.onclick = () => selectPickerTab(b.getAttribute('data-src')); });
   $('#goScript').onclick = () => go('scriptStudio');
   $('#homeMore').onclick = scrollHomeDown;
-  $('#useScript').onclick = () => goStep(2);
+  $('#useScript').onclick = useScript;
   loadFollowWpm(); paintFollowWpm(); $('#followWpm').addEventListener('input', onFollowWpm);
-  $('#mineSel').onchange = () => { const id = $('#mineSel').value; if (id) pickSavedScript(id, true); };
-  $('#mineDel').onclick = () => {
-    const id = $('#mineSel').value; if (!id) return;
-    withBusy(api('/api/scripts/' + encodeURIComponent(id), { method: 'DELETE' }), T('busy.deleting')).then(r => {
-      if (r.ok) { if (S.texts.mine && S.texts.mine.id === id) S.texts.mine = null; toast('Script deleted.'); loadSavedScripts(); renderPractice(); }
-    }).catch(() => {});
-  };
+  $('#mineList').addEventListener('click', e => onSavedListClick(e, 'practice'));
+  $('#mineEditSave').onclick = saveMineEdit;
+  $('#mineEditCancel').onclick = cancelMineEdit;
+  setupMineTitle();
+  $('#mineFold').onclick = toggleMineList;
+  ['#sheet', '#minePreview', '#mrBody'].forEach(id => watchLineNumbers($(id)));   // line numbers on every script text
   $('#sampleBtn').onclick = pickSample;
-  $('#ownText').addEventListener('input', () => { updateOwnCount(); clearErr($('#ownErr')); $('#ownText').removeAttribute('aria-invalid'); });
-  $('#ownUse').onclick = useOwn;
+  $('#recPause').onclick = togglePause;
+  $('#sheet').addEventListener('click', onSheetClick);
+  $('#ownText').addEventListener('input', () => { updateOwnCount(); clearErr($('#ownErr')); $('#ownText').removeAttribute('aria-invalid'); renderPractice(); });
+  $('#ownSave').onclick = saveOwn;
   $('#voiceRecordTab').onclick = () => { if (S.rec) return; S.voiceTab = 'rec'; renderPractice(); };
   $('#voiceUploadTab').onclick = () => { if (S.rec) return; S.voiceTab = 'up'; renderPractice(); };
   $('#recBtn').onclick = toggleRecording;
@@ -193,12 +239,18 @@ export function init() {
   $('#avFile').onchange = e => {
     const f = e.target.files && e.target.files[0]; e.target.value = '';
     if (!f) return;
-    if (!(f.type || '').startsWith('image/')) { toast(T('profile.errImage'), true); return; }
-    const r = new FileReader();
-    r.onload = () => { S.avatar = r.result; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okAvatar')); };
-    r.readAsDataURL(f);
+    const fd = new FormData(); fd.append('file', f);
+    withBusy(api('/api/profile/avatar', { method: 'PUT', body: fd }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
+      if (!r.ok) { toast((j && j.message) || T('profile.errImage'), true); return; }
+      S.avatar = j.avatar_url; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okAvatar'));
+    })).catch(() => toast(T('profile.errAvatarSave'), true));
   };
-  $('#avRemove').onclick = () => { S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved')); };
+  $('#avRemove').onclick = () => openConfirmDialog(T('profile.removeT'), T('profile.removeD'), T('profile.removeOk'), () => {
+    withBusy(api('/api/profile/avatar', { method: 'DELETE' }), T('busy.saving')).then(r => r.json().catch(() => null).then(j => {
+      if (!r.ok) { toast((j && j.message) || T('profile.errAvatarRemove'), true); return; }
+      S.avatar = null; paintAvatar($('#avTop')); RENDER.profile(); toast(T('profile.okRemoved'));
+    })).catch(() => toast(T('profile.errAvatarRemove'), true));
+  });
   $('#profileBaselineStart').onclick = toggleBaseline;
   $('#profileBaselineAgain').onclick = openBaselineRecorder;
   $('#profileBaselineListen').onclick = listenBaseline;

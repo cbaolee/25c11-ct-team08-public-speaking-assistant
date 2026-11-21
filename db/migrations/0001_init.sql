@@ -1,4 +1,8 @@
 -- 0001_init.sql: initial schema for profiles, baselines, scripts, sessions
+-- Run: once
+-- Applied: psc-dev (date unknown) | psc-prod not yet
+-- Effect: creates tables profiles, baselines, scripts, sessions, their indexes, RLS policies and grants.
+--         Running again fails ("relation already exists") and changes nothing.
 
 create table public.profiles (
   id                 uuid primary key references auth.users(id) on delete cascade,

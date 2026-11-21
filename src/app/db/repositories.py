@@ -1,4 +1,4 @@
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from src.app.db.models import (
@@ -10,6 +10,7 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptPatch,
     ScriptRow,
     ScriptSummary,
     SessionRow,
@@ -25,6 +26,10 @@ class ProfileRepo(Protocol):
     def update_profile(self, user_id: UUID, patch: ProfilePatch) -> ProfileRow | None: ...
 
     def set_consent(self, user_id: UUID, consent_recording: bool) -> ProfileRow | None: ...
+
+    def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None: ...
+
+    def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None: ...
 
     def delete_profile(self, user_id: UUID) -> bool: ...
 
@@ -50,6 +55,10 @@ class ScriptRepo(Protocol):
 
     def count_scripts(self, user_id: UUID) -> int: ...
 
+    def update_script(
+        self, user_id: UUID, script_id: UUID, patch: ScriptPatch
+    ) -> ScriptRow | None: ...
+
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool: ...
 
 
@@ -65,6 +74,8 @@ class SessionRepo(Protocol):
     def list_score_history(self, user_id: UUID, limit: int) -> list[ScorePoint]: ...
 
     def list_full_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]: ...
+
+    def list_compact_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]: ...
 
     def save_compact_session(
         self,

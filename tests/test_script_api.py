@@ -13,9 +13,9 @@ from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
-from src.app.config import settings
+from src.app.config import max_saved_scripts, script_title_max_chars, settings
 from src.app.db.factory import build_memory_repos, get_repos
-from src.app.db.models import StorageError
+from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
 from src.text_processing.contracts import (
     GeneratedScript,
@@ -246,13 +246,24 @@ def test_save_script_moderation_rejects_text(script_api) -> None:
     assert repos.scripts.count_scripts(state["user"].id) == 0
 
 
-def test_save_script_cap_returns_429(script_api) -> None:
+def test_save_script_cap_returns_409(script_api) -> None:
     client, _, _ = script_api
     _save(client, "First text.")
     _save(client, "Second text.")
     r = _save(client, "Third text.")
-    assert r.status_code == 429
-    assert r.json()["error_code"] == "rate_limited"
+    assert r.status_code == 409
+    assert r.json()["error_code"] == "script_limit_reached"
+    assert r.json()["limit"] == 2
+    assert r.json()["count"] == 2
+
+
+def test_saving_existing_script_at_cap_returns_existing_row(script_api) -> None:
+    client, _, _ = script_api
+    first = _save(client, "First text.")
+    _save(client, "Second text.")
+    again = _save(client, "First text.", title="Renamed")
+    assert again.status_code == 200
+    assert again.json()["id"] == first.json()["id"]
 
 
 def test_saved_scripts_other_user_cannot_list_read_or_delete(script_api) -> None:
@@ -260,7 +271,12 @@ def test_saved_scripts_other_user_cannot_list_read_or_delete(script_api) -> None
     script_id = _save(client, "Good morning.").json()["id"]
 
     state["user"] = _user("user-b")
-    assert client.get("/api/scripts").json() == {"items": [], "next_cursor": None}
+    assert client.get("/api/scripts").json() == {
+        "items": [],
+        "next_cursor": None,
+        "total": 0,
+        "limit": 2,
+    }
     assert client.get(f"/api/scripts/{script_id}").status_code == 404
     assert client.delete(f"/api/scripts/{script_id}").status_code == 404
 
@@ -282,6 +298,72 @@ def test_list_scripts_returns_summaries_newest_first_with_cursor(script_api, mon
     keys = [(item["created_at"], item["id"]) for item in items]
     assert keys == sorted(keys, reverse=True)
     assert sorted(item["id"] for item in items) == sorted(ids)
+    assert first["total"] == 3
+    assert first["limit"] == 10
+
+
+def _store_scripts(repos, user_id, count: int) -> None:
+    """Put `count` scripts straight into the repo (bypasses the per-user cap)."""
+    for index in range(count):
+        body = f"Saved script number {index}."
+        repos.scripts.create_script(
+            user_id,
+            NewScript(
+                title=f"Script {index}",
+                body=body,
+                word_count=len(body.split()),
+                source="written",
+                content_hash=build_content_hash(body),
+            ),
+        )
+
+
+def test_default_script_list_returns_all_saved_scripts(script_api) -> None:
+    # No monkeypatch here: the Query default for `limit` is bound when main.py is imported,
+    # so it is always config.max_saved_scripts from app_constants.toml.
+    client, repos, state = script_api
+    _store_scripts(repos, state["user"].id, max_saved_scripts)
+
+    body = client.get("/api/scripts").json()  # no limit: the default must cover the cap
+
+    assert len(body["items"]) == max_saved_scripts
+    assert body["next_cursor"] is None
+    assert body["total"] == max_saved_scripts
+
+
+def test_script_list_reports_cap_as_limit(script_api) -> None:
+    # script_api sets max_saved_scripts = 2; `limit` in the body is read at request time.
+    client, repos, state = script_api
+    _store_scripts(repos, state["user"].id, 1)
+
+    body = client.get("/api/scripts?limit=1").json()
+
+    assert (body["total"], body["limit"]) == (1, 2)
+
+
+def test_delete_script_keeps_practiced_session_snapshot(script_api) -> None:
+    client, repos, state = script_api
+    script = _save(client, "Practice this script.").json()
+    session_id = uuid4()
+    repos.sessions.create_session(
+        state["user"].id,
+        NewSession(
+            id=session_id,
+            script_id=UUID(script["id"]),
+            script_snapshot=script["body"],
+            status="ok",
+            result={},
+            result_schema_version="2.1",
+        ),
+    )
+
+    deleted = client.delete(f"/api/scripts/{script['id']}")
+    session = client.get(f"/api/sessions/{session_id}")
+
+    assert deleted.status_code == 200
+    assert session.status_code == 200
+    assert session.json()["script_snapshot"] == script["body"]
+    assert session.json()["script_id"] is None
 
 
 def test_delete_script_removes_it(script_api) -> None:
@@ -290,6 +372,89 @@ def test_delete_script_removes_it(script_api) -> None:
     r = client.delete(f"/api/scripts/{script_id}")
     assert r.json() == {"deleted": True, "id": script_id}
     assert client.get(f"/api/scripts/{script_id}").status_code == 404
+
+
+def test_rename_script_changes_only_the_title(script_api) -> None:
+    client, _, _ = script_api
+    script = _save(client, "Rename me please.").json()
+    r = client.patch(f"/api/scripts/{script['id']}", json={"title": "  My new name  "})
+    assert r.status_code == 200
+    assert r.json()["title"] == "My new name"
+    assert r.json()["body"] == script["body"]
+    assert client.get(f"/api/scripts/{script['id']}").json()["title"] == "My new name"
+
+
+def test_rename_script_rejects_empty_and_long_titles(script_api) -> None:
+    client, _, _ = script_api
+    script_id = _save(client, "Name rules.").json()["id"]
+    assert client.patch(f"/api/scripts/{script_id}", json={"title": ""}).status_code == 422
+    blank = client.patch(f"/api/scripts/{script_id}", json={"title": "   "})
+    assert blank.status_code == 422
+    assert blank.json()["error_code"] == "script_title_empty"
+    too_long = "x" * (script_title_max_chars + 1)
+    assert client.patch(f"/api/scripts/{script_id}", json={"title": too_long}).status_code == 422
+
+
+def test_edit_script_body_updates_count_and_hash(script_api) -> None:
+    client, repos, state = script_api
+    script = _save(client, "Old body text.").json()
+    r = client.patch(
+        f"/api/scripts/{script['id']}", json={"body": "A brand new body with six words."}
+    )
+    assert r.status_code == 200
+    assert r.json()["body"] == "A brand new body with six words."
+    assert r.json()["word_count"] == 7
+    assert r.json()["title"] == script["title"]
+    new_hash = build_content_hash("A brand new body with six words.")
+    assert repos.scripts.find_script_by_hash(state["user"].id, new_hash).id == UUID(script["id"])
+
+
+def test_edit_script_rejects_empty_body(script_api) -> None:
+    client, _, _ = script_api
+    script_id = _save(client, "Keep me.").json()["id"]
+    r = client.patch(f"/api/scripts/{script_id}", json={"body": "   "})
+    assert r.status_code == 422
+    assert r.json()["error_code"] == "script_empty"
+
+
+def test_edit_script_body_matching_another_script_returns_409(script_api) -> None:
+    client, _, _ = script_api
+    first = _save(client, "First saved text.").json()
+    second = _save(client, "Second saved text.").json()
+    r = client.patch(f"/api/scripts/{second['id']}", json={"body": "First saved text."})
+    assert r.status_code == 409
+    assert r.json()["error_code"] == "script_duplicate"
+    assert r.json()["duplicate_id"] == first["id"]
+    assert r.json()["duplicate_title"] == first["title"]
+    assert client.get(f"/api/scripts/{second['id']}").json()["body"] == "Second saved text."
+
+
+def test_edit_script_keeping_its_own_body_is_allowed(script_api) -> None:
+    client, _, _ = script_api
+    script = _save(client, "Same text kept.").json()
+    r = client.patch(
+        f"/api/scripts/{script['id']}", json={"body": "Same text kept.", "title": "New"}
+    )
+    assert r.status_code == 200
+    assert r.json()["title"] == "New"
+
+
+def test_edit_missing_script_skips_moderation(script_api, monkeypatch) -> None:
+    client, _, _ = script_api
+    calls = []
+    monkeypatch.setattr(
+        app_main.get_script_pipeline().moderator, "assert_safe", lambda *a, **k: calls.append(a)
+    )
+    r = client.patch(f"/api/scripts/{uuid4()}", json={"title": "Nobody"})
+    assert r.status_code == 404
+    assert calls == []
+
+
+def test_rename_missing_script_returns_404(script_api) -> None:
+    client, _, _ = script_api
+    r = client.patch(f"/api/scripts/{uuid4()}", json={"title": "Nobody"})
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "script_not_found"
 
 
 def test_scripts_storage_error_returns_503(script_api, monkeypatch) -> None:

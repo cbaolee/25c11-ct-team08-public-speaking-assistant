@@ -26,6 +26,7 @@ def session_api(monkeypatch):
     main.app.dependency_overrides[get_repos] = lambda: repos
     main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=current_user["id"])
     monkeypatch.setattr(settings, "retention_full_sessions", 10)
+    monkeypatch.setattr(settings, "max_compact_sessions", 30)
     yield repos, current_user
     main.app.dependency_overrides.clear()
 
@@ -171,6 +172,22 @@ def test_retention_compacts_sessions_beyond_ten(session_api):
     for row in original_rows:
         assert (settings.audio_bucket, row.audio_path) not in repos.files._state.files
         assert (settings.series_bucket, row.series_path) not in repos.files._state.files
+
+
+def test_retention_deletes_oldest_compact_sessions_beyond_cap(session_api, monkeypatch):
+    repos, _ = session_api
+    monkeypatch.setattr(settings, "retention_full_sessions", 2)
+    monkeypatch.setattr(settings, "max_compact_sessions", 3)
+    rows = [_create_session(repos, USER_A, files=True) for _ in range(7)]
+    newest_first = sorted(rows, key=lambda row: (row.created_at, str(row.id)), reverse=True)
+
+    main._prune_old_sessions(repos, USER_A)
+
+    stored = {row.id: repos.sessions.get_session(USER_A, row.id) for row in rows}
+    # 2 newest stay full, the next 3 become compact, the 2 oldest are deleted
+    assert [stored[row.id].is_compact for row in newest_first[:2]] == [False, False]
+    assert [stored[row.id].is_compact for row in newest_first[2:5]] == [True, True, True]
+    assert [stored[row.id] for row in newest_first[5:]] == [None, None]
 
 
 def test_retention_retries_file_cleanup_before_compacting(session_api, monkeypatch):

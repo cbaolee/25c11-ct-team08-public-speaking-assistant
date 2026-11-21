@@ -140,15 +140,25 @@
   }
 
   /* ---- Practice follow-along schedule (demo: highlight moves by TIME, not by the real voice; NOT part of scoring) ---- */
+  // Fallback slider limits, used only when /api/config fails. Real values: app_constants.toml [web] follow_wpm_*.
   const FOLLOW_WPM = { min: 100, max: 180, step: 5, def: 145 };
-  function clampFollowWpm(w) {                     // out of range -> clamp; not a finite number -> default
-    const n = typeof w === 'number' ? w : (w == null || w === '' ? NaN : Number(w));   // Number(null) would be 0
-    if (!Number.isFinite(n)) return FOLLOW_WPM.def;
-    return Math.min(FOLLOW_WPM.max, Math.max(FOLLOW_WPM.min, n));
+  function followLimitsOr(limits) {                // fill the limits not given from FOLLOW_WPM
+    const l = limits || {};
+    return {
+      min: l.min != null ? l.min : FOLLOW_WPM.min, max: l.max != null ? l.max : FOLLOW_WPM.max,
+      step: l.step != null ? l.step : FOLLOW_WPM.step, def: l.def != null ? l.def : FOLLOW_WPM.def
+    };
   }
-  function parseFollowWpm(raw) {                   // stored value (string/number): must be an integer multiple of 5 in range, else default
+  function clampFollowWpm(w, limits) {             // out of range -> clamp; not a finite number -> default
+    const l = followLimitsOr(limits);
+    const n = typeof w === 'number' ? w : (w == null || w === '' ? NaN : Number(w));   // Number(null) would be 0
+    if (!Number.isFinite(n)) return l.def;
+    return Math.min(l.max, Math.max(l.min, n));
+  }
+  function parseFollowWpm(raw, limits) {           // stored value (string/number): must be an integer multiple of step in range, else default
+    const l = followLimitsOr(limits);
     const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
-    if (typeof n !== 'number' || !Number.isInteger(n) || n < FOLLOW_WPM.min || n > FOLLOW_WPM.max || n % FOLLOW_WPM.step !== 0) return FOLLOW_WPM.def;
+    if (typeof n !== 'number' || !Number.isInteger(n) || n < l.min || n > l.max || n % l.step !== 0) return l.def;
     return n;
   }
   /* wordCounts[i] = words in sentence i. Sentence i lasts n_i * 60 / wpm seconds; leadS before the first, gapS after each.
@@ -157,7 +167,7 @@
   function followSchedule(o) {
     o = o || {};
     const counts = Array.isArray(o.wordCounts) ? o.wordCounts : [];
-    const per = 60 / clampFollowWpm(o.wpm), lead = o.leadS == null ? 0 : o.leadS, gap = o.gapS == null ? 0 : o.gapS;
+    const per = 60 / clampFollowWpm(o.wpm, o.limits), lead = o.leadS == null ? 0 : o.leadS, gap = o.gapS == null ? 0 : o.gapS;
     const k = Number.isInteger(o.startIndex) ? o.startIndex : -1, prev = o.prev || [];
     let t = lead;
     return counts.map((n, i) => {
@@ -171,13 +181,39 @@
      (so the highlight does not jump back), later ones are recomputed. idx < 0 (still in the lead-in): only the sentences move. */
   function followRetime(segs, idx, now, o) {
     if (!segs || !segs.length) return [];
-    if (idx < 0) return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: 0, startTime: segs[0].start });
+    if (idx < 0) return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: 0, startTime: segs[0].start });
     const old = segs[idx], dOld = old.end - old.start, frac = dOld > 0 ? Math.min(1, Math.max(0, (now - old.start) / dOld)) : 0;
-    const dNew = (o.wordCounts[idx] || 0) * 60 / clampFollowWpm(o.wpm);
-    return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
+    const dNew = (o.wordCounts[idx] || 0) * 60 / clampFollowWpm(o.wpm, o.limits);
+    return followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: idx, startTime: now - frac * dNew, prev: segs });
   }
 
-  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime };
+  /* Jump to sentence k at time now: it starts now, later ones follow at this wpm, earlier ones count as already read. */
+  function followJump(segs, k, now, o) {
+    const fresh = followSchedule({ wordCounts: o.wordCounts, wpm: o.wpm, limits: o.limits, leadS: o.leadS, gapS: o.gapS, startIndex: k, startTime: now });
+    return fresh.map((g, i) => (i < k ? { start: Math.min(g.start, now - (k - i) * 1e-3), end: Math.min(g.end, now) } : g));
+  }
+
+  /* Auto speed. Two taps (sentence fromK at fromT, then toK at toT, seconds): the speed the user really read at,
+     in wpm, or null when the taps say nothing reliable (backwards, a skip, too close). A speed outside
+     [lo, hi] is taken as lo or hi: reading very fast still pushes the slider to its fastest end.
+     o: { gapS, minS, minWords, maxAhead, lo, hi } */
+  function followMeasureWpm(counts, fromK, fromT, toK, toT, o) {
+    const ahead = toK - fromK;
+    if (!(ahead >= 1) || ahead > o.maxAhead) return null;
+    let words = 0;
+    for (let i = fromK; i < toK; i++) words += counts[i] || 0;
+    const secs = toT - fromT - ahead * (o.gapS || 0);
+    if (toT - fromT < o.minS || words < o.minWords || secs <= 0) return null;
+    const wpm = words * 60 / secs;
+    return Math.min(o.hi, Math.max(o.lo, wpm));
+  }
+  /* The slider value after one measurement: part of the way to it, on the step, inside [min, max]. */
+  function followBlendWpm(cur, measured, weight, limits) {
+    const v = (1 - weight) * cur + weight * measured, step = limits.step || 5;
+    return Math.min(limits.max, Math.max(limits.min, Math.round(v / step) * step));
+  }
+
+  const api = { mapResult, displayRound, pickBaselineProfile, expandCompact, FOLLOW_WPM, clampFollowWpm, parseFollowWpm, followSchedule, followRetime, followJump, followMeasureWpm, followBlendWpm };
   root.EvaluateClient = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : globalThis);

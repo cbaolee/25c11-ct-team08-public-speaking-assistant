@@ -1,5 +1,6 @@
 import { redrawCharts } from './charts.js';
 import { heroLightsOn } from './screens/home.js';
+import { practiceLocked } from './screens/practice.js';
 import { syncHero, syncStage } from './screens/landing.js';
 import { stopPlayback } from './screens/report.js';
 import { RENDER, S } from './state.js';
@@ -63,10 +64,15 @@ document.getElementById('viewApp').addEventListener('click', e => {
   const b = e.target.closest('.seg button');
   if (!b || b._passing || b.disabled || b.getAttribute('aria-selected') === 'true') return;
   const seg = b.closest('.seg'), panel = b.closest('.panel');
-  if (!panel || seg._busy || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // data-tab-static: the tab contents share one fixed-size cell and cross-fade in CSS (Practice Record / Upload).
+  // Animating the panel height there turns off position: sticky for a moment and the voice box jumps.
+  if (!panel || seg._busy || seg.hasAttribute('data-tab-static') || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   e.stopImmediatePropagation(); e.preventDefault();
   seg._busy = true;
-  const after = () => [...seg.parentElement.children].slice([...seg.parentElement.children].indexOf(seg) + 1).filter(el => !el.hidden && el.offsetParent !== null);
+  // the content that changes is what follows the tab bar; a bar that holds fixed buttons too
+  // (Practice: Generate a script) is marked data-tab-bar, and only what follows the whole bar fades
+  const bar = seg.closest('[data-tab-bar]') || seg;
+  const after = () => [...bar.parentElement.children].slice([...bar.parentElement.children].indexOf(bar) + 1).filter(el => !el.hidden && el.offsetParent !== null);
   $$('button', seg).forEach(x => x.setAttribute('aria-selected', String(x === b)));   // pill starts sliding now
   const h0 = panel.offsetHeight, old = after();
   Promise.all(old.map(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-in', fill: 'forwards' }).finished)).then(() => {
@@ -133,6 +139,7 @@ export function syncScrollThumb() {
 export function go(name, opts) {
   opts = opts || {};
   if (!S.user) { showView('landing'); return; }
+  if (name === 'practice' && practiceLocked()) return;   // an evaluation runs in the background: Practice waits for it
   if (S.scrollKey && !$('#viewApp').hidden) S.scrollPos[S.scrollKey] = window.scrollY;   // where the user leaves this screen
   const fromPos = screenPos(S.screen, S.from);   // measured before S.from changes
   if ((name === 'report' || name === 'profile') && S.screen !== name) S.from = S.screen;

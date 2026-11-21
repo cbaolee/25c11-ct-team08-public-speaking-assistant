@@ -6,12 +6,14 @@ All functions are sync; async endpoints call them via run_in_threadpool.
 """
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from postgrest.exceptions import APIError
 from storage3.exceptions import StorageApiError
 from supabase import Client
 
+from src.app.config import max_list_page_size
 from src.app.db.models import (
     SESSION_METRIC_PATHS,
     BaselineRow,
@@ -23,11 +25,13 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptPatch,
     ScriptRow,
     ScriptSummary,
     SessionRow,
     SessionSummary,
     StorageError,
+    build_avatar_path,
     build_object_path,
     decode_cursor,
 )
@@ -35,7 +39,7 @@ from src.app.db.models import (
 UNIQUE_VIOLATION = "23505"
 MAX_BEYOND_ROWS = 1000
 
-SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,created_at"
+SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,duration_min,created_at"
 # PostgREST JSON paths ("alias:result->section->key") read the chart numbers inside result
 SESSION_SUMMARY_COLUMNS = ",".join(
     [
@@ -59,8 +63,8 @@ def _execute(query):
 
 
 def _validate_limit(limit: int) -> None:
-    if not 1 <= limit <= 20:
-        raise ValueError("limit must be between 1 and 20")
+    if not 1 <= limit <= max_list_page_size:
+        raise ValueError(f"limit must be between 1 and {max_list_page_size}")
 
 
 def _newest_page(query, limit: int, cursor: str | None):
@@ -115,6 +119,18 @@ class SupabaseProfileRepo:
         row = _first(resp.data)
         return ProfileRow.model_validate(row) if row else None
 
+    def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None:
+        resp = _execute(self._table().update({"avatar_path": avatar_path}).eq("id", str(user_id)))
+        row = _first(resp.data)
+        return ProfileRow.model_validate(row) if row else None
+
+    def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None:
+        # One SQL statement (db/migrations/0003): keys not in `patch` are kept.
+        params = {"p_user_id": str(user_id), "p_patch": patch}
+        resp = _execute(self._client.rpc("merge_profile_preferences", params))
+        row = _first(resp.data)
+        return ProfileRow.model_validate(row) if row else None
+
     def delete_profile(self, user_id: UUID) -> bool:
         # Child rows go via "on delete cascade"; files are removed by the caller.
         resp = _execute(self._table().delete().eq("id", str(user_id)))
@@ -135,38 +151,38 @@ class SupabaseBaselineRepo:
         row = _first(resp.data)
         return BaselineRow.model_validate(row) if row else None
 
-    def _set_current(self, user_id: UUID, baseline_id: UUID, is_current: bool) -> None:
-        _execute(
-            self._table()
-            .update({"is_current": is_current})
-            .eq("id", str(baseline_id))
-            .eq("user_id", str(user_id))
-        )
-
     def replace_current_baseline(
         self, user_id: UUID, data: NewBaseline
     ) -> tuple[BaselineRow, BaselineRow | None]:
-        # The unique index baselines_one_current allows one current row per user,
-        # so the old row must be switched off before the new row is inserted.
-        previous = self.get_current_baseline(user_id)
-        if previous is not None:
-            self._set_current(user_id, previous.id, False)
-
-        values = {
-            **data.model_dump(mode="json"),
-            "user_id": str(user_id),
-            "is_current": True,
-        }
-        try:
-            resp = _execute(self._table().insert(values))
-        except StorageError:
-            if previous is not None:
-                self._set_current(user_id, previous.id, True)  # best-effort rollback
-            raise
-        row = _first(resp.data)
-        if row is None:
+        values = data.model_dump(mode="json")
+        resp = _execute(
+            self._client.rpc(
+                "replace_current_baseline",
+                {
+                    "p_user_id": str(user_id),
+                    "p_id": str(values["id"]),
+                    "p_hesitation_threshold_s": values["hesitation_threshold_s"],
+                    "p_median_pause_s": values.get("median_pause_s"),
+                    "p_median_f0_hz": values.get("median_f0_hz"),
+                    "p_mean_loudness_db": values.get("mean_loudness_db"),
+                    "p_flags": values["flags"],
+                    "p_audio_path": values.get("audio_path"),
+                },
+            )
+        )
+        payload = resp.data
+        if isinstance(payload, list):
+            payload = payload[0] if payload else None
+        if not isinstance(payload, dict):
             raise StorageError("Baseline insert returned no row")
-        return BaselineRow.model_validate(row), previous
+        new_row = payload.get("new_row")
+        previous_row = payload.get("previous_row")
+        if not isinstance(new_row, dict):
+            raise StorageError("Baseline insert returned no row")
+        return (
+            BaselineRow.model_validate(new_row),
+            BaselineRow.model_validate(previous_row) if isinstance(previous_row, dict) else None,
+        )
 
 
 class SupabaseScriptRepo:
@@ -214,6 +230,16 @@ class SupabaseScriptRepo:
             self._table().select("id", count="exact", head=True).eq("user_id", str(user_id))
         )
         return resp.count or 0
+
+    def update_script(self, user_id: UUID, script_id: UUID, patch: ScriptPatch) -> ScriptRow | None:
+        values = patch.model_dump(exclude_none=True)
+        if not values:
+            return self.get_script(user_id, script_id)
+        resp = _execute(
+            self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
+        )
+        row = _first(resp.data)
+        return ScriptRow.model_validate(row) if row else None
 
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         # sessions.script_id is set to null by "on delete set null".
@@ -283,6 +309,20 @@ class SupabaseSessionRepo:
         )
         return [SessionRow.model_validate(row) for row in resp.data]
 
+    def list_compact_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]:
+        if keep < 0:
+            raise ValueError("keep must be non-negative")
+        resp = _execute(
+            self._table()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .eq("is_compact", True)
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+            .range(keep, keep + MAX_BEYOND_ROWS - 1)
+        )
+        return [SessionRow.model_validate(row) for row in resp.data]
+
     def save_compact_session(
         self,
         user_id: UUID,
@@ -326,6 +366,8 @@ def _validate_object_path(user_id: UUID, path: str) -> None:
                 return
         except ValueError:
             continue
+    if build_avatar_path(user_id) == path:
+        return
     raise StorageError("Object path must be created with build_object_path")
 
 

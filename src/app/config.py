@@ -25,6 +25,11 @@ max_script_words = _script["max_script_words"]
 max_script_chars = _script["max_script_chars"]
 max_upload_bytes = _storage["max_upload_bytes"]
 max_saved_scripts = _storage["max_saved_scripts"]
+script_title_max_chars = _storage["script_title_max_chars"]
+max_list_page_size = _storage["max_list_page_size"]
+avatar_max_bytes = _storage["avatar_max_bytes"]
+avatar_size_px = _storage["avatar_size_px"]
+avatar_max_side_px = _storage["avatar_max_side_px"]
 # Whole request body (file + form fields). Larger bodies get 413 before they are read.
 max_request_bytes = max_upload_bytes + 1024 * 1024
 allowed_formats = ["wav", "mp3", "ogg", "flac", "matroska", "webm", "m4a"]
@@ -36,6 +41,15 @@ MIN_PAUSE_S = _audio["min_pause_s"]
 
 stt_connect_timeout_s = _audio["stt_connect_timeout_s"]
 stt_read_timeout_s = _audio["stt_read_timeout_s"]
+
+
+def validate_list_limits(page_size: int, saved_scripts: int) -> None:
+    """Stop start-up when one list call could not return every saved script."""
+    if page_size < saved_scripts:
+        raise RuntimeError(
+            f"storage.max_list_page_size ({page_size}) must be >= "
+            f"storage.max_saved_scripts ({saved_scripts}) in app_constants.toml"
+        )
 
 
 def _from_toml(section: str, key: str):
@@ -70,9 +84,11 @@ class Settings(BaseSettings):
     audio_bucket: str = "audio"
     series_bucket: str = "series"
     baselines_bucket: str = "baselines"
+    avatars_bucket: str = "avatars"
     retention_full_sessions: int = Field(
         default_factory=_from_toml("storage", "retention_full_sessions")
     )
+    max_compact_sessions: int = Field(default_factory=_from_toml("storage", "max_compact_sessions"))
     signed_url_ttl_s: int = Field(default_factory=_from_toml("storage", "signed_url_ttl_s"))
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
 

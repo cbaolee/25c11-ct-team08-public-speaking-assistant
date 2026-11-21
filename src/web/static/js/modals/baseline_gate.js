@@ -5,8 +5,9 @@ import { stopAudioTest } from '../modals/settings_modal.js';
 import { renderAccount, showView } from '../nav.js';
 import { requireConsent, startRecorder } from '../recorder.js';
 import { setStageAuth } from '../screens/landing.js';
-import { EVAL_ERR, EXT_BY_MIME } from '../screens/practice.js';
+import { EVAL_ERR, EXT_BY_MIME, clearFollowWpm } from '../screens/practice.js';
 import { resetBaselineAudio } from '../screens/profile.js';
+import { clearChatHistory } from '../screens/script_studio.js';
 import { revokeAudio, stopPlayback } from '../screens/report.js';
 import { CONFIG, RENDER, S } from '../state.js';
 import { closeModal, focusHeading, openModal, toast } from '../ui.js';
@@ -89,8 +90,10 @@ export function onGateAgree() {
   });
 }
 export function logout(expired) {
+  if (!expired) clearChatHistory(S.user && S.user.id);   // session expiry keeps the chat for the next login
   if (!expired && S.auth) api('/api/auth/logout', { method: 'POST' }).catch(() => {});   // best effort: revoke on the server
   storeAuth(null);
+  clearFollowWpm(S.user && S.user.id);
   hideTip(); stopPlayback(); resetBaselineAudio();   // no signed URL of this user may survive for the next one
   [S.rec, S.brec, S.grec].forEach(r => { if (r) r.cancel(); });
   stopAudioTest();
@@ -98,6 +101,6 @@ export function logout(expired) {
   S.rec = S.brec = S.grec = null; S.bbusy = null; S.follow = null; S.baselineGate = null; S.afterConsent = null; S.onDeny = null;
   if (S.evaluation) { S.evaluation.timers.forEach(clearTimeout); S.evaluation = null; }
   S.modal.slice().forEach(id => closeModal(id, false));
-  S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.currentSession = null; S.baseline = null; S.consent = false; S.avatar = null; S.savedScripts = null;
+  S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.currentSession = null; S.baseline = null; S.consent = false; S.avatar = null; S.savedScripts = null; S.savedScriptTotal = 0; S.ownSaved = null; S.readerScript = null; S.chatHistory = [];
   renderAccount(); setStageAuth(false); showView('landing'); window.scrollTo(0, 0);
 }

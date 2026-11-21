@@ -5,7 +5,9 @@ import { go, moveNavPill, moveSegPills, renderAccount, showView, slideIn, syncHe
 import { heroLightsOn } from '../screens/home.js';
 import { loadHistory } from '../screens/history.js';
 import { setStageAuth } from '../screens/landing.js';
-import { addBubble, fillTopicSelect, renderChatFile } from '../screens/script_studio.js';
+import { loadSavedScripts } from '../screens/saved_scripts.js';
+import { applyFollowWpm } from '../screens/practice.js';
+import { addBubble, fillTopicSelect, renderChatFile, restoreChat } from '../screens/script_studio.js';
 import { RENDER, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
@@ -77,7 +79,10 @@ export function openAuth(mode) {
 export function resetChat() {
   const feed = $('#chatFeed');
   feed.innerHTML = '';
-  addBubble('ai', '<p></p>').querySelector('p').textContent = T('script.greeting', { name: S.user.name });
+  S.chatHistory = [];
+  // The greeting always opens the chat. It is not stored: it is made again here, so a new display name shows.
+  addBubble('ai', '<p></p>', false).querySelector('p').textContent = T('script.greeting', { name: S.user.name });
+  restoreChat();   // then the latest conversation kept in localStorage, if any
   S.chatFile = null; renderChatFile(); $('#composerInput').value = ''; S.composerFolded = false; clearErr($('#composerError'));
 }
 export function enterApp(fresh) {
@@ -95,40 +100,46 @@ export function applyProfile(p) {
   S.user = { id: p.id, email: p.email, name: userName(p.display_name, p.email) };
   S.profile = { displayName: p.display_name || null, gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent, topics: p.topics || [] };
   S.consent = !!p.consent_recording;
+  S.avatar = p.avatar_url || null;
+  applyFollowWpm(p.preferences);
 }
-/* After log in, and on page load when tokens are stored: profile -> app -> baseline (F1) + history (F2). */
-/* Full-screen loading screen shown between log in and a fully loaded Home. */
+/* Full-screen loading screen: from the Log in click (or page load with stored tokens) until Home is
+   drawn with everything it needs. Only one loading screen: checking the password is part of it. */
 export function showAppLoader(on) {
   const el = $('#appLoader');
   if (on) { el.hidden = false; el.classList.remove('out'); return; }
   if (el.hidden) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.hidden = true; return; }
-  el.classList.add('out');
+  el.classList.add('out');   // .out lets clicks and scrolling through while it fades
   setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 400);
 }
+/* After log in, and on page load when tokens are stored. Everything Home and the first screens show
+   is loaded first, under the loading screen: the profile, history with the latest full scores, the
+   baseline, the saved script list and the web fonts. Only then is the app shown, drawn once, and
+   Home slides in. Nothing on Home changes afterwards. The Baseline Gate (if needed) opens after. */
 export function startSession(fresh) {
+  showAppLoader(true);
+  const fail = msg => {
+    showAppLoader(false);
+    if (fresh) showErr($('#authError'), msg || T('auth.errServer')); else toast(T('auth.errServer'), true);
+  };
   return api('/api/profile').then(readJson).then(({ ok, status, j }) => {
     if (!ok) {
-      if (status === 401) return;                       // sessionEnded() already ran
-      if (status === 404) storeAuth(null);              // account without a profile row: cannot continue
-      if (fresh) showErr($('#authError'), (j && j.message) || T('auth.errServer')); else toast(T('auth.errServer'), true);
+      if (status === 401) { showAppLoader(false); return; }   // sessionEnded() already ran
+      if (status === 404) storeAuth(null);                     // account without a profile row: cannot continue
+      fail(j && j.message);
       return;
     }
     applyProfile(j);
     S.sessions = []; S.baseline = null; S.savedScripts = null;
-    // Loading screen until everything that changes Home's layout is in: history and the latest
-    // scores, the baseline, the web fonts (the serif greeting changes size when it swaps in) and
-    // the header height. Home is drawn once more under the loader, then shown as it will stay.
-    // The Baseline Gate (if needed) opens after the loader.
-    showAppLoader(true);
-    enterApp(fresh);
+    S.screen = null;   // no screen is drawn by the loaders below; enterApp draws Home once, with all the data
     const user = S.user;
     const capped = (p, ms) => Promise.race([Promise.resolve(p).catch(() => {}), new Promise(r => setTimeout(r, ms))]);
     const fonts = document.fonts ? document.fonts.ready : null;
-    Promise.all([capped(loadHistory(), 10000), capped(loadBaseline(false), 10000), capped(fonts, 3000)]).then(([, needGate]) => {
+    return Promise.all([capped(loadHistory(), 10000), capped(loadBaseline(false), 10000), capped(loadSavedScripts(), 10000), capped(fonts, 3000)]).then(([, needGate]) => {
       if (S.user !== user) { showAppLoader(false); return; }
+      enterApp(fresh);
       syncHeader(); moveNavPill(false);
-      if (S.screen === 'home') RENDER.home();
       // two frames: the browser has laid out and painted the final Home before the loader fades.
       // A hidden tab runs no frames, so a timer reveals it anyway.
       let shown = false;
@@ -136,7 +147,6 @@ export function startSession(fresh) {
         if (shown) return;
         shown = true;
         showAppLoader(false);
-        // Home slides in and its lights come on as the loader fades, like coming back from another screen
         const cur = $('.screen.active');
         if (cur) slideIn(cur, 1, 120);
         if (S.screen === 'home') heroLightsOn();
@@ -146,7 +156,7 @@ export function startSession(fresh) {
       requestAnimationFrame(() => requestAnimationFrame(reveal));
       setTimeout(reveal, 200);
     });
-  }).catch(() => { showAppLoader(false); if (fresh) showErr($('#authError'), T('auth.errServer')); else toast(T('auth.errServer'), true); });
+  }).catch(() => fail());
 }
 export function readSignupProfile() {
   const name = $('#signupExtraDisplayName').value.trim();
@@ -218,10 +228,11 @@ export function finishSignup(consent) {
 export function logIn(email, password) {
   const err = $('#authError');
   setAuthBusy(true);
-  withBusy(fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) }), T('busy.signingIn'))
+  showAppLoader(true);   // the same loading screen stays up until Home is ready
+  fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
     .then(readJson).then(({ ok, j }) => {
       if (!ok) {
-        setAuthBusy(false);
+        setAuthBusy(false); showAppLoader(false);
         const code = j && j.error_code;
         showErr(err, AUTH_ERR[code] ? T(AUTH_ERR[code]) : (j && j.message) || T('auth.errServer'));
         $('#authPassword').setAttribute('aria-invalid', 'true'); $('#authPassword').focus();
@@ -230,5 +241,5 @@ export function logIn(email, password) {
       $('#authPassword').value = '';
       storeAuth(j);
       return startSession(true).finally(() => setAuthBusy(false));
-    }).catch(() => { setAuthBusy(false); showErr(err, T('auth.errServer')); });
+    }).catch(() => { setAuthBusy(false); showAppLoader(false); showErr(err, T('auth.errServer')); });
 }

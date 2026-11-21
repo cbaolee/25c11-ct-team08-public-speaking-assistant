@@ -46,7 +46,8 @@ export function levelAnim(lvlEl, stream, onErr) {
    no extra signal-processing constraints). */
 export function startRecorder(o) {
   const MIMES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
-  let stream = null, mr = null, t0 = 0, tickIv = null, stopLvl = null;
+  let stream = null, mr = null, t0 = 0, tickIv = null, stopLvl = null, pausedMs = 0, pausedAt = 0;
+  const elapsed = () => (Date.now() - t0 - pausedMs - (pausedAt ? Date.now() - pausedAt : 0)) / 1000;   // seconds recorded, pauses left out
   const chunks = [];
   const release = () => {
     clearInterval(tickIv);
@@ -59,6 +60,15 @@ export function startRecorder(o) {
       if (r.done) return; r.done = true; r.auto = !!auto;
       if (mr && mr.state !== 'inactive') mr.stop();            // onstop -> release() + onEnd with the Blob
       else { release(); o.onEnd(0, !!auto, { blob: null, mime: '' }); }   // stopped before the mic was ready
+    },
+    paused: false,
+    pause() {                        // keeps the mic open; time and the follow-along stop until resume()
+      if (r.done || r.paused || !mr || mr.state !== 'recording') return;
+      mr.pause(); pausedAt = Date.now(); r.paused = true;
+    },
+    resume() {
+      if (r.done || !r.paused || !mr) return;
+      mr.resume(); pausedMs += Date.now() - pausedAt; pausedAt = 0; r.paused = false;
     },
     cancel() {                       // abort without calling onEnd (log out, leaving the page)
       if (r.done) return; r.done = true; r.cancelled = true;
@@ -87,11 +97,11 @@ export function startRecorder(o) {
         release();
         if (r.cancelled) return;
         const type = mr.mimeType || mime || '';
-        o.onEnd(Math.round((Date.now() - t0) / 100) / 10, !!r.auto, { blob: new Blob(chunks, { type }), mime: type });
+        o.onEnd(Math.round(elapsed() * 10) / 10, !!r.auto, { blob: new Blob(chunks, { type }), mime: type });
       };
       stopLvl = levelAnim(o.lvl, st);
       t0 = Date.now(); mr.start();
-      tickIv = setInterval(() => { const s = (Date.now() - t0) / 1000; o.onTick(s); if (o.max && s >= o.max) r.stop(true); }, 200);
+      tickIv = setInterval(() => { if (r.paused) return; const s = elapsed(); o.onTick(s); if (o.max && s >= o.max) r.stop(true); }, 200);
     } catch (e) { fail({ name: 'unsupported' }); }
   }).catch(fail);
   return r;

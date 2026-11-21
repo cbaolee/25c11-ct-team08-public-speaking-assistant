@@ -1,8 +1,10 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 from urllib.parse import quote
 from uuid import UUID, uuid4
 
+from src.app.config import max_list_page_size
 from src.app.db.models import (
     BaselineRow,
     ConflictError,
@@ -13,11 +15,13 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptPatch,
     ScriptRow,
     ScriptSummary,
     SessionRow,
     SessionSummary,
     StorageError,
+    build_avatar_path,
     build_object_path,
     decode_cursor,
     read_session_metric,
@@ -38,8 +42,8 @@ def _now() -> datetime:
 
 
 def _validate_limit(limit: int) -> None:
-    if not 1 <= limit <= 20:
-        raise ValueError("limit must be between 1 and 20")
+    if not 1 <= limit <= max_list_page_size:
+        raise ValueError(f"limit must be between 1 and {max_list_page_size}")
 
 
 def _newest_first(rows):
@@ -107,6 +111,23 @@ class MemoryProfileRepo:
             },
             deep=True,
         )
+        self._state.profiles[user_id] = row
+        return row.model_copy(deep=True)
+
+    def set_avatar_path(self, user_id: UUID, avatar_path: str | None) -> ProfileRow | None:
+        existing = self._state.profiles.get(user_id)
+        if existing is None:
+            return None
+        row = existing.model_copy(update={"avatar_path": avatar_path}, deep=True)
+        self._state.profiles[user_id] = row
+        return row.model_copy(deep=True)
+
+    def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None:
+        existing = self._state.profiles.get(user_id)
+        if existing is None:
+            return None
+        merged = {**existing.preferences, **patch}
+        row = existing.model_copy(update={"preferences": merged}, deep=True)
         self._state.profiles[user_id] = row
         return row.model_copy(deep=True)
 
@@ -203,6 +224,14 @@ class MemoryScriptRepo:
     def count_scripts(self, user_id: UUID) -> int:
         return sum(1 for row in self._state.scripts.values() if row.user_id == user_id)
 
+    def update_script(self, user_id: UUID, script_id: UUID, patch: ScriptPatch) -> ScriptRow | None:
+        row = self._state.scripts.get(script_id)
+        if row is None or row.user_id != user_id:
+            return None
+        renamed = row.model_copy(update=patch.model_dump(exclude_none=True), deep=True)
+        self._state.scripts[script_id] = renamed
+        return renamed.model_copy(deep=True)
+
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         row = self._state.scripts.get(script_id)
         if row is None or row.user_id != user_id:
@@ -271,6 +300,16 @@ class MemorySessionRepo:
         )
         return [row.model_copy(deep=True) for row in rows[keep:]]
 
+    def list_compact_beyond(self, user_id: UUID, keep: int) -> list[SessionRow]:
+        if keep < 0:
+            raise ValueError("keep must be non-negative")
+        rows = _newest_first(
+            row
+            for row in self._state.sessions.values()
+            if row.user_id == user_id and row.is_compact
+        )
+        return [row.model_copy(deep=True) for row in rows[keep:]]
+
     def save_compact_session(
         self,
         user_id: UUID,
@@ -311,6 +350,8 @@ class MemoryAudioStore:
         prefix = f"{user_id}/"
         if not isinstance(path, str) or not path.startswith(prefix) or "\\" in path:
             raise StorageError("Object path must be scoped to the current user")
+        if build_avatar_path(user_id) == path:
+            return
         for suffix in (".series.json", ".webm"):
             object_id = path[len(prefix) : -len(suffix)] if path.endswith(suffix) else ""
             try:

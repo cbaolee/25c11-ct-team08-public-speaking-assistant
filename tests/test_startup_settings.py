@@ -65,6 +65,18 @@ def test_app_starts_when_keys_are_present(monkeypatch):
         assert client.get("/health").status_code == 200
 
 
+def test_app_does_not_start_when_list_page_is_smaller_than_script_cap(monkeypatch):
+    for field in ("deepgram_api_keys", "gladia_api_keys", "groq_api_keys"):
+        monkeypatch.setattr(main.settings, field, ["set"])
+    monkeypatch.setattr(main.settings, "app_env", "dev")
+    monkeypatch.setattr(main.settings, "supabase_url", "")
+    monkeypatch.setattr(main, "max_list_page_size", 4)
+    monkeypatch.setattr(main, "max_saved_scripts", 5)
+    with pytest.raises(RuntimeError, match="max_list_page_size"):
+        with TestClient(main.app):
+            pass
+
+
 # ---------- T1: SUPABASE_URL must be the project URL ----------
 
 

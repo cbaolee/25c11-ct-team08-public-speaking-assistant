@@ -4,6 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
+from src.app.config import max_list_page_size
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import (
     ConflictError,
@@ -101,7 +102,7 @@ def test_list_sessions_rejects_out_of_range_limit():
     repos = build_memory_repos()
 
     with pytest.raises(ValueError, match="limit"):
-        repos.sessions.list_sessions(uuid4(), limit=21, cursor=None)
+        repos.sessions.list_sessions(uuid4(), limit=max_list_page_size + 1, cursor=None)
 
 
 def test_insufficient_audio_session_cannot_have_score_or_audio_path():
@@ -153,6 +154,19 @@ def test_list_full_beyond_skips_newest_full_sessions():
     )[1:]
 
     assert [row.id for row in candidates] == [row.id for row in expected]
+
+
+def test_list_compact_beyond_skips_newest_compact_sessions():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    rows = [repos.sessions.create_session(user_id, _new_session()) for _ in range(4)]
+    for row in rows[:3]:
+        repos.sessions.save_compact_session(user_id, row.id, {}, [])
+
+    candidates = repos.sessions.list_compact_beyond(user_id, keep=1)
+    compact = sorted(rows[:3], key=lambda row: (row.created_at, str(row.id)), reverse=True)
+
+    assert [row.id for row in candidates] == [row.id for row in compact[1:]]
 
 
 def test_save_compact_session_clears_file_paths_and_is_one_time():
