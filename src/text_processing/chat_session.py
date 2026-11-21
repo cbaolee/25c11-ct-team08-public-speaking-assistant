@@ -124,7 +124,6 @@ class ChatSessionState:
     category: str
     duration_min: int
     initial_prompt: str = ""
-    topic: str = ""
     selected_template_id: str | None = None
     topic: str | None = None
     files_loaded: list[str] = field(default_factory=list)
@@ -458,22 +457,21 @@ def ingest_upload_file(
     if not file_bytes:
         raise DocumentParserError("empty_file", "The uploaded file is empty.")
 
-    if len(file_bytes) > 2 * 1024 * 1024:
-        raise DocumentParserError("file_too_large", "Uploaded file exceeds 2MB limit.")
-
-    if b"\x00" in file_bytes:
-        raise DocumentParserError(
-            "invalid_text_file", "Binary content with null bytes is not allowed."
-        )
-
     suffix = Path(filename).suffix.lower()
     if suffix not in (".pdf", ".md", ".txt"):
         raise DocumentParserError(
             "unsupported_file_type",
             f"Unsupported file format '{suffix}'. Only .pdf, .md, and .txt files are supported.",
         )
-    if suffix in (".md", ".txt") and not file_bytes.strip():
-        raise DocumentParserError("empty_file", "Uploaded text file is empty.")
+    if suffix in (".md", ".txt"):
+        if len(file_bytes) > 2 * 1024 * 1024:
+            raise DocumentParserError("file_too_large", "Uploaded file exceeds 2MB limit.")
+        if b"\x00" in file_bytes:
+            raise DocumentParserError(
+                "invalid_text_file", "Binary content with null bytes is not allowed."
+            )
+        if not file_bytes.strip():
+            raise DocumentParserError("empty_file", "Uploaded text file is empty.")
 
     temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
     try:
