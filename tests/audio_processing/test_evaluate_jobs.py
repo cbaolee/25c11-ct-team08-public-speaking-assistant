@@ -2,8 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from src.app.evaluate_jobs import EvaluateJobStore, RateLimited, load_weights, run_evaluate_job
 from src.audio_processing.contracts import AudioRejected, SttUnavailable
+from src.audio_processing.evaluate_jobs import (
+    EvaluateJobStore,
+    RateLimited,
+    load_weights,
+    run_evaluate_job,
+)
 
 
 def test_job_progress_and_cleanup(tmp_path: Path):

@@ -55,12 +55,12 @@ from src.app.db.session_helpers import (
     split_series,
 )
 from src.app.deps import CurrentUser, get_current_user
-from src.app.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
+from src.audio_processing.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
 from src.audio_processing.pipeline import evaluate_session
 from src.text_processing.contracts import (
     CATEGORY_SLUG_MAP,

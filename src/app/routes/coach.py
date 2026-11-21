@@ -6,12 +6,12 @@ from fastapi import APIRouter, Depends
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 
-from src.app.coach_note import CoachNoteCache, generate_coach_note
 from src.app.config import settings
 from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import StorageError
 from src.app.deps import CurrentUser, get_current_user
+from src.audio_processing.coach_note import CoachNoteCache, generate_coach_note
 
 router = APIRouter()
 cache = CoachNoteCache(CONSTANTS['coach']['cache_ttl_s'])

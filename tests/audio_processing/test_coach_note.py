@@ -5,9 +5,9 @@ from unittest.mock import Mock
 import pytest
 from fastapi.testclient import TestClient
 
-from src.app import coach_note as coach
 from src.app.deps import get_current_user
 from src.app.main import app
+from src.audio_processing import coach_note as coach
 
 
 @pytest.fixture
@@ -436,7 +436,7 @@ def test_insufficient_prompt_requires_checked_and_no_guessing():
 
 
 def test_insufficient_banned_word_logs_reason(insufficient_result, caplog):
-    with caplog.at_level("WARNING", logger="src.app.coach_note"):
+    with caplog.at_level("WARNING", logger="src.audio_processing.coach_note"):
         output = coach.generate_coach_note(
             insufficient_result, None, cerebras=lambda *a, **kw: note("It was scored."))
     assert output["source"] == "rule"
@@ -449,7 +449,7 @@ def test_exception_logs_reason(result, insufficient_result, caplog, insufficient
     def fail(*args, **kwargs):
         raise RuntimeError("private details")
 
-    with caplog.at_level("WARNING", logger="src.app.coach_note"):
+    with caplog.at_level("WARNING", logger="src.audio_processing.coach_note"):
         output = coach.generate_coach_note(
             insufficient_result if insufficient else result, None, cerebras=fail)
     assert output["source"] == "rule"
@@ -460,7 +460,7 @@ def test_exception_logs_reason(result, insufficient_result, caplog, insufficient
 
 @pytest.mark.parametrize("insufficient", [False, True])
 def test_accepted_output_does_not_log_warning(result, insufficient_result, caplog, insufficient):
-    with caplog.at_level("WARNING", logger="src.app.coach_note"):
+    with caplog.at_level("WARNING", logger="src.audio_processing.coach_note"):
         output = coach.generate_coach_note(
             insufficient_result if insufficient else result, None,
             cerebras=lambda *a, **kw: note("Please practise."))

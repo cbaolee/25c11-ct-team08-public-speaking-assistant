@@ -94,9 +94,9 @@ Password Modal, Audio Settings và Permissions cũ đã gộp vào Settings Moda
 
 | Tên gọi               | Mô tả                                                                                   |
 | --------------------- | --------------------------------------------------------------------------------------- |
-| **Coach Note Service** | `POST /api/sessions/{id}/coach-note`, `src/app/coach_note.py` |
+| **Coach Note Service** | `POST /api/sessions/{id}/coach-note`, `src/audio_processing/coach_note.py` |
 | **Retry Endpoint**    | `/api/practice/retry`: nhận diện lại từ hoặc câu, không lưu phiên |
-| **Evaluate Job** | `POST /api/evaluate`, `GET/DELETE /api/evaluate/{job_id}`, `src/app/evaluate_jobs.py` |
+| **Evaluate Job** | `POST /api/evaluate`, `GET/DELETE /api/evaluate/{job_id}`, `src/audio_processing/evaluate_jobs.py` |
 | **Evaluate Pipeline** | Chấm điểm một bài nói: probe → decode → VAD → STT → align → scoring                     |
 | **Baseline Pipeline** | Phân tích giọng mẫu: probe → decode → VAD → pause profile + F0                          |
 | **Script Pipeline**   | Sinh script: parser → sanitizer → generator. Sắp thêm **Template Matcher** và **Guard** |
