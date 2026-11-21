@@ -270,14 +270,18 @@ class MemorySessionRepo:
 
     def list_sessions(self, user_id: UUID, limit: int, cursor: str | None) -> list[SessionSummary]:
         _validate_limit(limit)
-        rows = _newest_first(row for row in self._state.sessions.values() if row.user_id == user_id)
+        rows = _newest_first(
+            row for row in self._state.sessions.values()
+            if row.user_id == user_id and row.status != "insufficient_audio"
+        )
         rows = _after_cursor(rows, cursor)
         return [_session_summary(row) for row in rows[:limit]]
 
     def list_score_history(self, user_id: UUID, limit: int) -> list[ScorePoint]:
         _validate_limit(limit)
         rows = sorted(
-            (row for row in self._state.sessions.values() if row.user_id == user_id),
+            (row for row in self._state.sessions.values()
+             if row.user_id == user_id and row.status != "insufficient_audio"),
             key=lambda row: (row.created_at, str(row.id)),
         )
         rows = rows[-limit:]
@@ -296,7 +300,7 @@ class MemorySessionRepo:
         rows = _newest_first(
             row
             for row in self._state.sessions.values()
-            if row.user_id == user_id and not row.is_compact
+            if row.user_id == user_id and not row.is_compact and row.status != "insufficient_audio"
         )
         return [row.model_copy(deep=True) for row in rows[keep:]]
 

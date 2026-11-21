@@ -294,3 +294,38 @@ test('followMeasureWpm / followBlendWpm: auto speed from two taps', () => {
   assert.equal(followBlendWpm(145, 120, 0.4, lim), 135);
   assert.equal(followBlendWpm(170, 240, 1, lim), 180);
 });
+
+test('sentence practice counts only reference errors and includes the threshold', () => {
+  const client = require('../../src/web/static/js/evaluate_client.js');
+  const words = Array.from({length: 10}, (_, i) => ({si: 0, status: i < 3 ? 'wrong' : 'ok'}));
+  const stat = client.sentenceErrorStats(words)[0];
+  assert.equal(stat.ratio, 0.3);
+  assert.equal(client.needsSentencePractice(stat, 0.3), true);
+  assert.equal(client.needsSentencePractice(stat, 0.31), false);
+  assert.equal(client.needsSentencePractice(client.sentenceErrorStats([{si: 1, status: 'ok'}])[0], 0.3), false);
+  assert.deepEqual(client.sentenceErrorStats([]), []);
+  assert.deepEqual(client.sentenceErrorStats([{si: 2, status: 'ins'}]), []);
+});
+
+
+test('sentence statistics omit empty and insertion-only sentences independently', () => {
+  const client = require('../../src/web/static/js/evaluate_client.js');
+  const stats = client.sentenceErrorStats([{ si: 3, status: 'ins' }, { si: 4, status: 'ok' }, { si: 4, status: 'ins' }]);
+  assert.deepEqual(stats, [{ si: 4, nRef: 1, nErr: 0, ratio: 0 }]);
+  assert.equal(client.needsSentencePractice(undefined, 0.3), false);
+  assert.equal(client.needsSentencePractice({ nRef: 0, ratio: 0 }, 0), false);
+});
+
+
+test('evaluation progress stays monotonic and estimates only within STT', () => {
+  const { displayProgress } = require('../../src/web/static/js/evaluate_client.js');
+  const weights = { upload: 5, decode: 10, vad: 10, stt: 35, align: 10 };
+  const stages = [{ key: 'upload', state: 'done' }, { key: 'decode', state: 'done' }, { key: 'vad', state: 'done' }, { key: 'stt', state: 'running' }, { key: 'align', state: 'pending' }];
+  const later = displayProgress(25, 25, stages, weights, 10000, 20);
+  assert.ok(later > 25 && later < 60);
+  assert.equal(displayProgress(25, 25, stages, weights, 10000), 25); // no tau -> no estimate
+  assert.equal(displayProgress(later, 25, stages, weights, 0), later);
+  stages[3].state = 'done';
+  assert.equal(displayProgress(25, 60, stages, weights, 100), 60);
+  assert.equal(displayProgress(60, 100, stages, weights, 0), 100);
+});

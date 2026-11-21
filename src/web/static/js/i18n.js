@@ -164,6 +164,8 @@ export const TEXT = {
   },
 
   eval: {
+    stages: { upload: 'Upload', decode: 'Decode audio', vad: 'Find speech', stt: 'Transcribe', align: 'Match words', fluency: 'Pace and pauses', pitch: 'Pitch and loudness', semantic: 'Meaning match', save: 'Save' },
+    percentLabel: '{n}% done', stepSkipped: 'Skipped', estimateNote: 'Transcription progress is estimated.',
     title: 'Analysing your recording',
     bgToast: 'This is taking a while. Keep using the app: we will tell you when your report is ready.',
     busyT: 'An evaluation is still running', busyD: 'Practice opens again when your report is ready. Please wait a moment.', busyOk: 'OK',
@@ -218,7 +220,9 @@ export const TEXT = {
     lgNatural: 'Natural (at punctuation)', lgHesitation: 'Hesitation (0.5 s or more)', lgForgot: 'Long (1.2 s or more)',
     pauseNatural: 'natural pause', pauseHes: 'hesitation', pauseForgot: 'long pause, maybe a forgotten word',
     stInsT: 'We could not score this recording',
-    stInsD: 'Speech covers only {p}% of the file, and at least 30% is needed. Nothing was saved to History.',
+    stInsD: "Speech covers only {p}% of the file, and at least 30% is needed.",
+    stInsNotScored: "This attempt isn't scored and won't count toward your progress.",
+    stInsKept: "It is deleted after {n} days.",
     stInsCta: 'Record again',
     unitWpm: 'WPM', unitSt: 'st', unitDb: 'dB', unitS: 's',
     adv_wpm: 'Pace: {v} WPM. Aim for 130 to 160.',
@@ -303,6 +307,19 @@ export const TEXT = {
     gPace: 'Pace', gHes: 'Hesitations / min', gFiller: 'Filler words', gWrong: 'Wrong / skipped', gPitch: 'Pitch range', gWords: '{n} of {total}',
     keyNumbers: 'Key numbers', onTarget: 'On target', workOn: 'Work on it',
     coachWho: 'Assistant', coachTag: 'Preview',
+    aiLabelNoScore: 'AI feedback on this recording',
+    ruleLabelNoScore: 'Tips for your next recording',
+    insLowSummary: 'Most of this recording was silence, so it could not be checked.',
+    insLowFocus1: 'Start speaking soon after you press record.',
+    insLowFocus2: 'Keep the microphone close and make sure it is not muted.',
+    insLowNext: 'Record again and read the text aloud from start to finish.',
+    insEmptySummary: 'No words could be recognised in this recording, so it could not be checked.',
+    insEmptyFocus1: 'Speak clearly in English at a steady volume.',
+    insEmptyFocus2: 'Reduce background noise if you can.',
+    insEmptyNext: 'Record again in a quiet place.',
+    aiLabel: 'AI feedback, based on your scores',
+    ruleLabel: 'Summary based on your scores',
+    nextStep: 'Next step',
     coachPlaceholder: 'Well done for finishing this take! Every run-through makes the next one easier. Read the focus point below, then give it one more try.'
   },
   gate: {
@@ -375,6 +392,7 @@ export const TEXT = {
   },
   chart: { table: 'View as table', time: 'Time', value: 'Value', type: 'Type', minutes: 'Minutes' }
 };
+TEXT.wc = { title: 'Practice', heardAs: 'Heard as: {x}', hearIt: 'Hear it', hearYourself: 'Hear yourself', tryAgain: 'Try again', stop: 'Stop', checking: 'Checking...', recognised: 'Recognised as {x}', close: 'Close, listen again', heard: 'Heard {y}', notHeard: "We couldn't hear that, try again", sampleVoice: 'Sample voice from your browser', practiceOnly: 'Practice only: your score does not change', noVoice: 'No English voice is available', practiceSentence: 'Practice this sentence', stillWrong: 'Still to practise: {x}', errMic: 'Microphone unavailable. Check your permissions and device.', errRate: 'Too many attempts. Please try again later.', errStt: 'Speech recognition is unavailable. Try again later.', errNet: 'Could not check the recording. Try again.', closeLabel: 'Close practice', timer: '{elapsed} / {max}' };
 TEXT.script.page = 'p. {n}';
 TEXT.report.playFrom = 'Play from {t}';
 export const TOPICS = TEXT.topics;

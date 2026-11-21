@@ -1,9 +1,12 @@
+import { coachNoteMode } from './coach_mode.js';
+import { api, readJson } from '../api.js';
 import { chart, hideTip, showTip } from '../charts.js';
 import { ADR, adviceList, fx, hasBase, paceWindows, progressDelta, sh } from '../data.js';
 import { T } from '../i18n.js';
 import { go, moveSegPills } from '../nav.js';
 import { deltaPill } from '../screens/home.js';
-import { RENDER, S } from '../state.js';
+import { CONFIG, RENDER, S } from '../state.js';
+import { openWordCoach, openSentenceCoach, closeWordCoach } from './word_coach.js';
 import { openModal } from '../ui.js';
 import { $, $$, IC, esc, fmtTime, plain } from '../utils.js';
 
@@ -23,9 +26,11 @@ export function wordHtml(w) {
   return h;
 }
 export function buildTranscript(an) {
+  const stats = window.EvaluateClient.sentenceErrorStats(an.words);
   return an.sentences.map((_, si) => {
     const ws = an.words.filter(w => w.si === si), first = ws.find(w => w.start != null), t0 = first ? first.start : 0;
-    return '<div class="tx-row"><button type="button" class="tx-time" data-t0="' + t0.toFixed(2) + '" aria-label="' + esc(T('report.playFrom', { t: fmtTime(t0) })) + '">' + fmtTime(t0) + '</button><div class="tx-text">' + ws.map(wordHtml).join(' ') + '</div></div>';
+    const practice = window.EvaluateClient.needsSentencePractice(stats.find(x => x.si === si), CONFIG.RETRY.minRatio) ? ' <button type="button" class="wc-sent-btn" data-si="' + si + '" aria-label="' + esc(T('wc.practiceSentence')) + '">&#8635; ' + esc(T('wc.practiceSentence')) + '</button>' : '';
+    return '<div class="tx-row"><button type="button" class="tx-time" data-t0="' + t0.toFixed(2) + '" aria-label="' + esc(T('report.playFrom', { t: fmtTime(t0) })) + '">' + fmtTime(t0) + '</button><div class="tx-text">' + ws.map(wordHtml).join(' ') + practice + '</div></div>';
   }).join('');
 }
 
@@ -77,8 +82,49 @@ export const overallLabel = v => (v >= 85 ? 'good' : v >= 70 ? 'fair' : v >= 50 
 export function coachNote(s) {
   return T('overview.coachPlaceholder', { name: S.user ? S.user.name : '' });
 }
+const coachCache = new Map();
+const coachPending = new Map();
+function renderCoachNote(el, note, s) {
+  el.replaceChildren();
+  const label = document.createElement('div'); label.className = 'cn-label'; label.textContent = T(note.source === 'rule' ? (s.sc.status === 'insufficient_audio' ? 'overview.ruleLabelNoScore' : 'overview.ruleLabel') : (s.sc.status === 'insufficient_audio' ? 'overview.aiLabelNoScore' : 'overview.aiLabel')); el.append(label);
+  const summary = document.createElement('div'); summary.textContent = note.summary; el.append(summary);
+  if (note.focus.length) {
+    const list = document.createElement('ul'); list.className = 'cn-list';
+    note.focus.slice(0, CONFIG.COACH.maxFocus).forEach(text => { const li = document.createElement('li'); li.textContent = text; list.append(li); });
+    el.append(list);
+  }
+  const next = document.createElement('div'); next.className = 'cn-next'; next.textContent = T('overview.nextStep') + ': ' + note.next_step; el.append(next);
+  el.removeAttribute('aria-busy');
+}
+function insufficientCoachNote(s) {
+  const key = s.sc.reason === 'low_voiced_ratio' ? 'overview.insLow' : 'overview.insEmpty';
+  return { source: 'rule', summary: T(key + 'Summary'), focus: [T(key + 'Focus1'), T(key + 'Focus2')], next_step: T(key + 'Next') };
+}
+export async function loadCoachNote(s) {
+  const mode = coachNoteMode(s); if (mode === 'none') return;
+  const el = $('#repCoachNote'); if (!el) return;
+  if (mode === 'client-rule') { renderCoachNote(el, insufficientCoachNote(s), s); return; }
+  if (coachCache.has(s.id)) { renderCoachNote(el, coachCache.get(s.id), s); return; }
+  el.replaceChildren(); el.setAttribute('aria-busy', 'true');
+  for (let i = 0; i < 3; i++) { const bar = document.createElement('span'); bar.className = 'skel cn-skel'; el.append(bar); }
+  try {
+    if (!coachPending.has(s.id)) {
+      const pending = (async () => {
+        const { ok, j } = await readJson(await api('/api/sessions/' + encodeURIComponent(s.id) + '/coach-note', { method: 'POST' }));
+        if (!ok || !j || typeof j.summary !== 'string' || !Array.isArray(j.focus) || typeof j.next_step !== 'string') throw new Error('Invalid feedback');
+        coachCache.set(s.id, j);
+        return j;
+      })().finally(() => coachPending.delete(s.id));
+      coachPending.set(s.id, pending);
+    }
+    const j = await coachPending.get(s.id);
+    if (S.currentSession === s && $('#repCoachNote') === el) renderCoachNote(el, j, s);
+  } catch (_) {
+    if (S.currentSession === s && $('#repCoachNote') === el) { if (s.sc.status === 'insufficient_audio') renderCoachNote(el, insufficientCoachNote(s), s); else { el.textContent = coachNote(s); el.removeAttribute('aria-busy'); } }
+  }
+}
 const OV_IC = {
-  good: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+  good: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>',
   warn: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M14 7h7v7"/></svg>',
   focus: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></svg>',
   pace: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 13l4-4M4 18a9 9 0 1 1 16 0"/></svg>',
@@ -97,7 +143,7 @@ export function overviewHtml(s) {
   const verdict = band ? T('overview.verdict_' + band) : T('overview.na');
   // three short cards: what went best, what to improve, what to do next
   const cards = [];
-  if (!lo) { /* no part could be scored */ } else if (lo.v >= 85) cards.push(['good', T('overview.strongest'), esc(T('overview.allGood'))]);
+  if (!lo) { /* no part could be scored */ } else if (lo.v >= CONFIG.PART_GOOD_MIN) cards.push(['good', T('overview.strongest'), esc(T('overview.allGood')), 'solo']);
   else {
     cards.push(['good', T('overview.strongest'), '<b>' + esc(hi.name) + '</b>']);
     cards.push(['warn', T('overview.improve'), '<b>' + esc(lo.name) + '</b>']);
@@ -108,13 +154,13 @@ export function overviewHtml(s) {
     '<h2 class="ov-verdict' + (band ? ' ' + band : '') + '">' + esc(verdict) + '</h2>' +
     '<div class="ov-coach"><span class="ov-coach-av" aria-hidden="true">' + IC.ai + '</span><div class="ov-coach-in">' +
       '<p class="ov-coach-who">' + esc(T('overview.coachWho')) + ' <span class="ov-coach-tag">' + esc(T('overview.coachTag')) + '</span></p>' +
-      '<p class="ov-coach-text" id="repCoachNote">' + esc(coachNote(s)) + '</p></div></div>' +
-    '<ul class="ov-cards">' + cards.map(c => '<li class="ov-card ' + c[0] + '"><span class="ov-ic" aria-hidden="true">' + OV_IC[c[0]] + '</span><div><p class="ov-k">' + esc(c[1]) + '</p><p class="ov-v">' + c[2] + '</p></div></li>').join('') + '</ul>';
+      '<div class="ov-coach-text" id="repCoachNote">' + esc(coachNote(s)) + '</div></div></div>' +
+    '<ul class="ov-cards">' + cards.map(c => '<li class="ov-card ' + c[0] + (c[3] ? ' ' + c[3] : '') + '"><span class="ov-ic" aria-hidden="true">' + OV_IC[c[0]] + '</span><div><p class="ov-k">' + esc(c[1]) + '</p><p class="ov-v">' + c[2] + '</p></div></li>').join('') + '</ul>';
 }
 /* Key numbers (own panel at the top of the right column): one row per measure, with a green
    "on target" or amber "work on it" state from the part score behind it */
 export function keyNumbersHtml(sc) {
-  const state = v => (v == null ? '' : v >= 85 ? 'ok' : 'warn');
+  const state = v => (v == null ? '' : v >= CONFIG.PART_GOOD_MIN ? 'ok' : 'warn');
   const tiles = [
     ['pace', sc.wpm == null ? esc(T('common.na')) : Math.round(sc.wpm) + '<small>' + esc(T('report.unitWpm')) + '</small>', T('overview.gPace'), sc.Fwpm],
     ['pause', esc(fx(sc.H, 1)), T('overview.gHes'), sc.Fpause],
@@ -140,10 +186,12 @@ RENDER.report = function () {
   $('#repHeadActions').hidden = !bad;   // normally the two buttons sit at the top of the pinned right column
   hideTip();
   if (bad) {
-    $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(sc.reason === 'empty_transcript' ? T('eval.insEmpty') : T('report.stInsD', { p: Math.round((sc.voicedRatio || 0) * 100) })) + '</p><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
+    $('#repState').innerHTML = '<div class="panel state"><span class="pill bad">' + IC.alert + esc(T('common.na')) + '</span><h2>' + esc(T('report.stInsT')) + '</h2><p>' + esc(sc.reason === 'empty_transcript' ? T('eval.insEmpty') : T('report.stInsD', { p: Math.floor(Math.round((sc.voicedRatio || 0) * 100 * 1e6) / 1e6) })) + ' ' + esc(T('report.stInsNotScored')) + (s.remote ? ' ' + esc(T('report.stInsKept', { n: CONFIG.RETENTION.insufficientDays })) : '') + '</p><div class="ov-coach"><span class="ov-coach-av" aria-hidden="true">' + IC.ai + '</span><div class="ov-coach-in"><p class="ov-coach-who">' + esc(T('overview.coachWho')) + '</p><div class="ov-coach-text" id="repCoachNote"></div></div></div><button class="btn btn-primary" type="button" data-go="practice">' + esc(T('report.stInsCta')) + '</button></div>';
+    loadCoachNote(s);
     return;
   }
   $('#repOverview').innerHTML = overviewHtml(s);
+  loadCoachNote(s);
   $('#repKeyNumbers').innerHTML = keyNumbersHtml(sc);
   $('#transcriptView').innerHTML = buildTranscript(an);
   S.play = { t: 0, on: false, iv: null };
@@ -197,7 +245,7 @@ if (window.ResizeObserver && $('.rep-aside')) new ResizeObserver(() => { if (S.s
 
 /* ---- detail windows. Assessments and suggestions are deterministic templates over the scores (the LLM never grades). ---- */
 export const PART_KEYS = { A: 'pA', F: 'pF', P: 'pP', S: 'pS' };
-export const bandOf = v => (v >= 85 ? 'good' : v >= 70 ? 'mid' : 'low');
+export const bandOf = v => (v >= CONFIG.PART_GOOD_MIN ? 'good' : v >= 70 ? 'mid' : 'low');
 export const BAND_PILL = { good: 'ok', mid: 'warn', low: 'bad' };
 export const secHtml = (title, inner) => '<section class="dsec"><h3>' + esc(title) + '</h3>' + inner + '</section>';
 export function tipsHtml(list) {
@@ -378,6 +426,7 @@ export function drawVolume(s) {
 export let PA = null;
 export const hasAudio = () => !!(PA && S.currentSession && S.currentSession.audioUrl && PA._url === S.currentSession.audioUrl);
 export function bindPlayerAudio(s) {
+  closeWordCoach(false);
   if (!PA) {
     PA = new Audio(); PA.preload = 'auto';
     PA.addEventListener('loadedmetadata', () => { if (!Number.isFinite(PA.duration)) { PA._fix = true; PA.currentTime = 1e101; } });   // MediaRecorder webm has no duration: force the browser to scan to the end (UNTESTED trick)
@@ -443,7 +492,8 @@ export function startPlayback() {
 }
 export function seekTo(t, play) { followPaused = false; stopPlayback(); S.play.t = Math.max(0, t); if (hasAudio()) PA.currentTime = S.play.t; if (play) startPlayback(); else updatePlayer(); }
 export function onTxClick(e) {
-  const tb = e.target.closest('.tx-time'), wb = e.target.closest('.w[data-i]');
+  const sb = e.target.closest('.wc-sent-btn'), tb = e.target.closest('.tx-time'), wb = e.target.closest('.w[data-i]');
+  if (sb) { openSentenceCoach(+sb.dataset.si, sb); return; }
   if (tb) { seekTo(parseFloat(tb.getAttribute('data-t0')), true); return; }
-  if (wb && S.currentSession) seekWord(+wb.getAttribute('data-i'));
+  if (wb && S.currentSession) { const i = +wb.getAttribute('data-i'); closeWordCoach(false); seekWord(i); openWordCoach(i, wb); }
 }

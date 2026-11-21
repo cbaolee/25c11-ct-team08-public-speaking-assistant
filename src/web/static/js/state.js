@@ -1,6 +1,11 @@
 /* Tunable values. Defaults below; GET /api/config (app_constants.toml [web]) overrides them in main.js. */
 export const CONFIG = {
   auth: { otp_length: 6, resend_cooldown_s: 60 },
+  EVAL_JOB: { pollMs: 700, maxWaitS: 300, weights: { upload: 5, decode: 10, vad: 10, stt: 35, align: 10, fluency: 5, pitch: 10, semantic: 10, save: 5 }, tauS: 20, closeDelayMs: 400, announcePct: 25 }, // fallback mirrors app_constants.toml [evaluate_job]
+  PART_GOOD_MIN: 85,                   // a part score from here counts as good (Overview, key numbers, coach note)
+  RETENTION: { insufficientDays: 7 }, // fallback mirrors app_constants.toml [retention] insufficient_days and SQL pg_cron
+  COACH: { maxFocus: 3 },             // fallback mirrors app_constants.toml [coach] max_focus_items
+  RETRY: { minRatio: 0.30, wordMax: 6, sentenceMax: 30, clipPad: 0.15 }, // fallback mirrors app_constants.toml [retry]
   OWN_MAX_WORDS: 1500,                 // max words in "write my own text"
   BASELINE_MIN_SECONDS: 10,            // shortest baseline accepted (the backend also rejects audio with too little speech)
   BASELINE_SECONDS: 30,                // length of the baseline recording (lower it for quick demos)

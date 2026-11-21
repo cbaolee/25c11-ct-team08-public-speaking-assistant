@@ -120,6 +120,11 @@ evaluate_timeout_ms = 120_000
 # Wait before a running evaluation moves to the background (user goes to Home), in milliseconds
 evaluate_background_after_ms = 5_000
 
+# Part score from which a part counts as "good" in the Overview, Key numbers and the
+# rule-based coach note (UI proposal, not yet agreed by the team; CLAUDE.md 1.7)
+part_good_min = 85
+
+
 [auth]
 # Provisional, not measured.
 otp_length = 6  # must match Supabase "Email OTP Length"
@@ -128,3 +133,53 @@ resend_cooldown_s = 60
 verify_attempts_per_window = 5
 verify_window_s = 600
 require_email_otp = true
+
+[retry]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.
+sentence_min_error_ratio = 0.30
+word_max_seconds = 6
+sentence_max_seconds = 30
+clip_pad_s = 0.15
+attempts_per_window = 20
+window_s = 600
+server_grace_s = 2
+max_target_chars = 500
+
+[coach]
+# Heuristic to block implications of a score for insufficient_audio sessions.
+insufficient_banned_words = ["score", "scores", "scored", "scoring", "grade", "grades", "graded", "rating", "ratings", "rated", "ranked", "points", "marks", "out of", "/100", "excellent"]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.3). Calibrate in M7.
+max_error_words = 15
+timeout_s = 20
+max_output_chars = 900
+cache_ttl_s = 3600
+max_focus_items = 3      # focus points shown and accepted from the LLM (11.3)
+rule_max_warnings = 2    # warnings turned into focus points by the rule-based fallback
+retry_unavailable = 1    # extra LLM provider attempts after 500/503 or a timeout (provider overloaded)
+retry_backoff_s = 2      # wait before that extra attempt
+max_completion_tokens = 1024  # includes reasoning tokens; Cerebras checks quota against it before running
+reasoning_effort = "low"      # supported by both Cerebras models in use
+
+[evaluate_job]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.1). Calibrate in M7.
+job_ttl_s = 900
+max_running_per_user = 1
+poll_interval_ms = 700
+max_wait_s = 300
+stt_estimate_tau_s = 20  # client-side estimate inside the stt stage (not measured progress)
+done_close_delay_ms = 400  # pause at 100% before the report opens (0 with reduced motion)
+announce_step_pct = 25   # screen reader hears the percent every N points or on a stage change
+
+[evaluate_job.stage_weights]
+upload = 5
+decode = 10
+vad = 10
+stt = 35
+align = 10
+fluency = 5
+pitch = 10
+semantic = 10
+save = 5
+
+[retention]
+insufficient_days = 7

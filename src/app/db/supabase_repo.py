@@ -275,7 +275,10 @@ class SupabaseSessionRepo:
         return SessionRow.model_validate(row) if row else None
 
     def list_sessions(self, user_id: UUID, limit: int, cursor: str | None) -> list[SessionSummary]:
-        query = self._table().select(SESSION_SUMMARY_COLUMNS).eq("user_id", str(user_id))
+        query = (
+            self._table().select(SESSION_SUMMARY_COLUMNS).eq("user_id", str(user_id))
+            .neq("status", "insufficient_audio")
+        )
         resp = _execute(_newest_page(query, limit, cursor))
         return [SessionSummary.model_validate(row) for row in resp.data]
 
@@ -285,6 +288,7 @@ class SupabaseSessionRepo:
             self._table()
             .select("id,created_at,overall")
             .eq("user_id", str(user_id))
+            .neq("status", "insufficient_audio")
             .order("created_at", desc=True)
             .order("id", desc=True)
             .limit(limit)
@@ -303,6 +307,7 @@ class SupabaseSessionRepo:
             .select("*")
             .eq("user_id", str(user_id))
             .eq("is_compact", False)
+            .neq("status", "insufficient_audio")
             .order("created_at", desc=True)
             .order("id", desc=True)
             .range(keep, keep + MAX_BEYOND_ROWS - 1)

@@ -16,17 +16,21 @@ from src.audio_processing.pipeline import analyze_baseline
 def _evaluate(monkeypatch, script: str):
     called: dict[str, bool] = {}
 
-    def fake_evaluate(audio_path, script, baseline, *, vad_params):
+    def fake_evaluate(audio_path, script, baseline, *, vad_params, **callbacks):
         called["yes"] = True
         raise AudioRejected("corrupt", "stop here")
 
     monkeypatch.setattr(main.settings, "baseline_required", False)
     monkeypatch.setattr(main, "evaluate_session", fake_evaluate)
-    r = TestClient(main.app).post(
+    client = TestClient(main.app)
+    r = client.post(
         "/api/evaluate",
         files={"audio": ("a.wav", b"RIFF", "audio/wav")},
         data={"script": script},
     )
+    if r.status_code == 202:
+        r = client.get(f"/api/evaluate/{r.json()['job_id']}")
+        assert r.json()["status"] == "failed"
     return r, called
 
 
@@ -47,7 +51,7 @@ def test_script_over_word_limit_is_rejected(monkeypatch):
 
 def test_script_at_word_limit_is_accepted(monkeypatch):
     r, called = _evaluate(monkeypatch, "word " * max_script_words)
-    assert r.status_code == 422  # reaches the (fake) pipeline, which stops with "corrupt"
+    assert r.status_code == 200  # job reached the fake pipeline
     assert r.json()["error_code"] == "corrupt"
     assert called
 

@@ -71,6 +71,11 @@ def test_api_config_returns_web_section():
     assert body["auth"] == {
         key: data["auth"][key] for key in ("otp_length", "resend_cooldown_s")
     }
+    assert body["retention"]["insufficient_days"] == data["retention"]["insufficient_days"] == 7
+    assert body["retry"]["sentence_min_error_ratio"] == 0.30
+    for key in ("stt_estimate_tau_s", "done_close_delay_ms", "announce_step_pct"):
+        assert body["evaluate_job"][key] == data["evaluate_job"][key]
+    assert body["coach"]["max_focus_items"] == data["coach"]["max_focus_items"]
 
 
 def test_ui_reads_every_web_key():

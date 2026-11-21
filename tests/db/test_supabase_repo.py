@@ -9,6 +9,7 @@ They need SUPABASE_URL, SUPABASE_SERVICE_KEY, DEV_USER_ID and DEV2_USER_ID
 
 import os
 from io import BytesIO
+from unittest.mock import MagicMock, call
 from uuid import UUID, uuid4
 
 import httpx
@@ -33,12 +34,51 @@ from src.app.db.models import (
 )
 from src.app.db.supabase_repo import (
     SupabaseBaselineRepo,
+    SupabaseSessionRepo,
     _execute,
     _newest_page,
     _validate_object_path,
 )
 
 # ---------- offline unit tests ----------
+
+
+def test_list_sessions_excludes_insufficient_audio_offline():
+    client = MagicMock()
+    query = client.table.return_value
+    query.select.return_value = query
+    query.eq.return_value = query
+    query.neq.return_value = query
+    query.order.return_value = query
+    query.limit.return_value = query
+    query.execute.return_value.data = []
+
+    assert SupabaseSessionRepo(client).list_sessions(uuid4(), 20, None) == []
+    query.neq.assert_called_once_with("status", "insufficient_audio")
+    calls = query.mock_calls
+    neq_index = calls.index(call.neq("status", "insufficient_audio"))
+    assert neq_index < calls.index(call.order("created_at", desc=True))
+    assert neq_index < calls.index(call.order("id", desc=True))
+    assert neq_index < calls.index(call.limit(20))
+
+
+@pytest.mark.parametrize(
+    "method, terminal", [("list_score_history", "limit"), ("list_full_beyond", "range")]
+)
+def test_session_queries_filter_before_pagination_offline(method, terminal):
+    client = MagicMock()
+    query = client.table.return_value
+    for name in ("select", "eq", "neq", "order", "limit", "range"):
+        getattr(query, name).return_value = query
+    query.execute.return_value.data = []
+
+    assert getattr(SupabaseSessionRepo(client), method)(uuid4(), 10) == []
+    query.neq.assert_called_once_with("status", "insufficient_audio")
+    calls = query.mock_calls
+    neq_index = calls.index(call.neq("status", "insufficient_audio"))
+    assert neq_index < calls.index(call.order("created_at", desc=True))
+    assert neq_index < calls.index(call.order("id", desc=True))
+    assert neq_index < next(i for i, item in enumerate(calls) if item[0] == terminal)
 
 
 def test_get_repos_uses_supabase_when_url_is_set(monkeypatch):

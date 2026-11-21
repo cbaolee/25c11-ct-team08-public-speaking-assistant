@@ -1,4 +1,5 @@
 import tempfile
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -146,6 +147,10 @@ def _insufficient(
     )
 
 
+class EvaluationCancelled(Exception):  # noqa: N818
+    """Evaluation was cancelled between processing steps."""
+
+
 def evaluate_session(
     audio_path: Path,
     script: str,
@@ -153,11 +158,20 @@ def evaluate_session(
     *,
     vad_params: Any,
     encode: Encoder | None = None,
+    on_stage: Callable[[str], None] | None = None,
+    should_cancel: Callable[[], bool] | None = None,
 ) -> EvaluationResultV2:
     """Run the whole scoring flow into an EvaluationResultV2 (ADR-004)."""
+    def start_stage(key: str) -> None:
+        if should_cancel is not None and should_cancel():
+            raise EvaluationCancelled()
+        if on_stage is not None:
+            on_stage(key)
+
     with tempfile.TemporaryDirectory() as temp_dir:
         workdir = Path(temp_dir)
 
+        start_stage("decode")
         probe(
             audio_path,
             max_seconds=max_audio_seconds,
@@ -172,6 +186,7 @@ def evaluate_session(
             timeout_s=decode_timeout_s,
         )
 
+        start_stage("vad")
         # (a) VAD + speech ratio check. Rejected before STT: no request is spent.
         segments = detect_speech(master, params=vad_params)
         voiced_ratio = _voiced_ratio(segments, master.duration_s)
@@ -187,6 +202,7 @@ def evaluate_session(
                 flags=[],
             )
 
+        start_stage("stt")
         # (b) STT. transcribe raises InsufficientAudio on an empty transcript (provider/model
         # are then unknown, so stt = None, OUR CHOICE).
         try:
@@ -211,11 +227,13 @@ def evaluate_session(
                 flags=stt.flags,
             )
 
+        start_stage("align")
         # (c) ONE alignment, shared by A, P_clarity, pauses, fillers and S.
         result = align(script, stt.words)
         acc = accuracy_scores(result)
         ref_tokens = script.split()
 
+        start_stage("fluency")
         # (d) Pauses: personal threshold from the baseline, 0.7 s without one.
         threshold = (
             baseline.hesitation_threshold_s
@@ -234,10 +252,12 @@ def evaluate_session(
         f_wpm, f_pause, f_filler = score_wpm(wpm), score_hesitation(h), score_filler(r_pct)
         fluency = compute_fluency(f_wpm, f_pause, f_filler)
 
+        start_stage("pitch")
         # (f) Pitch + Pronunciation
         pitch = score_pitch(master, baseline)
         pronunciation = combine_pronunciation(acc.clarity, pitch.score)
 
+        start_stage("semantic")
         # (g) Semantic
         sentences = score_sentences(build_sentence_pairs(script, result.items), encode=encode)
         semantic = score_semantic(sentences)

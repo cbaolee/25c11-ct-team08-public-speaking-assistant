@@ -51,7 +51,10 @@ Cột **Trong code** là id hoặc class để tìm nhanh trong `src/web/`.
 | Report        | **Report Header**               | `#repH`, `#repMeta`, `#repAgain`                                                                   | Tiêu đề, tên bài, nút Practise again / View history                                                                                                                      |
 | Report        | **Report State**                | `#repState`                                                                                        | Thông báo khi buổi chấm lỗi hoặc thiếu dữ liệu                                                                                                                           |
 | Report        | **Overview Card**               | `#repOverview`                                                                                     | Thẻ xanh: nhận xét tổng quát và một hàng ô chỉ số                                                                                                                        |
+| Report        | **AI Coach Note**              | `#repCoachNote`, `.cn-`                                                                            | Nhận xét AI dựa trên điểm đã tính (`#repCoachNote`, class `.cn-`); chỉ diễn giải, không chấm điểm |
 | Report        | **Transcript View**             | `#transcriptView`                                                                                  | Từng từ được tô màu: **Wrong Word** (`.w-wrong`), **Near Miss** (`.w-near`), **Missing Word** (`.w-missing`), **Pause Chip** (`.pausechip`), **Filler Chip** (`.fillerchip`) |
+| Report        | **Word Coach**                  | `#wordCoach`, `word_coach.js`, `.wc-`                                                              | Panel nổi cạnh từ lỗi: nghe mẫu, nghe lại, thu lại                                                                                                                       |
+| Report        | **Sentence Coach**              | `.wc-sent-btn`                                                                                     | Nút cuối câu có tỉ lệ lỗi ≥ ngưỡng, mở cùng panel cho cả câu                                                                                                             |
 | Report        | **Hover Note**                  | `#tip`                                                                                             | Ô chú thích hiện khi rê chuột/focus vào từ được tô hoặc điểm trên biểu đồ                                                                                                |
 | Report        | **Player**                      | `#player` (`#playBtn`, `#seek`, `#playTime`)                                                       | Phát lại ghi âm; bấm vào một từ để nhảy tới đúng chỗ                                                                                                                     |
 | Report        | **Report Charts**               | `#chPace`, `#chPause`, `#chRepPitch`, `#chVol`                                                     | Pace over time, Pauses, Pitch vs baseline, Voice loudness                                                                                                                |
@@ -69,7 +72,7 @@ Cột **Trong code** là id hoặc class để tìm nhanh trong `src/web/`.
 | **Settings Modal**     | `#settingsModal`     | Danh sách 5 mục; chọn mục thì trượt sang trong cùng khung: **Permissions**, **Audio**, **Reading Speed** (`#settingsSpeed`: khoảng tốc độ, Auto speed), **Change Password**, **Delete Account** |
 | **Safety Alert**       | `#safetyAlert`       | Báo nội dung bị cấm                                                                                                             |
 | **Confirm Dialog**     | `#confirmDialog`     | Xác nhận xoá hoặc thoát                                                                                                         |
-| **Evaluating Overlay** | `#evaluatingOverlay` | Màn hình chờ chấm điểm                                                                                                          |
+| **Evaluating Overlay** | `#evaluatingOverlay` | Màn hình chờ chấm điểm: phần trăm và 9 bước, class `.ev-*` |
 | **Error Dialog**       | `#errorDialog`       | Báo lỗi                                                                                                                         |
 | **Baseline Gate**      | `#baselineGate`      | Ghi âm 30 giây giọng mẫu (mở sau khi đăng nhập nếu chưa có baseline)                                                            |
 | **Baseline Recorder**  | `#baselineRecorder`  | Ghi lại baseline từ Profile (Record again); không hỏi lại quyền ghi âm, không đóng được khi đang ghi hoặc đang gửi               |
@@ -92,6 +95,9 @@ Password Modal, Audio Settings và Permissions cũ đã gộp vào Settings Moda
 
 | Tên gọi               | Mô tả                                                                                   |
 | --------------------- | --------------------------------------------------------------------------------------- |
+| **Coach Note Service** | `POST /api/sessions/{id}/coach-note`, `src/audio_processing/coach_note.py` |
+| **Retry Endpoint**    | `/api/practice/retry`: nhận diện lại từ hoặc câu, không lưu phiên |
+| **Evaluate Job** | `POST /api/evaluate`, `GET/DELETE /api/evaluate/{job_id}`, `src/audio_processing/evaluate_jobs.py` |
 | **Evaluate Pipeline** | Chấm điểm một bài nói: probe → decode → VAD → STT → align → scoring                     |
 | **Baseline Pipeline** | Phân tích giọng mẫu: probe → decode → VAD → pause profile + F0                          |
 | **Script Pipeline**   | Sinh script: parser → sanitizer → generator. Sắp thêm **Template Matcher** và **Guard** |

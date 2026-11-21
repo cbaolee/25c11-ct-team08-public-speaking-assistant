@@ -107,13 +107,14 @@ Only needed when `SUPABASE_URL` is set.
    | `0002_storage.sql` | once | Private buckets `audio`, `series`, `baselines` and their policies |
    | `0003_profile_avatar_preferences.sql` | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, function `merge_profile_preferences` |
    | `0004_replace_baseline_fn.sql` | any time | Function `replace_current_baseline` (baseline swap in one transaction) |
+   | `0005_purge_insufficient_sessions.sql` | optional, any time | pg_cron job that deletes `insufficient_audio` sessions older than 7 days (must match `app_constants.toml` `[retention] insufficient_days`). Enable the `pg_cron` extension first (Dashboard -> Database -> Extensions). Until it has run, insufficient sessions are not deleted even though the UI says "deleted after 7 days". |
 
    Deploy a backend version only after the migrations it needs have run.
 2. **Create test users** on `psc-dev` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
 3. **Create a `profiles` row for each test user.** Baselines, scripts and sessions reference `profiles(id)`, so saving fails for a user without a profile.
 4. Record a baseline once for your test user: with `BASELINE_REQUIRED=true`, `/api/evaluate` returns `409 baseline_required` until a baseline exists.
 
-> Never edit a merged migration. Add a new file (`0005_...sql`) with the `Run` / `Applied` / `Effect` header. Run it on `psc-dev` first.
+> Never edit a merged migration. Add a new file (`0006_...sql`) with the `Run` / `Applied` / `Effect` header. Run it on `psc-dev` first.
 
 ### Testing
 

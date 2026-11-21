@@ -84,6 +84,17 @@ def _minimal_result() -> EvaluationResultV2:
     )
 
 
+def post_and_wait(client, *args, **kwargs):
+    response = client.post(*args, **kwargs)
+    if response.status_code != 202:
+        return response
+    job = client.get(f"/api/evaluate/{response.json()['job_id']}")
+    assert job.status_code == 200
+    assert job.json()["status"] == "done"
+    import httpx
+    return httpx.Response(200, json=job.json()["result"])
+
+
 def _post(
     monkeypatch,
     raw: str,
@@ -91,7 +102,7 @@ def _post(
     *,
     save_handler=None,
 ):
-    def fake(audio_path, script, baseline, *, vad_params):
+    def fake(audio_path, script, baseline, *, vad_params, on_stage=None, should_cancel=None):
         if captured is not None:
             captured["baseline"] = baseline
         return _minimal_result()
@@ -99,7 +110,8 @@ def _post(
     monkeypatch.setattr(main, "evaluate_session", fake)
     if save_handler is not None:
         monkeypatch.setattr(main, "_save_result_to_history", save_handler)
-    return TestClient(main.app).post(
+    return post_and_wait(
+        TestClient(main.app),
         "/api/evaluate",
         files={"audio": ("a.wav", b"x", "audio/wav")},
         data={"script": "Hello.", "baseline_profile": raw},
@@ -208,11 +220,12 @@ def test_evaluate_save_failure_keeps_result_and_logs_without_script(monkeypatch,
     monkeypatch.setattr(
         main,
         "evaluate_session",
-        lambda audio_path, script, baseline, *, vad_params: _minimal_result(),
+        lambda audio_path, script, baseline, *, vad_params, **callbacks: _minimal_result(),
     )
     monkeypatch.setattr(main, "_save_result_to_history", fail_save)
 
-    response = TestClient(main.app).post(
+    response = post_and_wait(
+        TestClient(main.app),
         "/api/evaluate",
         files={"audio": ("a.wav", b"x", "audio/wav")},
         data={"script": script},
@@ -303,12 +316,13 @@ def _post_with(monkeypatch, data: dict, saved: dict):
         saved.update(kwargs)
         return str(uuid4())
 
-    def fake(audio_path, script, baseline, *, vad_params):
+    def fake(audio_path, script, baseline, *, vad_params, on_stage=None, should_cancel=None):
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
     monkeypatch.setattr(main, "_save_result_to_history", fake_save)
-    return TestClient(main.app).post(
+    return post_and_wait(
+        TestClient(main.app),
         "/api/evaluate",
         files={"audio": ("a.wav", b"x", "audio/wav")},
         data={"script": "Hello.", **data},
