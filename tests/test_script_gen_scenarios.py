@@ -435,6 +435,22 @@ class TestScenario1TopicSuggestions:
         assert len(session.chunks) > 0
         assert "notes.txt" in session.files_loaded
 
+    def test_api_suggest_with_invalid_or_cross_tenant_session_returns_404(
+        self, scenario_setup
+    ) -> None:
+        client: TestClient = scenario_setup["client"]
+        resp = client.post(
+            "/api/script-chat/suggest",
+            data={
+                "category": "wildlife",
+                "duration_min": 5,
+                "session_id": "non-existent-or-cross-tenant-session-id",
+            },
+        )
+        assert resp.status_code == 404
+        body = resp.json()
+        assert body["error_code"] == "session_not_found"
+
 
 # ---------------------------------------------------------------------------
 # Scenario 2: Interactive Gathering Reaching ready_to_generate=True
@@ -503,6 +519,22 @@ class TestScenario2InteractiveGathering:
         session = chat_session_store.get(session_id, user_id=user_id)
         assert session is not None
         assert session.ready_to_generate is True
+
+    def test_api_message_empty_input_returns_422(self, scenario_setup) -> None:
+        client: TestClient = scenario_setup["client"]
+        suggest_res = client.post(
+            "/api/script-chat/suggest",
+            data={"category": "wildlife", "duration_min": 5},
+        )
+        session_id = suggest_res.json()["session_id"]
+
+        resp = client.post(
+            "/api/script-chat/message",
+            data={"session_id": session_id, "message": "   "},
+        )
+        assert resp.status_code == 422
+        body = resp.json()
+        assert body["error_code"] == "empty_input"
 
 
 # ---------------------------------------------------------------------------

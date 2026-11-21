@@ -701,12 +701,19 @@ async def script_chat_suggest_endpoint(
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
     clean_session_id = session_id.strip()
-    session = store.get(clean_session_id, user_id=user_id) if clean_session_id else None
+    session = None
+    if clean_session_id:
+        session = store.get(clean_session_id, user_id=user_id)
+        if session is None:
+            raise ScriptGenerationError(
+                error_code="session_not_found",
+                message="Session not found or access denied.",
+                status_code=404,
+            )
 
     if session is None:
-        sid = clean_session_id or str(uuid4())
         session = ChatSessionState(
-            session_id=sid,
+            session_id=str(uuid4()),
             user_id=user_id,
             category=category,
             duration_min=duration_min,
@@ -872,6 +879,13 @@ async def script_chat_message_endpoint(
         file_text = "\n".join(c.content for c in file_chunks[:20])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
+
+    if not clean_msg and not file_chunks:
+        raise ScriptGenerationError(
+            error_code="empty_input",
+            message="Please provide a message or a document.",
+            status_code=422,
+        )
 
     if clean_msg:
         session.user_notes.append(clean_msg)
