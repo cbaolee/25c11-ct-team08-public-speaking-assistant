@@ -125,6 +125,7 @@ class ChatSessionState:
     duration_min: int
     initial_prompt: str = ""
     selected_template_id: str | None = None
+    topic: str | None = None
     files_loaded: list[str] = field(default_factory=list)
     chunks: list[DocumentChunk] = field(default_factory=list)
     chunk_embeddings: Any | None = None  # NDArray[np.float32] normalized
@@ -384,6 +385,8 @@ def format_checklist_fallback(
         lines.append(f"- Specific details: {', '.join(clean_entities)}")
     if missing_groups:
         lines.append(f"- Key areas: {', '.join(missing_groups)}")
+    if not missing_entities and not missing_groups:
+        lines.append("- Key concepts, supporting arguments, or examples for your speech.")
     return "\n".join(lines)
 
 
