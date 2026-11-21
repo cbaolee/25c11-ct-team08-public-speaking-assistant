@@ -111,7 +111,9 @@ def test_signup_failure_preserves_safe_accounts(client, monkeypatch, mode):
 def test_config_and_no_sensitive_logs(client, caplog, monkeypatch):
     caplog.set_level(logging.DEBUG)
     config = client.get("/api/config").json()
-    assert config["auth"] == {"otp_length": 6, "resend_cooldown_s": 60}
+    assert config["auth"] == {
+        "otp_length": 6, "resend_cooldown_s": 60, "unconfirmed_ttl_min": 60
+    }
     from src.app.constants import CONSTANTS
 
     assert all(config[k] == v for k, v in CONSTANTS["web"].items())

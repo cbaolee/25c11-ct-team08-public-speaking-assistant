@@ -256,7 +256,7 @@ export function logIn(email, password) {
 
 const OTP_ERR = { otp_invalid: 'auth.errOtpInvalid', otp_expired: 'auth.errOtpExpired', rate_limited: 'auth.errRateLimited', invalid_email: 'auth.errEmail' };
 let otp = null, otpMotion = null, otpBusy = false, otpInitialized = false;
-const otpConfig = () => ({ otp_length: CONFIG.auth?.otp_length ?? 6, resend_cooldown_s: CONFIG.auth?.resend_cooldown_s ?? 60 });
+const otpConfig = () => ({ otp_length: CONFIG.auth?.otp_length ?? 6, resend_cooldown_s: CONFIG.auth?.resend_cooldown_s ?? 60, unconfirmed_ttl_min: CONFIG.auth?.unconfirmed_ttl_min ?? 60 });
 
 function morphAuthCard(leavingEls, apply, enteringEls) {
   const a = $('#lAuth');
@@ -305,6 +305,7 @@ function openOtpStep(email, { from, consent, resend, draft }) {
   otp = { email, from, consent, draft: draft || null, sentAt: resend ? null : Date.now(), timer: null };
   const current = otp, n = otpConfig().otp_length, input = $('#otpCode'), step = $('#otpStep'), a = $('#lAuth');
   $('#otpSentTo').textContent = T(from === 'in' ? 'auth.otpSentLogin' : 'auth.otpSent', { n, email });
+  $('#otpExpiry').textContent = T('auth.otpExpiry', { n: otpConfig().unconfirmed_ttl_min });   // purge: ADR-011, SQL 0006
   input.maxLength = n; input.style.setProperty('--otp-len', n); input.value = ''; input.removeAttribute('aria-invalid');
   clearErr($('#otpError')); $('#otpHint').hidden = true; $('#otpHint').textContent = '';
   startOtpCountdown();
