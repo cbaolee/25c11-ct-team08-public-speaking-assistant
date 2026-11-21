@@ -285,9 +285,9 @@ export const TEXT = {
     errRate: 'Too many attempts. Please wait a few minutes and try again.', ok: 'Password changed.'
   },
   audio: {
-    title: 'Audio settings', sub: 'Choose your microphone and volume.', mic: 'Microphone',
+    title: 'Audio settings', sub: 'Choose the microphone used for practice, your baseline and the word and sentence coach.', mic: 'Microphone',
     mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
-    recVol: 'Recording volume', playVol: 'Playback volume', test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
+    test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
   },
   settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', speed: 'Reading speed', password: 'Change password', delete: 'Delete account' },
   del: {
