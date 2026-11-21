@@ -135,25 +135,34 @@ export function savePass() {
   }).catch(() => { $('#passSave').disabled = false; showErr(err, T('auth.errServer')); });
 }
 
-/* ---- Delete account: the button unlocks only when the typed email matches the account ---- */
-const emailMatches = () => $('#delConfirmEmail').value.trim().toLowerCase() === (S.user.email || '').toLowerCase();
+/* ---- Delete account: re-auth with the current password (ADR-011); Agree unlocks once it is typed ---- */
+const DEL_ERR = { wrong_password: 'del.errWrong', rate_limited: 'del.errRate' };   // storage_unavailable, auth_unavailable -> del.failed
 function fillDelete() {
-  $('#delConfirmEmail').value = '';
+  $('#delUser').value = S.user.email || '';   // hidden username field so password managers pick the right account
+  $('#delPassword').value = '';
   $('#delConfirm').disabled = true;
   clearErr($('#delErr'));
 }
+function cancelDelete() { $('#delPassword').value = ''; showList(true); }
 function confirmDelete() {
-  const err = $('#delErr');
-  if (!emailMatches()) { showErr(err, T('del.mismatch')); return; }
+  const err = $('#delErr'), pw = $('#delPassword').value;
+  if (!pw) return;
   $('#delConfirm').disabled = true;
-  deleteAccount().then(r => {
-    if (r.status === 401) return;
-    if (!r.ok) { $('#delConfirm').disabled = false; showErr(err, T('del.failed')); return; }
+  deleteAccount(pw).then(readJson).then(({ ok, status, j }) => {
+    if (status === 401) return;   // session ended: api() already logged out
+    if (!ok) {
+      const code = j && j.error_code;
+      showErr(err, T(DEL_ERR[code] || 'del.failed'));
+      if (code === 'wrong_password') { $('#delPassword').value = ''; $('#delPassword').focus(); }
+      else $('#delConfirm').disabled = !$('#delPassword').value;
+      return;
+    }
+    $('#delPassword').value = '';
     clearChatHistory(S.user && S.user.id);   // logout(true) keeps the chat, a deleted account must not
     dropFollowWpm(S.user && S.user.id);
     logout(true);
     toast(T('del.done'));
-  }).catch(() => { $('#delConfirm').disabled = false; showErr(err, T('del.failed')); });
+  }).catch(() => { $('#delConfirm').disabled = !$('#delPassword').value; showErr(err, T('del.failed')); });
 }
 
 export function setupSettings() {
@@ -167,6 +176,8 @@ export function setupSettings() {
   $('#audioOutput').addEventListener('input', e => { $('#audioOutputValue').textContent = e.target.value; });
   $('#audioTest').onclick = testMic;
   $('#audioSave').onclick = () => { stopAudioTest(); toast(T('audio.ok')); showList(true); };
-  $('#delConfirmEmail').addEventListener('input', () => { $('#delConfirm').disabled = !emailMatches(); clearErr($('#delErr')); });
+  $('#delPassword').addEventListener('input', () => { $('#delConfirm').disabled = !$('#delPassword').value; clearErr($('#delErr')); });
+  $('#delPassword').addEventListener('keydown', e => { if (e.key === 'Enter' && $('#delPassword').value) confirmDelete(); });
+  $('#delCancel').onclick = cancelDelete;
   $('#delConfirm').onclick = confirmDelete;
 }
