@@ -68,3 +68,12 @@ follow_gap_s = 0.5
 # Sessions per History page, and most pages loaded on Home and History
 history_page_size = 20
 history_max_pages = 5
+
+[auth]
+# Provisional, not measured.
+otp_length = 6  # must match Supabase "Email OTP Length"
+otp_ttl_s = 600  # MemoryAuth only; Supabase uses its own expiry
+resend_cooldown_s = 60
+verify_attempts_per_window = 5
+verify_window_s = 600
+require_email_otp = true
