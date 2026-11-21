@@ -42,9 +42,16 @@ max_script_chars = 40_000
 min_pdf_size_bytes = 1024
 max_pdf_size_bytes = 26_214_400
 max_pdf_pages = 10
+# Uploaded Markdown/plain-text (.md, .txt) limits: largest file in bytes (2 MB) and max words.
+# Prevents oversized text documents from stalling local embeddings and Layer 2 moderation.
+max_text_file_bytes = 2_097_152
+max_text_file_words = 15_000
 # Words the LLM writes for each template slot (min and max)
 slot_fill_min_words = 80
 slot_fill_max_words = 150
+# Template topic suggester: max topics shown (4-5) and min cosine score for a strong match
+topic_suggest_top_k = 5
+topic_suggest_min_score = 0.35
 
 [api_keys]
 # How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.

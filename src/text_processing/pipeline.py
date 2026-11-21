@@ -115,10 +115,24 @@ class ScriptGenerationPipeline:
         # Stage 1, 2, 3: Validate, Parse, and Sanitize input document (if provided)
         self._update_job(job_id, "extracting", 15)
         chunks: list[DocumentChunk] = []
+        force_free_topic = False
         if request.session_id:
             sess = self.session_store.get(request.session_id, user_id=request.user_id)
-            if sess and sess.chunks:
-                chunks.extend(sess.chunks)
+            if sess:
+                force_free_topic = sess.selected_template_id is None
+                if sess.chunks:
+                    chunks.extend(sess.chunks)
+                if sess.user_notes:
+                    notes_text = sanitize_text("\n".join(sess.user_notes)).strip()
+                    if notes_text:
+                        chunks.append(
+                            DocumentChunk(
+                                chunk_id=len(chunks) + 1,
+                                heading="User Notes",
+                                page=1,
+                                content=notes_text,
+                            )
+                        )
 
         if request.pdf_path or request.raw_text:
             try:
@@ -164,7 +178,11 @@ class ScriptGenerationPipeline:
         # Stage 5 & 6: Route between Template Branch (6T) and Free-Topic LLM Branch (6L)
         self._update_job(job_id, "generating", 65)
         template_doc = None
-        if request.category and request.category.strip().lower() != "free":
+        if (
+            not force_free_topic
+            and request.category
+            and request.category.strip().lower() != "free"
+        ):
             template_doc = self.template_store.get(request.topic)
             if template_doc is not None:
                 cat_norm = request.category.strip().lower()

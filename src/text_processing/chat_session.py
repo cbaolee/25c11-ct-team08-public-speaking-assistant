@@ -31,7 +31,7 @@ from .contracts import (
     TemplateSlot,
     TopicMetadata,
 )
-from .parser import DocumentParserError, parse_input_to_chunks
+from .parser import DocumentParserError, validate_and_parse_document
 from .template_engine import parse_slots
 
 if TYPE_CHECKING:
@@ -124,6 +124,7 @@ class ChatSessionState:
     category: str
     duration_min: int
     initial_prompt: str = ""
+    topic: str = ""
     selected_template_id: str | None = None
     topic: str | None = None
     files_loaded: list[str] = field(default_factory=list)
@@ -453,7 +454,7 @@ def ingest_upload_file(
     filename: str,
     ocr_runner: Any | None = None,
 ) -> list[DocumentChunk]:
-    """Ingest uploaded document into DocumentChunk items and cleanup temp files."""
+    """Ingest uploaded .pdf, .md, or .txt document into DocumentChunks and clean up temp file."""
     if not file_bytes:
         raise DocumentParserError("empty_file", "The uploaded file is empty.")
 
@@ -466,34 +467,26 @@ def ingest_upload_file(
         )
 
     suffix = Path(filename).suffix.lower()
-
-    if suffix == ".pdf":
-        temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
-        try:
-            temp_file.write(file_bytes)
-            temp_file.flush()
-            temp_file.close()
-            chunks = parse_input_to_chunks(pdf_path=temp_file.name, ocr_runner=ocr_runner)
-            return chunks
-        finally:
-            Path(temp_file.name).unlink(missing_ok=True)
-
-    elif suffix in (".md", ".txt"):
-        try:
-            text = file_bytes.decode("utf-8")
-        except UnicodeDecodeError:
-            text = file_bytes.decode("latin-1", errors="replace")
-
-        if not text.strip():
-            raise DocumentParserError("empty_file", "Uploaded text file is empty.")
-
-        return parse_input_to_chunks(raw_text=text)
-
-    else:
+    if suffix not in (".pdf", ".md", ".txt"):
         raise DocumentParserError(
             "unsupported_file_type",
             f"Unsupported file format '{suffix}'. Only .pdf, .md, and .txt files are supported.",
         )
+    if suffix in (".md", ".txt") and not file_bytes.strip():
+        raise DocumentParserError("empty_file", "Uploaded text file is empty.")
+
+    temp_file = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+    try:
+        temp_file.write(file_bytes)
+        temp_file.flush()
+        temp_file.close()
+        return validate_and_parse_document(
+            file_path=temp_file.name,
+            filename=filename,
+            ocr_runner=ocr_runner,
+        )
+    finally:
+        Path(temp_file.name).unlink(missing_ok=True)
 
 
 __all__ = [
