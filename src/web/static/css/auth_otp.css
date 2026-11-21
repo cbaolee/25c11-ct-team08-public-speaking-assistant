@@ -1,0 +1,24 @@
+.l-auth.signup:has(> .otp-step:not([hidden])) { max-width: 420px; }
+.l-auth .otp-title { font: 600 22px/1.2 var(--sans); color: #fff; margin: 18px 0 4px; }
+.l-auth .otp-sent { margin-bottom: 12px; overflow-wrap: anywhere; }
+.l-auth .otp-hint { margin: 0 0 10px; }
+.l-auth .otp-code.otp-code {
+  --otp-slot: 1.6em;
+  font: 600 28px/1 var(--sans); font-variant-numeric: tabular-nums;
+  letter-spacing: calc(var(--otp-slot) - 1ch);
+  padding-left: calc((var(--otp-slot) - 1ch) / 2); padding-right: 0;
+  text-align: left; box-sizing: content-box; width: calc(var(--otp-len) * var(--otp-slot));
+  max-width: calc(100% - (var(--otp-slot) - 1ch) / 2 - 2px); display: block; margin: 10px 0 0; min-height: 64px;
+  background-color: rgba(255,255,255,.06);
+  background-image: repeating-linear-gradient(to right, rgba(255,255,255,.38) 0 calc(var(--otp-slot) - 12px), transparent 0 var(--otp-slot));
+  background-size: calc(var(--otp-len) * var(--otp-slot)) 2px; background-repeat: no-repeat;
+  background-position: left 7px bottom 12px; background-origin: border-box;
+}
+.l-auth .otp-code.otp-code[aria-invalid="true"] { background-color: rgba(252,165,165,.08); }
+.l-auth .otp-verify { width: 100%; margin-top: 22px; }
+.l-auth .otp-verify[aria-busy="true"] { cursor: progress; }
+.l-auth .otp-actions { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.l-auth .otp-resend, .l-auth .otp-back { color: #C9D0DB; }
+.l-auth .otp-resend:hover, .l-auth .otp-resend:focus-visible, .l-auth .otp-back:hover, .l-auth .otp-back:focus-visible { color: #fff; outline: 3px solid rgba(143,176,255,.35); outline-offset: 2px; }
+.l-auth .otp-resend:disabled { color: #8A94A6; cursor: default; font-variant-numeric: tabular-nums; }
+@media (max-width: 420px) { .l-auth .otp-code.otp-code { --otp-slot: 1.35em; font-size: 24px; } }

@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="/static/css/layout.css">
 <link rel="stylesheet" href="/static/css/components.css">
 <link rel="stylesheet" href="/static/css/screens.css">
+<link rel="stylesheet" href="/static/css/auth_otp.css">
 </head>
 <body>
 <a class="skip" href="#main" data-t="common.skip"></a>
@@ -110,6 +111,21 @@
       <div class="ferr" id="authError" role="alert"></div>
       <button class="btn btn-primary btn-lg" type="submit" id="authSubmit" style="width:100%;margin-top:22px"></button>
     </form>
+    <section class="otp-step" id="otpStep" aria-labelledby="otpTitle" hidden>
+      <h3 class="otp-title" id="otpTitle" data-t="auth.otpTitle"></h3>
+      <p class="note otp-sent" id="otpSentTo"></p>
+      <div class="pill ok otp-hint" id="otpHint" role="status" hidden></div>
+      <form id="otpForm" novalidate>
+        <label for="otpCode" data-t="auth.otpLabel"></label>
+        <input class="otp-code" id="otpCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" autocapitalize="none" spellcheck="false" aria-describedby="otpSentTo otpError">
+        <div class="ferr" id="otpError" role="alert"></div>
+        <button class="btn btn-primary btn-lg otp-verify" type="submit" id="otpVerify" data-t="auth.otpVerify"></button>
+      </form>
+      <div class="otp-actions">
+        <button class="linkbtn otp-resend" type="button" id="otpResend"></button>
+        <button class="linkbtn otp-back" type="button" id="otpBack" data-t="auth.otpBack"></button>
+      </div>
+    </section>
         </div>
       </div>
     </div>
@@ -522,6 +538,7 @@
 </div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>
+<script src="/static/js/otp_utils.js"></script>
 <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

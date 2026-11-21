@@ -6,7 +6,7 @@ import { heroLightsOn } from '../screens/home.js';
 import { loadHistory } from '../screens/history.js';
 import { setStageAuth } from '../screens/landing.js';
 import { addBubble, fillTopicSelect, renderChatFile } from '../screens/script_studio.js';
-import { RENDER, S } from '../state.js';
+import { CONFIG, RENDER, S } from '../state.js';
 import { openModal, toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
 
@@ -67,6 +67,7 @@ export function applyAuthMode(mode) {
   clearErr($('#authError'));
 }
 export function openAuth(mode) {
+  resetOtpStep();
   fillSignupForm();
   setAuthMode(mode);
   if (S.view !== 'landing') showView('landing');
@@ -205,6 +206,11 @@ export function finishSignup(consent) {
         if (code === 'email_taken' || code === 'invalid_email') { $('#authEmail').setAttribute('aria-invalid', 'true'); $('#authEmail').focus(); }
         return;
       }
+      if (j && j.verification_required === true) {
+        $('#authPassword').value = ''; $('#authPassword2').value = '';
+        openOtpStep(d.email, { from: 'up', consent });
+        return;
+      }
       $('#authPassword').value = ''; $('#authPassword').removeAttribute('aria-invalid'); $('#authEmail').removeAttribute('aria-invalid');
       fillSignupForm(true);
       setAuthMode('in');
@@ -223,6 +229,11 @@ export function logIn(email, password) {
       if (!ok) {
         setAuthBusy(false);
         const code = j && j.error_code;
+        if (code === 'email_not_confirmed') {
+          $('#authPassword').value = '';
+          openOtpStep(email, { from: 'in', resend: true });
+          return;
+        }
         showErr(err, AUTH_ERR[code] ? T(AUTH_ERR[code]) : (j && j.message) || T('auth.errServer'));
         $('#authPassword').setAttribute('aria-invalid', 'true'); $('#authPassword').focus();
         return;
@@ -231,4 +242,129 @@ export function logIn(email, password) {
       storeAuth(j);
       return startSession(true).finally(() => setAuthBusy(false));
     }).catch(() => { setAuthBusy(false); showErr(err, T('auth.errServer')); });
+}
+
+
+const OTP_ERR = { otp_invalid: 'auth.errOtpInvalid', otp_expired: 'auth.errOtpExpired', rate_limited: 'auth.errRateLimited', invalid_email: 'auth.errEmail' };
+let otp = null, otpMotion = null, otpBusy = false, otpInitialized = false;
+const otpConfig = () => ({ otp_length: CONFIG.auth?.otp_length ?? 6, resend_cooldown_s: CONFIG.auth?.resend_cooldown_s ?? 60 });
+
+function morphAuthCard(leavingEls, apply, enteringEls) {
+  const a = $('#lAuth');
+  otpMotion = null;
+  [a, ...leavingEls, ...enteringEls].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
+  a.style.overflow = '';
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !a.animate || !$('#lStage').classList.contains('is-auth')) {
+    apply(); return Promise.resolve();
+  }
+  const token = {}; otpMotion = token;
+  const r0 = a.getBoundingClientRect();
+  const fades = leavingEls.map(el => el.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 200, easing: 'ease-in', fill: 'forwards' }));
+  return Promise.all(fades.map(f => f.finished)).then(() => {
+    if (otpMotion !== token) return;
+    apply(); fades.forEach(f => f.cancel());
+    const r1 = a.getBoundingClientRect();
+    a.style.overflow = 'hidden';
+    const grow = a.animate([{ width: r0.width + 'px', height: r0.height + 'px' }, { width: r1.width + 'px', height: r1.height + 'px' }], { duration: 420, easing: 'cubic-bezier(.65, 0, .35, 1)' });
+    enteringEls.forEach(el => el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 340, delay: 160, easing: 'ease-out', fill: 'backwards' }));
+    return grow.finished.then(() => { if (otpMotion === token) { a.style.overflow = ''; otpMotion = null; } });
+  }).catch(() => {});
+}
+function resetOtpStep() {
+  if (otp) clearInterval(otp.timer);
+  otp = null; otpMotion = null; otpBusy = false;
+  const a = $('#lAuth');
+  [a, a.querySelector('.seg'), $('#authForm'), $('#otpStep')].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
+  a.style.overflow = ''; a.querySelector('.seg').hidden = false; $('#authForm').hidden = false; $('#otpStep').hidden = true;
+  $('#otpVerify').disabled = false; $('#otpVerify').removeAttribute('aria-busy');
+}
+function updateOtpCountdown() {
+  if (!otp) return;
+  const left = window.OtpUtils.cooldownLeft(otp.sentAt, Date.now(), otpConfig().resend_cooldown_s), button = $('#otpResend');
+  button.disabled = left > 0;
+  button.textContent = left ? T('auth.otpResendIn', { t: window.OtpUtils.formatCountdown(left) }) : T('auth.otpResend');
+  if (!left && otp.timer) { clearInterval(otp.timer); otp.timer = null; }
+}
+function startOtpCountdown() {
+  if (!otp) return;
+  clearInterval(otp.timer); otp.timer = null; updateOtpCountdown();
+  if (otp && window.OtpUtils.cooldownLeft(otp.sentAt, Date.now(), otpConfig().resend_cooldown_s) > 0) otp.timer = setInterval(updateOtpCountdown, 1000);
+}
+function openOtpStep(email, { from, consent, resend }) {
+  initOtp();
+  if (otp) clearInterval(otp.timer);
+  otp = { email, from, consent, sentAt: resend ? null : Date.now(), timer: null };
+  const current = otp, n = otpConfig().otp_length, input = $('#otpCode'), step = $('#otpStep'), a = $('#lAuth');
+  $('#otpSentTo').textContent = T(from === 'in' ? 'auth.otpSentLogin' : 'auth.otpSent', { n, email });
+  input.maxLength = n; input.style.setProperty('--otp-len', n); input.value = ''; input.removeAttribute('aria-invalid');
+  clearErr($('#otpError')); $('#otpHint').hidden = true; $('#otpHint').textContent = '';
+  startOtpCountdown();
+  morphAuthCard([a.querySelector('.seg'), $('#authForm')], () => { a.querySelector('.seg').hidden = true; $('#authForm').hidden = true; step.hidden = false; }, [step]).then(() => { if (otp === current) input.focus(); });
+  if (resend) resendOtp();
+}
+function closeOtpStep(mode) {
+  const current = otp, a = $('#lAuth');
+  if (current) clearInterval(current.timer);
+  otp = null;
+  return morphAuthCard([$('#otpStep')], () => {
+    $('#otpStep').hidden = true; a.querySelector('.seg').hidden = false; $('#authForm').hidden = false;
+    moveSegPills(false, a);
+    if (S.authMode !== mode) applyAuthMode(mode);
+  }, [a.querySelector('.seg'), $('#authForm')]).then(() => { if (!otp) moveSegPills(false, a); });
+}
+async function resendOtp() {
+  const current = otp, button = $('#otpResend');
+  if (!current || button.disabled || otpBusy) return;
+  $('#otpHint').hidden = true; $('#otpHint').textContent = ''; clearErr($('#otpError'));
+  button.disabled = true; button.textContent = T('auth.otpResending');
+  try {
+    const { ok, status } = await readJson(await fetch('/api/auth/resend-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: current.email }) }));
+    if (otp !== current) return;
+    if (ok) { $('#otpHint').hidden = false; requestAnimationFrame(() => { $('#otpHint').textContent = T('auth.otpResent'); }); current.sentAt = Date.now(); startOtpCountdown(); $('#otpCode').focus(); }
+    else if (status === 429) { showErr($('#otpError'), T('auth.errRateLimited')); current.sentAt = Date.now(); startOtpCountdown(); $('#otpCode').focus(); }
+    else { showErr($('#otpError'), T('auth.errServer')); button.disabled = false; button.textContent = T('auth.otpResend'); }
+  } catch (_) { if (otp === current) { showErr($('#otpError'), T('auth.errServer')); button.disabled = false; button.textContent = T('auth.otpResend'); } }
+}
+async function submitOtp(e) {
+  e.preventDefault();
+  if (!otp || otpBusy) return;
+  const current = otp, input = $('#otpCode'), n = otpConfig().otp_length, error = $('#otpError'), button = $('#otpVerify');
+  if (!window.OtpUtils.isCompleteOtp(input.value, n)) { showErr(error, T('auth.errOtpFormat', { n })); input.setAttribute('aria-invalid', 'true'); input.focus(); return; }
+  otpBusy = true; button.disabled = true; button.setAttribute('aria-busy', 'true'); clearErr(error);
+  try {
+    const { ok, j } = await readJson(await withBusy(fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: current.email, token: input.value }) }), T('busy.verifying')));
+    if (otp !== current) return;
+    if (ok) {
+      if (current.from === 'up') fillSignupForm(true);
+      await closeOtpStep('in');
+      if (otp) return;
+      $('#authEmail').value = current.email; $('#authPassword').value = ''; $('#authPassword2').value = '';
+      $('#loginHint').textContent = T('auth.hintVerified'); $('#loginHint').hidden = false;
+      toast(T(current.consent === false ? 'auth.okVerifiedOff' : 'auth.okVerified')); $('#authPassword').focus();
+    } else {
+      const code = j && j.error_code;
+      showErr(error, OTP_ERR[code] ? T(OTP_ERR[code]) : (j && j.message) || T('auth.errServer'));
+      input.setAttribute('aria-invalid', 'true'); input.focus(); input.select();
+    }
+  } catch (_) { if (otp === current) { showErr(error, T('auth.errServer')); input.setAttribute('aria-invalid', 'true'); input.focus(); input.select(); } }
+  finally { otpBusy = false; button.disabled = false; button.removeAttribute('aria-busy'); }
+}
+function initOtp() {
+  if (otpInitialized) return;
+  otpInitialized = true;
+  const input = $('#otpCode');
+  input.addEventListener('input', () => { input.value = window.OtpUtils.normalizeOtp(input.value, otpConfig().otp_length); input.removeAttribute('aria-invalid'); clearErr($('#otpError')); });
+  input.addEventListener('paste', e => {
+    e.preventDefault();
+    const value = input.value.slice(0, input.selectionStart) + e.clipboardData.getData('text') + input.value.slice(input.selectionEnd);
+    input.value = window.OtpUtils.normalizeOtp(value, otpConfig().otp_length); input.removeAttribute('aria-invalid'); clearErr($('#otpError'));
+  });
+  $('#otpForm').addEventListener('submit', submitOtp);
+  $('#otpResend').addEventListener('click', resendOtp);
+  $('#otpBack').addEventListener('click', () => {
+    if (!otp || otpBusy) return;
+    const mode = otp.from;
+    $('#authPassword').value = ''; $('#authPassword2').value = '';
+    closeOtpStep(mode).then(() => { if (!otp) $('#authEmail').focus(); });
+  });
 }
