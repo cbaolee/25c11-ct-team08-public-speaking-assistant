@@ -1,18 +1,22 @@
--- Purge accounts that never confirmed their email (ADR-011).
+-- 0006_purge_unconfirmed_accounts.sql: delete accounts that never confirmed their email (ADR-011)
+-- Run: optional, any time (after 0001). Needs the pg_cron extension.
+-- Applied: psc-dev not yet | psc-prod not yet
+-- Effect: every 15 minutes (UTC), deletes auth.users rows whose email is still unconfirmed
+--         and whose last code was sent more than 60 minutes ago. `on delete cascade` then
+--         removes their profiles row (created at sign up, ADR-010 D4) and any other rows.
+--         Running again replaces the job with the same schedule; no other data changes.
 -- Source: app_constants.toml [auth] unconfirmed_ttl_min (60). If it changes, update the
--- interval below as well (tests/db/test_purge_sql.py checks they match).
--- Run: on Supabase, enable pg_cron in Dashboard -> Database -> Extensions, then run this
--- file in the SQL Editor. It is NOT run automatically by the app. The schedule uses UTC.
--- Effect: every 15 minutes, delete auth.users rows whose email is still unconfirmed and
--- whose last code was sent more than 60 minutes ago. `on delete cascade` then removes
--- their profiles row (created at sign up, ADR-010 D4) and any other rows.
--- The clock starts at the last code sent: confirmation_sent_at, falling back to created_at.
--- ASSUMPTION, NOT CHECKED on a real Supabase project: GoTrue updates
--- confirmation_sent_at when the code is resent (POST /api/auth/resend-otp), so Resend
--- moves the deadline. If it does not, the deadline counts from the first code.
--- Files first: Supabase does not allow deleting storage.objects with SQL, so an account
--- that has any object in Storage (folder name = user id) is skipped. Unconfirmed accounts
--- cannot log in, so they normally have no files.
+--         interval below and the fallback in src/web/static/js/state.js as well
+--         (tests/db/test_purge_sql.py checks they match).
+-- How: on Supabase, enable pg_cron in Dashboard -> Database -> Extensions, then run this
+--         file in the SQL Editor. The app never runs it.
+-- Deadline: counts from the last code sent: confirmation_sent_at, falling back to created_at.
+--         ASSUMPTION, NOT CHECKED on a real Supabase project: GoTrue updates
+--         confirmation_sent_at when the code is resent (POST /api/auth/resend-otp), so Resend
+--         moves the deadline. If it does not, the deadline counts from the first code.
+-- Files first: Supabase does not allow deleting storage.objects with SQL, so an account that
+--         has any object in Storage (first folder = user id) is skipped. Unconfirmed accounts
+--         cannot log in, so they normally have no files.
 -- The job runs as postgres and bypasses RLS intentionally, to delete accounts of all users.
 -- pg_cron >= 1.4 updates schedules with the same name automatically; the DO block keeps
 -- reruns safe on older versions. Check with: select * from cron.job;

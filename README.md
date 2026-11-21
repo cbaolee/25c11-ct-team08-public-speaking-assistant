@@ -32,6 +32,7 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 | **Saved Scripts**     | Up to 10 named scripts per user, editable, shared by Practice and Script Studio. Practising a script does not save it.                                                                                        |
 | **Follow-along**      | While recording, the current sentence is highlighted at a chosen speed. Tapping a sentence moves the highlight there; with Auto speed on, the taps also set the speed. Range and Auto speed are in Settings. |
 | **Profile**           | Display name, accent, recording consent, profile picture and reading-speed preferences, stored per account.                                                                                       |
+| **Account**           | Email + password with email verification. Changing the password or deleting the account asks for the current password; deleting removes recordings, baseline, scripts and history. Settings > Audio picks the microphone (kept in this browser). |
 
 ## Tech Stack
 
@@ -108,6 +109,7 @@ Only needed when `SUPABASE_URL` is set.
    | `0003_profile_avatar_preferences.sql` | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, function `merge_profile_preferences` |
    | `0004_replace_baseline_fn.sql` | any time | Function `replace_current_baseline` (baseline swap in one transaction) |
    | `0005_purge_insufficient_sessions.sql` | optional, any time | pg_cron job that deletes `insufficient_audio` sessions older than 7 days (must match `app_constants.toml` `[retention] insufficient_days`). Enable the `pg_cron` extension first (Dashboard -> Database -> Extensions). Until it has run, insufficient sessions are not deleted even though the UI says "deleted after 7 days". |
+   | `0006_purge_unconfirmed_accounts.sql` | optional, any time | pg_cron job (every 15 min) that deletes accounts whose email is still unconfirmed 60 minutes after the last code (must match `app_constants.toml` `[auth] unconfirmed_ttl_min`); accounts with files in Storage are skipped. Enable `pg_cron` first. Until it has run, unconfirmed accounts stay even though the "Check your email" step says they are deleted (ADR-011). |
 
    Deploy a backend version only after the migrations it needs have run.
 2. **Create test users** on `psc-dev` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
