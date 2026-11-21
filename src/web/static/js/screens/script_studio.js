@@ -553,7 +553,6 @@ function startGenerate() {
   const sel = S.selectedTemplate || { template_id: null, topic: null }, seed = S.chatSeed || {}, category = $('#composerTopic').value;
   const req = { sid: S.chatSessionId, topic: category, tplId: sel.template_id, tplTitle: sel.topic || '', dur: +$('#composerDuration').value || 5,
     genTopic: sel.template_id || freeTopicText(seed.prompt, seed.fileName, category), txt: seed.prompt || '', file: seed.fileName ? { name: seed.fileName } : null };
-  S.lastReq = req;
   generateScript(req, false);
 }
 export function sendChat() {

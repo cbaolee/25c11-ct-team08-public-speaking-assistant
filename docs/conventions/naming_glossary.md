@@ -29,6 +29,7 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 | **Script List Full**   | Báo danh sách script đã lưu đã đầy (chỉ có nút Close) |
 | **Script Reader**      | Xem nội dung script (bấm vào thẻ script trong chat hoặc trong Saved Scripts). Nút Edit sửa tên và nội dung ngay trong popup, nút Save, Close và nút **⋯** mở **Reader Menu** (Save script / Copy / Download / Practice) |
 | **Evaluating Overlay** | Màn hình chờ chấm điểm, có nút Cancel |
+| **Eval Dock**          | Thẻ nhỏ góc trên bên phải (dưới top bar) khi chấm điểm chạy nền: thanh tiến độ và số %. Bấm vào thì thẻ rộng sang trái, hiện các bước đã/chưa chấm và nút Cancel |
 | **Error Dialog**       | Báo lỗi, có nút Retry |
 | **Baseline Gate**      | Bắt ghi âm giọng mẫu trước khi dùng app (nút Log out hoặc bắt đầu ghi) |
 | **Baseline Recorder**  | Ghi lại giọng mẫu, mở từ Profile (nút Record again) |

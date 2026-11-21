@@ -556,6 +556,17 @@
   <div class="actions" style="justify-content:center"><button class="btn btn-sm" type="button" id="ovCancel" data-t="common.cancel"></button></div>
 </div></div>
 
+<aside class="ev-dock" id="evDock" hidden>
+  <button class="ev-dock-head" type="button" id="evDockHead" aria-expanded="false" aria-controls="evDockBody">
+    <span class="ev-dock-row"><span class="ev-dock-label" data-t="eval.dockLabel"></span><span class="ev-dock-pct" id="evDockPercent">0%</span></span>
+    <span class="ev-track" id="evDockBar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-labelledby="evDockHead"><span class="ev-fill"></span></span>
+  </button>
+  <div class="ev-dock-body" id="evDockBody" hidden>
+    <ol class="ev-steps" id="evDockSteps"></ol>
+    <div class="actions"><button class="btn btn-sm" type="button" id="evDockCancel" data-t="common.cancel"></button></div>
+  </div>
+</aside>
+
 <div class="mbg" id="errorDialog" role="alertdialog" aria-modal="true" aria-labelledby="meTitle" aria-describedby="meMsg"><div class="box" style="border-top:5px solid var(--bad)">
   <h2 id="meTitle" data-t="eval.errTitle"></h2>
   <p id="meMsg" data-t="eval.errMsg"></p>

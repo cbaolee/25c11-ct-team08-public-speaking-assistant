@@ -527,12 +527,52 @@ export function cancelEval() {
   const ev = S.evaluation;
   if (ev) {
     S.evaluation = null;
-    ev.timers.forEach(clearTimeout);
+    stopEvalTimers(ev);
     ev.ctrl.abort();
     if (ev.jobId) api('/api/evaluate/' + encodeURIComponent(ev.jobId), { method: 'DELETE', keepalive: true }).catch(() => {});
   }
   closeModal('evaluatingOverlay');
+  hideEvalDock(true);
 }
+/* Drops a running evaluation without a request (log out): the server job ends on its own. */
+export function dropEval() {
+  if (S.evaluation) { stopEvalTimers(S.evaluation); S.evaluation.ctrl.abort(); S.evaluation = null; }
+  hideEvalDock(true);
+}
+function stopEvalTimers(ev) {
+  ev.timers.forEach(clearTimeout);
+  clearInterval(ev.counter);
+}
+
+/* ---- progress dock: the small top-right card that shows a background evaluation ---- */
+const EVAL_DOCK_SLIDE_MS = 400;   // matches the .ev-dock transform transition
+let dock_hide_timer = 0;          // pending slide-out of the dock
+function showEvalDock() {
+  const dock = $('#evDock');
+  clearTimeout(dock_hide_timer);
+  $('#evDockSteps').innerHTML = $('#evaluatingOverlay .ev-steps').innerHTML;   // same step states as the overlay
+  setDockOpen(false);
+  dock.classList.remove('ev-dock-in', 'ev-dock-out');
+  dock.hidden = false;
+  void dock.offsetWidth;   // start the slide-in from the off-screen position
+  dock.classList.add('ev-dock-in');
+}
+/* now: remove at once (cancel, error, log out); otherwise slide out to the right first, then remove. */
+function hideEvalDock(now) {
+  const dock = $('#evDock');
+  clearTimeout(dock_hide_timer);
+  if (dock.hidden) return;
+  const remove = () => { dock.hidden = true; dock.classList.remove('ev-dock-in', 'ev-dock-out'); setDockOpen(false); };
+  if (now || matchMedia('(prefers-reduced-motion: reduce)').matches) { remove(); return; }
+  dock.classList.add('ev-dock-out');
+  dock_hide_timer = setTimeout(remove, EVAL_DOCK_SLIDE_MS);
+}
+function setDockOpen(open) {
+  $('#evDock').classList.toggle('open', open);
+  $('#evDockHead').setAttribute('aria-expanded', open ? 'true' : 'false');
+  $('#evDockBody').hidden = !open;
+}
+export function toggleEvalDock() { setDockOpen(!$('#evDock').classList.contains('open')); }
 
 /* ---- real evaluation: POST /api/evaluate. S.audio is kept until a scored result is saved, so Retry re-sends the same audio. ---- */
 export const EXT_BY_MIME = { 'audio/webm': '.webm', 'audio/ogg': '.ogg', 'audio/mp4': '.m4a' };
@@ -540,6 +580,9 @@ export const EVAL_ERR = { too_long: 'errTooLong', too_large: 'errTooLarge', stt_
   baseline_required: 'errBaselineRequired', baseline_unavailable: 'errBaselineUnavailable', baseline_not_saved: 'errBaselineNotSaved',
   script_not_found: 'errScriptNotFound', invalid_script_id: 'errScriptNotFound', script_storage_unavailable: 'errScriptStorage', script_empty: 'errScriptEmpty', script_too_long: 'errScriptTooLong' };
 export function showEvalError(msg) { $('#meMsg').textContent = msg; openModal('errorDialog', { focus: '#meRetry' }); }
+/* The percent counts up one step at a time toward the real progress (ev.target) and the bars follow the
+   shown number, so a jump from 3% to 15% plays as 3, 4, 5 ... 15. After EVALUATE_BACKGROUND_AFTER_MS the
+   overlay gives way to the dock and the user is sent Home; Practice and recording wait for the report. */
 export function runEvalReal(txt) {
   const au = S.audio, blob = au.blob || au.file;
   if (!blob) return;
@@ -548,76 +591,118 @@ export function runEvalReal(txt) {
   fd.append('audio', blob, fname); fd.append('script', txt.text);   // the server reads the baseline itself
   if (txt.id) fd.append('script_id', txt.id);
   if (txt.short) fd.append('topic', txt.short);
-  const ctrl = new AbortController(), ev = S.evaluation = { timers: [], ctrl, jobId: null, shown: 0, sttStarted: null };
+  const ctrl = new AbortController(), ev = S.evaluation = { timers: [], counter: 0, ctrl, jobId: null, shown: 0, target: 0, stage: '', sttStarted: null, background: false, result: null };
   const active = () => S.evaluation === ev;
-  const end = () => { ev.timers.forEach(clearTimeout); if (active()) S.evaluation = null; closeModal('evaluatingOverlay', false); };
+  const end = () => { stopEvalTimers(ev); if (active()) S.evaluation = null; closeModal('evaluatingOverlay', false); };
   const fail = j => {
-    end();
+    end(); hideEvalDock(true);
     if (j && j.error_code === 'baseline_required') { S.baseline = null; toast(T('eval.errBaselineRequired'), true); openBaselineGate(); return; }
     showEvalError(j && j.error_code && EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : ((j && j.message) || T('eval.errServer')));
+  };
+  const paintPercent = () => {
+    const label = T('eval.percentLabel', { n: ev.shown });
+    $('#evPercent').textContent = label;
+    $('#evDockPercent').textContent = ev.shown + '%';
+    $$('#evBar, #evDockBar').forEach(bar => { bar.setAttribute('aria-valuenow', ev.shown); $('.ev-fill', bar).style.width = ev.shown + '%'; });
+    const bucket = Math.floor(ev.shown / CONFIG.EVAL_JOB.announcePct);
+    if (bucket !== ev.liveBucket || ev.stage !== ev.liveStage) {
+      $('#evLive').textContent = [ev.stage ? T('eval.stages.' + ev.stage) : '', label].filter(Boolean).join(' - ');
+      ev.liveBucket = bucket; ev.liveStage = ev.stage;
+    }
   };
   const paint = job => {
     const stages = job.stages || [];
     const stt = stages.find(stage => stage.key === 'stt' && stage.state === 'running');
     if (stt && ev.sttStarted === null) ev.sttStarted = Date.now();
     if (!stt) ev.sttStarted = null;
-    ev.shown = EvaluateClient.displayProgress(ev.shown, job.progress || 0, stages, CONFIG.EVAL_JOB.weights, ev.sttStarted === null ? 0 : (Date.now() - ev.sttStarted) / 1000, CONFIG.EVAL_JOB.tauS);
-    $('#evPercent').textContent = T('eval.percentLabel', { n: ev.shown });
-    $('#evBar').setAttribute('aria-valuenow', ev.shown);
-    $('#evBar .ev-fill').style.width = ev.shown + '%';
-    $$('.ev-step', $('#evaluatingOverlay')).forEach(el => {
+    ev.target = EvaluateClient.displayProgress(ev.target, job.progress || 0, stages, CONFIG.EVAL_JOB.weights, ev.sttStarted === null ? 0 : (Date.now() - ev.sttStarted) / 1000, CONFIG.EVAL_JOB.tauS);
+    ev.stage = job.stage || '';
+    $$('.ev-step').forEach(el => {   // the overlay list and the dock list
       const stage = stages.find(item => item.key === el.dataset.key), state = stage ? stage.state : 'pending';
       el.dataset.state = state;
       $('.ev-icon', el).textContent = state === 'done' ? '✓' : state === 'running' ? '●' : '○';
       $('.ev-status', el).textContent = state === 'skipped' ? T('eval.stepSkipped') : '';
     });
-    const bucket = Math.floor(ev.shown / CONFIG.EVAL_JOB.announcePct), stage = job.stage || '';
-    if (bucket !== ev.liveBucket || stage !== ev.liveStage) {
-      $('#evLive').textContent = [stage ? T('eval.stages.' + stage) : '', T('eval.percentLabel', { n: ev.shown })].filter(Boolean).join(' - ');
-      ev.liveBucket = bucket; ev.liveStage = stage;
-    }
     $('#ovStep').textContent = stt ? T('eval.estimateNote') : '';
     $('#ovStep').hidden = !stt;
-    $('#ovText').textContent = ''; 
+  };
+  const complete = () => {
+    const result = ev.result, background = ev.background;
+    end();
+    finishEvalReal(result, txt, background);
+    if (background) dock_hide_timer = setTimeout(() => hideEvalDock(false), CONFIG.EVAL_DOCK_HOLD_MS);   // the dock stays at 100% a moment, then slides out
+  };
+  const tick = () => {
+    if (!active()) return;
+    if (ev.shown < ev.target) { ev.shown++; paintPercent(); return; }
+    if (!ev.result || ev.shown < 100) return;
+    clearInterval(ev.counter);
+    if (ev.background) { complete(); return; }
+    ev.timers.push(setTimeout(() => { if (active()) complete(); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : CONFIG.EVAL_JOB.closeDelayMs));
+  };
+  const goBackground = () => {
+    if (!active() || ev.result) return;   // already finished: the report opens as usual
+    ev.background = true;
+    closeModal('evaluatingOverlay', false);
+    showEvalDock(); paintPercent();
+    safeRun(() => go('home'));   // a Home render error must not hide the notice below
+    openConfirmDialog(T('eval.bgT'), T('eval.bgD'), T('eval.busyOk'), null, { noCancel: true, primary: true });
   };
   const timeout = () => {
     if (!active()) return;
     if (ev.jobId) api('/api/evaluate/' + encodeURIComponent(ev.jobId), { method: 'DELETE' }).catch(() => {});
-    ctrl.abort(); end(); showEvalError(T('eval.errTimeout'));
+    ctrl.abort(); fail({ message: T('eval.errTimeout') });
   };
   ev.timers.push(setTimeout(timeout, CONFIG.EVAL_JOB.maxWaitS * 1000));
-  paint({ progress: 0, stages: [] });
+  ev.timers.push(setTimeout(goBackground, CONFIG.EVALUATE_BACKGROUND_AFTER_MS));
+  ev.counter = setInterval(tick, CONFIG.EVAL_COUNT_STEP_MS);
+  paint({ progress: 0, stages: [] }); paintPercent();
   openModal('evaluatingOverlay', { lock: true, focus: '#ovCancel' });
   const poll = () => {
     api('/api/evaluate/' + encodeURIComponent(ev.jobId), { signal: ctrl.signal }).then(res => res.json().catch(() => null).then(job => {
       if (!active()) return;
-      if (res.status === 401) { end(); return; }
-      if (res.status === 404) { end(); showEvalError(T('eval.errServer')); return; }
+      if (res.status === 401) { end(); hideEvalDock(true); return; }
+      if (res.status === 404) { fail(null); return; }
       if (!res.ok || !job) { fail(job); return; }
       paint(job);
-      if (job.status === 'done') {
-        ev.timers.push(setTimeout(() => { if (active()) { end(); finishEvalReal(job.result, txt); } }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : CONFIG.EVAL_JOB.closeDelayMs));
-      } else if (job.status === 'failed') fail(job);
-      else if (job.status === 'cancelled') end();
+      if (job.status === 'done') { ev.result = job.result; ev.target = 100; }   // tick() finishes once the count reaches 100
+      else if (job.status === 'failed') fail(job);
+      else if (job.status === 'cancelled') { end(); hideEvalDock(true); }
       else ev.timers.push(setTimeout(poll, CONFIG.EVAL_JOB.pollMs));
-    })).catch(() => { if (active()) { end(); showEvalError(T('eval.errNet')); } });
+    })).catch(() => { if (active()) fail({ message: T('eval.errNet') }); });
   };
   api('/api/evaluate', { method: 'POST', body: fd, signal: ctrl.signal }).then(res => res.json().catch(() => null).then(job => {
     if (!active()) return;
     if (res.status === 202 && job && job.job_id) { ev.jobId = job.job_id; poll(); return; }
-    if (res.status === 401) { end(); return; }
+    if (res.status === 401) { end(); hideEvalDock(true); return; }
     fail(job);
-  })).catch(() => { if (active()) { end(); showEvalError(T('eval.errNet')); } });
+  })).catch(() => { if (active()) fail({ message: T('eval.errNet') }); });
 }
-export function finishEvalReal(j, txt) {
+/* background: the user is elsewhere, so the report is offered in a pop-up instead of opened. */
+export function finishEvalReal(j, txt, background) {
   const m = EvaluateClient.mapResult(j, txt.text), base = { ts: Date.now(), title: txt.short, topicKey: txt.topic, an: m.an, sc: m.sc, dur: m.an.dur, accent: S.profile ? S.profile.accent : null, demo: false, raw: j };
-  if (m.sc.status !== 'ok') { S.audio = null; S.currentSession = Object.assign(j.saved && j.session_id ? { id: j.session_id, remote: true } : { id: 'local-' + S.nextId++ }, base); go('report'); return; }   // insufficient_audio: shown, not in History
-  const ses = Object.assign({ id: j.saved && j.session_id ? j.session_id : 'local-' + S.nextId++, audioUrl: URL.createObjectURL(S.audio.blob || S.audio.file), fresh: true, remote: !!j.saved }, base);
-  S.audio = null; S.currentSession = ses;
-  if (j.saved) S.sessions.push(ses);   // D-06: only saved sessions are in History (they come back after F5)
-  go('report');
-  toast(T(j.saved ? 'eval.saved' : 'eval.notSaved'), !j.saved);
+  let ses;
+  if (m.sc.status !== 'ok') ses = Object.assign(j.saved && j.session_id ? { id: j.session_id, remote: true } : { id: 'local-' + S.nextId++ }, base);   // insufficient_audio: shown, not in History
+  else {
+    ses = Object.assign({ id: j.saved && j.session_id ? j.session_id : 'local-' + S.nextId++, audioUrl: URL.createObjectURL(S.audio.blob || S.audio.file), fresh: true, remote: !!j.saved }, base);
+    if (j.saved) S.sessions.push(ses);   // D-06: only saved sessions are in History (they come back after F5)
+  }
+  S.audio = null;
+  const open = () => { S.currentSession = ses; go('report'); };
+  const note = () => { if (m.sc.status === 'ok') toast(T(j.saved ? 'eval.saved' : 'eval.notSaved'), !j.saved); };
+  if (!background) { open(); note(); return; }
+  S.choosing = true;   // Practice opens on step 1 next time
+  openConfirmDialog(T('eval.readyT'), T('eval.readyD', { title: txt.short || '' }), T('eval.readyView'), open, { cancelLabel: T('common.close'), primary: true });
+  note();
+  if (S.screen === 'home') safeRun(RENDER.home);   // the new session shows in History at once
 }
-/* Practice is never locked: an evaluation keeps its progress overlay open until it ends (VE-11). The background
-   mode of feat/55 was dropped when merging (decision 21/11); nav.js and script_reader.js still call this. */
-export function practiceLocked() { return false; }
+/* Runs a screen render and logs its error, so the pop-up that follows or precedes it still works. */
+function safeRun(fn) {
+  try { fn(); } catch (e) { console.error(e); }
+}
+/* Practice and every recorder wait while an evaluation runs in the background: say why instead of opening them. */
+export function practiceLocked() {
+  if (!S.evaluation || !S.evaluation.background) return false;
+  openConfirmDialog(T('eval.busyT'), T('eval.busyD'), T('eval.busyOk'), null, { noCancel: true, primary: true });
+  return true;
+}

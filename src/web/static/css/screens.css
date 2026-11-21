@@ -827,7 +827,7 @@ textarea.body-input { display: block; width: 100%; resize: vertical; font: 400 c
 /* Evaluate job progress */
 .ev-percent { font: 600 42px/1.2 var(--serif); font-variant-numeric: tabular-nums; margin: 16px 0 10px; }
 .ev-track { height: 6px; border-radius: var(--r-pill); background: var(--line); overflow: hidden; }
-.ev-fill { width: 0; height: 100%; background: var(--accent); transition: width 300ms cubic-bezier(.2,.7,.3,1); }
+.ev-fill { display: block; width: 0; height: 100%; background: var(--accent); transition: width 60ms linear; }   /* follows the shown percent, one step per tick */
 .ev-steps { list-style: none; padding: 0; margin: 20px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; text-align: left; }
 .ev-step { display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .ev-icon { width: 1em; text-align: center; flex: none; }
@@ -839,4 +839,22 @@ textarea.body-input { display: block; width: 100%; resize: vertical; font: 400 c
 .ev-status { font-size: .8em; }
 .ev-sr { position: absolute; width: 1px; height: 1px; clip: rect(0, 0, 0, 0); overflow: hidden; }
 @media (max-width: 640px) { .ev-steps { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: reduce) { .ev-fill { transition: none; } }
+/* Progress dock: a background evaluation, top right under the header. It is anchored on the right, so
+   opening it grows the card to the left; it slides in and out from the right edge. */
+.ev-dock { position: fixed; top: calc(var(--hh) + 12px); right: 16px; z-index: 60; width: 220px; max-width: calc(100vw - 32px);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); overflow: hidden;
+  transform: translateX(calc(100% + 24px)); transition: transform 400ms cubic-bezier(.2,.7,.3,1), width 300ms cubic-bezier(.2,.7,.3,1); }
+.ev-dock[hidden] { display: none; }
+.ev-dock.ev-dock-in { transform: translateX(0); }
+.ev-dock.ev-dock-in.ev-dock-out { transform: translateX(calc(100% + 24px)); }
+.ev-dock.open { width: 400px; }
+.ev-dock-head { display: block; width: 100%; padding: 12px 14px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.ev-dock-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-panel); }
+.ev-dock-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ev-dock-label { font-weight: 600; font-size: 14px; }
+.ev-dock .ev-track { display: block; }
+.ev-dock-pct { font: 600 18px/1 var(--serif); font-variant-numeric: tabular-nums; }
+.ev-dock-body { padding: 0 14px 12px; }
+.ev-dock-body .ev-steps { margin: 4px 0 10px; font-size: 14px; }
+.ev-dock-body .actions { justify-content: flex-end; margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .ev-fill, .ev-dock { transition: none; } }

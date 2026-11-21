@@ -29,8 +29,9 @@ export const CONFIG = {
   COMPOSER_MAX_WORDS: 3000,            // most words in one Script Studio message
   COMPOSER_MAX_LINES: 5.5,             // the Script Studio text box grows up to this many lines
   SCRIPT_POLL_INTERVAL_MS: 650,        // wait between two status checks of a script being generated
-  EVALUATE_TIMEOUT_MS: 120000,         // longest wait for one evaluation
   EVALUATE_BACKGROUND_AFTER_MS: 5000,  // after this the evaluation goes on in the background and the user is sent Home
+  EVAL_COUNT_STEP_MS: 30,              // the shown percent moves one step per tick toward the real progress
+  EVAL_DOCK_HOLD_MS: 3000,             // the progress dock stays at 100% this long, then slides out
   MAX_SAVED_SCRIPTS: 10,               // saved scripts per user (app_constants.toml [storage])
   SCRIPT_TITLE_MAX_CHARS: 70,          // longest saved script name ([storage])
   MAX_PDF_SIZE_BYTES: 26214400,        // largest PDF for Script Studio ([script], 25 MB)
@@ -45,7 +46,7 @@ export const S = {
   scrollPos: {}, scrollKey: null,   // where each screen was last scrolled to (nav.js go)
   user: null, profile: null, consent: false, baseline: null, avatar: null,
   texts: { mine: null, sample: null, own: null }, pickerTab: 'mine', sampleN: 0,
-  chatFile: null, lastReq: null, chatBusy: false,
+  chatFile: null, chatBusy: false,
   chatHistory: [],
   savedScripts: null, savedScriptTotal: 0, ownSaved: null, nameDialog: null,
   audio: null, rec: null, brec: null, voiceTab: 'rec',

@@ -3,7 +3,7 @@ import { T } from '../i18n.js';
 import { requireConsent, startRecorder } from '../recorder.js';
 import { CONFIG, S } from '../state.js';
 import { fmtTime } from '../utils.js';
-import { EXT_BY_MIME } from './practice.js';
+import { EXT_BY_MIME, practiceLocked } from './practice.js';
 import { PA, hasAudio, stopPlayback } from './report.js';
 
 const ACCENT_LANG = { 'American English': 'en-US', 'British English': 'en-GB' };
@@ -61,6 +61,7 @@ function open(words, kind, target, clicked, word) {
   const idle = () => { retry.disabled = false; retry.className = 'btn btn-sm btn-primary'; retry.textContent = T('wc.tryAgain'); timer.textContent = ''; };
   retry.onclick = () => {
     if (recorder) { recorder.stop(false); return; }
+    if (practiceLocked()) return;   // no new recording while an evaluation runs in the background
     requireConsent(() => {
       if (token !== generation || session !== S.currentSession || p.hidden) return;
       stopPlayback(); stopClip(); if (synth) synth.cancel(); lock(true); setResult('');

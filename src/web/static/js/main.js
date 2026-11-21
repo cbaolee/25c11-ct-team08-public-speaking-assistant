@@ -31,7 +31,7 @@ import { openSettings, setupSettings } from './modals/settings_modal.js';
 import { go, moveNavPill, moveSegPills, paintAvatar, renderAccount, showView, syncHeader, syncScrollThumb } from './nav.js';
 import { deleteSession, openReport } from './screens/history.js';
 import { kickFollow, setStageAuth, syncHero, syncStage } from './screens/landing.js';
-import { cancelEval, togglePause, onSheetClick, cancelMineEdit, goStep, loadFollowWpm, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, renderPractice, runEval, saveMineEdit, saveOwn, setupMineTitle, toggleMineList, selectPickerTab, toggleRecording, updateOwnCount, useScript } from './screens/practice.js';
+import { cancelEval, togglePause, onSheetClick, cancelMineEdit, goStep, loadFollowWpm, onAudioFile, onFollowWpm, paintFollowWpm, pickSample, renderPractice, runEval, saveMineEdit, saveOwn, setupMineTitle, toggleMineList, selectPickerTab, toggleEvalDock, toggleRecording, updateOwnCount, useScript } from './screens/practice.js';
 import { closeStudioSavedMenu, confirmScriptName, onSavedListClick, paintNameCount, toggleStudioSavedMenu } from './screens/saved_scripts.js';
 import { closeMenu, onMenuClick, onReaderClosed, saveEdit, setupReaderTitle, toggleEdit, toggleMenu } from './screens/script_reader.js';
 import { listenBaseline, onBaselineAudioError, openBaselineRecorder, toggleBaseline } from './screens/profile.js';
@@ -79,7 +79,6 @@ export function loadConfig() {
     CONFIG.COMPOSER_MAX_WORDS = c.composer_max_words ?? CONFIG.COMPOSER_MAX_WORDS;
     CONFIG.COMPOSER_MAX_LINES = c.composer_max_lines ?? CONFIG.COMPOSER_MAX_LINES;
     CONFIG.SCRIPT_POLL_INTERVAL_MS = c.script_poll_interval_ms ?? CONFIG.SCRIPT_POLL_INTERVAL_MS;
-    CONFIG.EVALUATE_TIMEOUT_MS = c.evaluate_timeout_ms ?? CONFIG.EVALUATE_TIMEOUT_MS;
     CONFIG.EVALUATE_BACKGROUND_AFTER_MS = c.evaluate_background_after_ms ?? CONFIG.EVALUATE_BACKGROUND_AFTER_MS;
     CONFIG.MAX_SAVED_SCRIPTS = c.max_saved_scripts ?? CONFIG.MAX_SAVED_SCRIPTS;
     CONFIG.SCRIPT_TITLE_MAX_CHARS = c.script_title_max_chars ?? CONFIG.SCRIPT_TITLE_MAX_CHARS;
@@ -218,8 +217,10 @@ export function init() {
   $('#fileIn').onchange = onAudioFile;
   $('#evalBtn').onclick = runEval;
   $('#ovCancel').onclick = cancelEval;
+  $('#evDockHead').onclick = toggleEvalDock;
+  $('#evDockCancel').onclick = cancelEval;
   window.addEventListener('pagehide', () => { if (S.evaluation) cancelEval(); });
-  new MutationObserver(() => { if (S.evaluation && S.screen !== 'practice') cancelEval(); }).observe($('#screenPractice'), { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(() => { if (S.evaluation && !S.evaluation.background && S.screen !== 'practice') cancelEval(); }).observe($('#screenPractice'), { attributes: true, attributeFilter: ['class'] });
   $('#meRetry').onclick = () => { closeModal('errorDialog', false); runEval(); };
 
   // report

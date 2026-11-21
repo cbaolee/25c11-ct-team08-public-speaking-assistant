@@ -2,6 +2,7 @@ import { api, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
 import { postBaseline } from '../modals/baseline_gate.js';
 import { paintAvatar } from '../nav.js';
+import { practiceLocked } from '../screens/practice.js';
 import { startRecorder } from '../recorder.js';
 import { CONFIG, RENDER, S } from '../state.js';
 import { closeModal, openModal, toast, withBusy } from '../ui.js';
@@ -77,7 +78,7 @@ export function openBaselineRecorder() {
 }
 export function toggleBaseline() {
   if (S.brec) { S.brec.stop(false); return; }
-  if (S.bbusy) return;
+  if (S.bbusy || practiceLocked()) return;   // no new recording while an evaluation runs in the background
   {
     resetBaselineAudio();   // stop playback and drop any pending URL before the mic opens
     S.brec = startRecorder({
