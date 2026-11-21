@@ -85,6 +85,107 @@ def parse_slots(
     return slots
 
 
+_INLINE_FACT_TOKENS = frozenset(
+    {
+        "year",
+        "years",
+        "date",
+        "name",
+        "count",
+        "pct",
+        "percentage",
+        "degrees",
+        "meters",
+        "hours",
+        "location",
+        "country",
+        "island",
+        "species",
+        "time_of_day",
+        "amount",
+        "statistic",
+        "days",
+        "marsupial",
+        "bird",
+        "mammal",
+        "title",
+        "speaker",
+        "city",
+        "region",
+        "number",
+        "cost",
+        "price",
+        "budget",
+        "score",
+        "author",
+        "director",
+        "movie",
+        "company",
+        "example_a",
+        "example_b",
+        "example_c",
+    }
+)
+
+
+def _is_inline_fact_slot_name(slot_name: str) -> bool:
+    """Return True if a slot name denotes a short inline fact/entity, not a full paragraph."""
+    low = slot_name.lower()
+    if low.startswith("entity_"):
+        return True
+    parts = low.removeprefix("argument_")
+    return any(
+        parts == tok or parts.endswith(f"_{tok}") or f"_{tok}_" in parts
+        for tok in _INLINE_FACT_TOKENS
+    )
+
+
+def _is_inline_fact_slot(slot: TemplateSlot, occurrence_count: int = 1) -> bool:
+    """Detect short inline fill-in-the-blank slots (1–6 words) vs analytical argument slots."""
+    if slot.slot_type == "entity" or occurrence_count > 1:
+        return True
+    if _is_inline_fact_slot_name(slot.name):
+        return True
+    follow = slot.follow_text.lstrip()
+    lead = slot.lead_in.rstrip()
+    if follow and follow[0] not in ".!?,;:\n\r" and lead and lead[-1] not in ".!?:":
+        return True
+    return False
+
+
+def _compute_slot_budgets(
+    template: TemplateDocument,
+    unique_arg_slots: list[TemplateSlot],
+    occurrences: dict[str, int],
+) -> dict[str, tuple[int, int]]:
+    """Compute `(min_words, max_words)` per slot so assembled scripts fit `duration_min`."""
+    inline_slots = [s for s in unique_arg_slots if _is_inline_fact_slot(s, occurrences[s.name])]
+    long_slots = [s for s in unique_arg_slots if s not in inline_slots]
+
+    budgets: dict[str, tuple[int, int]] = {s.name: (1, 6) for s in inline_slots}
+    if not long_slots:
+        return budgets
+
+    min_target, max_target = TARGET_WORD_COUNT_RANGES.get(
+        template.metadata.duration_min, (650, 750)
+    )
+    target_mid = (min_target + max_target) // 2
+    fixed_words = len(SLOT_PATTERN.sub("", template.body).split())
+    inline_est = sum(3 * occurrences[s.name] for s in inline_slots)
+    remaining = max(0, target_mid - fixed_words - inline_est)
+    per_slot = remaining // len(long_slots)
+
+    if per_slot >= _SLOT_FILL_MIN_WORDS:
+        lo = _SLOT_FILL_MIN_WORDS
+        hi = min(_SLOT_FILL_MAX_WORDS, max(_SLOT_FILL_MIN_WORDS + 20, int(per_slot * 1.25)))
+    else:
+        lo = max(15, int(per_slot * 0.75))
+        hi = max(30, min(_SLOT_FILL_MAX_WORDS, int(per_slot * 1.25) + 10))
+    for s in long_slots:
+        budgets[s.name] = (lo, hi)
+    return budgets
+
+
 def assemble_template(template_body: str, slot_values: dict[str, str]) -> str:
     """Replace ``{{ slot_name }}`` placeholders with filled values."""
 
@@ -98,11 +199,14 @@ def assemble_template(template_body: str, slot_values: dict[str, str]) -> str:
         is_end_of_block = (after_pos >= len(template_body)) or (
             template_body[after_pos] in "\n\r"
         )
-        is_entity = slot_name.startswith("entity_")
+        is_inline = _is_inline_fact_slot_name(slot_name)
         if has_trailing_punct:
             while val and val[-1] in ".!?,;:":
                 val = val[:-1].rstrip()
-        elif is_end_of_block or (not is_entity and slot_name.startswith("argument_")):
+        elif is_inline:
+            while val and val[-1] in ".!?,;:":
+                val = val[:-1].rstrip()
+        elif is_end_of_block or slot_name.startswith("argument_"):
             if val and val[-1] not in ".!?":
                 val += "."
         return val
@@ -127,25 +231,37 @@ def _build_slot_fill_prompt(
     chunks_context: str,
     topic: str,
     user_feedback: str | None = None,
+    slot_budgets: dict[str, tuple[int, int]] | None = None,
 ) -> list[dict[str, str]]:
     """Build the LLM messages for filling one or more argument slots."""
-    slot_descriptions = [
-        f"- Slot name: {s.name}\n"
-        f'  Text before slot: "{s.lead_in}"\n'
-        f'  Text after slot: "{s.follow_text}"\n'
-        f"  Required: Write a coherent analytical argument of "
-        f"{_SLOT_FILL_MIN_WORDS}–{_SLOT_FILL_MAX_WORDS} words "
-        f"(2–5 sentences) that fits naturally between the lead-in and follow text."
-        for s in slots
-    ]
+    slot_descriptions: list[str] = []
+    for s in slots:
+        lo, hi = (slot_budgets or {}).get(s.name, (_SLOT_FILL_MIN_WORDS, _SLOT_FILL_MAX_WORDS))
+        if hi <= 10:
+            req_line = (
+                f"  Required: Write ONLY a concise factual value/phrase ({lo}–{hi} words, "
+                "no full sentence, no trailing period) that fits grammatically inside the sentence."
+            )
+        else:
+            req_line = (
+                f"  Required: Write a coherent analytical argument of {lo}–{hi} words "
+                "that fits naturally between the lead-in and follow text."
+            )
+        slot_descriptions.append(
+            f"- Slot name: {s.name}\n"
+            f'  Text before slot: "{s.lead_in}"\n'
+            f'  Text after slot: "{s.follow_text}"\n'
+            f"{req_line}"
+        )
 
     system_msg = (
-        "You are an academic speech writer. Your task is to fill argument slots "
+        "You are an academic speech writer. Your task is to fill slots "
         "in a speech template about the given topic.\n\n"
         "RULES:\n"
-        "1. Each filled argument must be 2–5 sentences, approximately "
-        f"{_SLOT_FILL_MIN_WORDS}–{_SLOT_FILL_MAX_WORDS} words.\n"
-        "2. Base your arguments on the source document chunks provided.\n"
+        "1. Strictly respect each slot's Required word count (short 1–6 word phrase for inline "
+        "fact slots; concise analytical argument for full slots).\n"
+        "2. Base your values on the source document chunks provided (or accurate general facts "
+        "when no document is provided).\n"
         "3. Return ONLY valid JSON in this exact format:\n"
         '   {"slots": {"<slot_name>": {"text": "...", "source_chunk_ids": [...]}}}\n'
         "4. source_chunk_ids must be integers from the provided chunk IDs.\n"
@@ -169,6 +285,7 @@ def _estimate_prompt_tokens(
     slots: list[TemplateSlot],
     chunks_context: str,
     user_feedback: str | None = None,
+    slot_budgets: dict[str, tuple[int, int]] | None = None,
 ) -> int:
     feedback_words = len(user_feedback.split()) if user_feedback else 0
     prompt_words = (
@@ -176,7 +293,10 @@ def _estimate_prompt_tokens(
         + feedback_words
         + sum(len(s.lead_in.split()) + len(s.follow_text.split()) + 30 for s in slots)
     )
-    output_words = len(slots) * (_SLOT_FILL_MAX_WORDS + 20)
+    output_words = sum(
+        (slot_budgets or {}).get(s.name, (_SLOT_FILL_MIN_WORDS, _SLOT_FILL_MAX_WORDS))[1] + 20
+        for s in slots
+    )
     return int((prompt_words + output_words) * _TOKENS_PER_WORD)
 
 
@@ -332,18 +452,28 @@ class TemplateEngine:
         warnings: list[str] = []
 
         if argument_slots:
-            batches = _group_slots_into_batches(argument_slots, max_tokens_per_batch=5000)
+            occurrences: dict[str, int] = {}
+            unique_arg_slots: list[TemplateSlot] = []
+            for s in argument_slots:
+                occurrences[s.name] = occurrences.get(s.name, 0) + 1
+                if occurrences[s.name] == 1:
+                    unique_arg_slots.append(s)
+            slot_budgets = _compute_slot_budgets(template, unique_arg_slots, occurrences)
+            batches = _group_slots_into_batches(unique_arg_slots, max_tokens_per_batch=5000)
             active_client = client or self.client or _get_groq_client()
             active_chain = self.model_chain or _get_model_chain()
 
             if active_client is None:
                 warnings.append("llm_client_unavailable_using_placeholders")
-                for slot in argument_slots:
+                for slot in unique_arg_slots:
                     slot_name_clean = slot.name.replace("argument_", "").replace("_", " ")
-                    slot_values[slot.name] = (
-                        f"Research demonstrates that {slot_name_clean} "
-                        "plays a pivotal role in shaping long-term outcomes and performance."
-                    )
+                    if slot_budgets[slot.name][1] <= 10:
+                        slot_values[slot.name] = slot_name_clean
+                    else:
+                        slot_values[slot.name] = (
+                            f"Research demonstrates that {slot_name_clean} "
+                            "plays a pivotal role in shaping long-term outcomes and performance."
+                        )
                     real_para = template.body[: slot.start_char].count("\n\n") + 1
                     all_citations.append(
                         ParagraphCitation(
@@ -381,10 +511,17 @@ class TemplateEngine:
                         batch_chunks_context = ""
 
                     messages = _build_slot_fill_prompt(
-                        batch, batch_chunks_context, topic, user_feedback=user_feedback
+                        batch,
+                        batch_chunks_context,
+                        topic,
+                        user_feedback=user_feedback,
+                        slot_budgets=slot_budgets,
                     )
                     estimated_tokens = _estimate_prompt_tokens(
-                        batch, batch_chunks_context, user_feedback=user_feedback
+                        batch,
+                        batch_chunks_context,
+                        user_feedback=user_feedback,
+                        slot_budgets=slot_budgets,
                     )
 
                     for retry in range(max_fill_retries):

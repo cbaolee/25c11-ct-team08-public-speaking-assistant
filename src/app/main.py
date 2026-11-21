@@ -1,6 +1,8 @@
 import json
 import logging
+import os
 import tempfile
+import threading
 from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
@@ -85,6 +87,17 @@ WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 logger = logging.getLogger(__name__)
 
 
+def _warmup_script_pipeline() -> None:
+    """Pre-load TemplateStore and the local embedding model in the background at startup."""
+    try:
+        pipeline = get_script_pipeline()
+        retriever = getattr(pipeline.template_engine, "retriever", None)
+        if retriever is not None:
+            retriever.get_model()
+    except Exception:
+        logger.debug("Background script pipeline warm-up skipped.", exc_info=True)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     """Refuse to start when a required key is missing (fail at startup, not mid-demo)."""
@@ -92,6 +105,8 @@ async def lifespan(_: FastAPI):
     if missing:
         logger.critical("Missing required settings in .env: %s", ", ".join(missing))
         raise RuntimeError("Missing required settings in .env: " + ", ".join(missing))
+    if not os.getenv("PYTEST_CURRENT_TEST"):
+        threading.Thread(target=_warmup_script_pipeline, daemon=True).start()
     yield
 
 
