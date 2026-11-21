@@ -181,7 +181,9 @@ async def web_config() -> dict[str, Any]:
         "script_title_max_chars": script_title_max_chars,
         "max_pdf_size_bytes": CONSTANTS["script"]["max_pdf_size_bytes"],
         "max_pdf_pages": CONSTANTS["script"]["max_pdf_pages"],
-        "auth": {key: CONSTANTS["auth"][key] for key in ("otp_length", "resend_cooldown_s")},
+        "auth": {key: CONSTANTS["auth"][key] for key in (
+            "otp_length", "resend_cooldown_s", "unconfirmed_ttl_min"
+        )},
         "retry": {key: CONSTANTS["retry"][key] for key in (
             "sentence_min_error_ratio", "word_max_seconds", "sentence_max_seconds", "clip_pad_s"
         )},

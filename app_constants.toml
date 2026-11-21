@@ -133,6 +133,9 @@ resend_cooldown_s = 60
 verify_attempts_per_window = 5
 verify_window_s = 600
 require_email_otp = true
+# Unconfirmed accounts are deleted this long after the last code was sent (ADR-011).
+# Must match the interval in db/migrations/0006_purge_unconfirmed_accounts.sql.
+unconfirmed_ttl_min = 60
 
 [retry]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.

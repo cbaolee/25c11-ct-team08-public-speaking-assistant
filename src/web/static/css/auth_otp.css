@@ -18,6 +18,7 @@
 .l-auth .otp-verify { width: 100%; margin-top: 22px; }
 .l-auth .otp-verify[aria-busy="true"] { cursor: progress; }
 .l-auth .otp-actions { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.l-auth .otp-expiry { margin: 14px 0 0; font-size: 12px; }
 .l-auth .otp-resend, .l-auth .otp-back { color: #C9D0DB; }
 .l-auth .otp-resend:hover, .l-auth .otp-resend:focus-visible, .l-auth .otp-back:hover, .l-auth .otp-back:focus-visible { color: #fff; outline: 3px solid rgba(143,176,255,.35); outline-offset: 2px; }
 .l-auth .otp-resend:disabled { color: #8A94A6; cursor: default; font-variant-numeric: tabular-nums; }

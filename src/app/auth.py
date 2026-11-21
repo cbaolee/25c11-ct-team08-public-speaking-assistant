@@ -136,6 +136,7 @@ class _MemoryAccount:
     otp_hash: str | None = None
     otp_expires_at: float = 0
     otp_attempts: int = 0
+    otp_sent_at: float = 0  # last time a code was sent: the unconfirmed TTL counts from here
 
 
 def _mask_email(email: str) -> str:
@@ -156,8 +157,15 @@ class MemoryAuthProvider:
         code_factory: Callable[[], str] | None = None,
         clock: Callable[[], float] = time.monotonic,
         log_codes: bool = False,
+        unconfirmed_ttl_s: float | None = None,
+        on_purge: Callable[[UUID], None] | None = None,
     ) -> None:
         config = CONSTANTS["auth"]
+        # Same rule as SQL 0006 on Supabase: unconfirmed accounts expire after the TTL.
+        self._unconfirmed_ttl_s = (
+            config["unconfirmed_ttl_min"] * 60 if unconfirmed_ttl_s is None else unconfirmed_ttl_s
+        )
+        self._on_purge = on_purge  # e.g. drop the profile in the in-memory repositories
         self._require_email_otp = (
             config["require_email_otp"] if require_email_otp is None else require_email_otp
         )
@@ -180,6 +188,26 @@ class MemoryAuthProvider:
     @staticmethod
     def _hash(password: str, salt: bytes) -> bytes:
         return hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _PBKDF2_ROUNDS)
+
+    def _purge_unconfirmed(self) -> None:
+        """Lazily delete unconfirmed accounts whose last code is older than the TTL.
+
+        Called (under the lock) at the start of sign up, log in, verify and resend, so an
+        expired account behaves as if it never existed. Profiles live in the repositories,
+        which this provider does not know, so `on_purge` removes them when it is set.
+        """
+        now = self._clock()
+        expired = [
+            a for a in self._accounts.values()
+            if not a.confirmed and now - a.otp_sent_at >= self._unconfirmed_ttl_s
+        ]
+        for account in expired:
+            del self._accounts[account.email]
+            if self._on_purge is not None:
+                try:
+                    self._on_purge(account.id)
+                except Exception:
+                    logger.warning("Could not remove the profile of an expired unconfirmed account")
 
     def _account_by_id(self, user_id: UUID) -> _MemoryAccount | None:
         return next((a for a in self._accounts.values() if a.id == user_id), None)
@@ -207,7 +235,8 @@ class MemoryAuthProvider:
     def _issue_otp(self, account: _MemoryAccount) -> None:
         code = self._code_factory()
         account.otp_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
-        account.otp_expires_at = self._clock() + self._otp_ttl_s
+        account.otp_sent_at = self._clock()
+        account.otp_expires_at = account.otp_sent_at + self._otp_ttl_s
         account.otp_attempts = 0
         if self._log_codes:
             logger.info("dev OTP for %s : %s", _mask_email(account.email), code)
@@ -217,6 +246,7 @@ class MemoryAuthProvider:
         if len(password) < MIN_PASSWORD_LENGTH:
             raise WeakPasswordError()
         with self._lock:
+            self._purge_unconfirmed()
             account = self._accounts.get(email)
             if account is not None:
                 if account.confirmed:
@@ -235,6 +265,7 @@ class MemoryAuthProvider:
     def verify_signup_otp(self, email: str, token: str) -> UUID | None:
         """Confirm an account; confirmed accounts also return invalid to hide their status."""
         with self._lock:
+            self._purge_unconfirmed()
             account = self._accounts.get(email.strip().lower())
             if account is None or account.confirmed or account.otp_hash is None:
                 raise OtpInvalidError()
@@ -253,6 +284,7 @@ class MemoryAuthProvider:
 
     def resend_signup_otp(self, email: str) -> None:
         with self._lock:
+            self._purge_unconfirmed()
             account = self._accounts.get(email.strip().lower())
             if account is not None and not account.confirmed:
                 self._issue_otp(account)
@@ -267,6 +299,7 @@ class MemoryAuthProvider:
 
     def sign_in(self, email: str, password: str) -> AuthSession:
         with self._lock:
+            self._purge_unconfirmed()
             account = self._accounts.get(email)
             if account is None or not hmac.compare_digest(
                 account.password_hash, self._hash(password, account.salt)
@@ -541,11 +574,18 @@ class SupabaseAuthProvider:
         return True
 
 
+def _drop_memory_profile(user_id: UUID) -> None:
+    """Dev only: what the cascade does on Supabase (profiles row of a purged account)."""
+    from src.app.db.factory import get_repos  # lazy: the repositories do not depend on auth
+
+    get_repos().profiles.delete_profile(user_id)
+
+
 @lru_cache(maxsize=1)
 def get_auth() -> AuthProvider:
     """FastAPI dependency: Supabase Auth when SUPABASE_URL is set, RAM accounts in dev."""
     if settings.supabase_url:
         return SupabaseAuthProvider(settings.supabase_url, settings.supabase_service_key)
     if settings.app_env == "dev":
-        return MemoryAuthProvider(log_codes=True)
+        return MemoryAuthProvider(log_codes=True, on_purge=_drop_memory_profile)
     raise AuthUnavailableError("Auth is not configured")
