@@ -637,7 +637,7 @@ async def generate_script_endpoint(
         sess = store.get(clean_session_id, user_id=user_id)
         if sess:
             if not clean_topic:
-                clean_topic = sess.topic or sess.initial_prompt or ""
+                clean_topic = getattr(sess, "topic", None) or sess.initial_prompt or ""
             if not category and sess.category:
                 category = sess.category
             if duration_min == 5 and sess.duration_min:
@@ -812,6 +812,7 @@ async def script_chat_select_topic_endpoint(
         )
     else:
         session.selected_template_id = None
+        session.topic = session.initial_prompt or "Free-topic speech"
         session.missing_entities = []
         session.missing_groups = []
         session.coverage_ratio = 0.0
@@ -924,7 +925,7 @@ async def script_chat_message_endpoint(
         user_notes=session.user_notes,
     )
 
-    topic = session.topic or session.initial_prompt or "your speech"
+    topic = getattr(session, "topic", None) or session.initial_prompt or "your speech"
     if session.selected_template_id:
         reply = build_followup_reply(
             topic=topic, ready_to_generate=session.ready_to_generate,
