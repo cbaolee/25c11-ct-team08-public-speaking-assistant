@@ -1034,8 +1034,13 @@ async def create_saved_script_endpoint(
     body_error = _validate_script(clean_body)
     if body_error is not None:
         return body_error
+    # User-written scripts go through full Layer 1 + Layer 2 moderation.
+    # Pipeline-generated scripts already passed Stage 4 input moderation; running Layer 2
+    # again on long AI-generated prose causes frequent false positives in llama-guard3:1b.
     get_script_pipeline().moderator.assert_safe(
-        f"{clean_title}\n{clean_body}", user_id=str(user.id)
+        f"{clean_title}\n{clean_body}",
+        user_id=str(user.id),
+        use_layer2=(payload.source == "written"),
     )
     data = NewScript(
         title=clean_title,

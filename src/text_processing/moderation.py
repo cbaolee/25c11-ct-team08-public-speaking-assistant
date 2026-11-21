@@ -459,21 +459,28 @@ class ContentModerator:
         )
         return unsafe, True
 
-    def check_text(self, text: str, user_id: str = "anonymous") -> ModerationDecision:
-        """Run Layer 1 (then Layer 2 if enabled); decisions are cached per `(sha256, user_id)`.
+    def check_text(
+        self,
+        text: str,
+        user_id: str = "anonymous",
+        *,
+        use_layer2: bool = True,
+    ) -> ModerationDecision:
+        """Run Layer 1 (plus Layer 2 when enabled and `use_layer2=True`), cached per user.
 
-        "Unavailable" Layer 2 decisions are returned but never cached.
+        "Unavailable" Layer 2 decisions and Layer-1-only bypass checks are never cached.
         """
         if not text or not text.strip():
             return ModerationDecision(allowed=True, layer="regex")
 
         cache_key = self.compute_cache_key(text, user_id)
-        cached = self._cache.get(cache_key)
-        if cached is not None:
-            logger.debug("moderation layer=cache allowed=%s", cached.allowed)
-            return replace(cached, layer="cache")
+        if use_layer2:
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                logger.debug("moderation layer=cache allowed=%s", cached.allowed)
+                return replace(cached, layer="cache")
 
-        cacheable = True
+        cacheable = use_layer2
         try:
             flagged, cleaned = self._find_terms(text)
         except _InputTooLargeError:  # fail-closed on size, not a verdict on the content
@@ -488,7 +495,7 @@ class ContentModerator:
                     layer="regex",
                     flagged_terms=flagged,
                 )
-            elif self.enable_llama_guard and cleaned:
+            elif use_layer2 and self.enable_llama_guard and cleaned:
                 decision, cacheable = self._layer2_decision(cleaned)
             else:
                 decision = ModerationDecision(allowed=True, layer="regex")
@@ -498,13 +505,19 @@ class ContentModerator:
         logger.debug("moderation layer=%s allowed=%s", decision.layer, decision.allowed)
         return decision
 
-    def assert_safe(self, text: str, user_id: str = "anonymous") -> ModerationDecision:
+    def assert_safe(
+        self,
+        text: str,
+        user_id: str = "anonymous",
+        *,
+        use_layer2: bool = True,
+    ) -> ModerationDecision:
         """Return the decision if allowed; else raise `ScriptGenerationError`.
 
         422 `content_rejected` for a verdict; 503 `moderation_unavailable` when fail-closed
         Layer 2 could not answer.
         """
-        decision = self.check_text(text, user_id=user_id)
+        decision = self.check_text(text, user_id=user_id, use_layer2=use_layer2)
         if not decision.allowed:
             if decision.reason == LAYER2_UNAVAILABLE_REASON:
                 raise ScriptGenerationError(
