@@ -286,7 +286,9 @@ export const TEXT = {
   },
   audio: {
     title: 'Audio settings', sub: 'Choose the microphone used for practice, your baseline and the word and sentence coach.', mic: 'Microphone',
-    mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
+    micDefault: 'Default microphone', micN: 'Microphone {n}',
+    micHint: 'Device names are hidden until you allow the microphone. Press Test microphone to show them.',
+    micGone: 'The chosen microphone was not found. Using the default microphone.',
     test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
   },
   settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', speed: 'Reading speed', password: 'Change password', delete: 'Delete account' },

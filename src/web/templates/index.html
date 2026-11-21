@@ -454,6 +454,7 @@
     <p class="note" data-t="audio.sub"></p>
     <label for="audioMic" data-t="audio.mic"></label>
     <select id="audioMic"></select>
+    <p class="note" id="audioMicHint" aria-live="polite"></p>
     <div class="row" style="margin-top:16px"><button class="btn" type="button" id="audioTest" data-t="audio.test"></button><span class="note" id="audioTestNote" aria-live="polite"></span></div>
     <div class="lvl" id="audioLevel" aria-hidden="true" style="margin-top:12px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="actions"><button class="btn btn-primary" type="button" id="audioSave" data-t="common.save"></button></div>
@@ -639,6 +640,7 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>
 <script src="/static/js/otp_utils.js"></script>
+<script src="/static/js/mic_device.js"></script>
 <script src="/static/js/script_duplicate.js"></script>
 <script type="module" src="/static/js/main.js"></script>
 <div id="wordCoach" role="dialog" aria-modal="false" aria-labelledby="wcTitle" hidden></div>

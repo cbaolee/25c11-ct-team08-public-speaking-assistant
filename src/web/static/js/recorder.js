@@ -1,11 +1,26 @@
+import { T } from './i18n.js';
 import { S } from './state.js';
-import { openModal } from './ui.js';
+import { openModal, toast } from './ui.js';
 import { $$ } from './utils.js';
+
+/* Open the microphone chosen in Settings > Audio (mic_device.js, ADR-011). If that device is gone
+   (unplugged), forget the choice, say so, and use the default microphone once. Only the device is
+   chosen: the capture chain (browser defaults) stays the same for baseline and practice. */
+export function openChosenMic() {
+  const M = window.MicDevice, uid = S.user && S.user.id;
+  return M.openMic(navigator.mediaDevices, M.getSavedMicId(uid), {
+    fallback: true,
+    onMissing: () => { M.saveMicId(uid, ''); toast(T('audio.micGone')); }
+  });
+}
 
 /* ---------- recorder helper (real microphone: getUserMedia + MediaRecorder + AnalyserNode) ---------- */
 /* levelAnim(lvlEl, stream): level bars driven by the real mic level (RMS per slice of the waveform).
-   With no `stream` it opens the mic itself (Profile mic test) and closes its own tracks on stop. */
-export function levelAnim(lvlEl, stream, onErr) {
+   With no `stream` it opens the mic itself (Profile mic test) and closes its own tracks on stop:
+   the saved microphone, or opts.micId (Settings test: the device picked in the list, not yet saved;
+   no fallback, so a missing device is reported). opts.onOpen() runs once the mic is open. */
+export function levelAnim(lvlEl, stream, onErr, opts) {
+  const o = opts || {};
   const bars = $$('i', lvlEl);
   let ctx = null, iv = null, own = null, stopped = false;
   const attach = st => {
@@ -31,7 +46,8 @@ export function levelAnim(lvlEl, stream, onErr) {
   };
   if (stream) attach(stream);
   else if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(st => { own = st; attach(st); }).catch(e => { if (!stopped && onErr) onErr(e); });
+    const open = o.micId !== undefined ? window.MicDevice.openMic(navigator.mediaDevices, o.micId) : openChosenMic();
+    open.then(st => { own = st; attach(st); if (!stopped && o.onOpen) o.onOpen(); }).catch(e => { if (!stopped && onErr) onErr(e); });
   } else if (onErr) Promise.resolve().then(() => { if (!stopped) onErr({ name: 'unsupported' }); });
   return () => {
     stopped = true; clearInterval(iv);
@@ -43,7 +59,7 @@ export function levelAnim(lvlEl, stream, onErr) {
 /* startRecorder(o) -> {stop, cancel} returned synchronously; the mic opens asynchronously.
    o.onTick(sec) · o.onEnd(sec, auto, {blob, mime}) fires after the Blob is ready · o.onError('denied'|'nodevice'|'unsupported').
    Baseline and practice recordings both go through this one function, so they share one capture chain (browser defaults,
-   no extra signal-processing constraints). */
+   no extra signal-processing constraints; only the chosen device, see openChosenMic). */
 export function startRecorder(o) {
   const MIMES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg;codecs=opus'];
   let stream = null, mr = null, t0 = 0, tickIv = null, stopLvl = null, pausedMs = 0, pausedAt = 0;
@@ -85,7 +101,7 @@ export function startRecorder(o) {
     Promise.resolve().then(() => fail({ name: 'unsupported' }));   // async so the caller has stored the handle first
     return r;
   }
-  navigator.mediaDevices.getUserMedia({ audio: true }).then(st => {
+  openChosenMic().then(st => {
     if (r.done) { st.getTracks().forEach(t => t.stop()); return; }   // stop/cancel arrived before the mic was ready
     stream = st;
     try {
