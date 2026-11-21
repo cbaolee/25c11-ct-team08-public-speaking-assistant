@@ -1,5 +1,6 @@
 """Generate and validate score interpretations without changing evaluation results."""
 import json
+import logging
 import math
 import re
 import threading
@@ -14,6 +15,8 @@ from src.app.key_pool import KeysExhaustedError, get_pool
 from src.audio_processing.scoring import display_round
 from src.audio_processing.vad import MIN_VOICED_RATIO
 from src.text_processing.moderation import ContentModerator
+
+logger = logging.getLogger(__name__)
 
 
 class CoachNote(TypedDict):
@@ -90,32 +93,44 @@ def allowed_numbers(payload: dict) -> set[Decimal]:
     return collect(payload)
 
 
-def validate_output(obj, payload, max_output_chars, moderator, max_focus=None,
-                    banned_words=(), require_next_step=False) -> CoachNote | None:
+def validation_failure(obj, payload, max_output_chars, moderator, max_focus=None,
+                       banned_words=(), require_next_step=False) -> str | None:
     if max_focus is None:
         max_focus = CONSTANTS['coach']['max_focus_items']
+    if obj is None:
+        return 'no_response'
     if not isinstance(obj, dict) or set(obj) != {'summary', 'strengths', 'focus', 'next_step'}:
-        return None
+        return 'schema'
     if not isinstance(obj['summary'], str) or not obj['summary'].strip():
-        return None
+        return 'schema'
     if (not isinstance(obj['next_step'], str) or
             (require_next_step and not obj['next_step'].strip())):
-        return None
+        return 'schema'
     if any(not isinstance(obj[k], list) or any(not isinstance(x, str) for x in obj[k])
-           for k in ('strengths', 'focus')) or len(obj['focus']) > max_focus:
-        return None
+           for k in ('strengths', 'focus')):
+        return 'schema'
+    if len(obj['focus']) > max_focus:
+        return 'too_many_focus'
     strings = [obj['summary'], *obj['strengths'], *obj['focus'], obj['next_step']]
     text = '\n'.join(strings)
     patterns = [(r'\b' if re.match(r'\w', term[0]) else '') + re.escape(term)
                 + (r'\b' if re.match(r'\w', term[-1]) else '')
                 for term in banned_words if term]
-    if (any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns) or
-            sum(map(len, strings)) > max_output_chars or
-            not find_numbers(text) <= allowed_numbers(payload) or
-            not moderator.check_text(text).allowed):
-        return None
-    return obj
+    if any(re.search(pattern, text, re.IGNORECASE) for pattern in patterns):
+        return 'banned_word'
+    if sum(map(len, strings)) > max_output_chars:
+        return 'too_long'
+    if not find_numbers(text) <= allowed_numbers(payload):
+        return 'stray_number'
+    if not moderator.check_text(text).allowed:
+        return 'moderation'
+    return None
 
+
+def validate_output(obj, payload, max_output_chars, moderator, max_focus=None,
+                    banned_words=(), require_next_step=False) -> CoachNote | None:
+    return None if validation_failure(obj, payload, max_output_chars, moderator, max_focus,
+                                      banned_words, require_next_step) else obj
 
 def rule_based_note(payload) -> dict:
     names = {'accuracy': 'Accuracy', 'fluency': 'Fluency and pacing',
@@ -168,6 +183,9 @@ _SYSTEM_INSUFFICIENT = (
     'why (reason low_voiced_ratio: too little speech was detected; empty_transcript: no words '
     'were recognised) and give practical tips for recording again. Do not mention or imply any '
     'score, grade, rating, points or level, and do not claim anything about pronunciation. '
+    'Say that the recording could not be checked; never use the words score, scored or scoring. '
+    'Only state facts given by the reason and the numbers in the data; do not guess about '
+    'recognised words, background noise or the microphone unless the reason implies it. '
     'Use no numbers except those in the data. Return English JSON with exactly summary, '
     'strengths, focus, next_step; strengths and focus are arrays of strings; '
     'strengths may be empty. '
@@ -239,10 +257,15 @@ def generate_coach_note(result, settings, *, moderator=None, cerebras=call_cereb
             value = cerebras(payload, settings, config['timeout_s'], system=_SYSTEM_INSUFFICIENT)
         except Exception:
             value = None
+            reason = 'exception'
+        else:
+            reason = validation_failure(value, payload, config['max_output_chars'], moderator,
+                                        banned_words=config['insufficient_banned_words'],
+                                        require_next_step=True)
         options = {'banned_words': config['insufficient_banned_words'], 'require_next_step': True}
-        note = validate_output(value, payload, config['max_output_chars'], moderator, **options)
-        if note is not None:
-            return {**note, 'source': 'cerebras'}
+        if reason is None:
+            return {**value, 'source': 'cerebras'}
+        logger.warning('coach_note fallback: status=%s reason=%s', 'insufficient_audio', reason)
         note = validate_output(rule_based_insufficient_note(payload), payload,
                                config['max_output_chars'], moderator, **options)
         if note is None:
@@ -253,10 +276,12 @@ def generate_coach_note(result, settings, *, moderator=None, cerebras=call_cereb
     try:
         value = cerebras(payload, settings, config['timeout_s'])
     except Exception:
-        value = None
-    note = validate_output(value, payload, config['max_output_chars'], moderator)
-    if note is not None:
-        return {**note, 'source': 'cerebras'}
+        reason = 'exception'
+    else:
+        reason = validation_failure(value, payload, config['max_output_chars'], moderator)
+    if reason is None:
+        return {**value, 'source': 'cerebras'}
+    logger.warning('coach_note fallback: status=%s reason=%s', result.get('status') or 'ok', reason)
     note = validate_output(rule_based_note(payload), payload, config['max_output_chars'], moderator)
     if note is None:
         raise ValueError('Rule-based coach note failed validation')

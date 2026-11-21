@@ -409,3 +409,60 @@ def test_cerebras_duplicate_fallback_model_is_called_once(monkeypatch):
     settings = _cerebras_settings(keys=["duplicate-model-test-key"], fallback="model")
     assert coach.call_cerebras({}, settings, 1) is None
     post.assert_called_once()
+
+
+@pytest.mark.parametrize(
+    "value, limit, options, allowed, expected",
+    [
+        (None, 900, {}, True, "no_response"),
+        ({}, 900, {}, True, "schema"),
+        ({**note("Fine"), "focus": ["a", "b"]}, 900, {"max_focus": 1}, True,
+         "too_many_focus"),
+        (note("scored"), 900, {"banned_words": ("scored",)}, True, "banned_word"),
+        (note("Fine"), 1, {}, True, "too_long"),
+        (note("999"), 900, {}, True, "stray_number"),
+        (note("Fine"), 900, {}, False, "moderation"),
+        (note("Fine"), 900, {}, True, None),
+    ],
+)
+def test_validation_failure_codes(value, limit, options, allowed, expected):
+    moderator = Mock(check_text=Mock(return_value=SimpleNamespace(allowed=allowed)))
+    assert coach.validation_failure(value, {}, limit, moderator, **options) == expected
+
+
+def test_insufficient_prompt_requires_checked_and_no_guessing():
+    assert "checked" in coach._SYSTEM_INSUFFICIENT
+    assert "do not guess" in coach._SYSTEM_INSUFFICIENT
+
+
+def test_insufficient_banned_word_logs_reason(insufficient_result, caplog):
+    with caplog.at_level("WARNING", logger="src.app.coach_note"):
+        output = coach.generate_coach_note(
+            insufficient_result, None, cerebras=lambda *a, **kw: note("It was scored."))
+    assert output["source"] == "rule"
+    assert [record.getMessage() for record in caplog.records] == [
+        "coach_note fallback: status=insufficient_audio reason=banned_word"]
+
+
+@pytest.mark.parametrize("insufficient", [False, True])
+def test_exception_logs_reason(result, insufficient_result, caplog, insufficient):
+    def fail(*args, **kwargs):
+        raise RuntimeError("private details")
+
+    with caplog.at_level("WARNING", logger="src.app.coach_note"):
+        output = coach.generate_coach_note(
+            insufficient_result if insufficient else result, None, cerebras=fail)
+    assert output["source"] == "rule"
+    status = "insufficient_audio" if insufficient else "ok"
+    assert [record.getMessage() for record in caplog.records] == [
+        f"coach_note fallback: status={status} reason=exception"]
+
+
+@pytest.mark.parametrize("insufficient", [False, True])
+def test_accepted_output_does_not_log_warning(result, insufficient_result, caplog, insufficient):
+    with caplog.at_level("WARNING", logger="src.app.coach_note"):
+        output = coach.generate_coach_note(
+            insufficient_result if insufficient else result, None,
+            cerebras=lambda *a, **kw: note("Please practise."))
+    assert output["source"] == "cerebras"
+    assert not caplog.records
