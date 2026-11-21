@@ -30,6 +30,7 @@ from src.app.auth import (
     WeakPasswordError,
     get_auth,
 )
+from src.app.config import settings
 from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import ProfileUpsert, StorageError
@@ -409,3 +410,56 @@ async def change_password(
         logger.exception("Could not change the password")
         return _auth_unavailable()
     return {"updated": True}
+
+
+def _user_buckets() -> tuple[str, ...]:
+    return (
+        settings.audio_bucket,
+        settings.series_bucket,
+        settings.baselines_bucket,
+        settings.avatars_bucket,
+    )
+
+
+@router.delete("/account")
+async def delete_account(
+    payload: DeleteAccountPayload,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    auth: Annotated[AuthProvider, Depends(get_auth)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Delete the account and all its data (ADR-011). Order matters:
+
+    1. re-check the current password (nothing is deleted on 403/429/503);
+    2. empty the user's folder in every bucket; Storage objects are not removed by the
+       database cascade, so they go first. If Storage fails, stop: rows still point to files
+       and a retry deletes what is left (every step is idempotent);
+    3. delete the auth user; `on delete cascade` removes profiles, baselines, scripts and
+       sessions. If this fails after the files are gone, the account still works without
+       recordings and the user can try again.
+    Running evaluate jobs are not cancelled: the job store has no per-user cancel (see ADR-011).
+    """
+    denied = await _check_current_password(auth, user, payload.password)
+    if denied is not None:
+        return denied
+    try:
+        for bucket in _user_buckets():
+            await run_in_threadpool(repos.files.delete_user_folder, user.id, bucket)
+    except StorageError:
+        logger.warning("Delete account: Storage cleanup failed, nothing else was deleted")
+        return _error(
+            503, "storage_unavailable",
+            "Your files could not be deleted right now. Please try again.",
+        )
+    try:
+        await run_in_threadpool(auth.delete_user, user.id)
+    except AuthProviderError:
+        logger.warning("Delete account: files deleted but the account could not be deleted")
+        return _auth_unavailable()
+    try:
+        # Supabase: the cascade already removed the rows, so this is a no-op. In-memory
+        # accounts and repositories are not linked, so the rows are removed here.
+        await run_in_threadpool(repos.profiles.delete_profile, user.id)
+    except StorageError:
+        logger.warning("Delete account: account deleted, profile cleanup failed")
+    return {"deleted": True}

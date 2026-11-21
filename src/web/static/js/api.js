@@ -48,8 +48,8 @@ export function sessionEnded() {
   if (S.user) { logout(true); toast(T('auth.expired'), true); }
 }
 
-/* Settings > Delete account. Stub: the backend route DELETE /api/auth/account is not built yet
-   (handed over to the Auth group), so today this request fails and the UI shows an error. */
-export function deleteAccount() {
-  return api('/api/auth/account', { method: 'DELETE' });
+/* Settings > Delete account: DELETE /api/auth/account with the current password (ADR-011).
+   A wrong password is 403 wrong_password, so api() does not treat it as a session that ended. */
+export function deleteAccount(password) {
+  return api('/api/auth/account', { method: 'DELETE', json: { password } });
 }

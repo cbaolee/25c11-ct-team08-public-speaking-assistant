@@ -290,8 +290,9 @@ export const TEXT = {
   },
   settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', speed: 'Reading speed', password: 'Change password', delete: 'Delete account' },
   del: {
-    title: 'Delete account', sub: 'This deletes your account, your scripts, your recordings and your baseline. It cannot be undone.',
-    typeEmail: 'Type your email to confirm', confirm: 'Delete my account', mismatch: 'The email does not match your account.',
+    title: 'Delete account', sub: 'This permanently deletes your account with all your recordings, your baseline, your scripts and your practice history. It cannot be undone.',
+    password: 'Enter your current password to confirm', agree: 'Agree',
+    errWrong: 'The password is not correct. Nothing was deleted.', errRate: 'Too many attempts. Please wait a few minutes and try again.',
     failed: 'Your account could not be deleted right now. Please try again later.', done: 'Your account was deleted.'
   },
   speed: {

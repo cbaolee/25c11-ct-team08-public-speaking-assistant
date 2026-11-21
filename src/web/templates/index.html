@@ -495,10 +495,11 @@
     <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
     <h3 data-t="del.title"></h3>
     <p class="note" data-t="del.sub"></p>
-    <label for="delConfirmEmail" data-t="del.typeEmail"></label>
-    <input type="email" id="delConfirmEmail" autocomplete="off" spellcheck="false">
+    <input type="email" id="delUser" autocomplete="username" hidden>
+    <label for="delPassword" data-t="del.password"></label>
+    <input type="password" id="delPassword" autocomplete="current-password">
     <div class="ferr" id="delErr" role="alert"></div>
-    <div class="actions"><button class="btn btn-danger" type="button" id="delConfirm" data-t="del.confirm" disabled></button></div>
+    <div class="actions"><button class="btn" type="button" id="delCancel" data-t="common.cancel"></button><button class="btn btn-danger" type="button" id="delConfirm" data-t="del.agree" disabled></button></div>
   </section>
   </div>
 </div>
