@@ -44,7 +44,7 @@ export function pickSavedScript(id, byUser) {   // byUser: clicked in the list (
   return (byUser ? withBusy(req, T('busy.loading')) : req).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) return;
     if (mineEditId && mineEditId !== s.id) cancelMineEdit();   // another script picked: the open edit is dropped
-    S.texts.mine = { id: s.id, title: s.title, short: s.title, text: s.body, topic: s.category || null, duration_min: s.duration_min || null };
+    S.texts.mine = { id: s.id, title: s.title, short: s.title, text: s.body, topic: null };
     renderSavedLists();
     if (S.screen === 'practice') { if (byUser) S.choosing = true; renderPractice(); }
   }).catch(() => {});
@@ -76,7 +76,7 @@ export function useScript() {
 /* Save script (Own tab): asks for a name, then saves; the text stays in the box. */
 export function saveOwn() {
   const v = ownTextOrError(); if (!v) return;
-  saveScriptAs({ title: T('practice.ownTitle'), text: v, source: 'written' }).then(j => {
+  saveScriptAs({ title: T('practice.ownTitle'), text: v }, true).then(j => {
     if (j) S.ownSaved = { id: j.id, title: j.title, text: v };
   });
 }

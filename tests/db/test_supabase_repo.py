@@ -16,6 +16,7 @@ import httpx
 import pytest
 from dotenv import dotenv_values
 from PIL import Image
+from postgrest.exceptions import APIError
 
 from src.app import main as app_main
 from src.app.config import max_list_page_size, settings
@@ -25,7 +26,11 @@ from src.app.db.models import (
     NewBaseline,
     NewScript,
     NewSession,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptLimitReachedError,
+    ScriptPatch,
+    ScriptRow,
     StorageError,
     build_avatar_path,
     build_content_hash,
@@ -34,6 +39,7 @@ from src.app.db.models import (
 )
 from src.app.db.supabase_repo import (
     SupabaseBaselineRepo,
+    SupabaseScriptRepo,
     SupabaseSessionRepo,
     _execute,
     _newest_page,
@@ -117,6 +123,80 @@ def test_newest_page_rejects_bad_limit():
         _newest_page(None, 0, None)
     with pytest.raises(ValueError):
         _newest_page(None, max_list_page_size + 1, None)
+
+
+def _script_row(user_id: UUID, title: str, body: str) -> ScriptRow:
+    return ScriptRow(
+        id=uuid4(),
+        user_id=user_id,
+        title=title,
+        body=body,
+        content_hash=build_content_hash(body),
+        created_at="2026-11-22T00:00:00+00:00",
+    )
+
+
+def _script(title: str, body: str) -> NewScript:
+    return NewScript(title=title, body=body, content_hash=build_content_hash(body))
+
+
+def _unique_violation_repo(monkeypatch, *, by_hash=None, by_title=None) -> SupabaseScriptRepo:
+    """A script repo whose insert/update hits Postgres 23505; the twin lookups return fixed rows."""
+    client = MagicMock()
+    violation = APIError({"code": "23505", "message": "duplicate key value"})
+    table = client.table.return_value
+    table.insert.return_value.execute.side_effect = violation
+    table.update.return_value.eq.return_value.eq.return_value.execute.side_effect = violation
+    repo = SupabaseScriptRepo(client)
+    monkeypatch.setattr(repo, "find_script_by_hash", lambda user_id, content_hash: by_hash)
+    monkeypatch.setattr(repo, "find_script_by_title", lambda user_id, title: by_title)
+    return repo
+
+
+def test_create_script_unique_violation_on_body_raises_duplicate_body(monkeypatch):
+    owner = uuid4()
+    twin = _script_row(owner, "Old talk", "Same text.")
+    repo = _unique_violation_repo(monkeypatch, by_hash=twin, by_title=twin)
+    with pytest.raises(ScriptDuplicateBodyError) as err:
+        repo.create_script(owner, _script("Old talk", "Same text."))
+    assert err.value.twin.id == twin.id  # both match: the body wins
+
+
+def test_create_script_unique_violation_on_title_raises_duplicate_title(monkeypatch):
+    owner = uuid4()
+    twin = _script_row(owner, "My Talk", "Other text.")
+    repo = _unique_violation_repo(monkeypatch, by_title=twin)
+    with pytest.raises(ScriptDuplicateTitleError) as err:
+        repo.create_script(owner, _script("my talk", "New text."))
+    assert err.value.twin.id == twin.id
+
+
+def test_create_script_unique_violation_without_twin_stays_conflict(monkeypatch):
+    repo = _unique_violation_repo(monkeypatch)
+    with pytest.raises(ConflictError) as err:
+        repo.create_script(uuid4(), _script("A", "B."))
+    assert not isinstance(err.value, (ScriptDuplicateBodyError, ScriptDuplicateTitleError))
+
+
+def test_update_script_unique_violation_maps_to_the_other_script(monkeypatch):
+    owner, script_id = uuid4(), uuid4()
+    other = _script_row(owner, "Taken", "Taken text.")
+    repo = _unique_violation_repo(monkeypatch, by_title=other)
+    with pytest.raises(ScriptDuplicateTitleError):
+        repo.update_script(owner, script_id, ScriptPatch(title="taken"))
+    repo = _unique_violation_repo(monkeypatch, by_hash=other)
+    with pytest.raises(ScriptDuplicateBodyError):
+        patch = ScriptPatch(body="Taken text.", content_hash=other.content_hash)
+        repo.update_script(owner, script_id, patch)
+
+
+def test_update_script_unique_violation_on_itself_stays_conflict(monkeypatch):
+    owner = uuid4()
+    own = _script_row(owner, "Mine", "Mine text.")
+    repo = _unique_violation_repo(monkeypatch, by_title=own)
+    with pytest.raises(ConflictError) as err:
+        repo.update_script(owner, own.id, ScriptPatch(title="Mine"))
+    assert not isinstance(err.value, ScriptDuplicateTitleError)
 
 
 class _FakeRpcClient:
@@ -497,7 +577,7 @@ def test_merge_preferences_keeps_other_keys(profile_restore):
 
 def _new_script(body: str) -> NewScript:
     return NewScript(
-        title="Integration test script",
+        title=f"Integration test script {uuid4()}",  # titles are unique per user
         body=body,
         content_hash=build_content_hash(body),
     )
@@ -517,7 +597,7 @@ def test_list_scripts_returns_more_than_twenty(env):
 
 
 @pytest.mark.integration
-def test_save_script_at_cap_raises_and_duplicate_still_returns(env, monkeypatch):
+def test_save_script_at_cap_raises_and_duplicate_body_wins(env, monkeypatch):
     repos, owner, _, created = env
     first = repos.scripts.create_script(owner, _new_script(f"Cap test {uuid4()}."))
     created["scripts"].append(first.id)
@@ -528,8 +608,9 @@ def test_save_script_at_cap_raises_and_duplicate_still_returns(env, monkeypatch)
         app_main._save_script_row(repos, owner, _new_script(f"New text {uuid4()}."))
     assert (err.value.limit, err.value.count) == (count, count)
 
-    same, created_new = app_main._save_script_row(repos, owner, _new_script(first.body))
-    assert (same.id, created_new) == (first.id, False)  # a duplicate wins even at the cap
+    with pytest.raises(ScriptDuplicateBodyError) as dup:
+        app_main._save_script_row(repos, owner, _new_script(first.body))
+    assert dup.value.twin.id == first.id  # a duplicate is reported even at the cap
 
 
 @pytest.mark.integration

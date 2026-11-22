@@ -62,4 +62,4 @@ jobs:
           node-version: "22"
 
       - name: Run JavaScript tests
-        run: node --test tests/web/evaluate_client.test.js tests/web/otp_utils.test.js tests/web/coach_mode.test.js
+        run: node --test tests/web/evaluate_client.test.js tests/web/otp_utils.test.js tests/web/coach_mode.test.js tests/web/script_duplicate.test.js

@@ -27,7 +27,7 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 | **Settings Modal**     | Mở từ User Menu. Màn đầu là **Settings List**, chọn một mục thì trượt sang màn con (có nút Back): **Permissions** (quyền micro), **Audio Settings** (chọn mic, âm lượng thu, âm lượng phát, thử mic), **Reading Speed** (khoảng min/max của Speed Slider, bật tự chỉnh tốc độ), **Change Password**, **Delete Account** (gõ lại email để xác nhận) |
 | **Safety Alert**       | Báo nội dung bị cấm |
 | **Confirm Dialog**     | Xác nhận xoá hoặc thoát |
-| **Script Name Dialog** | Nhập tên khi lưu script |
+| **Script Name Dialog** | Nhập tên khi lưu script ở Practice → tab Own (chat và reader lưu luôn theo tên đang hiện) |
 | **Script List Full**   | Báo danh sách script đã lưu đã đầy (chỉ có nút Close) |
 | **Script Reader**      | Xem nội dung script (bấm vào thẻ script trong chat hoặc trong Saved Scripts). Nút Edit sửa tên và nội dung ngay trong popup, nút Save, Close và nút **⋯** mở **Reader Menu** (Save script / Copy / Download / Practice) |
 | **Evaluating Overlay** | Màn hình chờ chấm điểm, có nút Cancel |
