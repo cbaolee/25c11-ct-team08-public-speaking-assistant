@@ -1,10 +1,11 @@
 """Groq LLM script generator with multi-section free-topic flow and fallback chain."""
 
 import json
+import unicodedata
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from src.app.config import settings
+from src.app.config import script_title_max_chars, settings
 from src.app.constants import CONSTANTS
 
 from .contracts import (
@@ -43,6 +44,72 @@ SECTION_PLANS: dict[int, list[tuple[str, int]]] = {
         ("Future Outlook & Final Call to Action", 700),
     ],
 }
+
+SCRIPT_TITLE_MIN_WORDS = 2
+# The prompt asks the model for 4-8 words; we accept a wider range so a good title
+# is not thrown away over one word.
+SCRIPT_TITLE_MAX_WORDS = 12
+
+_TITLE_QUOTES = "\"'“”‘’«»`"
+_TITLE_LEADING_CHARS = _TITLE_QUOTES + "*_#"
+# '#' is not stripped at the end: it can be part of the title ("Learning C#")
+_TITLE_TRAILING_CHARS = _TITLE_QUOTES + "*_"
+_TITLE_TRAILING_PUNCT = ".,;:"
+_TITLE_PREFIX = "title:"
+
+
+def _strip_trailing_punct(title: str) -> str:
+    """Drop trailing `.,;:`, but keep one final dot after an abbreviation ("U.S.")."""
+    stripped = title.rstrip(_TITLE_TRAILING_PUNCT + " ")
+    if stripped == title or not title.rstrip().endswith("."):
+        return stripped
+    last_word = stripped.rsplit(" ", 1)[-1]
+    if stripped[-1:].isalnum() and "." in last_word[1:-1]:
+        return stripped + "."
+    return stripped
+
+
+def normalize_script_title(raw: object) -> str | None:
+    """Clean an untrusted LLM title; return None when it is unusable (rejected, never cut)."""
+    if not isinstance(raw, str):
+        return None
+    # Compose first so decomposed (NFD) text is not counted longer than it looks
+    raw = unicodedata.normalize("NFC", raw)
+    # Control/format characters (NUL, zero-width space...) can hide or spoof text in the UI
+    cleaned = "".join(" " if unicodedata.category(ch).startswith("C") else ch for ch in raw)
+    title = " ".join(cleaned.split())
+    # Quotes, prefix and trailing dots wrap each other ('"Title: X."'), so repeat until stable.
+    # Every pass only keeps or shortens the string, so the loop always ends.
+    previous = None
+    while previous != title:
+        previous = title
+        title = title.lstrip(_TITLE_LEADING_CHARS + " ")
+        if title.lower().startswith(_TITLE_PREFIX):
+            title = title[len(_TITLE_PREFIX) :]
+        title = _strip_trailing_punct(title.rstrip(_TITLE_TRAILING_CHARS + " "))
+    word_count = len(title.split())
+    if not (SCRIPT_TITLE_MIN_WORDS <= word_count <= SCRIPT_TITLE_MAX_WORDS):
+        return None
+    if len(title) > script_title_max_chars:
+        return None
+    return title
+
+
+def _title_prompt_note(section_index: int) -> str:
+    """Prompt addition asking for a speech title; only section 1 carries it."""
+    if section_index != 1:
+        return ""
+    return (
+        ' Also add a top-level "title": a 4-8 word title for the whole speech; '
+        "do not repeat it in the paragraphs."
+    )
+
+
+def _section_title(data: object, section_index: int) -> str | None:
+    """Normalised title from section 1's LLM JSON; a bad title never fails the section."""
+    if section_index != 1 or not isinstance(data, dict):
+        return None
+    return normalize_script_title(data.get("title"))
 
 
 @dataclass
@@ -139,8 +206,8 @@ class ScriptGenerator:
         greeting: str | None = None,
         user_feedback: str | None = None,
         chat_context: str | None = None,
-    ) -> tuple[str, list[tuple[str, list[int]]]]:
-        """Generate one speech section via the 3-model Groq fallback chain."""
+    ) -> tuple[str, list[tuple[str, list[int]]], str | None]:
+        """Return `(model_id, paragraphs, title)`; `title` is None except for section 1."""
         if not self.client:
             raise ScriptGenerationError(
                 "generation_unavailable",
@@ -187,6 +254,7 @@ class ScriptGenerator:
                     "facts, figures, or claims from that specific source document chunk; if a "
                     "paragraph uses general knowledge or the speaker's chat notes, use []. "
                     'Return JSON: {"paragraphs": [{"text": "...", "source_chunk_ids": []}]}'
+                    f"{_title_prompt_note(section_index)}"
                 ),
             },
             {
@@ -218,7 +286,7 @@ class ScriptGenerator:
                 if not paragraphs:
                     raise ValueError("Empty paragraphs returned by LLM.")
                 self.limiter.consume(model_id, estimated_tokens)
-                return model_id, paragraphs
+                return model_id, paragraphs, _section_title(data, section_index)
             except Exception as exc:
                 last_err = exc
         raise ScriptGenerationError(
@@ -291,6 +359,7 @@ class ScriptGenerator:
         citations: list[ParagraphCitation] = []
         models_used: list[str] = []
         prior_titles: list[str] = []
+        script_title: str | None = None
 
         for idx, (section_title, target_words) in enumerate(plan, start=1):
             section_chunks = (
@@ -304,7 +373,7 @@ class ScriptGenerator:
                 if source_chunks
                 else []
             )
-            model_id, sec_paragraphs = self._generate_section(
+            model_id, sec_paragraphs, sec_title = self._generate_section(
                 topic=clean_topic,
                 section_title=section_title,
                 target_words=target_words,
@@ -316,6 +385,8 @@ class ScriptGenerator:
                 user_feedback=user_feedback,
                 chat_context=chat_context,
             )
+            if idx == 1:
+                script_title = sec_title
             if model_id not in models_used:
                 models_used.append(model_id)
             prior_titles.append(section_title)
@@ -356,4 +427,5 @@ class ScriptGenerator:
             citations=citations,
             flags=flags,
             warnings=warnings,
+            title=script_title,
         )
