@@ -145,7 +145,6 @@ export const TEXT = {
     saved: 'Saved as "{title}".',
     nameCount: '{n} / {max} characters', foldList: 'Hide the script list', unfoldList: 'Show the script list',
     edit: 'Edit', editTitle: 'Edit script', editAria: 'Edit {title}', bodyLabel: 'Script text', errBodyEmpty: 'The script text cannot be empty.', edited: 'Script updated.',
-    meta: '{d} min · {n} words',
     deleteAria: 'Delete {title}', deleteTitle: 'Delete this script?', deleteMsg: '"{title}" will be removed from your list. Reports of sessions you practised with it stay.',
     deleted: 'Script deleted.',
     dupBodyT: 'This script is already saved', dupBodyMsg: 'Your saved script "{title}" has exactly the same text, so this one was not saved.',

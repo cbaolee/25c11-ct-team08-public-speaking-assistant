@@ -1,7 +1,7 @@
 import { api, readJson } from '../api.js';
 import { T, TOPICS } from '../i18n.js';
 import { paintAvatar } from '../nav.js';
-import { isSavedListFull, openListFull, saveScriptAs } from '../screens/saved_scripts.js';
+import { saveScriptAs } from '../screens/saved_scripts.js';
 import { openReader, runScriptAction } from '../screens/script_reader.js';
 import { CONFIG, RENDER, S } from '../state.js';
 import { openModal, popIn, toast } from '../ui.js';
@@ -572,9 +572,8 @@ export function sendChat() {
   else sendSuggest(txt, file);   // idle, or picking_topic (asks again, see sendSuggest)
 }
 /* The reader window (openReader) lives in screens/script_reader.js. */
-/* Save from a chat bubble or the reader menu: asks for a name, then the chat copy remembers the saved id. */
+/* Save from a chat bubble or the reader menu under the name the card shows; the chat copy remembers the saved id. */
 export function saveChatScript(sc) {
-  if (isSavedListFull()) { openListFull(); return; }
   saveScriptAs(sc).then(j => { if (j) { sc.savedId = j.id; sc.title = sc.cardName = j.title; renameChatScript(j.id, j.title); persistChat(); } });
 }
 /* A chat script was edited in the reader: redraw its card and keep the change in localStorage. */
