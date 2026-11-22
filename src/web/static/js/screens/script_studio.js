@@ -574,8 +574,6 @@ export function sendChat() {
 /* The reader window (openReader) lives in screens/script_reader.js. */
 /* Save from a chat bubble or the reader menu: asks for a name, then the chat copy remembers the saved id. */
 export function saveChatScript(sc) {
-  const known = sc.savedId && (S.savedScripts || []).some(s => s.id === sc.savedId);
-  if (known) { toast(T('saved.already', { title: sc.cardName || sc.title })); return; }
   if (isSavedListFull()) { openListFull(); return; }
   saveScriptAs(sc).then(j => { if (j) { sc.savedId = j.id; sc.title = sc.cardName = j.title; renameChatScript(j.id, j.title); persistChat(); } });
 }

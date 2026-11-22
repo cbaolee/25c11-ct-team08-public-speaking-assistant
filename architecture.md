@@ -94,10 +94,10 @@ tests/                      pytest (tests/db: repositories and helpers); tests/w
 | `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor`                  |
 | `GET /api/sessions/{id}`           | One session: full result and signed audio URL, or compact summary            |
 | `DELETE /api/sessions/{id}`        | Delete the session files, then the row                                       |
-| `POST /api/scripts`                | Save a script; same body returns the existing row (200); cap returns 409     |
+| `POST /api/scripts`                | Save a script; duplicate title/body returns 409; cap returns 409             |
 | `GET /api/scripts?limit=&cursor=`  | Saved-script summaries with `total`, cap `limit`, `next_cursor`              |
 | `GET /api/scripts/{id}`            | One saved script with its body                                               |
-| `PATCH /api/scripts/{id}`          | Edit `title` and/or `body`; body equal to another saved script returns 409 `script_duplicate` |
+| `PATCH /api/scripts/{id}`          | Edit `title` and/or `body`; duplicate title/body returns 409                 |
 | `DELETE /api/scripts/{id}`         | Delete a saved script; linked sessions keep `script_snapshot`               |
 | `GET /api/profile`                 | Profile row, `email`, `preferences`, signed `avatar_url` or `null`           |
 | `PATCH /api/profile`               | Edit profile fields; `preferences` keys are merged, not replaced             |
@@ -127,7 +127,7 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 | 404    | `{"error": "session_not_found"}`                                         | Unknown session or another user's session          |
 | 409    | `{"error_code": "baseline_required", ...}`                               | Evaluate without a baseline                        |
 | 409    | `{"error_code": "script_limit_reached", "limit": N, "count": N, ...}`    | New saved script at the per-user cap               |
-| 409    | `{"error_code": "script_duplicate", "duplicate_id", "duplicate_title"}` | Edited body equals another saved script            |
+| 409    | `{"error_code": "script_duplicate_body" \| "script_duplicate_title", "duplicate_id", "duplicate_title"}` | Duplicate saved script text or title |
 | 413    | `{"error_code": "avatar_too_large", ...}`                                | Avatar above `storage.avatar_max_bytes`            |
 | 422    | `{"error_code": "avatar_invalid", ...}`                                  | Not PNG/JPEG/WebP, or a side above `avatar_max_side_px` |
 | 422    | Validation error                                                         | Bad `preferences` value                            |
@@ -278,7 +278,7 @@ sequenceDiagram
 ### 5.4 Saved scripts
 
 - A script reaches the `scripts` table only through Save. Practice sends the text without saving; an unsaved script survives only as `sessions.script_snapshot`.
-- The same body returns the existing row even at the cap; a new script at the cap returns `409 script_limit_reached`.
+- Duplicate body or case-insensitive title returns `409 script_duplicate_body` or `script_duplicate_title`; a new script at the cap returns `409 script_limit_reached`.
 - Deleting a script sets linked `sessions.script_id` to null and keeps `script_snapshot`, so reports still open.
 
 ### 5.5 Log in

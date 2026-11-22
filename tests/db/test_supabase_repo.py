@@ -339,8 +339,6 @@ def test_script_owner_only_and_find_by_hash(env):
         NewScript(
             title="IT",
             body="Hello there.",
-            word_count=2,
-            source="written",
             content_hash=content_hash,
         ),
     )
@@ -360,8 +358,6 @@ def test_count_scripts_counts_only_own_rows(env):
         NewScript(
             title="IT",
             body="Count me.",
-            word_count=2,
-            source="written",
             content_hash=f"it-{uuid4()}",
         ),
     )
@@ -503,8 +499,6 @@ def _new_script(body: str) -> NewScript:
     return NewScript(
         title="Integration test script",
         body=body,
-        word_count=len(body.split()),
-        source="written",
         content_hash=build_content_hash(body),
     )
 
