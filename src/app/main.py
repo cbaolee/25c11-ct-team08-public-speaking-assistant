@@ -44,11 +44,11 @@ from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
     NewScript,
     NewSession,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptLimitReachedError,
     ScriptPatch,
     ScriptRow,
-    ScriptDuplicateBodyError,
-    ScriptDuplicateTitleError,
     SessionRow,
     StorageError,
     build_content_hash,
