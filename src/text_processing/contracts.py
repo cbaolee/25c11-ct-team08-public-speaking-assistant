@@ -131,6 +131,7 @@ class GeneratedScript:
     citations: list[ParagraphCitation] = field(default_factory=list)
     flags: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    title: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -143,6 +144,7 @@ class GeneratedScript:
             "citations": [c.to_dict() for c in self.citations],
             "flags": list(self.flags),
             "warnings": list(self.warnings),
+            "title": self.title,
         }
 
 
