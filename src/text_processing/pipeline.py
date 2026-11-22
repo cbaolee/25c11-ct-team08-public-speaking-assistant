@@ -253,7 +253,7 @@ class ScriptGenerationPipeline:
                     greeting=request.greeting,
                 )
 
-        # Stage 7: Post-validation and D-13 20-minute audio evaluation warning
+        # Stage 7: Post-validation and 20-minute script audio-limit warning
         eff_duration = result.duration_min or request.duration_min
         issues = validate_assembled_script(result.script, eff_duration)
         if "unresolved_slots" in issues:
@@ -269,7 +269,7 @@ class ScriptGenerationPipeline:
             if "audio_limit_warning" not in result.flags:
                 result.flags.append("audio_limit_warning")
             result.warnings.append(
-                "20-minute scripts may approach the 22-minute (1320s) evaluation audio limit."
+                "20-minute scripts read slowly may approach the 32-minute evaluation audio limit."
             )
 
         # Stage 8: Store in LRU cache and return

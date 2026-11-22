@@ -258,6 +258,7 @@ sequenceDiagram
 
 - A save error never hides the score ([ADR-002](docs/adr/ADR-002.md)); a compaction error does not change `saved`.
 - `insufficient_audio` results are saved without audio.
+- Practice recordings are capped at 1,920 seconds (32 minutes); the 100 MB original-file upload cap is unchanged. The 16 kHz mono 16-bit master WAV is about 62 MB at that duration, within [Gladia's documented 135-minute and 1,000 MB pre-recorded limits](https://docs.gladia.io/chapters/limits-and-specifications/supported-formats.md).
 - The Evaluating Overlay shows the job progress. The shown percent counts up one step every `EVAL_COUNT_STEP_MS` (30 ms) toward the real progress, and the progress bars follow the shown number.
 - After `evaluate_background_after_ms` (5 s) the job continues in the background: the overlay closes, the user is sent Home with a notice, and the **Eval Dock** (top right, under the header) shows the bar and percent. Clicking it widens the card to the left and lists the steps, with a Cancel button. Practice and every new recording (Practice, Profile baseline, Word Coach) are locked until the job ends (`practiceLocked()`).
 - When the job is done, a dialog offers the report; the dock stays at 100% for `EVAL_DOCK_HOLD_MS` (3 s), then slides out to the right and is hidden. A page reload loses the dialog; the saved session still appears in History.
