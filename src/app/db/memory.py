@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from threading import RLock
 from typing import Any
 from urllib.parse import quote
 from uuid import UUID, uuid4
@@ -18,6 +19,8 @@ from src.app.db.models import (
     ScriptPatch,
     ScriptRow,
     ScriptSummary,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     SessionRow,
     SessionSummary,
     StorageError,
@@ -33,6 +36,7 @@ class MemoryState:
     profiles: dict[UUID, ProfileRow] = field(default_factory=dict)
     baselines: dict[UUID, list[BaselineRow]] = field(default_factory=dict)
     scripts: dict[UUID, ScriptRow] = field(default_factory=dict)
+    scripts_lock: RLock = field(default_factory=RLock)
     sessions: dict[UUID, SessionRow] = field(default_factory=dict)
     files: dict[tuple[str, str], bytes] = field(default_factory=dict)
 
@@ -192,14 +196,21 @@ class MemoryScriptRepo:
         self._state = state
 
     def create_script(self, user_id: UUID, data: NewScript) -> ScriptRow:
-        row = ScriptRow(
-            id=uuid4(),
-            user_id=user_id,
-            created_at=_now(),
-            **data.model_dump(),
-        )
-        self._state.scripts[row.id] = row.model_copy(deep=True)
-        return row.model_copy(deep=True)
+        with self._state.scripts_lock:
+            twin = self.find_script_by_hash(user_id, data.content_hash)
+            if twin is not None:
+                raise ScriptDuplicateBodyError(twin)
+            twin = self.find_script_by_title(user_id, data.title)
+            if twin is not None:
+                raise ScriptDuplicateTitleError(twin)
+            row = ScriptRow(
+                id=uuid4(),
+                user_id=user_id,
+                created_at=_now(),
+                **data.model_dump(),
+            )
+            self._state.scripts[row.id] = row.model_copy(deep=True)
+            return row.model_copy(deep=True)
 
     def get_script(self, user_id: UUID, script_id: UUID) -> ScriptRow | None:
         row = self._state.scripts.get(script_id)
@@ -215,22 +226,49 @@ class MemoryScriptRepo:
         )
         return matches[0].model_copy(deep=True) if matches else None
 
+    def find_script_by_title(self, user_id: UUID, title: str) -> ScriptRow | None:
+        normalized = title.strip().lower()
+        matches = _newest_first(
+            row
+            for row in self._state.scripts.values()
+            if row.user_id == user_id and row.title.strip().lower() == normalized
+        )
+        return matches[0].model_copy(deep=True) if matches else None
+
     def list_scripts(self, user_id: UUID, limit: int, cursor: str | None) -> list[ScriptSummary]:
         _validate_limit(limit)
         rows = _newest_first(row for row in self._state.scripts.values() if row.user_id == user_id)
         rows = _after_cursor(rows, cursor)
-        return [ScriptSummary.model_validate(row.model_dump()) for row in rows[:limit]]
+        return [
+            ScriptSummary(
+                id=row.id,
+                title=row.title,
+                word_count=len(row.body.split()),
+                created_at=row.created_at,
+            )
+            for row in rows[:limit]
+        ]
 
     def count_scripts(self, user_id: UUID) -> int:
         return sum(1 for row in self._state.scripts.values() if row.user_id == user_id)
 
     def update_script(self, user_id: UUID, script_id: UUID, patch: ScriptPatch) -> ScriptRow | None:
-        row = self._state.scripts.get(script_id)
-        if row is None or row.user_id != user_id:
-            return None
-        renamed = row.model_copy(update=patch.model_dump(exclude_none=True), deep=True)
-        self._state.scripts[script_id] = renamed
-        return renamed.model_copy(deep=True)
+        with self._state.scripts_lock:
+            row = self._state.scripts.get(script_id)
+            if row is None or row.user_id != user_id:
+                return None
+            values = patch.model_dump(exclude_none=True)
+            if values.get("content_hash"):
+                twin = self.find_script_by_hash(user_id, values["content_hash"])
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateBodyError(twin)
+            if values.get("title"):
+                twin = self.find_script_by_title(user_id, values["title"])
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateTitleError(twin)
+            renamed = row.model_copy(update=values, deep=True)
+            self._state.scripts[script_id] = renamed
+            return renamed.model_copy(deep=True)
 
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         row = self._state.scripts.get(script_id)

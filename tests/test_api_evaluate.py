@@ -337,8 +337,6 @@ def _store_script(repos, user_id, topic: str | None = "Keystone species"):
         NewScript(
             title="T",
             body="Hello.",
-            word_count=1,
-            source="written",
             content_hash=f"h-{uuid4()}",
             topic=topic,
         ),
@@ -357,7 +355,7 @@ def test_evaluate_saves_own_script_id_and_its_topic(monkeypatch, repos):
     r = _post_with(monkeypatch, {"script_id": str(script.id)}, saved)
     assert r.status_code == 200
     assert saved["script_id"] == script.id
-    assert saved["topic"] == "Keystone species"  # from the script when no topic is sent
+    assert saved["topic"] == "T"  # from the saved script title when no topic is sent
 
 
 def test_evaluate_topic_from_form_wins(monkeypatch, repos):

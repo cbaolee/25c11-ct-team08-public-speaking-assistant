@@ -142,13 +142,14 @@ export const TEXT = {
     empty: 'No saved scripts yet. Save a script in Script, or write your own and save it.',
     pickOne: 'No script chosen yet. Choose a script on the left to see its text here.', notSaved: 'Not saved',
     saveScript: 'Save script', saveTitle: 'Save script', nameLabel: 'Script name', errNameEmpty: 'Enter a name for the script.',
-    saved: 'Saved as "{title}".', already: 'This script is already in your list as "{title}".',
+    saved: 'Saved as "{title}".',
     nameCount: '{n} / {max} characters', foldList: 'Hide the script list', unfoldList: 'Show the script list',
     edit: 'Edit', editTitle: 'Edit script', editAria: 'Edit {title}', bodyLabel: 'Script text', errBodyEmpty: 'The script text cannot be empty.', edited: 'Script updated.',
     meta: '{d} min · {n} words',
     deleteAria: 'Delete {title}', deleteTitle: 'Delete this script?', deleteMsg: '"{title}" will be removed from your list. Reports of sessions you practised with it stay.',
     deleted: 'Script deleted.',
-    duplicateTitle: 'This script already exists', duplicateMsg: 'The text you wrote is the same as your saved script "{title}". Change the text, or keep using that script.',
+    dupBodyT: 'This script is already saved', dupBodyMsg: 'Your saved script "{title}" has exactly the same text, so this one was not saved.',
+    dupTitleT: 'This name is already used', dupTitleMsg: 'You already have a saved script named "{title}". Pick another name.',
     fullTitle: 'Your script list is full', fullMsg: 'You can keep up to {max} saved scripts. Delete one before you save another.'
   },
 

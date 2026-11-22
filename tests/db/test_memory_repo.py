@@ -37,10 +37,8 @@ def _new_session(*, audio_path: str | None = None) -> NewSession:
 
 def _new_script(content_hash: str = "hash-1") -> NewScript:
     return NewScript(
-        title="Practice",
+        title=f"Practice {content_hash}",
         body="A short script.",
-        word_count=3,
-        source="written",
         content_hash=content_hash,
     )
 
@@ -226,16 +224,17 @@ def test_replace_current_baseline_same_id_raises_conflict():
         repos.baselines.replace_current_baseline(user_id, data)
 
 
-def test_new_script_rejects_unsupported_duration():
-    with pytest.raises(ValidationError):
-        NewScript(
-            title="Practice",
-            body="A short script.",
-            word_count=3,
-            source="written",
-            content_hash="hash-1",
-            duration_min=7,
-        )
+def test_new_script_accepts_only_title_body_and_hash():
+    script = NewScript(
+        title="Practice",
+        body="A short script.",
+        content_hash="hash-1",
+    )
+    assert script.model_dump() == {
+        "title": "Practice",
+        "body": "A short script.",
+        "content_hash": "hash-1",
+    }
 
 
 def test_profile_patch_only_changes_fields_that_were_set():

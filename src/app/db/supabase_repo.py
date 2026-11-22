@@ -28,6 +28,8 @@ from src.app.db.models import (
     ScriptPatch,
     ScriptRow,
     ScriptSummary,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     SessionRow,
     SessionSummary,
     StorageError,
@@ -39,7 +41,7 @@ from src.app.db.models import (
 UNIQUE_VIOLATION = "23505"
 MAX_BEYOND_ROWS = 1000
 
-SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,duration_min,created_at"
+SCRIPT_SUMMARY_COLUMNS = "id,title,body,created_at"
 # PostgREST JSON paths ("alias:result->section->key") read the chart numbers inside result
 SESSION_SUMMARY_COLUMNS = ",".join(
     [
@@ -194,7 +196,16 @@ class SupabaseScriptRepo:
 
     def create_script(self, user_id: UUID, data: NewScript) -> ScriptRow:
         values = {**data.model_dump(mode="json"), "user_id": str(user_id)}
-        resp = _execute(self._table().insert(values))
+        try:
+            resp = _execute(self._table().insert(values))
+        except ConflictError:
+            twin = self.find_script_by_hash(user_id, data.content_hash)
+            if twin is not None:
+                raise ScriptDuplicateBodyError(twin)
+            twin = self.find_script_by_title(user_id, data.title)
+            if twin is not None:
+                raise ScriptDuplicateTitleError(twin)
+            raise
         row = _first(resp.data)
         if row is None:
             raise StorageError("Script insert returned no row")
@@ -220,10 +231,32 @@ class SupabaseScriptRepo:
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
 
+    def find_script_by_title(self, user_id: UUID, title: str) -> ScriptRow | None:
+        resp = _execute(
+            self._table()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+        )
+        normalized = title.strip().lower()
+        for row in resp.data:
+            if str(row.get("title", "")).strip().lower() == normalized:
+                return ScriptRow.model_validate(row)
+        return None
+
     def list_scripts(self, user_id: UUID, limit: int, cursor: str | None) -> list[ScriptSummary]:
         query = self._table().select(SCRIPT_SUMMARY_COLUMNS).eq("user_id", str(user_id))
         resp = _execute(_newest_page(query, limit, cursor))
-        return [ScriptSummary.model_validate(row) for row in resp.data]
+        return [
+            ScriptSummary(
+                id=row["id"],
+                title=row["title"],
+                word_count=len(row["body"].split()),
+                created_at=row["created_at"],
+            )
+            for row in resp.data
+        ]
 
     def count_scripts(self, user_id: UUID) -> int:
         resp = _execute(
@@ -235,9 +268,20 @@ class SupabaseScriptRepo:
         values = patch.model_dump(exclude_none=True)
         if not values:
             return self.get_script(user_id, script_id)
-        resp = _execute(
-            self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
-        )
+        try:
+            resp = _execute(
+                self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
+            )
+        except ConflictError:
+            if patch.content_hash is not None:
+                twin = self.find_script_by_hash(user_id, patch.content_hash)
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateBodyError(twin)
+            if patch.title is not None:
+                twin = self.find_script_by_title(user_id, patch.title)
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateTitleError(twin)
+            raise
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
 

@@ -5,3 +5,5 @@
 | 2026-11-14 | #28 / #12 | Copilot | Guidance on implementing models, in-memory adapters|
 | 2026-11-14 | #32 / #15 | Copilot | Guidance on implementing encoding function|
 | 2026-11-14 | #43 / #16 | Copilot | Guidance with Supabase connection, save-failure handling|
+| 2026-11-20 | #64 / #55 | Copilot | Guidance with script backend, saving history|
+| 2026-11-22 | #103 / #102 | Copilot | Guidance with SQL Migration and helped updted script models|

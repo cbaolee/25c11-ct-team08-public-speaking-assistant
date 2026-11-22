@@ -18,9 +18,7 @@ from pydantic import (
 
 from src.app.constants import CONSTANTS
 
-ScriptSource = Literal["generated_template", "generated_llm", "written"]
 SessionStatus = Literal["ok", "insufficient_audio"]
-ScriptDuration = Literal[5, 10, 15, 20]
 
 
 class StorageError(Exception):
@@ -29,6 +27,18 @@ class StorageError(Exception):
 
 class ConflictError(StorageError):
     """An object or record conflicts with existing data."""
+
+
+class ScriptDuplicateTitleError(ConflictError):
+    def __init__(self, twin: "ScriptRow") -> None:
+        self.twin = twin
+        super().__init__(f'Saved script title already exists: "{twin.title}"')
+
+
+class ScriptDuplicateBodyError(ConflictError):
+    def __init__(self, twin: "ScriptRow") -> None:
+        self.twin = twin
+        super().__init__(f'Saved script body already exists: "{twin.title}"')
 
 
 class ScriptLimitReachedError(Exception):
@@ -118,33 +128,19 @@ class BaselineRow(NewBaseline):
 class NewScript(BaseModel):
     title: str
     body: str
-    word_count: int
-    source: ScriptSource
     content_hash: str
-    topic: str | None = None
-    category: str | None = None
-    duration_min: ScriptDuration | None = None
-    citations: list[dict] = Field(default_factory=list)
-    template_id: str | None = None
-    models_used: list[str] = Field(default_factory=list)
 
 
 class ScriptSummary(BaseModel):
     id: UUID
     title: str
-    topic: str | None
-    source: ScriptSource
     word_count: int
-    duration_min: ScriptDuration | None = None
     created_at: datetime
 
 
 class ScriptPatch(BaseModel):
-    """Fields an edit may change. A new body always comes with its word_count and content_hash."""
-
     title: str | None = None
     body: str | None = None
-    word_count: int | None = None
     content_hash: str | None = None
 
 

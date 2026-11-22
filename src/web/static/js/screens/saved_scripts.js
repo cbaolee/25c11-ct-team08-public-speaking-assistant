@@ -13,10 +13,6 @@ import { $, $$, IC, clearErr, esc, showErr } from '../utils.js';
 
 const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>';
 const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
-/* GeneratedScript.source ("template" / "llm") -> the scripts.source value the API stores. */
-export const SCRIPT_SOURCE = { template: 'generated_template', llm: 'generated_llm' };
-export const SCRIPT_DURATIONS = [5, 10, 15, 20];   // fixed by the scripts.duration_min check in SQL
-
 export function savedScriptLimit() {
   return CONFIG.MAX_SAVED_SCRIPTS;
 }
@@ -38,9 +34,9 @@ export function loadSavedScripts() {
   }).catch(() => {});
 }
 
-/* Meta line shared by the lists and the Practice preview: "5 min · 658 words" (no minutes when unknown). */
-export function scriptMeta(durationMin, wordCount) {
-  return durationMin ? T('saved.meta', { d: durationMin, n: wordCount }) : T('saved.words', { n: wordCount });
+/* Meta line shared by the lists and the Practice preview. */
+export function scriptMeta(_durationMin, wordCount) {
+  return T('saved.words', { n: wordCount });
 }
 /* Same card as a script in the Chat Feed: file icon, name, meta; then Edit and Delete icons. */
 function itemHtml(script, selectedId) {
@@ -130,20 +126,26 @@ export function openListFull() {
 export function saveScriptAs(sc) {
   if (isSavedListFull()) { openListFull(); return Promise.resolve(null); }
   return askScriptName(T('saved.saveTitle'), T('common.save'), sc.title).then(name => {
-    const d = +sc.duration_min;
     return withBusy(api('/api/scripts', { method: 'POST', json: {
-      title: name, body: sc.text, source: SCRIPT_SOURCE[sc.source] || 'written',
-      duration_min: SCRIPT_DURATIONS.indexOf(d) >= 0 ? d : null, topic: sc.title ? sc.title.slice(0, CONFIG.SCRIPT_TITLE_MAX_CHARS) : null,
-      category: sc.topic || null, template_id: sc.template_id || null, models_used: sc.models_used || [], citations: sc.citations || []
+      title: name, body: sc.text
     } }), T('busy.saving')).then(readJson).then(({ ok, status, j }) => {
       if (!ok) {
         const code = j && j.error_code;
         if (code === 'script_limit_reached') { openListFull(); loadSavedScripts(); return null; }
         if (code === 'content_rejected') { openModal('safetyAlert'); return null; }
+        if (code === 'script_duplicate_body') {
+          openNotice(T('saved.dupBodyT'), T('saved.dupBodyMsg', { title: j.duplicate_title }));
+          return null;
+        }
+        if (code === 'script_duplicate_title') {
+          openNotice(T('saved.dupTitleT'), T('saved.dupTitleMsg', { title: j.duplicate_title }));
+          askScriptName(T('saved.saveTitle'), T('common.save'), name);
+          return null;
+        }
         toast((j && j.message) || T('eval.errServer'), true);
         return null;
       }
-      toast(T(status === 200 ? 'saved.already' : 'saved.saved', { title: j.title }));
+      toast(T('saved.saved', { title: j.title }));
       loadSavedScripts();
       return j;
     }).catch(() => { toast(T('eval.errNet'), true); return null; });
@@ -156,7 +158,8 @@ export function patchSavedScript(id, patch, errorBox) {
   return withBusy(api('/api/scripts/' + encodeURIComponent(id), { method: 'PATCH', json: patch }), T('busy.saving')).then(readJson).then(({ ok, j }) => {
     if (!ok) {
       if (j && j.error_code === 'content_rejected') openModal('safetyAlert');
-      else if (j && j.error_code === 'script_duplicate') openNotice(T('saved.duplicateTitle'), T('saved.duplicateMsg', { title: j.duplicate_title }));
+      else if (j && j.error_code === 'script_duplicate_body') openNotice(T('saved.dupBodyT'), T('saved.dupBodyMsg', { title: j.duplicate_title }));
+      else if (j && j.error_code === 'script_duplicate_title') openNotice(T('saved.dupTitleT'), T('saved.dupTitleMsg', { title: j.duplicate_title }));
       else showErr(errorBox, (j && j.message) || T('eval.errServer'));
       return null;
     }
@@ -220,8 +223,7 @@ export function openSavedScript(id, edit) {
   closeStudioSavedMenu(false);
   withBusy(api('/api/scripts/' + encodeURIComponent(id)), T('busy.loading')).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) { toast(T('eval.errServer'), true); return; }
-    openReader({ title: s.title, cardName: s.title, text: s.body, citations: s.citations || [], warnings: [], savedId: s.id, fromList: true,
-      topic: s.category || null, duration_min: s.duration_min, source: s.source }, { edit });
+    openReader({ title: s.title, cardName: s.title, text: s.body, citations: [], warnings: [], savedId: s.id, fromList: true }, { edit });
   }).catch(() => toast(T('eval.errNet'), true));
 }
 

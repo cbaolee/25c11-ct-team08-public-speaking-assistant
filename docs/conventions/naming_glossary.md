@@ -16,6 +16,8 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 
 **Saved Scripts**: danh sách script người dùng đã lưu (tối đa `max_saved_scripts`), hiện "x / N", mỗi script là một thẻ file giống thẻ trong chat, có icon Edit và Delete. Có ở Practice (tab _Mine_) và Script Studio (Show my scripts, dạng menu thả xuống **Saved Menu**).
 
+**Saved-script duplicate errors**: `script_duplicate_body` khi văn bản đã trùng; `script_duplicate_title` khi tên trùng không phân biệt hoa thường.
+
 ## 2. Popup (modal) và lớp phủ
 
 | Tên gọi                | Chức năng |
