@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
 
 from src.app.config import max_list_page_size
 from src.app.db.factory import build_memory_repos, get_repos

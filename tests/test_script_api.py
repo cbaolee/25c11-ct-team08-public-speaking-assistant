@@ -199,7 +199,9 @@ def test_save_script_stores_row_in_repo(script_api) -> None:
     assert body["body"] == "Good morning."
     assert body["word_count"] == 2
     assert "user_id" not in body and "content_hash" not in body
-    assert repos.scripts.get_script(state["user"].id, UUID(body["id"])).title == "Script Good morning."
+    saved = repos.scripts.get_script(state["user"].id, UUID(body["id"]))
+    assert saved is not None
+    assert saved.title == "Script Good morning."
 
 
 def test_save_same_text_twice_returns_duplicate_body(script_api) -> None:

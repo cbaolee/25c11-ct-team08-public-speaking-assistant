@@ -25,11 +25,11 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptPatch,
     ScriptRow,
     ScriptSummary,
-    ScriptDuplicateBodyError,
-    ScriptDuplicateTitleError,
     SessionRow,
     SessionSummary,
     StorageError,
@@ -198,13 +198,13 @@ class SupabaseScriptRepo:
         values = {**data.model_dump(mode="json"), "user_id": str(user_id)}
         try:
             resp = _execute(self._table().insert(values))
-        except ConflictError:
+        except ConflictError as err:
             twin = self.find_script_by_hash(user_id, data.content_hash)
             if twin is not None:
-                raise ScriptDuplicateBodyError(twin)
+                raise ScriptDuplicateBodyError(twin) from err
             twin = self.find_script_by_title(user_id, data.title)
             if twin is not None:
-                raise ScriptDuplicateTitleError(twin)
+                raise ScriptDuplicateTitleError(twin) from err
             raise
         row = _first(resp.data)
         if row is None:
@@ -272,15 +272,15 @@ class SupabaseScriptRepo:
             resp = _execute(
                 self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
             )
-        except ConflictError:
+        except ConflictError as err:
             if patch.content_hash is not None:
                 twin = self.find_script_by_hash(user_id, patch.content_hash)
                 if twin is not None and twin.id != script_id:
-                    raise ScriptDuplicateBodyError(twin)
+                    raise ScriptDuplicateBodyError(twin) from err
             if patch.title is not None:
                 twin = self.find_script_by_title(user_id, patch.title)
                 if twin is not None and twin.id != script_id:
-                    raise ScriptDuplicateTitleError(twin)
+                    raise ScriptDuplicateTitleError(twin) from err
             raise
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
