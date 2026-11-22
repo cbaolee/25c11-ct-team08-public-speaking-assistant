@@ -3,6 +3,7 @@ import { T, TOPICS } from '../i18n.js';
 import { paintAvatar } from '../nav.js';
 import { saveScriptAs } from '../screens/saved_scripts.js';
 import { openReader, runScriptAction } from '../screens/script_reader.js';
+import { pickScriptTitle } from '../screens/script_studio_state.js';
 import { CONFIG, RENDER, S } from '../state.js';
 import { openModal, popIn, toast } from '../ui.js';
 import { $, $$, IC, clearErr, esc, showErr, wordsOf } from '../utils.js';
@@ -263,7 +264,9 @@ function fillScriptBubble(ai, sc) {
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + scriptCardHtml();
   $('.fc-name', ai).textContent = sc.cardName;
   const wc = wordsOf(sc.text);
-  $('.fc-main .note', ai).textContent = sc.duration_min + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + (sc.warnings.length ? ' · ' + T('script.hasNotes') : '');
+  /* The name shown in the Script Bubble is the Script Title now, so the Topic label sits in the note (skipped when it equals the name, e.g. old chats) */
+  const topic = sc.topic ? topicLabel(sc.topic) : '';
+  $('.fc-main .note', ai).textContent = (topic && topic !== sc.cardName ? topic + ' · ' : '') + sc.duration_min + ' ' + T('script.min') + ' · ' + wc + ' ' + T('script.words') + (sc.warnings.length ? ' · ' + T('script.hasNotes') : '');
   $('[data-a=view]', ai).setAttribute('aria-label', T('script.viewAria', { title: sc.cardName }));
   $('[data-a=practice]', ai).textContent = T('script.practice');
   $('[data-a=save]', ai).textContent = T('saved.saveScript');
@@ -420,9 +423,10 @@ export function generateScript(req, again) {
       S.chatPollTimer = setTimeout(() => poll(id), pollIntervalMs()); return;
     }
     const res = j.result || {}, text = res.script || '';
-    const title = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
-    /* The card is named after the Topic the person picked (template title when one is chosen), not the chat message */
-    const cardName = req.tplTitle || topicLabel(req.topic);
+    /* The AI's Script Title names both the saved script and the Script Bubble; without one (older backend, rejected title)
+       we keep the old naming. The Topic label moves to the Script Bubble note, see fillScriptBubble. */
+    const fallback = req.tplTitle || titleFrom(req.txt, req.file, req.topic);
+    const title = pickScriptTitle(res, fallback, CONFIG.SCRIPT_TITLE_MAX_CHARS), cardName = title;
     ai._script = { title, cardName, text, topic: req.topic, duration_min: res.duration_min || req.dur || 5, source: res.source || (req.tplId ? 'template' : 'llm'),
       template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
     fillScriptBubble(ai, ai._script);
