@@ -631,6 +631,7 @@ class TemplateEngine:
             citations=all_citations,
             flags=flags,
             warnings=warnings,
+            title=topic.strip() or None,
         )
 
 
