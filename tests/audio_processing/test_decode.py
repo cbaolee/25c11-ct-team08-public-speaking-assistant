@@ -2,9 +2,11 @@ import shutil
 import subprocess
 import wave
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
+from src.app.config import max_audio_seconds
 from src.audio_processing import decode as decode_module
 from src.audio_processing.contracts import AudioRejected
 from src.audio_processing.decode import decode_to_master
@@ -14,7 +16,7 @@ pytestmark = pytest.mark.skipif(
     reason="ffmpeg not installed",
 )
 
-LIMITS = dict(max_seconds=1320, cap_margin_s=10, timeout_s=60)
+LIMITS = dict(max_seconds=max_audio_seconds, cap_margin_s=10, timeout_s=60)
 
 
 def _ffmpeg(*args):
@@ -109,6 +111,21 @@ def test_too_long_is_detected_through_duration_cap(wav_16k_mono, workdir):
     # 3-second source, 1-second limit, -t cap = 2 seconds. Master is 2 seconds > 1 second.
     with pytest.raises(AudioRejected) as info:
         decode_to_master(wav_16k_mono, workdir, max_seconds=1, cap_margin_s=1, timeout_s=60)
+    assert _code(info) == "too_long"
+
+
+def test_audio_over_configured_limit_is_rejected(workdir, monkeypatch):
+    def fake_run(command, **kwargs):
+        assert command[command.index("-t") + 1] == str(max_audio_seconds + 10)
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    fake_wave = MagicMock()
+    fake_wave.__enter__.return_value.getnframes.return_value = (max_audio_seconds + 1) * 16000
+    fake_wave.__enter__.return_value.getframerate.return_value = 16000
+    monkeypatch.setattr(decode_module.subprocess, "run", fake_run)
+    monkeypatch.setattr(decode_module.wave, "open", lambda *_: fake_wave)
+    with pytest.raises(AudioRejected) as info:
+        decode_to_master(Path("over_limit.wav"), workdir, **LIMITS)
     assert _code(info) == "too_long"
 
 

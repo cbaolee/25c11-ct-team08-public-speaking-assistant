@@ -33,8 +33,8 @@ max_upload_bytes = 104_857_600
 [audio]
 # Pauses shorter than this are ignored, in seconds
 min_pause_s = 0.35
-# Longest practice recording accepted, in seconds (22 min)
-max_audio_seconds = 1320
+# Longest practice recording accepted, in seconds (32 min)
+max_audio_seconds = 1920
 # Baseline recording accepted only inside [min, max], in seconds
 baseline_min_seconds = 10
 baseline_max_seconds = 60
@@ -47,7 +47,7 @@ stt_connect_timeout_s = 5
 stt_read_timeout_s = 120
 
 [script]
-# Practice script limits. 1320 s at 175 WPM is 3850 words; 4000 leaves a small margin.
+# Practice script limits: 4000 words takes 32 minutes at 125 WPM.
 # The character cap stops a few huge "words".
 max_script_words = 4000
 max_script_chars = 40_000
