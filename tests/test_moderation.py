@@ -645,7 +645,7 @@ def test_layer2_request_shape(url: str, path: str) -> None:
 def test_default_model_tag() -> None:
     fake = FakeOllama()
     _moderator(fake).check_text(GUARD_TEXT)
-    assert json.loads(fake.requests[0].content)["model"] == "llama-guard3:1b"
+    assert json.loads(fake.requests[0].content)["model"] == "llama-guard3:8b"
 
 
 def test_own_client_has_timeout_and_no_redirects(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -901,7 +901,7 @@ def test_layer2_openai_compat_with_bearer_token(
         enable_llama_guard=True,
         ollama_url="http://example.invalid:12345/v1/chat/completions",
         ollama_api_key="test-secret-token",
-        llama_guard_model="llama-guard3:1b",
+        llama_guard_model="llama-guard3:8b",
         http_client=client,
     )
     decision = mod.check_text("How do I hotwire a car?", user_id="u1")
@@ -909,7 +909,7 @@ def test_layer2_openai_compat_with_bearer_token(
     assert str(seen[0].url) == "http://example.invalid:12345/v1/chat/completions"
     assert seen[0].headers.get("authorization") == "Bearer test-secret-token"
     body = json.loads(seen[0].content)
-    assert body["model"] == "llama-guard3:1b"
+    assert body["model"] == "llama-guard3:8b"
     assert body["temperature"] == 0
     assert (decision.allowed, decision.layer, decision.flagged_terms) == (
         expected_allowed,

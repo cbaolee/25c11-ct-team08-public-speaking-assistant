@@ -2,7 +2,7 @@
 
 Responsibilities (Brief §5.2 Stage 4, §5.8):
 - Layer 1 (Always active): Fast deterministic blocklist filter (injection phrases + profanity)
-- Layer 2 (Optional, `enable_llama_guard` + `ollama_url`): local Llama-Guard-3-1B via Ollama
+- Layer 2 (Optional, `enable_llama_guard` + `ollama_url`): Llama-Guard-3-8B via Ollama
   `POST {ollama_url}/api/chat`. Only text that PASSED Layer 1 is sent (a Layer 1 block is final).
 - In-memory LRU + TTL cache keyed by `(sha256(text), user_id)`
 - Delimiter wrapping helper to protect against indirect prompt injection from PDFs
@@ -93,9 +93,10 @@ INPUT_TOO_LARGE_REASON = "input_too_large_after_normalization"
 
 # Not checked against a real Ollama: the model tag, and that /api/chat applies the
 # Llama Guard template.
-DEFAULT_LLAMA_GUARD_MODEL = "llama-guard3:1b"
+DEFAULT_LLAMA_GUARD_MODEL = "llama-guard3:8b"
 # Picked for now, not measured. Timeout PER httpx operation (connect/read/write/pool).
-DEFAULT_OLLAMA_TIMEOUT_S = 10.0
+# 25.0s accommodates cold-start model loading for llama-guard3:8b (~4.9 GB).
+DEFAULT_OLLAMA_TIMEOUT_S = 25.0
 # Picked for now, not measured: ~4000 characters per chunk, at most 8 chunks (~32k
 # characters) per text sent to Layer 2.
 DEFAULT_LAYER2_MAX_CHARS = 4000
