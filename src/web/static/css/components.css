@@ -143,6 +143,17 @@ button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1
 #screenScriptStudio .composer select, #screenScriptStudio .composer .csel-btn { font-size: 15px; }
 #screenScriptStudio .composer .btn { min-height: 44px; }
 #screenScriptStudio .composer .iconbtn { width: 44px; height: 44px; padding: 0; }
+/* Send turns into Regenerate once the chat has a script (script_studio.js toggles .is-regen once; the width is not animated
+   so the text box does not jitter). Arrow icon + label; the label is hidden on narrow screens and the button stays 44px square. */
+#screenScriptStudio .composer .composer-send .ic-regen, #screenScriptStudio .composer .composer-send .lbl-regen { display: none; }
+#screenScriptStudio .composer .composer-send.is-regen .ic-send { display: none; }
+#screenScriptStudio .composer .composer-send.is-regen .ic-regen { display: block; }
+#screenScriptStudio .composer .composer-send.is-regen .lbl-regen { display: inline; white-space: nowrap; }
+#screenScriptStudio .composer .iconbtn.composer-send.is-regen { width: auto; padding: 0 14px; }
+@media (max-width: 560px) {
+  #screenScriptStudio .composer .composer-send.is-regen .lbl-regen { display: none; }
+  #screenScriptStudio .composer .iconbtn.composer-send.is-regen { width: 44px; padding: 0; }
+}
 .fchip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 3px 4px 3px 12px; font: 500 14px var(--sans); margin-bottom: 10px; }
 .composer > .row:has(#composerTopic) { padding-right: 36px; }   /* room for the fold arrow at the top right */
 /* Category / Duration row: labels centred on the selects, and the selects a little shorter than the 44px buttons */
