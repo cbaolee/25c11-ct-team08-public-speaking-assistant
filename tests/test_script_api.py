@@ -69,6 +69,7 @@ def _build_test_pipeline() -> tuple[ScriptGenerationPipeline, MagicMock]:
             models_used=["openai/gpt-oss-120b"],
             citations=[ParagraphCitation(paragraph=1, heading=None, page=None, status="uncited")],
             flags=["uncited"],
+            title="Quantum Computing Ethics Today",
         )
 
     llm_mock.generate_free_topic_script.side_effect = _fake_free_topic
@@ -133,11 +134,13 @@ def test_generate_script_template_and_llm_cache_and_20m_warning(
     assert job_tpl["status"] == "completed"
     assert job_tpl["result"]["source"] == "template"
     assert "word_count_adjusted" in job_tpl["result"]["flags"]
+    assert job_tpl["result"]["title"] == "Keystone Species Conservation"
 
-    for _ in range(2):
+    for _ in range(2):  # the 2nd round is a cache hit and must keep the title
         job_llm = _submit_and_poll("Quantum Computing Ethics", duration_min=20, user_id="alice")
         assert job_llm["status"] == "completed"
         assert job_llm["result"]["source"] == "llm"
+        assert job_llm["result"]["title"] == "Quantum Computing Ethics Today"
         assert "audio_limit_warning" in job_llm["result"]["flags"]
 
     assert llm_mock.generate_free_topic_script.call_count == 1
