@@ -38,6 +38,7 @@ from src.app.db.models import (
     encode_cursor,
 )
 from src.app.db.supabase_repo import (
+    SupabaseAccountRepo,
     SupabaseBaselineRepo,
     SupabaseScriptRepo,
     SupabaseSessionRepo,
@@ -123,6 +124,44 @@ def test_newest_page_rejects_bad_limit():
         _newest_page(None, 0, None)
     with pytest.raises(ValueError):
         _newest_page(None, max_list_page_size + 1, None)
+
+
+def _chain_client(data):
+    client = MagicMock()
+    query = client.table.return_value
+    for name in ("select", "eq", "limit", "upsert", "delete"):
+        getattr(query, name).return_value = query
+    query.execute.return_value.data = data
+    return client, query
+
+
+def test_assign_shard_inserts_without_overwriting_offline():
+    client, query = _chain_client([{"shard_ref": "bbbb"}])
+    user_id = uuid4()
+    assert SupabaseAccountRepo(client).assign_shard(user_id, "aaaa") == "bbbb"  # stored wins
+    client.table.assert_any_call("accounts")
+    query.upsert.assert_called_once_with(
+        {"user_id": str(user_id), "shard_ref": "aaaa"},
+        on_conflict="user_id",
+        ignore_duplicates=True,
+    )
+
+
+def test_get_shard_without_row_is_none_offline():
+    client, _ = _chain_client([])
+    assert SupabaseAccountRepo(client).get_shard(uuid4()) is None
+
+
+def test_count_by_shard_offline():
+    client, _ = _chain_client([{"shard_ref": "core"}, {"shard_ref": "b"}, {"shard_ref": "b"}])
+    assert SupabaseAccountRepo(client).count_by_shard() == {"core": 1, "b": 2}
+
+
+def test_delete_user_sessions_filters_by_user_offline():
+    client, query = _chain_client([{"id": "a"}, {"id": "b"}])
+    user_id = uuid4()
+    assert SupabaseSessionRepo(client).delete_user_sessions(user_id) == 2
+    query.eq.assert_called_once_with("user_id", str(user_id))
 
 
 def _script_row(user_id: UUID, title: str, body: str) -> ScriptRow:

@@ -89,6 +89,21 @@ class SessionRepo(Protocol):
 
     def delete_session(self, user_id: UUID, session_id: UUID) -> bool: ...
 
+    # Every session row of the user, for deleting an account. Returns how many were deleted.
+    def delete_user_sessions(self, user_id: UUID) -> int: ...
+
+
+# Which shard project holds a user's sessions and session files (core project, ADR-012).
+class AccountRepo(Protocol):
+    # Shard ref: "core" or a shard project's ref (config.ShardProject.ref).
+    def get_shard(self, user_id: UUID) -> str | None: ...
+
+    # Keeps the shard already stored for the user, so two first requests agree on one shard.
+    def assign_shard(self, user_id: UUID, shard_ref: str) -> str: ...
+
+    # Users per shard ref; shards with no user are missing from the dict.
+    def count_by_shard(self) -> dict[str, int]: ...
+
 
 class AudioStore(Protocol):
     def upload_file(
