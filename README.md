@@ -54,7 +54,7 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 - [uv](https://docs.astral.sh/uv/)
 - [FFmpeg](https://ffmpeg.org/) available on your `PATH` (also used to encode stored audio as Opus)
 - API keys for [Groq](https://console.groq.com/), [Deepgram](https://deepgram.com/) and [Gladia](https://www.gladia.io/) (the server does not start without them)
-- Access to the team's [Supabase](https://supabase.com/) project `psc-dev` (optional for local runs, see [Database setup](#database-setup))
+- Access to the team's [Supabase](https://supabase.com/) projects `psc-main` and `psc-shard01` … `psc-shard09` (optional for local runs, see [Database setup](#database-setup))
 
 ### Installation
 
@@ -100,7 +100,8 @@ Tunable limits (saved-script cap, avatar size, list page size, UI timings and fo
 
 Only needed when `SUPABASE_URL` is set.
 
-1. **Run the migrations** in order on the Supabase project (_SQL Editor_ → paste → _Run_). Back up first and update the file's `Applied:` line after running it.
+1. **Enable `pg_cron`** on every project (_Database → Extensions_): each one runs a cleanup job. Full order for a new core or shard project: [architecture.md 4.7](architecture.md).
+   **Run the migrations** in order on the core project `psc-main` (_SQL Editor_ → paste → _Run_). Back up first and update the file's `Applied:` line after running it.
 
    | File | Run | Creates |
    | --- | --- | --- |
@@ -108,21 +109,27 @@ Only needed when `SUPABASE_URL` is set.
    | `0002_storage.sql` | once | Private buckets `audio`, `series`, `baselines` and their policies |
    | `0003_profile_avatar_preferences.sql` | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, function `merge_profile_preferences` |
    | `0004_replace_baseline_fn.sql` | any time | Function `replace_current_baseline` (baseline swap in one transaction) |
-   | `0005_purge_insufficient_sessions.sql` | optional, any time | pg_cron job that deletes `insufficient_audio` sessions older than 7 days (must match `app_constants.toml` `[retention] insufficient_days`). Enable the `pg_cron` extension first (Dashboard -> Database -> Extensions). Until it has run, insufficient sessions are not deleted even though the UI says "deleted after 7 days". |
-   | `0009_purge_unconfirmed_accounts.sql` | optional, any time | pg_cron job (every 15 min) that deletes accounts whose email is still unconfirmed 60 minutes after the last code (must match `app_constants.toml` `[auth] unconfirmed_ttl_min`); accounts with files in Storage are skipped. Enable `pg_cron` first. Until it has run, unconfirmed accounts stay even though the "Check your email" step says they are deleted (ADR-011). |
+   | `0005_purge_insufficient_sessions.sql` | required, any time | pg_cron job that deletes `insufficient_audio` sessions older than 7 days (must match `app_constants.toml` `[retention] insufficient_days`). Enable the `pg_cron` extension first (Dashboard -> Database -> Extensions). Until it has run, insufficient sessions are not deleted even though the UI says "deleted after 7 days". |
+   | `0006_scripts_title_body_only.sql` | once | `scripts` keeps only title and body; unique title and body per user |
+   | `0007_drop_profile_topics.sql` | once | Drops `profiles.topics` |
+   | `0008_replace_baseline_delete_old.sql` | any time | `replace_current_baseline` keeps one baseline row per user |
+   | `0009_purge_unconfirmed_accounts.sql` | required, any time | pg_cron job (every 15 min) that deletes accounts whose email is still unconfirmed 60 minutes after the last code (must match `app_constants.toml` `[auth] unconfirmed_ttl_min`); accounts with files in Storage are skipped. Enable `pg_cron` first. Until it has run, unconfirmed accounts stay even though the "Check your email" step says they are deleted (ADR-011). |
+   | `0010_accounts.sql` | any time | Table `accounts` (which shard holds each user's sessions); existing users get `core` |
+
+   On every **shard project** (ADR-012) run `db/migrations/shard/0001_sessions.sql` (once), then `shard/0002_purge_insufficient_sessions.sql` (enable pg_cron first), then list the shards in `SUPABASE_SHARDS`.
 
    Deploy a backend version only after the migrations it needs have run.
-2. **Create test users** on `psc-dev` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
+2. **Create test users** on `psc-main` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
 3. **Create a `profiles` row for each test user.** Baselines, scripts and sessions reference `profiles(id)`, so saving fails for a user without a profile.
 4. Record a baseline once for your test user: with `BASELINE_REQUIRED=true`, `/api/evaluate` returns `409 baseline_required` until a baseline exists.
 
-> Never edit a merged migration. Add a new file (`0010_...sql`) with the `Run` / `Applied` / `Effect` header. Run it on `psc-dev` first.
+> Never edit a merged migration, except its `Applied:` line. Add a new file (`0011_...sql`, or the next number in `shard/`) with the `Run` / `Applied` / `Effect` header. Run it on every project it is for (core or each shard).
 
 ### Testing
 
 ```bash
 uv run pytest                                   # unit tests, no network or keys needed
-uv run pytest -m integration                    # real Supabase tests on psc-dev
+uv run pytest -m integration                    # real Supabase tests on psc-main and the shards
 node --test tests/web/evaluate_client.test.js   # UI helper tests
 ```
 

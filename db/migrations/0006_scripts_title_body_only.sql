@@ -1,5 +1,9 @@
--- Run once. Applied. Effect: reduce scripts to title/body plus technical fields,
--- remove duplicate rows and names, and enforce per-user title/body uniqueness.
+-- 0006_scripts_title_body_only.sql: saved scripts keep only title and body
+-- Run: once (running again fails: the dropped columns no longer exist)
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main 2026-11-23
+-- Effect: reduce scripts to title/body plus technical fields, remove duplicate rows and
+--         names, and enforce per-user title/body uniqueness.
 
 -- Keep the oldest row when content_hash duplicates exist.
 delete from public.scripts duplicate

@@ -1,6 +1,7 @@
 -- 0001_init.sql: initial schema for profiles, baselines, scripts, sessions
 -- Run: once
--- Applied: psc-dev (date unknown)
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main, last run 2026-11-12
 -- Effect: creates tables profiles, baselines, scripts, sessions, their indexes, RLS policies and grants.
 --         Running again fails ("relation already exists") and changes nothing.
 

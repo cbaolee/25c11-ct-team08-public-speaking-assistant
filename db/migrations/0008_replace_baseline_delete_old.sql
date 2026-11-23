@@ -1,6 +1,7 @@
 -- 0008_replace_baseline_delete_old.sql: keep exactly one baseline row per user
 -- Run: any time (safe to run again)
--- Applied: psc-dev 2026-11-23
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main, last run 2026-11-23
 -- Effect: replaces public.replace_current_baseline with the same parameters.
 --         In one transaction the function locks and copies the old baseline, switches it off,
 --         inserts the new baseline, then deletes every other baseline row of that user.

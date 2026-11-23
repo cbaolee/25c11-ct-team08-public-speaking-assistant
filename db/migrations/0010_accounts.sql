@@ -1,6 +1,7 @@
 -- 0010_accounts.sql: which project holds each user's sessions (multi-project DB, ADR-012)
--- Run: any time, on the core project only (psc-dev). Safe to run again.
--- Applied: psc-dev not yet
+-- Run: any time (safe to run again)
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main, last run 2026-11-23
 -- Effect: creates public.accounts (one row per user: user_id -> shard_ref), its index and RLS
 --         with no policy, so only the service key can read or write it.
 --         shard_ref is 'core' for the core project, else the project ref of a shard, the

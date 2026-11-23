@@ -85,7 +85,7 @@ class ShardProject(BaseModel):
 
     `ref` is what accounts.shard_ref stores: the first part of the URL host, which never
     changes. `number` is the 1-based position in SUPABASE_SHARDS, only a label for logs and
-    project names (psc-shared01 is number 1); it is never stored.
+    project names (psc-shard01 is number 1); it is never stored.
     """
 
     ref: str

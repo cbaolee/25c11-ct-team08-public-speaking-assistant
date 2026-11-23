@@ -1,6 +1,7 @@
 -- 0002_storage.sql: private buckets with per-user folder policies
 -- Run: once
--- Applied: psc-dev (date unknown)
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main, last run 2026-11-12
 -- Effect: creates private buckets audio, series, baselines and their per-user policies.
 --         Running again fails (duplicate bucket id / policy already exists) and changes nothing.
 insert into storage.buckets (id, name, public)
