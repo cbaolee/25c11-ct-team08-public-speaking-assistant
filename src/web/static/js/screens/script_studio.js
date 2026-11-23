@@ -583,7 +583,9 @@ function renderGatherBubble(ai, j) {
 }
 /* Step 3: never writes a script, only updates chips and reply. After a script this is only the file step of a Regenerate
    (`regenFeedback` is a string then): the file goes alone (the text is feedback, not a message), the stage and chatHasScript stay,
-   the reply has no Generate Script button (renderGatherBubble), and on success the Regenerate starts at once with the same busy Composer. */
+   and on success the Regenerate starts at once with the same busy Composer. The server's reply to that file step is NOT shown
+   (it asks for more detail, which contradicts the Regenerate that follows): its loading bubble is removed and the Regenerate's own
+   loading bubble takes its place in the same tick, so the Chat Feed shows one continuous skeleton. Nothing of it goes to the chat history. */
 function sendMessage(txt, file, regenFeedback) {
   const regen = typeof regenFeedback === 'string';
   const fd = new FormData(), ai = loadingBubble(T('script.extracting'), regen ? regenFeedback : txt, file);   // `sent` = the draft a failed turn gives back
@@ -593,7 +595,8 @@ function sendMessage(txt, file, regenFeedback) {
   if (file) fd.append('file', file.raw, file.name);
   chatTurn(URL_MESSAGE, { method: 'POST', body: fd }, ai, j => {
     if (S.chatHasScript !== true) S.chatStage = 'gathering';
-    setSessionFiles(j.files_loaded); renderGatherBubble(ai, j);
+    setSessionFiles(j.files_loaded);
+    if (regen) ai.remove(); else renderGatherBubble(ai, j);
   }, null, regen ? () => startGenerate(regenFeedback) : undefined);
 }
 /* The request body of a script run, built from the session state (never from an earlier script's req).
