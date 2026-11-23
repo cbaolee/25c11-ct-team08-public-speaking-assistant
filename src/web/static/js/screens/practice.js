@@ -495,7 +495,7 @@ export function toggleRecording() {
     const counts = txt ? followCounts(txt.text) : null;
     S.follow = txt ? { counts, segs: buildFollow(counts), idx: -2, now: 0 } : null;
     S.rec = startRecorder({
-      lvl: $('#recLvl'), onTick: s => { $('#recTimer').textContent = fmtClock(s); followTick(s); },
+      lvl: $('#recLvl'), max: CONFIG.MAX_AUDIO_SECONDS, onTick: s => { $('#recTimer').textContent = fmtClock(s); followTick(s); },
       onEnd: (sec, auto, rec) => {
         S.rec = null; S.follow = null;
         if (rec && rec.blob) S.audio = { kind: 'rec', dur: sec, blob: rec.blob, mime: rec.mime };

@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import (
+    max_audio_seconds,
     max_list_page_size,
     max_request_bytes,
     max_saved_scripts,
@@ -176,6 +177,7 @@ async def web_config() -> dict[str, Any]:
     return {
         **CONSTANTS["web"],
         "max_saved_scripts": max_saved_scripts,
+        "max_audio_seconds": max_audio_seconds,
         "script_title_max_chars": script_title_max_chars,
         "max_pdf_size_bytes": CONSTANTS["script"]["max_pdf_size_bytes"],
         "max_pdf_pages": CONSTANTS["script"]["max_pdf_pages"],
@@ -721,7 +723,7 @@ async def generate_script_endpoint(
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
             pdf_path = tmp_file.name
         await run_in_threadpool(
-            save_upload_limited, pdf, Path(pdf_path), max_bytes=max_upload_bytes
+            save_upload_limited, pdf, Path(pdf_path), max_bytes=max_upload_bytes, audio=False
         )
 
     clean_topic = topic.strip()

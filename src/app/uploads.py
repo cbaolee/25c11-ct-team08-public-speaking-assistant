@@ -14,11 +14,14 @@ ALLOWED_UPLOAD_SUFFIXES = frozenset(
 CHUNK_BYTES = 1024 * 1024
 
 
-def too_large_message(max_bytes: int) -> str:
-    return (
-        f"The file is too large (maximum {max_bytes // (1024 * 1024)} MB). "
-        "Please choose a smaller file."
+def too_large_message(max_bytes: int, *, audio: bool = False) -> str:
+    """Text for the too_large error; audio files get a hint to send a compressed format."""
+    hint = (
+        "Please send the recording as MP3 or M4A."
+        if audio
+        else "Please choose a smaller file."
     )
+    return f"The file is too large (maximum {max_bytes // (1024 * 1024)} MB). {hint}"
 
 
 def safe_upload_path(directory: Path, filename: str | None, *, stem: str = "upload") -> Path:
@@ -35,7 +38,9 @@ def safe_upload_path(directory: Path, filename: str | None, *, stem: str = "uplo
     return directory / f"{stem}{suffix}"
 
 
-def save_upload_limited(upload: UploadFile, dest: Path, *, max_bytes: int) -> int:
+def save_upload_limited(
+    upload: UploadFile, dest: Path, *, max_bytes: int, audio: bool = True
+) -> int:
     """Copy `upload` to `dest` in chunks and stop as soon as it exceeds `max_bytes`.
 
     Raises AudioRejected("too_large") and removes the partial file. Returns the bytes written.
@@ -47,7 +52,7 @@ def save_upload_limited(upload: UploadFile, dest: Path, *, max_bytes: int) -> in
             while chunk := upload.file.read(CHUNK_BYTES):
                 written += len(chunk)
                 if written > max_bytes:
-                    raise AudioRejected("too_large", too_large_message(max_bytes))
+                    raise AudioRejected("too_large", too_large_message(max_bytes, audio=audio))
                 out.write(chunk)
     except AudioRejected:
         dest.unlink(missing_ok=True)

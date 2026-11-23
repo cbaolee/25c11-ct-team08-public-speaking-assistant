@@ -55,6 +55,14 @@ def test_save_upload_limited_stops_and_removes_partial_file(tmp_path, monkeypatc
     assert not dest.exists()
 
 
+@pytest.mark.parametrize(("audio", "hint"), [(True, "MP3 or M4A"), (False, "smaller file")])
+def test_save_upload_limited_message_fits_file_kind(tmp_path, audio, hint):
+    dest = tmp_path / "upload.bin"
+    with pytest.raises(AudioRejected) as err:
+        save_upload_limited(_upload(b"0123456789"), dest, max_bytes=5, audio=audio)
+    assert hint in str(err.value.message)
+
+
 def _limited_app(max_bytes: int) -> TestClient:
     app = FastAPI()
     app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_bytes)
