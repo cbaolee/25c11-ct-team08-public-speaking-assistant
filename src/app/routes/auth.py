@@ -428,15 +428,19 @@ async def delete_account(
     auth: Annotated[AuthProvider, Depends(get_auth)],
     repos: Annotated[Repos, Depends(get_repos)],
 ):
-    """Delete the account and all its data (ADR-011). Order matters:
+    """Delete the account and all its data (ADR-011, ADR-012). Order matters:
 
     1. re-check the current password (nothing is deleted on 403/429/503);
     2. empty the user's folder in every bucket; Storage objects are not removed by the
-       database cascade, so they go first. If Storage fails, stop: rows still point to files
-       and a retry deletes what is left (every step is idempotent);
-    3. delete the auth user; `on delete cascade` removes profiles, baselines, scripts and
-       sessions. If this fails after the files are gone, the account still works without
-       recordings and the user can try again.
+       database cascade, so they go first. `repos.files` sends audio and series to the
+       user's shard project. If Storage fails, stop: rows still point to files and a retry
+       deletes what is left (every step is idempotent);
+    3. delete the user's session rows; they may live in a shard project, where the cascade
+       from the core project does not reach. If this fails, stop: the account still exists
+       and a retry deletes what is left;
+    4. delete the auth user, always last; `on delete cascade` removes accounts, profiles,
+       baselines, scripts (and sessions in the core project). If this fails after the data
+       is gone, the account still works without history and the user can try again.
     Running evaluate jobs are not cancelled: the job store has no per-user cancel (see ADR-011).
     """
     denied = await _check_current_password(auth, user, payload.password)
@@ -445,11 +449,19 @@ async def delete_account(
     try:
         for bucket in _user_buckets():
             await run_in_threadpool(repos.files.delete_user_folder, user.id, bucket)
-    except StorageError:
+    except (StorageError, RuntimeError):  # RuntimeError: the user's shard is not configured
         logger.warning("Delete account: Storage cleanup failed, nothing else was deleted")
         return _error(
             503, "storage_unavailable",
             "Your files could not be deleted right now. Please try again.",
+        )
+    try:
+        await run_in_threadpool(repos.sessions.delete_user_sessions, user.id)
+    except (StorageError, RuntimeError):
+        logger.warning("Delete account: files deleted but the session rows could not be deleted")
+        return _error(
+            503, "storage_unavailable",
+            "Your history could not be deleted right now. Please try again.",
         )
     try:
         await run_in_threadpool(auth.delete_user, user.id)
