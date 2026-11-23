@@ -144,6 +144,35 @@ def test_create_baseline_replaces_old_and_deletes_old_audio(monkeypatch, repos):
     assert repos.files.download_file(USER_A, settings.baselines_bucket, new.audio_path)
 
 
+def test_create_baseline_storage_error_keeps_old_baseline(monkeypatch, repos):
+    _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile(0.8)))
+    old = repos.baselines.get_current_baseline(USER_A)
+
+    def broken(*args, **kwargs):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.baselines, "replace_current_baseline", broken)
+    r = _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile(1.1)))
+    assert r.status_code == 503
+    assert repos.baselines.get_current_baseline(USER_A) == old
+    assert repos.files.download_file(USER_A, settings.baselines_bucket, old.audio_path)
+
+
+def test_create_baseline_deletes_exactly_the_previous_audio(monkeypatch, repos):
+    _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile(0.8)))
+    old = repos.baselines.get_current_baseline(USER_A)
+    deleted: list[list[str]] = []
+    real_delete = repos.files.delete_files
+
+    def recording_delete(user_id, bucket, paths):
+        deleted.append(list(paths))
+        real_delete(user_id, bucket, paths)
+
+    monkeypatch.setattr(repos.files, "delete_files", recording_delete)
+    _post(monkeypatch, lambda audio_path, *, vad_params: _ok_payload(_profile(1.1)))
+    assert deleted == [[old.audio_path]]
+
+
 def test_create_baseline_storage_error_returns_503(monkeypatch, repos):
     def broken(*args, **kwargs):
         raise StorageError("down")

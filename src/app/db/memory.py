@@ -35,6 +35,7 @@ from src.app.db.models import (
 class MemoryState:
     profiles: dict[UUID, ProfileRow] = field(default_factory=dict)
     baselines: dict[UUID, list[BaselineRow]] = field(default_factory=dict)
+    baselines_lock: RLock = field(default_factory=RLock)
     scripts: dict[UUID, ScriptRow] = field(default_factory=dict)
     scripts_lock: RLock = field(default_factory=RLock)
     sessions: dict[UUID, SessionRow] = field(default_factory=dict)
@@ -167,28 +168,28 @@ class MemoryBaselineRepo:
     def replace_current_baseline(
         self, user_id: UUID, data: NewBaseline
     ) -> tuple[BaselineRow, BaselineRow | None]:
-        if any(row.id == data.id for rows in self._state.baselines.values() for row in rows):
-            raise ConflictError(f"Baseline already exists: {data.id}")
-        existing_rows = self._state.baselines.get(user_id, [])
-        previous = next((row for row in existing_rows if row.is_current), None)
-        new_row = BaselineRow(
-            user_id=user_id,
-            is_current=True,
-            recorded_at=_now(),
-            **data.model_dump(),
-        )
-        updated_rows = [
-            row.model_copy(update={"is_current": False}, deep=True)
-            if row.is_current
-            else row.model_copy(deep=True)
-            for row in existing_rows
-        ]
-        updated_rows.append(new_row.model_copy(deep=True))
-        self._state.baselines[user_id] = updated_rows
-        return (
-            new_row.model_copy(deep=True),
-            previous.model_copy(deep=True) if previous is not None else None,
-        )
+        """Same steps as the SQL function: copy the old row, add the new one, drop the old ones."""
+        with self._state.baselines_lock:
+            if any(row.id == data.id for rows in self._state.baselines.values() for row in rows):
+                raise ConflictError(f"Baseline already exists: {data.id}")
+            existing_rows = self._state.baselines.get(user_id, [])
+            previous = next((row for row in existing_rows if row.is_current), None)
+            previous = previous.model_copy(deep=True) if previous is not None else None
+            new_row = BaselineRow(
+                user_id=user_id,
+                is_current=True,
+                recorded_at=_now(),
+                **data.model_dump(),
+            )
+            self._state.baselines[user_id] = [new_row.model_copy(deep=True)]
+            # sessions.baseline_id is "on delete set null" in the database
+            dropped_ids = {row.id for row in existing_rows}
+            for session_id, session in self._state.sessions.items():
+                if session.baseline_id in dropped_ids:
+                    self._state.sessions[session_id] = session.model_copy(
+                        update={"baseline_id": None}
+                    )
+            return new_row.model_copy(deep=True), previous
 
 
 class MemoryScriptRepo:

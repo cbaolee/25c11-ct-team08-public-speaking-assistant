@@ -175,7 +175,7 @@ erDiagram
 | Table       | Holds                     | Rules                                                                                     |
 | ----------- | ------------------------- | ----------------------------------------------------------------------------------------- |
 | `profiles`  | One row per user          | `id` = `auth.users.id`; delete cascades to all child rows; `avatar_path`; `preferences` jsonb |
-| `baselines` | Voice baseline measures   | One `is_current` row per user (unique partial index)                                      |
+| `baselines` | Voice baseline measures   | Exactly one row per user, always `is_current`                                             |
 | `scripts`   | Saved scripts             | Cap `storage.max_saved_scripts` per user; `content_hash` finds duplicates; `source`: `generated_template`, `generated_llm`, `written` |
 | `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions |
 
@@ -184,7 +184,7 @@ erDiagram
 | Function                    | Migration | Effect                                                                  | Reason                                       |
 | --------------------------- | --------- | ----------------------------------------------------------------------- | -------------------------------------------- |
 | `merge_profile_preferences` | `0003`    | Merges a jsonb patch into `profiles.preferences`, returns the row       | Atomic per-key merge                         |
-| `replace_current_baseline`  | `0004`    | Locks the current baseline, switches it off, inserts the new one, returns both | One transaction: a failed insert leaves the old baseline current |
+| `replace_current_baseline`  | `0008`    | Locks the current baseline, switches it off, inserts the new one, deletes the old rows, returns new and old | One transaction: a failed insert leaves the old baseline current |
 
 Both are `execute` for `service_role` only (revoked from `public`, `anon`, `authenticated`) and take `user_id` as a parameter, because the service key bypasses RLS.
 
@@ -208,7 +208,8 @@ Run by hand in the Supabase SQL Editor, in file order. Each file starts with `Ru
 | `0001_init.sql`                        | once     | Tables, indexes, RLS policies, grants                                |
 | `0002_storage.sql`                     | once     | Buckets `audio`, `series`, `baselines` and folder policies           |
 | `0003_profile_avatar_preferences.sql`  | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, `merge_profile_preferences` |
-| `0004_replace_baseline_fn.sql`         | any time | `replace_current_baseline`                                           |
+| `0004_replace_baseline_fn.sql`         | any time | `replace_current_baseline` (replaced by `0008`)                      |
+| `0008_replace_baseline_delete_old.sql` | any time | `replace_current_baseline` that keeps one baseline row per user      |
 
 Merged migrations are never edited; a schema change is a new file. The backend is deployed only after its migrations have run.
 
@@ -269,8 +270,8 @@ sequenceDiagram
 
 1. `POST /api/baseline` analyses the sample; only an `ok` result is stored.
 2. The audio is encoded to Opus and uploaded to `baselines`.
-3. `replace_current_baseline` (SQL function, RPC) swaps the current row in one transaction.
-4. The old baseline audio is deleted; a failure only logs a warning.
+3. `replace_current_baseline` (SQL function, RPC) inserts the new row and deletes the old one in one transaction; if it fails, the new audio is deleted and the old baseline stays.
+4. The old baseline audio is deleted; a failure only logs a warning. Old sessions keep their result, their `baseline_id` becomes null.
 5. `POST /api/evaluate` reads the baseline from the database; a client-sent baseline is ignored.
 
 ### 5.3 History

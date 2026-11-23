@@ -213,6 +213,39 @@ def test_replace_current_baseline_keeps_exactly_one_current():
     assert repos.baselines.get_current_baseline(user_id) == second
 
 
+def test_replace_current_baseline_keeps_only_the_newest_row():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    rows = [
+        repos.baselines.replace_current_baseline(
+            user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+        )[0]
+        for _ in range(3)
+    ]
+
+    stored = repos.baselines._state.baselines[user_id]
+    assert [row.id for row in stored] == [rows[-1].id]
+    assert stored[0].is_current is True
+
+
+def test_replace_current_baseline_clears_baseline_id_of_old_sessions():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    first, _ = repos.baselines.replace_current_baseline(
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+    )
+    session = repos.sessions.create_session(
+        user_id, _new_session().model_copy(update={"baseline_id": first.id})
+    )
+    repos.baselines.replace_current_baseline(
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.8)
+    )
+
+    still_there = repos.sessions.get_session(user_id, session.id)
+    assert still_there is not None
+    assert still_there.baseline_id is None
+
+
 def test_replace_current_baseline_same_id_raises_conflict():
     repos = build_memory_repos()
     user_id = uuid4()
