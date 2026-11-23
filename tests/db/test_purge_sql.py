@@ -1,12 +1,19 @@
 import re
 from pathlib import Path
 
+import pytest
+
 from src.app.constants import CONSTANTS
 
+MIGRATIONS = Path(__file__).resolve().parents[2] / "db/migrations"
 
-def test_purge_sql_matches_retention_constant():
-    path = Path(__file__).resolve().parents[2] / "db/migrations"
-    path = path / "0005_purge_insufficient_sessions.sql"
+
+# The core project (0005) and every shard project (shard/0002) run the same job.
+@pytest.mark.parametrize(
+    "name", ["0005_purge_insufficient_sessions.sql", "shard/0002_purge_insufficient_sessions.sql"]
+)
+def test_purge_sql_matches_retention_constant(name):
+    path = MIGRATIONS / name
     data = path.read_bytes()
     assert not data.startswith(b"\xef\xbb\xbf")
     sql = path.read_text(encoding="utf-8")
