@@ -24,8 +24,8 @@ flowchart LR
     API --> Text["Script Pipeline<br/>src/text_processing"]
     Audio -->|speech-to-text| STT["Deepgram, Gladia"]
     Text -->|LLM| Groq["Groq API"]
-    API -->|repository layer| DB[("Supabase PostgreSQL")]
-    API -->|repository layer| Store[("Supabase Storage")]
+    API -->|repository layer| DB[("Supabase PostgreSQL<br/>core + shards")]
+    API -->|repository layer| Store[("Supabase Storage<br/>core + shards")]
     API -->|accounts| AuthSvc["Supabase Auth"]
 ```
 
@@ -35,14 +35,15 @@ flowchart LR
 | Backend                      | Python 3.12, FastAPI             | HTTP API, validation, orchestration                     |
 | Evaluate / Baseline Pipeline | FFmpeg, Silero VAD, jiwer        | Score a recording, analyse a voice baseline             |
 | Script Pipeline              | PyMuPDF4LLM, Groq                | Generate an MC script from user content                 |
-| Database                     | Supabase PostgreSQL              | Profiles, preferences, baselines, scripts, sessions     |
-| Object storage               | Supabase Storage                 | Recordings, chart series, avatars                       |
+| Database                     | Supabase PostgreSQL              | Core: accounts, profiles, preferences, baselines, scripts; user's shard: sessions (see 4.6) |
+| Object storage               | Supabase Storage                 | Core: avatars, baselines; user's shard: recordings, chart series |
 | Accounts                     | Supabase Auth                    | Sign up, log in, token refresh, password change         |
 
 ## 2. Code map
 
 ```
-db/migrations/              SQL migrations, applied in file order (see 4.5)
+db/migrations/              SQL migrations for the core project, applied in file order (see 4.5)
+db/migrations/shard/        SQL migrations for every shard project
 src/app/
 ├── main.py                 FastAPI app: /api/config, /api/evaluate, /api/scripts*, /api/sessions*,
 │                           /api/generate-script*, /api/topics, static UI (Cache-Control: no-cache)
@@ -57,7 +58,8 @@ src/app/
     ├── repositories.py     Repository interfaces (typing.Protocol)
     ├── supabase_repo.py    Supabase implementation
     ├── memory.py           In-memory implementation (tests, local dev)
-    ├── factory.py          Repos container; get_repos() picks the implementation
+    ├── sharding.py         ShardRouter; sessions and audio/series files go to the user's shard
+    ├── factory.py          Repos container; get_repos() picks the implementation and wires the shards
     └── session_helpers.py  Opus encoding, series split/merge, compaction
 src/audio_processing/       Evaluate and Baseline Pipeline
 src/text_processing/        Script Pipeline
@@ -141,7 +143,7 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 
 ```mermaid
 flowchart TB
-    Routes["Endpoints"] -->|Depends(get_repos)| Repos["Repos<br/>profiles · baselines · scripts · sessions · files"]
+    Routes["Endpoints"] -->|Depends(get_repos)| Repos["Repos<br/>profiles · baselines · scripts · sessions · files · accounts"]
     Repos -.implements.-> Proto["Protocols<br/>repositories.py"]
     Factory["get_repos()"] -->|SUPABASE_URL set| Supa["Supabase*Repo<br/>SupabaseAudioStore"]
     Factory -->|no URL, APP_ENV=dev| Mem["Memory*Repo<br/>MemoryAudioStore"]
@@ -150,7 +152,8 @@ flowchart TB
 
 | Rule                                   | Reason                                                                 |
 | -------------------------------------- | ---------------------------------------------------------------------- |
-| Interfaces `ProfileRepo`, `BaselineRepo`, `ScriptRepo`, `SessionRepo`, `AudioStore`; every method takes `user_id` first | Ownership is part of every call |
+| Interfaces `ProfileRepo`, `BaselineRepo`, `ScriptRepo`, `SessionRepo`, `AudioStore`, `AccountRepo`; every method takes `user_id` first | Ownership is part of every call |
+| `sessions` and `files` are sharded wrappers (`sharding.py`); endpoints never pick a project | One place decides where a user's data lives (4.6) |
 | Supabase and memory versions behave the same | Unit tests and local runs need no project; production never falls back to memory |
 | Missing row and another user's row both return `None` / `False` | No way to probe other users' ids |
 | Lists newest first by `(created_at, id)`, cursor based | Stable pages while rows are added |
@@ -160,11 +163,12 @@ flowchart TB
 
 ### 4.2 Data model
 
-Four tables, all with row level security. Rationale in [ADR-001](docs/adr/ADR-001.md).
+Five tables, all with row level security. Rationale in [ADR-001](docs/adr/ADR-001.md); `accounts` and shards in [ADR-012](docs/adr/ADR-012.md). The diagram shows the core project; in shard projects `sessions` has the same columns without foreign keys.
 
 ```mermaid
 erDiagram
     AUTH_USERS ||--|| PROFILES : "id"
+    AUTH_USERS ||--o| ACCOUNTS : "user_id"
     PROFILES ||--o{ BASELINES : "user_id"
     PROFILES ||--o{ SCRIPTS : "user_id"
     PROFILES ||--o{ SESSIONS : "user_id"
@@ -177,7 +181,8 @@ erDiagram
 | `profiles`  | One row per user          | `id` = `auth.users.id`; delete cascades to all child rows; `avatar_path`; `preferences` jsonb |
 | `baselines` | Voice baseline measures   | Exactly one row per user, always `is_current`                                             |
 | `scripts`   | Saved scripts             | Cap `storage.max_saved_scripts` per user; `content_hash` finds duplicates; `source`: `generated_template`, `generated_llm`, `written` |
-| `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions |
+| `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions; lives in the user's shard |
+| `accounts`  | Shard of each user        | Core only; `shard_ref` (`core` or a shard's project ref) set the first time the user saves a session or session file; no policy (service key only) |
 
 ### 4.3 SQL functions
 
@@ -192,8 +197,8 @@ Both are `execute` for `service_role` only (revoked from `public`, `anon`, `auth
 
 | Bucket      | Content                                | Path                                           |
 | ----------- | -------------------------------------- | ---------------------------------------------- |
-| `audio`     | Practice recording (Opus/WebM, 32 kbps) | `{user_id}/{session_id}.webm`                 |
-| `series`    | Pitch and loudness series from `result` | `{user_id}/{session_id}.series.json`          |
+| `audio`     | Practice recording (Opus/WebM, 32 kbps), user's shard | `{user_id}/{session_id}.webm`  |
+| `series`    | Pitch and loudness series from `result`, user's shard | `{user_id}/{session_id}.series.json` |
 | `baselines` | Baseline recording                     | `{user_id}/{baseline_id}.webm`                 |
 | `avatars`   | Profile picture, square WebP           | `{user_id}/avatar.webp` (one file, upsert)     |
 
@@ -209,9 +214,39 @@ Run by hand in the Supabase SQL Editor, in file order. Each file starts with `Ru
 | `0002_storage.sql`                     | once     | Buckets `audio`, `series`, `baselines` and folder policies           |
 | `0003_profile_avatar_preferences.sql`  | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, `merge_profile_preferences` |
 | `0004_replace_baseline_fn.sql`         | any time | `replace_current_baseline` (replaced by `0008`)                      |
+| `0005_purge_insufficient_sessions.sql` | required | pg_cron job that deletes `insufficient_audio` sessions after 7 days |
+| `0006_scripts_title_body_only.sql`     | once     | `scripts` keeps title and body only; unique title and body per user  |
+| `0007_drop_profile_topics.sql`         | once     | Drops `profiles.topics`                                              |
 | `0008_replace_baseline_delete_old.sql` | any time | `replace_current_baseline` that keeps one baseline row per user      |
+| `0009_purge_unconfirmed_accounts.sql`  | required | pg_cron job that deletes unconfirmed accounts (ADR-011)              |
+| `0010_accounts.sql`                    | any time | `accounts` (user to shard); existing users get `core`                 |
+
+Shard projects run `db/migrations/shard/` instead:
+
+| File                                         | Run      | Creates                                                     |
+| -------------------------------------------- | -------- | ----------------------------------------------------------- |
+| `shard/0001_sessions.sql`                    | once     | `sessions` without foreign keys, buckets `audio`, `series`  |
+| `shard/0002_purge_insufficient_sessions.sql` | required | Same pg_cron job as `0005`                                  |
 
 Merged migrations are never edited; a schema change is a new file. The backend is deployed only after its migrations have run.
+
+### 4.6 Core and shard projects
+
+```mermaid
+flowchart LR
+    Repos["Repos"] --> Core[("Core (shard ref core)<br/>Auth, accounts, profiles, baselines, scripts<br/>buckets avatars, baselines<br/>sessions, audio, series of users from before the shards")]
+    Repos -->|accounts.shard_ref| Shards[("Shard projects<br/>sessions, audio, series")]
+```
+
+| Rule | Reason |
+| ---- | ------ |
+| Core is `SUPABASE_URL`; shards come from `SUPABASE_SHARDS`, a JSON object project URL to service key | Easy to add a shard; no numbers to keep in sync |
+| `accounts` stores the project ref (`https://<ref>.supabase.co`), never a position | Moving or adding entries in `.env` never points a user at the wrong project; `ShardProject.number` (position + 1) is only a label |
+| A user's sessions, audio and series sit in one shard | Saving, compacting and deleting a session touch one project |
+| A write gives a user without an `accounts` row the shard project with the fewest users (ties: `.env` order); never the core while a shard exists; a read never does | Users who never practise take no shard space |
+| `user_id` is the key in every project | Paths and repo signatures stay the same; old data stays in the core |
+| No shards configured: everything is in the core, but `accounts` rows are still written | Turning shards on later keeps old users where their data is |
+| Deleting an account: files, then shard session rows, then the auth user | The core cascade does not reach shards; the account goes last so a retry finishes the job |
 
 ### 4.6 Retention
 
@@ -227,6 +262,34 @@ Merged migrations are never edited; a schema change is a new file. The backend i
 | Compact `result`                   | 1,356     |
 | Compact `mistakes`                 | 74,320    |
 | Whole compact row                  | 742,714   |
+
+### 4.7 Setting up a project
+
+Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `psc-shard09` (`SUPABASE_SHARDS`). Region Singapore, Free plan. **Every project needs the `pg_cron` extension** (Dashboard → Database → Extensions), because each one runs a cleanup job.
+
+**New core project** (only when the core is rebuilt), SQL Editor, in this order:
+
+| Order | File | Run |
+| ----- | ---- | --- |
+| 1 | `0001_init.sql`, `0002_storage.sql` | once |
+| 2 | `0003_profile_avatar_preferences.sql` | any time |
+| 3 | `0006_scripts_title_body_only.sql` | once |
+| 4 | `0007_drop_profile_topics.sql`, `0008_replace_baseline_delete_old.sql` | any time |
+| 5 | `0005_purge_insufficient_sessions.sql`, `0009_purge_unconfirmed_accounts.sql` | any time, need `pg_cron` |
+| 6 | `0010_accounts.sql` | any time |
+
+`0004` is skipped on a new core: `0008` creates the same function in its current form.
+
+**New shard project**, SQL Editor, in this order:
+
+| Order | File | Run |
+| ----- | ---- | --- |
+| 1 | `shard/0001_sessions.sql` | once |
+| 2 | `shard/0002_purge_insufficient_sessions.sql` | any time, needs `pg_cron` |
+
+Then add `"https://<ref>.supabase.co": "<service key>"` to `SUPABASE_SHARDS` in `.env` and restart. New users can be placed there at once (never in the core); existing users stay where they are. Never run core migrations on a shard or shard migrations on the core.
+
+After running a migration, update its `Applied:` line (project and date). Check the cleanup jobs with `select jobname, schedule from cron.job;` and that every project answers with `uv run pytest -m integration tests/db/test_shards_live.py`.
 
 ## 5. Main flows
 
@@ -306,7 +369,7 @@ Per-user keys keep two accounts on one browser apart. Every `localStorage` acces
 | ----------- | ----------------------------------------------------------------------------------------------------------- |
 | Identity    | `get_current_user` verifies the `Authorization: Bearer` token (Supabase Auth, or memory accounts in dev); 401 `not_authenticated`. |
 | Application | The service key bypasses RLS, so every query and SQL function filters by `user_id` in code. Other users' rows return 404. |
-| Database    | RLS on all four tables with owner-only policies (`auth.uid()`); tables granted to `authenticated` and `service_role`, not `anon`; SQL functions executable by `service_role` only. |
+| Database    | Core tables `profiles`, `baselines`, `scripts`, `sessions` have RLS with owner-only policies (`auth.uid()`); `accounts` and every shard project have RLS with no policy (service key only); tables granted to `authenticated` and `service_role`, not `anon`; SQL functions executable by `service_role` only. |
 | Storage     | Private buckets; policies limit each user to the folder `{user_id}/`.                                       |
 | Uploads     | Avatars checked by content (Pillow), size and pixel limits, re-encoded to WebP; audio size capped before reading. |
 | Secrets     | Keys only in `.env` (git-ignored); `.env.example` lists names without values.                                |
@@ -335,7 +398,7 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | Command                          | Covers                                                                            |
 | -------------------------------- | --------------------------------------------------------------------------------- |
 | `uv run pytest`                  | Unit tests with `build_memory_repos()` and dependency overrides; no network or keys |
-| `uv run pytest -m integration`   | Real Supabase tests on `psc-dev` (repositories, SQL functions, buckets)            |
+| `uv run pytest -m integration`   | Real Supabase tests on `psc-main` and the shards (repositories, SQL functions, buckets, shard check)          |
 | `node --test tests/web/evaluate_client.test.js` | `evaluate_client.js`: result mapping, follow-along schedule, auto speed            |
 | `uv run ruff check .`            | Lint and import order                                                             |
 

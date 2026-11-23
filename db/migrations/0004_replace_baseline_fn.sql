@@ -1,6 +1,7 @@
 -- 0004_replace_baseline_fn.sql: replace the current baseline in one transaction
--- Run: any time
--- Applied: psc-dev 2026-11-20
+-- Run: any time (safe to run again; 0008 replaces the function, so do not run 0004 after 0008)
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main, last run 2026-11-20
 -- Effect: creates or replaces the public.replace_current_baseline SQL function.
 --         The function locks and switches off the old baseline, inserts the new baseline,
 --         and returns both rows in one transaction. Callable by the backend (service_role) only.

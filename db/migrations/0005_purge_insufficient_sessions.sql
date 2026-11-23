@@ -1,4 +1,9 @@
--- Purge insufficient-audio sessions after their retention period.
+-- 0005_purge_insufficient_sessions.sql: purge insufficient-audio sessions after their retention period
+-- Run: required, any time (safe to run again). Needs the pg_cron extension.
+--      Required because the UI tells users insufficient sessions are deleted after 7 days.
+-- Where: core project only (psc-main). Shard projects run shard/0002 instead.
+-- Applied: psc-main, not recorded (check with: select * from cron.job;)
+-- Effect: daily job deleting insufficient_audio sessions older than 7 days.
 -- Source: app_constants.toml [retention] insufficient_days. If it changes, update
 -- this file and the fallback in src/web/static/js/state.js as well.
 -- On Supabase: enable pg_cron in Dashboard -> Database -> Extensions, then run

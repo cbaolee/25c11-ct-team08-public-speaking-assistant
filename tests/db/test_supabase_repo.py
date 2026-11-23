@@ -1,7 +1,7 @@
 """Tests for the Supabase repositories.
 
 Unit tests at the top run offline. Tests marked `integration` call the real
-psc-dev project and are skipped by default; run them with:
+psc-main project and are skipped by default; run them with:
     uv run pytest -m integration
 They need SUPABASE_URL, SUPABASE_SERVICE_KEY, DEV_USER_ID and DEV2_USER_ID
 (the second test user) in .env, and both users must already have a profiles row.
@@ -307,7 +307,7 @@ def test_replace_baseline_without_new_row_raises(data):
         SupabaseBaselineRepo(_FakeRpcClient(data)).replace_current_baseline(uuid4(), new)
 
 
-# ---------- integration tests (psc-dev only) ----------
+# ---------- integration tests (psc-main only) ----------
 
 
 def _test_user_id(name: str) -> str:
@@ -555,7 +555,7 @@ def test_audio_store_upload_conflict_signed_url_and_delete(env):
         repos.files.download_file(owner, bucket, path)
 
 
-# ---------- avatar and preferences (psc-dev, needs db/migrations/0003) ----------
+# ---------- avatar and preferences (psc-main, needs db/migrations/0003) ----------
 
 
 @pytest.fixture
@@ -611,7 +611,7 @@ def test_merge_preferences_keeps_other_keys(profile_restore):
     assert repos.profiles.get_profile(owner).preferences["follow_wpm"] == 155
 
 
-# ---------- saved-script cap and list (psc-dev) ----------
+# ---------- saved-script cap and list (psc-main) ----------
 
 
 def _new_script(body: str) -> NewScript:

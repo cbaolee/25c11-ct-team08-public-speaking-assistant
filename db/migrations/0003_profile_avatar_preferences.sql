@@ -1,6 +1,7 @@
 -- 0003_profile_avatar_preferences.sql: avatar and user preferences
 -- Run: any time (safe to run again)
--- Applied: psc-dev 2026-11-20
+-- Where: core project only (psc-main). Never on a shard project.
+-- Applied: psc-main, last run 2026-11-20
 -- Effect: adds profiles.avatar_path (null) and profiles.preferences ('{}') to every existing row,
 --         creates private bucket 'avatars' and its per-user policy, and function
 --         merge_profile_preferences (backend only). No existing data is changed.
