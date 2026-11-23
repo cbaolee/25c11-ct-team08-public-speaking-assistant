@@ -165,7 +165,10 @@ class TestTemplateEngine:
                         {
                             "slots": {
                                 "argument_core_mechanism": {
-                                    "text": "aerobic capacity dictates pacing thresholds.",
+                                    "text": (
+                                        "optimal pacing prevents early glycogen depletion "
+                                        "and stabilizes aerobic thresholds."
+                                    ),
                                     "source_chunk_ids": [1],
                                 },
                                 "argument_case_evidence": {
@@ -232,7 +235,67 @@ class TestTemplateEngine:
         result = engine.fill_template(sample_template, chunks=None)
 
         assert "uncited" in result.flags
-        assert all(c.status == "uncited" for c in result.citations)
+        assert result.citations == []
+
+    def test_fill_template_chat_context_and_deduplicates_multi_slot_paragraph(
+        self,
+        sample_chunks: list[DocumentChunk],
+    ) -> None:
+        multi_slot_template = TemplateDocument(
+            metadata=TopicMetadata(
+                template_id="sports/multi_5m",
+                category_slug="sports",
+                category="Sports",
+                topic="Pacing Dynamics",
+                topic_slug="multi_5m",
+                duration_min=5,
+            ),
+            body=(
+                "Intro paragraph.\n\n"
+                "In paragraph two, {{ argument_unrelated_intro }} whereas "
+                "{{ argument_supported_claim }}.\n"
+            ),
+            file_path="data/templates/sports/multi_5m.md",
+        )
+        mock_client = MagicMock()
+        mock_response = MagicMock()
+        mock_response.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content=json.dumps(
+                        {
+                            "slots": {
+                                "argument_unrelated_intro": {
+                                    "text": "medieval castles stood on hills",
+                                    "source_chunk_ids": [1],
+                                },
+                                "argument_supported_claim": {
+                                    "text": "optimal pacing prevents early glycogen depletion",
+                                    "source_chunk_ids": [1],
+                                },
+                            }
+                        }
+                    )
+                )
+            )
+        ]
+        mock_client.chat.completions.create.return_value = mock_response
+
+        engine = TemplateEngine(client=mock_client)
+        result = engine.fill_template(
+            multi_slot_template,
+            chunks=sample_chunks,
+            chat_context="Highlight marathon runners in humid climates.",
+        )
+
+        sent_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        user_prompt = sent_messages[1]["content"]
+        assert "Speaker's notes & requirements from chat" in user_prompt
+        assert "Highlight marathon runners in humid climates." in user_prompt
+        assert len(result.citations) == 1
+        assert result.citations[0].paragraph == 2
+        assert result.citations[0].status == "cited"
+        assert result.citations[0].chunk_id == 1
 
 
 class TestInlineFactSlotsAndDynamicBudgets:

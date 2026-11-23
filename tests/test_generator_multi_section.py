@@ -47,7 +47,12 @@ def test_generate_free_topic_script_all_durations(
 
     gen, completions = _build_generator(_handler)
     chunks = [
-        DocumentChunk(chunk_id=0, page=2, heading="Intro", content="Source evidence <script>")
+        DocumentChunk(
+            chunk_id=0,
+            page=2,
+            heading="Intro",
+            content="AI in Healthcare speech evidence <script>",
+        )
     ]
     res = gen.generate_free_topic_script(
         topic="AI in Healthcare",
@@ -79,7 +84,60 @@ def test_generate_free_topic_script_uncited_flag_when_no_chunks_or_invalid_id() 
     assert "uncited" in res.flags
 
     res_no_src = gen.generate_free_topic_script(topic="Clean Energy", duration_min=5, chunks=None)
+    assert res_no_src.citations == []
     assert "uncited" in res_no_src.flags
+
+
+def test_generate_free_topic_script_chat_context_and_rejects_unsupported_citation() -> None:
+    unrelated_para = " ".join(["medieval cathedral masonry"] * 115)
+    gen, completions = _build_generator(
+        lambda **_: _make_response(
+            {"paragraphs": [{"text": unrelated_para, "source_chunk_ids": [0]}]}
+        )
+    )
+    chunks = [
+        DocumentChunk(
+            chunk_id=0,
+            page=3,
+            heading="Solar Grid",
+            content="Photovoltaic microgrids improve rural clean energy resilience.",
+        )
+    ]
+    res = gen.generate_free_topic_script(
+        topic="Clean Energy Microgrids",
+        duration_min=5,
+        chunks=chunks,
+        chat_context="Focus on university campus microgrid deployment and student involvement.",
+    )
+    first_user_prompt = completions.calls[0]["messages"][1]["content"]
+    assert "Speaker's notes & requirements from chat" in first_user_prompt
+    assert "university campus microgrid deployment" in first_user_prompt
+    assert all(c.status == "uncited" for c in res.citations)
+    assert "uncited" in res.flags
+
+
+def test_generate_free_topic_script_ignores_unrelated_document_chunks() -> None:
+    para = " ".join(["volleyball serving teamwork rotation strategy"] * 70)
+    gen, completions = _build_generator(
+        lambda **_: _make_response({"paragraphs": [{"text": para, "source_chunk_ids": [1]}]})
+    )
+    unrelated_chunks = [
+        DocumentChunk(
+            chunk_id=1,
+            page=1,
+            heading="Tax Law",
+            content="Corporate amortization schedules and municipal bond yields.",
+        )
+    ]
+    res = gen.generate_free_topic_script(
+        topic="Volleyball Teamwork Strategy",
+        duration_min=5,
+        chunks=unrelated_chunks,
+    )
+    first_user_prompt = completions.calls[0]["messages"][1]["content"]
+    assert "<UNTRUSTED_USER_DOCUMENT>" not in first_user_prompt
+    assert all(c.status == "uncited" for c in res.citations)
+    assert "uncited" in res.flags
 
 
 def test_generate_free_topic_script_fallback_chain_and_503_exhaustion() -> None:

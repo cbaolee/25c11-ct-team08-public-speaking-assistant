@@ -65,6 +65,9 @@ slot_fill_max_words = 150
 # Template topic suggester: max topics shown (4-5) and min cosine score for a strong match
 topic_suggest_top_k = 5
 topic_suggest_min_score = 0.35
+# Minimum cosine similarity for retrieving document chunks and verifying paragraph citations
+retrieval_min_score = 0.25
+citation_min_support_score = 0.52
 
 [api_keys]
 # How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.
