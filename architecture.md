@@ -42,8 +42,8 @@ flowchart LR
 ## 2. Code map
 
 ```
-db/migrations/              SQL migrations for the core project, applied in file order (see 4.5)
-db/migrations/shard/        SQL migrations for every shard project
+db/migration_main/          SQL migrations for the core project, applied in file order (see 4.5)
+db/migration_shard/         SQL migrations for every shard project (see 4.5, 4.7)
 src/app/
 ├── main.py                 FastAPI app: /api/config, /api/evaluate, /api/scripts*, /api/sessions*,
 │                           /api/generate-script*, /api/topics, static UI (Cache-Control: no-cache)
@@ -221,12 +221,12 @@ Run by hand in the Supabase SQL Editor, in file order. Each file starts with `Ru
 | `0009_purge_unconfirmed_accounts.sql`  | required | pg_cron job that deletes unconfirmed accounts (ADR-011)              |
 | `0010_accounts.sql`                    | any time | `accounts` (user to shard); existing users get `core`                 |
 
-Shard projects run `db/migrations/shard/` instead:
+Shard projects run `db/migration_shard/` instead:
 
 | File                                         | Run      | Creates                                                     |
 | -------------------------------------------- | -------- | ----------------------------------------------------------- |
-| `shard/0001_sessions.sql`                    | once     | `sessions` without foreign keys, buckets `audio`, `series`  |
-| `shard/0002_purge_insufficient_sessions.sql` | required | Same pg_cron job as `0005`                                  |
+| `migration_shard/0001_sessions.sql`                    | once     | `sessions` without foreign keys, buckets `audio`, `series`  |
+| `migration_shard/0002_purge_insufficient_sessions.sql` | required | Same pg_cron job as `0005`                                  |
 
 Merged migrations are never edited; a schema change is a new file. The backend is deployed only after its migrations have run.
 
@@ -284,8 +284,8 @@ Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `
 
 | Order | File | Run |
 | ----- | ---- | --- |
-| 1 | `shard/0001_sessions.sql` | once |
-| 2 | `shard/0002_purge_insufficient_sessions.sql` | any time, needs `pg_cron` |
+| 1 | `migration_shard/0001_sessions.sql` | once |
+| 2 | `migration_shard/0002_purge_insufficient_sessions.sql` | any time, needs `pg_cron` |
 
 Then add `"https://<ref>.supabase.co": "<service key>"` to `SUPABASE_SHARDS` in `.env` and restart. New users can be placed there at once (never in the core); existing users stay where they are. Never run core migrations on a shard or shard migrations on the core.
 

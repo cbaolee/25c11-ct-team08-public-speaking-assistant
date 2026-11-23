@@ -129,7 +129,7 @@ class SupabaseProfileRepo:
         return ProfileRow.model_validate(row) if row else None
 
     def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None:
-        # One SQL statement (db/migrations/0003): keys not in `patch` are kept.
+        # One SQL statement (db/migration_main/0003): keys not in `patch` are kept.
         params = {"p_user_id": str(user_id), "p_patch": patch}
         resp = _execute(self._client.rpc("merge_profile_preferences", params))
         row = _first(resp.data)
@@ -410,7 +410,7 @@ class SupabaseSessionRepo:
 
 
 class SupabaseAccountRepo:
-    """public.accounts on the core project (db/migrations/0010_accounts.sql)."""
+    """public.accounts on the core project (db/migration_main/0010_accounts.sql)."""
 
     def __init__(self, client: Client) -> None:
         self._client = client

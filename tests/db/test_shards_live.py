@@ -3,7 +3,7 @@
 Skipped by default. Run with:
     uv run pytest -m integration tests/db/test_shards_live.py
 Needs SUPABASE_URL, SUPABASE_SERVICE_KEY and SUPABASE_SHARDS in .env, migration 0010 on the
-core and shard/0001 on every shard.
+core and migration_shard/0001 on every shard.
 
 It creates 10 test accounts (emails TEST_EMAIL_PATTERN), gives each a profile, a 10 s
 baseline and one short practice session, checks that every shard project received a

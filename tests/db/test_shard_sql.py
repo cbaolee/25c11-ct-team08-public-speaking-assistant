@@ -3,11 +3,11 @@
 import re
 from pathlib import Path
 
-MIGRATIONS = Path(__file__).resolve().parents[2] / "db/migrations"
+DB = Path(__file__).resolve().parents[2] / "db"
 
 
 def _read(name: str) -> str:
-    data = (MIGRATIONS / name).read_bytes()
+    data = (DB / name).read_bytes()
     assert not data.startswith(b"\xef\xbb\xbf")
     return data.decode("utf-8")
 
@@ -19,13 +19,13 @@ def _sessions_columns(sql: str) -> list[str]:
 
 
 def test_shard_sessions_has_the_core_columns():
-    core = _sessions_columns(_read("0001_init.sql"))
-    shard = _sessions_columns(_read("shard/0001_sessions.sql"))
+    core = _sessions_columns(_read("migration_main/0001_init.sql"))
+    shard = _sessions_columns(_read("migration_shard/0001_sessions.sql"))
     assert shard == core
 
 
 def test_shard_sessions_has_no_foreign_key_and_no_policy():
-    sql = _read("shard/0001_sessions.sql")
+    sql = _read("migration_shard/0001_sessions.sql")
     assert "references" not in sql.lower()
     assert "create policy" not in sql.lower()
     assert "enable row level security" in sql
@@ -33,7 +33,7 @@ def test_shard_sessions_has_no_foreign_key_and_no_policy():
 
 
 def test_accounts_migration_backfills_core_and_is_rerunnable():
-    sql = _read("0010_accounts.sql")
+    sql = _read("migration_main/0010_accounts.sql")
     assert "create table if not exists public.accounts" in sql
     assert "references auth.users(id) on delete cascade" in sql
     assert "create policy" not in sql.lower()

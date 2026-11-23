@@ -5,15 +5,19 @@ import pytest
 
 from src.app.constants import CONSTANTS
 
-MIGRATIONS = Path(__file__).resolve().parents[2] / "db/migrations"
+DB = Path(__file__).resolve().parents[2] / "db"
 
 
-# The core project (0005) and every shard project (shard/0002) run the same job.
+# The core project (0005) and every shard project (migration_shard/0002) run the same job.
 @pytest.mark.parametrize(
-    "name", ["0005_purge_insufficient_sessions.sql", "shard/0002_purge_insufficient_sessions.sql"]
+    "name",
+    [
+        "migration_main/0005_purge_insufficient_sessions.sql",
+        "migration_shard/0002_purge_insufficient_sessions.sql",
+    ],
 )
 def test_purge_sql_matches_retention_constant(name):
-    path = MIGRATIONS / name
+    path = DB / name
     data = path.read_bytes()
     assert not data.startswith(b"\xef\xbb\xbf")
     sql = path.read_text(encoding="utf-8")
@@ -33,8 +37,7 @@ def test_frontend_insufficient_days_matches_retention_constant():
 
 
 def _unconfirmed_sql() -> tuple[bytes, str]:
-    path = Path(__file__).resolve().parents[2] / "db/migrations"
-    path = path / "0009_purge_unconfirmed_accounts.sql"
+    path = DB / "migration_main/0009_purge_unconfirmed_accounts.sql"
     return path.read_bytes(), path.read_text(encoding="utf-8")
 
 

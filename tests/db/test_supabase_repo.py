@@ -555,7 +555,7 @@ def test_audio_store_upload_conflict_signed_url_and_delete(env):
         repos.files.download_file(owner, bucket, path)
 
 
-# ---------- avatar and preferences (psc-main, needs db/migrations/0003) ----------
+# ---------- avatar and preferences (psc-main, needs db/migration_main/0003) ----------
 
 
 @pytest.fixture

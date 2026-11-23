@@ -1,8 +1,8 @@
--- shard/0001_sessions.sql: sessions table and session buckets of a shard project (ADR-012)
+-- migration_shard/0001_sessions.sql: sessions table and session buckets of a shard project (ADR-012)
 -- Run: once (running again fails: relation / bucket already exists)
 -- Where: every shard project (psc-shard01 ... psc-shard09). Never on the core (psc-main):
 --        the core already has public.sessions from 0001.
--- Applied: not yet
+-- Applied: psc-shard01 ... psc-shard09, 2026-11-23
 -- Effect: creates public.sessions with the same columns as the core table, buckets audio and
 --         series (private). Running again fails ("relation already exists" / duplicate
 --         bucket id) and changes nothing.
