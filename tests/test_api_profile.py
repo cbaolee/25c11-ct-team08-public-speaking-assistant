@@ -148,7 +148,7 @@ def _put_avatar(client, content, name="avatar.png"):
 
 
 def _stored_avatar(repos) -> Image.Image:
-    data = repos.files._state.files[(settings.avatars_bucket, build_avatar_path(TEST_USER_ID))]
+    data = repos.profiles._state.files[(settings.avatars_bucket, build_avatar_path(TEST_USER_ID))]
     return Image.open(BytesIO(data))
 
 
@@ -178,7 +178,7 @@ def test_upload_avatar_too_many_pixels_returns_422(client, monkeypatch):
 def test_uploaded_avatar_is_one_square_webp(client, repos):
     assert _put_avatar(client, _image_bytes()).status_code == 200
     assert _put_avatar(client, _image_bytes(color="blue")).status_code == 200
-    keys = [k for k in repos.files._state.files if k[0] == settings.avatars_bucket]
+    keys = [k for k in repos.profiles._state.files if k[0] == settings.avatars_bucket]
     assert keys == [(settings.avatars_bucket, build_avatar_path(TEST_USER_ID))]
     stored = _stored_avatar(repos)
     assert stored.format == "WEBP"
@@ -206,7 +206,7 @@ def test_upload_avatar_removes_file_when_path_save_fails(client, repos, monkeypa
     monkeypatch.setattr(repos.profiles, "set_avatar_path", fail)
     r = _put_avatar(client, _image_bytes())
     assert r.status_code == 503
-    assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
+    assert not any(k[0] == settings.avatars_bucket for k in repos.profiles._state.files)
 
 
 def test_upload_avatar_kept_when_signing_fails(client, repos, monkeypatch):
@@ -223,7 +223,7 @@ def test_upload_avatar_kept_when_signing_fails(client, repos, monkeypatch):
 def test_upload_avatar_without_profile_stores_nothing(repos):
     r = _put_avatar(TestClient(main.app), _image_bytes())
     assert r.status_code == 404
-    assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
+    assert not any(k[0] == settings.avatars_bucket for k in repos.profiles._state.files)
 
 
 def test_delete_avatar_removes_file_even_if_path_is_null(client, repos):
@@ -231,7 +231,7 @@ def test_delete_avatar_removes_file_even_if_path_is_null(client, repos):
     repos.profiles.set_avatar_path(TEST_USER_ID, None)
     r = client.delete("/api/profile/avatar")
     assert r.status_code == 200
-    assert not any(k[0] == settings.avatars_bucket for k in repos.files._state.files)
+    assert not any(k[0] == settings.avatars_bucket for k in repos.profiles._state.files)
 
 
 def test_delete_avatar_when_none(client):

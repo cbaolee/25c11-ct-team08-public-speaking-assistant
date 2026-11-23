@@ -13,7 +13,12 @@ import pytest
 
 from src.app.auth import MemoryAuthProvider, get_auth
 from src.app.config import settings
-from src.app.db.factory import build_memory_repos, get_repos, get_supabase_client
+from src.app.db.factory import (
+    build_memory_repos,
+    get_repos,
+    get_shard_client,
+    get_supabase_client,
+)
 from src.app.deps import CurrentUser, get_current_user
 from src.app.main import app
 from src.app.routes.auth import reset_auth_limiters
@@ -31,7 +36,7 @@ def isolated_app(request, monkeypatch):
     monkeypatch.setattr(settings, "supabase_url", "")
     monkeypatch.setattr(settings, "supabase_service_key", "")
     monkeypatch.setattr(settings, "supabase_shards", {})
-    for cached in (get_repos, get_auth, get_supabase_client):
+    for cached in (get_repos, get_auth, get_supabase_client, get_shard_client):
         cached.cache_clear()
     reset_auth_limiters()
     repos, auth = build_memory_repos(), MemoryAuthProvider(code_factory=lambda: TEST_OTP)
@@ -42,5 +47,5 @@ def isolated_app(request, monkeypatch):
     )
     yield
     app.dependency_overrides.clear()
-    for cached in (get_repos, get_auth, get_supabase_client):
+    for cached in (get_repos, get_auth, get_supabase_client, get_shard_client):
         cached.cache_clear()
