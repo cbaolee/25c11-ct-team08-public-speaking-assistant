@@ -31,7 +31,7 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 | **Session History**   | Each evaluated session is saved with its audio and chart data. The newest 10 sessions stay complete; the next 30 keep only scores, script and mistakes; older ones are deleted. |
 | **Saved Scripts**     | Up to 10 named scripts per user, editable, shared by Practice and Script Studio. Practising a script does not save it.                                                                                        |
 | **Follow-along**      | While recording, the current sentence is highlighted at a chosen speed. Tapping a sentence moves the highlight there; with Auto speed on, the taps also set the speed. Range and Auto speed are in Settings. |
-| **Profile**           | Display name, accent, topics, recording consent, profile picture and reading-speed preferences, stored per account.                                                                                       |
+| **Profile**           | Display name, accent, recording consent, profile picture and reading-speed preferences, stored per account.                                                                                       |
 
 ## Tech Stack
 
@@ -143,7 +143,7 @@ uv run uvicorn src.app.main:app --reload --port 8000
 Then open <http://localhost:8000> in the browser on the same machine. Browsers only allow the
 microphone on `localhost` or HTTPS.
 
-1. **Sign up** with an email and a password (at least 8 characters), choose your accent and topics.
+1. **Sign up** with an email and a password (at least 8 characters), choose your accent.
 2. **Record your baseline**: the Baseline Gate asks for 30 seconds of normal reading once.
 3. **Script Studio**: pick a template topic or describe your event (or attach a PDF up to 10 pages), then save the script.
 4. **Practice**: choose a saved script, your own text or a sample, then record (pause and resume allowed) or upload your voice.

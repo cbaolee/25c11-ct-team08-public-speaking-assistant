@@ -107,7 +107,7 @@ export const TEXT = {
     tabsLabel: 'Text to read', tabMine: 'My script', tabSample: 'Sample', tabOwn: 'Write my own',
     sheetLabel: 'Text to read aloud',
     makeScript: 'Generate a script',
-    emptySampleT: 'No sample chosen yet.', sampleBtn: 'Show a sample', sampleAnother: 'Show another sample', sampleNote: 'Picked from your topics.',
+    emptySampleT: 'No sample chosen yet.', sampleBtn: 'Show a sample', sampleAnother: 'Show another sample',
     emptyOwnT: 'Type your text in the box, then choose Use this script.',
     ownLabel: 'Your text', ownCounter: '{n} / {max} words', errOwnMax: 'Keep the text to {max} words or fewer.', errOwnEmpty: 'Type some text first.',
     fromScript: 'From Script · {title}', sampleTitle: 'Sample · {title}', ownTitle: 'Your own text',
@@ -250,7 +250,7 @@ export const TEXT = {
   profile: {
     title: 'Profile', sub: 'Your details and your 30-second baseline voice.',
     userInfo: 'Your details', editInfo: 'Edit details', changeAvatar: 'Change photo', removeAvatar: 'Remove photo',
-    rowName: 'Name', rowGender: 'Gender', rowAge: 'Age', rowAccent: 'Target accent', rowTopics: 'Script topics', rowBaseline: 'Baseline voice', rowBaselineDone: 'Recorded on {date}', rowNotSet: 'Not set',
+    rowName: 'Name', rowGender: 'Gender', rowAge: 'Age', rowAccent: 'Target accent', rowBaseline: 'Baseline voice', rowBaselineDone: 'Recorded on {date}', rowNotSet: 'Not set',
     baselineTitle: 'Baseline voice', baselineNote: 'Read the passage naturally, as in a normal conversation. Your pitch and pauses are compared with this recording.',
     start: 'Start recording', stop: 'Stop recording', again: 'Record again', recording: 'Recording...',
     saved: 'Baseline saved on {date}', none: 'No baseline yet', tooShort: 'Too short: record at least {n} s',
@@ -268,13 +268,12 @@ export const TEXT = {
   pm: {
     displayName: 'Your name', displayNamePh: 'What should we call you?', errName: 'Enter your name.',
     titleFirst: 'Welcome. Tell us how you want to practise', titleEdit: 'Edit your details',
-    subFirst: 'Choose your accent and topics to continue. Gender and age are optional.',
+    subFirst: 'Choose your accent to continue. Gender and age are optional.',
     subEdit: 'Update your details and press Save.',
     gender: 'Gender', optional: '(optional)', genderPh: 'Prefer not to say', genders: ['Male', 'Female', 'Other'],
     age: 'Age', agePh: 'For example 21',
     accent: 'Target accent', accents: ['American English', 'British English'],
-    topics: 'Script topics', topicsHint: '(choose at least one)',
-    errAge: 'Enter an age between 1 and 120, or leave it empty.', errAccent: 'Choose one accent.', errTopics: 'Choose at least one topic.',
+    errAge: 'Enter an age between 1 and 120, or leave it empty.', errAccent: 'Choose one accent.',
     saved: 'Details saved.', saveErr: 'Could not save your details. Please try again.'
   },
   pass: { title: 'Change password', sub: 'Choose a new password for your account.', username: 'Email', newPass: 'New password', newPass2: 'Repeat new password', errEmpty: 'Fill in both password fields.', errMismatch: 'The two passwords do not match.', ok: 'Password changed.' },

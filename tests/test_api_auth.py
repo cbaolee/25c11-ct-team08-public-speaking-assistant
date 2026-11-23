@@ -31,7 +31,6 @@ SIGNUP = {
     "target_accent": "American",
     "age": 21,
     "gender": "Female",
-    "topics": ["sports"],
     "consent_recording": True,
 }
 
@@ -74,7 +73,6 @@ def test_signup_creates_account_and_profile(client):
     profile = _repos().profiles.get_profile(user_id)
     assert profile.target_accent == "American"
     assert profile.display_name == "ana"  # email is lower-cased, name from its first part
-    assert profile.topics == ["sports"]
     assert profile.consent_recording is True
 
 

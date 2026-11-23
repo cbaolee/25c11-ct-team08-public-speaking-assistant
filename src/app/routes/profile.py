@@ -33,7 +33,6 @@ class ProfileUpdatePayload(BaseModel):
     display_name: str | None = Field(default=None, max_length=50)
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = Field(default=None, max_length=50)
-    topics: list[str] | None = Field(default=None, max_length=20)
     consent_recording: bool | None = None
     preferences: UserPreferences | None = None
 

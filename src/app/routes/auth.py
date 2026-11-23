@@ -66,7 +66,6 @@ class SignupPayload(BaseModel):
     display_name: str | None = Field(default=None, max_length=50)
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = Field(default=None, max_length=50)
-    topics: list[str] = Field(default_factory=list, max_length=20)
     consent_recording: bool = False
 
 
@@ -86,7 +85,6 @@ class SignupDetails(BaseModel):
     display_name: str | None = Field(default=None, max_length=50)
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = Field(default=None, max_length=50)
-    topics: list[str] = Field(default_factory=list, max_length=20)
     consent_recording: bool = False
 
 
@@ -181,7 +179,6 @@ async def sign_up(
             display_name=(payload.display_name or "").strip() or email.split("@")[0][:50],
             age=payload.age,
             gender=payload.gender,
-            topics=payload.topics,
         )
         profile_created_here = False
         try:
@@ -233,7 +230,6 @@ def _apply_profile(repos: Repos, user_id: UUID, details: SignupDetails, email: s
         display_name=(details.display_name or "").strip() or email.split("@")[0][:50],
         age=details.age,
         gender=details.gender,
-        topics=details.topics,
     )
     try:
         repos.profiles.upsert_profile(user_id, profile)
