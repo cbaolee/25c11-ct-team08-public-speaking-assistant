@@ -75,7 +75,7 @@ class Settings(BaseSettings):
     # Moderation Layer 2 (Ollama / OpenAI-compatible Llama-Guard endpoint)
     ollama_host: str = ""
     ollama_api_key: str = ""
-    guard_model: str = "llama-guard3:1b"
+    guard_model: str = "llama-guard3:8b"
 
     # Speech-to-text providers (Deepgram primary, Gladia fallback)
     deepgram_api_keys: KeyList = []
