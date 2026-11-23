@@ -534,3 +534,48 @@ def test_get_repos_rejects_non_dev_without_persistent_adapter(monkeypatch):
             get_repos()
     finally:
         get_repos.cache_clear()
+
+
+# ---------- accounts and shard cleanup (ADR-012) ----------
+
+
+def test_memory_account_keeps_the_first_shard():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    assert repos.accounts.get_shard(user_id) is None
+    assert repos.accounts.assign_shard(user_id, "aaaa") == "aaaa"
+    assert repos.accounts.assign_shard(user_id, "bbbb") == "aaaa"  # already stored: unchanged
+    assert repos.accounts.get_shard(user_id) == "aaaa"
+
+
+def test_memory_account_counts_users_per_shard():
+    repos = build_memory_repos()
+    for shard_ref in ("core", "aaaa", "aaaa"):
+        repos.accounts.assign_shard(uuid4(), shard_ref)
+    assert repos.accounts.count_by_shard() == {"core": 1, "aaaa": 2}
+
+
+def test_memory_account_rejects_an_empty_shard():
+    with pytest.raises(ValueError):
+        build_memory_repos().accounts.assign_shard(uuid4(), "")
+
+
+def test_memory_delete_user_sessions_keeps_other_users():
+    repos = build_memory_repos()
+    ana, ben = uuid4(), uuid4()
+    for _ in range(2):
+        repos.sessions.create_session(ana, _new_session())
+    repos.sessions.create_session(ben, _new_session())
+    assert repos.sessions.delete_user_sessions(ana) == 2
+    assert repos.sessions.list_sessions(ana, 10, None) == []
+    assert len(repos.sessions.list_sessions(ben, 10, None)) == 1
+    assert repos.sessions.delete_user_sessions(ana) == 0  # safe to run again
+
+
+def test_memory_delete_profile_drops_the_account_row():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    repos.profiles.upsert_profile(user_id, ProfileUpsert(target_accent="American"))
+    repos.accounts.assign_shard(user_id, "aaaa")
+    repos.profiles.delete_profile(user_id)
+    assert repos.accounts.get_shard(user_id) is None

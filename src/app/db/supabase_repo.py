@@ -404,6 +404,50 @@ class SupabaseSessionRepo:
         )
         return len(resp.data) > 0
 
+    def delete_user_sessions(self, user_id: UUID) -> int:
+        resp = _execute(self._table().delete().eq("user_id", str(user_id)))
+        return len(resp.data or [])
+
+
+class SupabaseAccountRepo:
+    """public.accounts on the core project (db/migrations/0010_accounts.sql)."""
+
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    def _table(self):
+        return self._client.table("accounts")
+
+    def get_shard(self, user_id: UUID) -> str | None:
+        resp = _execute(self._table().select("shard_ref").eq("user_id", str(user_id)).limit(1))
+        row = _first(resp.data)
+        return None if row is None else str(row["shard_ref"])
+
+    def assign_shard(self, user_id: UUID, shard_ref: str) -> str:
+        """Insert unless a row exists (`on conflict do nothing`), then read the stored shard."""
+        if not shard_ref:
+            raise ValueError("shard_ref must not be empty")
+        _execute(
+            self._table().upsert(
+                {"user_id": str(user_id), "shard_ref": shard_ref},
+                on_conflict="user_id",
+                ignore_duplicates=True,
+            )
+        )
+        stored = self.get_shard(user_id)
+        if stored is None:
+            raise StorageError("Account insert returned no row")
+        return stored
+
+    def count_by_shard(self) -> dict[str, int]:
+        """One small row per user (100 users at most, ADR-012), so the count is done here."""
+        resp = _execute(self._table().select("shard_ref"))
+        counts: dict[str, int] = {}
+        for row in resp.data or []:
+            shard_ref = str(row["shard_ref"])
+            counts[shard_ref] = counts.get(shard_ref, 0) + 1
+        return counts
+
 
 def _validate_object_path(user_id: UUID, path: str) -> None:
     """Allow only paths made by build_object_path inside the user's own folder."""

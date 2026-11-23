@@ -1,7 +1,10 @@
+import json
+import re
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import urlparse
 
-from pydantic import Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from src.app.constants import CONSTANTS
@@ -61,6 +64,76 @@ def _from_toml(section: str, key: str):
 KeyList = Annotated[list[str], NoDecode]
 
 
+def _clean_supabase_url(value: str) -> str:
+    """Keep only the project URL (https://<ref>.supabase.co): trailing "/" is removed,
+    an API path such as /rest/v1 is refused, because every request would fail later."""
+    url = value.strip().rstrip("/")
+    if url.lower().endswith(_SUPABASE_API_SUFFIXES):
+        raise ValueError(
+            "SUPABASE_URL must be the project URL https://<ref>.supabase.co, "
+            f"without an API path such as /rest/v1 (got {url!r})"
+        )
+    return url
+
+
+CORE_SHARD_REF = "core"  # accounts.shard_ref of users whose sessions stay in SUPABASE_URL
+_SHARD_REF = re.compile(r"^[a-z0-9-]+$")
+
+
+class ShardProject(BaseModel):
+    """One shard project (ADR-012): holds the sessions table and the audio, series buckets.
+
+    `ref` is what accounts.shard_ref stores: the first part of the URL host, which never
+    changes. `number` is the 1-based position in SUPABASE_SHARDS, only a label for logs and
+    project names (psc-shared01 is number 1); it is never stored.
+    """
+
+    ref: str
+    number: int
+    url: str
+    service_key: str
+
+
+def shard_ref_from_url(url: str) -> str:
+    """https://hrtwwvdrueanstxjtqki.supabase.co -> "hrtwwvdrueanstxjtqki"."""
+    host = urlparse(url).hostname or ""
+    ref = host.split(".")[0].lower()
+    if not _SHARD_REF.match(ref) or ref == CORE_SHARD_REF:
+        raise ValueError(f"SUPABASE_SHARDS: cannot read a project ref from {url!r}")
+    return ref
+
+
+def parse_shards(value: object) -> dict[str, ShardProject]:
+    """SUPABASE_SHARDS='{"https://a.supabase.co": "key-a", "https://b.supabase.co": "key-b"}'.
+
+    A JSON object, project URL -> service key. Order does not matter for the data: users are
+    stored by project ref, so entries can be added, moved or (when empty) removed freely.
+    """
+    if isinstance(value, str):
+        if not value.strip():
+            return {}
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError as err:
+            raise ValueError(
+                'SUPABASE_SHARDS must be a JSON object {"<project url>": "<service key>", ...}'
+            ) from err
+    if not isinstance(value, dict):
+        raise ValueError(
+            'SUPABASE_SHARDS must be a JSON object {"<project url>": "<service key>", ...}'
+        )
+    shards: dict[str, ShardProject] = {}
+    for number, (raw_url, raw_key) in enumerate(value.items(), start=1):
+        if not isinstance(raw_url, str) or not isinstance(raw_key, str) or not raw_key.strip():
+            raise ValueError("SUPABASE_SHARDS: every project URL needs a service key")
+        url = _clean_supabase_url(raw_url)
+        ref = shard_ref_from_url(url)
+        if ref in shards:
+            raise ValueError(f"SUPABASE_SHARDS lists project {ref} twice")
+        shards[ref] = ShardProject(ref=ref, number=number, url=url, service_key=raw_key.strip())
+    return shards
+
+
 class Settings(BaseSettings):
     # Several keys per service: when one runs out of quota the next is used (src/app/key_pool.py)
     cerebras_api_keys: KeyList = []
@@ -84,6 +157,8 @@ class Settings(BaseSettings):
     # Supabase: database and storage
     supabase_url: str = ""
     supabase_service_key: str = ""
+    # Extra projects for sessions and their files; empty means everything stays in SUPABASE_URL
+    supabase_shards: Annotated[dict[str, ShardProject], NoDecode] = {}
     audio_bucket: str = "audio"
     series_bucket: str = "series"
     baselines_bucket: str = "baselines"
@@ -112,15 +187,14 @@ class Settings(BaseSettings):
     @field_validator("supabase_url")
     @classmethod
     def _check_supabase_url(cls, value: str) -> str:
-        """Keep only the project URL (https://<ref>.supabase.co): trailing "/" is removed,
-        an API path such as /rest/v1 is refused, because every request would fail later."""
-        url = value.strip().rstrip("/")
-        if url.lower().endswith(_SUPABASE_API_SUFFIXES):
-            raise ValueError(
-                "SUPABASE_URL must be the project URL https://<ref>.supabase.co, "
-                f"without an API path such as /rest/v1 (got {url!r})"
-            )
-        return url
+        return _clean_supabase_url(value)
+
+    @field_validator("supabase_shards", mode="before")
+    @classmethod
+    def _parse_shards(cls, value: object) -> object:
+        if isinstance(value, dict) and all(isinstance(v, ShardProject) for v in value.values()):
+            return value
+        return parse_shards(value)
 
 
 settings = Settings()
@@ -138,7 +212,7 @@ def missing_required_settings(s: Settings) -> list[str]:
         "GLADIA_API_KEYS": ",".join(s.gladia_api_keys),
         "GROQ_API_KEYS": ",".join(s.groq_api_keys),
     }
-    if s.app_env != "dev" or s.supabase_url:
+    if s.app_env != "dev" or s.supabase_url or s.supabase_shards:
         required["SUPABASE_URL"] = s.supabase_url
         required["SUPABASE_SERVICE_KEY"] = s.supabase_service_key
     return [name for name, value in required.items() if not value.strip()]

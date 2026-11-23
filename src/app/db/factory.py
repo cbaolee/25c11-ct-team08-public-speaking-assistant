@@ -5,6 +5,7 @@ from supabase import Client, create_client
 
 from src.app.config import settings
 from src.app.db.memory import (
+    MemoryAccountRepo,
     MemoryAudioStore,
     MemoryBaselineRepo,
     MemoryProfileRepo,
@@ -14,6 +15,7 @@ from src.app.db.memory import (
 )
 from src.app.db.models import StorageError
 from src.app.db.repositories import (
+    AccountRepo,
     AudioStore,
     BaselineRepo,
     ProfileRepo,
@@ -21,6 +23,7 @@ from src.app.db.repositories import (
     SessionRepo,
 )
 from src.app.db.supabase_repo import (
+    SupabaseAccountRepo,
     SupabaseAudioStore,
     SupabaseBaselineRepo,
     SupabaseProfileRepo,
@@ -36,6 +39,7 @@ class Repos:
     scripts: ScriptRepo
     sessions: SessionRepo
     files: AudioStore
+    accounts: AccountRepo
 
 
 def build_memory_repos() -> Repos:
@@ -46,6 +50,7 @@ def build_memory_repos() -> Repos:
         scripts=MemoryScriptRepo(state),
         sessions=MemorySessionRepo(state),
         files=MemoryAudioStore(state),
+        accounts=MemoryAccountRepo(state),
     )
 
 
@@ -65,6 +70,7 @@ def build_supabase_repos() -> Repos:
         scripts=SupabaseScriptRepo(client),
         sessions=SupabaseSessionRepo(client),
         files=SupabaseAudioStore(client),
+        accounts=SupabaseAccountRepo(client),
     )
 
 

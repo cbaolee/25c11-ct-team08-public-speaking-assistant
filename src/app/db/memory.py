@@ -40,6 +40,8 @@ class MemoryState:
     scripts_lock: RLock = field(default_factory=RLock)
     sessions: dict[UUID, SessionRow] = field(default_factory=dict)
     files: dict[tuple[str, str], bytes] = field(default_factory=dict)
+    accounts: dict[UUID, str] = field(default_factory=dict)  # user_id -> shard_ref
+    accounts_lock: RLock = field(default_factory=RLock)
 
 
 def _now() -> datetime:
@@ -151,6 +153,7 @@ class MemoryProfileRepo:
         for session_id, row in list(self._state.sessions.items()):
             if row.user_id == user_id:
                 del self._state.sessions[session_id]
+        self._state.accounts.pop(user_id, None)  # Supabase: accounts cascade from auth.users
         return True
 
 
@@ -382,6 +385,32 @@ class MemorySessionRepo:
             return False
         del self._state.sessions[session_id]
         return True
+
+    def delete_user_sessions(self, user_id: UUID) -> int:
+        ids = [sid for sid, row in self._state.sessions.items() if row.user_id == user_id]
+        for session_id in ids:
+            del self._state.sessions[session_id]
+        return len(ids)
+
+
+class MemoryAccountRepo:
+    def __init__(self, state: MemoryState) -> None:
+        self._state = state
+
+    def get_shard(self, user_id: UUID) -> str | None:
+        return self._state.accounts.get(user_id)
+
+    def assign_shard(self, user_id: UUID, shard_ref: str) -> str:
+        if not shard_ref:
+            raise ValueError("shard_ref must not be empty")
+        with self._state.accounts_lock:
+            return self._state.accounts.setdefault(user_id, shard_ref)
+
+    def count_by_shard(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for shard_ref in list(self._state.accounts.values()):
+            counts[shard_ref] = counts.get(shard_ref, 0) + 1
+        return counts
 
 
 class MemoryAudioStore:

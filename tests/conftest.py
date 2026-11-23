@@ -30,6 +30,7 @@ def isolated_app(request, monkeypatch):
     # Code that calls get_repos()/get_auth() directly (not through FastAPI) must not see .env
     monkeypatch.setattr(settings, "supabase_url", "")
     monkeypatch.setattr(settings, "supabase_service_key", "")
+    monkeypatch.setattr(settings, "supabase_shards", {})
     for cached in (get_repos, get_auth, get_supabase_client):
         cached.cache_clear()
     reset_auth_limiters()
