@@ -1,10 +1,14 @@
 import logging
+import tempfile
 from collections.abc import Callable
+from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import requests
 
 from src.app.config import stt_connect_timeout_s, stt_read_timeout_s
+from src.app.db.session_helpers import AudioEncodingError, encode_opus
 from src.app.key_pool import get_pool, status_code_of
 from src.audio_processing.contracts import (
     InsufficientAudio,
@@ -17,12 +21,20 @@ from src.audio_processing.contracts import (
 logger = logging.getLogger(__name__)
 
 # (connect, read): without a timeout a hung provider blocks the request forever.
+# requests also uses the connect timeout as the longest stall while the file is being sent.
 STT_TIMEOUT = (stt_connect_timeout_s, stt_read_timeout_s)
+
+# Content-Type sent to the provider, by file suffix.
+UPLOAD_MIME = {".wav": "audio/wav", ".webm": "audio/webm"}
+
+
+def _mime_of(path: Path) -> str:
+    return UPLOAD_MIME.get(path.suffix.lower(), "application/octet-stream")
 
 
 def call_deepgram(master: MasterAudio, *, api_key: str, model: str = "nova-2") -> SttResult:
     url = f"https://api.deepgram.com/v1/listen?model={model}&filler_words=true&punctuate=true&utterances=false"
-    headers = {"Authorization": f"Token {api_key}", "Content-Type": "audio/wav"}
+    headers = {"Authorization": f"Token {api_key}", "Content-Type": _mime_of(master.path)}
 
     with open(master.path, "rb") as f:
         response = requests.post(url, headers=headers, data=f, timeout=STT_TIMEOUT)
@@ -60,8 +72,7 @@ def call_gladia(master: MasterAudio, *, api_key: str) -> SttResult:
     headers = {"x-gladia-key": api_key}
 
     with open(master.path, "rb") as f:
-        # Send the file name from master.path.name
-        files = {"audio": (master.path.name, f, "audio/wav")}
+        files = {"audio": (master.path.name, f, _mime_of(master.path))}
         response = requests.post(url, headers=headers, files=files, timeout=STT_TIMEOUT)
 
     response.raise_for_status()
@@ -137,6 +148,22 @@ def _try_provider(name: str, call: Callable[[str], SttResult], keys: list[str]) 
 
 
 def transcribe(master: MasterAudio, *, settings: Any) -> SttResult:
+    """Send a 32 kbps Opus copy of the master WAV to STT; fall back to the WAV if encoding fails.
+
+    The Opus file is about 8 times smaller, and sending the file is most of the STT time.
+    """
+    with tempfile.TemporaryDirectory() as temp_dir:
+        upload_path = Path(temp_dir) / "stt.webm"
+        try:
+            encode_opus(master.path, upload_path)
+            upload = replace(master, path=upload_path)
+        except AudioEncodingError as e:
+            logger.warning("Opus encoding for STT failed, sending WAV: %s", e)
+            upload = master
+        return _transcribe_file(upload, settings=settings)
+
+
+def _transcribe_file(master: MasterAudio, *, settings: Any) -> SttResult:
     """Every Deepgram key first, then every Gladia key.
 
     An empty transcript (InsufficientAudio) is an answer about the audio, not a provider

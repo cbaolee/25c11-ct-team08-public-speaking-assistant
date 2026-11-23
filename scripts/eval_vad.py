@@ -30,7 +30,7 @@ from src.audio_processing.vad import VadParams, detect_speech, find_pauses
 # NOTE: adjust the "src." import lines to match how the repo imports.
 
 # Limits used only by this tool (not read from the app config).
-MAX_SECONDS = 1320
+MAX_SECONDS = 1920
 CAP_MARGIN_S = 10
 DECODE_TIMEOUT_S = 120
 

@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
+from src.app.db.session_helpers import AudioEncodingError
 from src.audio_processing.contracts import InsufficientAudio, MasterAudio, SttUnavailable
 from src.audio_processing.stt import STT_TIMEOUT, call_deepgram, call_gladia, transcribe
 
@@ -260,3 +261,41 @@ def test_evaluate_returns_503_stt_unavailable(monkeypatch):
     r = client.get(f"/api/evaluate/{r.json()['job_id']}")
     assert r.json()["status"] == "failed"
     assert r.json()["error_code"] == "stt_unavailable"
+
+
+def _deepgram_ok(seen: list):
+    def mock_post(url, *args, **kwargs):
+        seen.append((kwargs["headers"]["Content-Type"], kwargs["data"].read()))
+        resp = MagicMock()
+        resp.json.return_value = {
+            "results": {"channels": [{"alternatives": [{"transcript": "hi", "words": []}]}]}
+        }
+        return resp
+
+    return mock_post
+
+
+def test_transcribe_sends_opus_copy(monkeypatch, mock_master):
+    """STT gets the small Opus file, not the master WAV."""
+    seen: list = []
+
+    def fake_encode(wav_path, out_path):
+        assert wav_path == mock_master.path
+        out_path.write_bytes(b"opus bytes")
+
+    monkeypatch.setattr("src.audio_processing.stt.encode_opus", fake_encode)
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", _deepgram_ok(seen))
+    transcribe(mock_master, settings=MockSettings())
+    assert seen == [("audio/webm", b"opus bytes")]
+
+
+def test_transcribe_sends_wav_when_opus_encoding_fails(monkeypatch, mock_master):
+    seen: list = []
+
+    def broken_encode(wav_path, out_path):
+        raise AudioEncodingError("ffmpeg failed")
+
+    monkeypatch.setattr("src.audio_processing.stt.encode_opus", broken_encode)
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", _deepgram_ok(seen))
+    transcribe(mock_master, settings=MockSettings())
+    assert seen == [("audio/wav", mock_master.path.read_bytes())]

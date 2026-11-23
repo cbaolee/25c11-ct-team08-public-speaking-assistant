@@ -57,6 +57,7 @@ export function loadConfig() {
     const retry = c.retry || {};
     CONFIG.RETRY = { minRatio: retry.sentence_min_error_ratio ?? CONFIG.RETRY.minRatio, wordMax: retry.word_max_seconds ?? CONFIG.RETRY.wordMax, sentenceMax: retry.sentence_max_seconds ?? CONFIG.RETRY.sentenceMax, clipPad: retry.clip_pad_s ?? CONFIG.RETRY.clipPad };
     CONFIG.OWN_MAX_WORDS = c.own_max_words ?? CONFIG.OWN_MAX_WORDS;
+    CONFIG.MAX_AUDIO_SECONDS = c.max_audio_seconds ?? CONFIG.MAX_AUDIO_SECONDS;
     CONFIG.BASELINE_SECONDS = c.baseline_seconds ?? CONFIG.BASELINE_SECONDS;
     CONFIG.BASELINE_MIN_SECONDS = c.baseline_min_seconds ?? CONFIG.BASELINE_MIN_SECONDS;
     CONFIG.SPEAKING_WPM_FOR_ESTIMATE = c.speaking_wpm_for_estimate ?? CONFIG.SPEAKING_WPM_FOR_ESTIMATE;

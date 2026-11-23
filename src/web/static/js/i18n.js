@@ -181,7 +181,7 @@ export const TEXT = {
     errScriptTooLong: 'The practice text is too long. Please use a shorter text.',
     errScriptStorage: 'Saved scripts are not available right now. Please try again.',
     errTooLong: 'This recording is longer than the allowed limit. Please choose a shorter one.',
-    errTooLarge: 'This file is too large. Please choose a smaller one.',
+    errTooLarge: 'This file is too large (maximum 100 MB). Please send the recording as MP3 or M4A.',
     errNoStream: 'No audio was found in this file. Please check the file and try again.',
     errFormat: 'This file format is not supported. Please upload an audio-only file.',
     errCorrupt: 'This audio could not be read. It may be damaged; try another file or record again.',
