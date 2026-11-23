@@ -1,6 +1,6 @@
 /* Tunable values. Defaults below; GET /api/config (app_constants.toml [web]) overrides them in main.js. */
 export const CONFIG = {
-  auth: { otp_length: 6, resend_cooldown_s: 60, unconfirmed_ttl_min: 60 }, // fallback mirrors app_constants.toml [auth] and SQL 0006
+  auth: { otp_length: 6, resend_cooldown_s: 60, unconfirmed_ttl_min: 60 }, // fallback mirrors app_constants.toml [auth] and SQL 0009
   EVAL_JOB: { pollMs: 700, maxWaitS: 360, weights: { upload: 5, decode: 10, vad: 10, stt: 35, align: 10, fluency: 5, pitch: 10, semantic: 10, save: 5 }, tauS: 20, closeDelayMs: 400, announcePct: 25 }, // fallback mirrors app_constants.toml [evaluate_job]
   PART_GOOD_MIN: 85,                   // a part score from here counts as good (Overview, key numbers, coach note)
   RETENTION: { insufficientDays: 7 }, // fallback mirrors app_constants.toml [retention] insufficient_days and SQL pg_cron
