@@ -100,7 +100,7 @@ Tunable limits (saved-script cap, avatar size, list page size, UI timings and fo
 
 Only needed when `SUPABASE_URL` is set.
 
-1. **Enable `pg_cron`** on every project (_Database → Extensions_): each one runs a cleanup job. Full order for a new core or shard project: [architecture.md 4.7](architecture.md).
+1. **Enable `pg_cron`** on every project (_Database → Extensions_): each one runs a cleanup job. Full order for a new core or shard project: [architecture.md 4.8](architecture.md).
    **Run the migrations** in order on the core project `psc-main` (_SQL Editor_ → paste → _Run_). Back up first and update the file's `Applied:` line after running it.
 
    | File | Run | Creates |
@@ -111,19 +111,19 @@ Only needed when `SUPABASE_URL` is set.
    | `0004_replace_baseline_fn.sql` | any time | Function `replace_current_baseline` (baseline swap in one transaction) |
    | `0005_purge_insufficient_sessions.sql` | required, any time | pg_cron job that deletes `insufficient_audio` sessions older than 7 days (must match `app_constants.toml` `[retention] insufficient_days`). Enable the `pg_cron` extension first (Dashboard -> Database -> Extensions). Until it has run, insufficient sessions are not deleted even though the UI says "deleted after 7 days". |
    | `0006_scripts_title_body_only.sql` | once | `scripts` keeps only title and body; unique title and body per user |
-   | `0007_drop_profile_topics.sql` | once | Drops `profiles.topics` |
+   | `0007_drop_profile_topics.sql` | any time | Drops `profiles.topics` |
    | `0008_replace_baseline_delete_old.sql` | any time | `replace_current_baseline` keeps one baseline row per user |
    | `0009_purge_unconfirmed_accounts.sql` | required, any time | pg_cron job (every 15 min) that deletes accounts whose email is still unconfirmed 60 minutes after the last code (must match `app_constants.toml` `[auth] unconfirmed_ttl_min`); accounts with files in Storage are skipped. Enable `pg_cron` first. Until it has run, unconfirmed accounts stay even though the "Check your email" step says they are deleted (ADR-011). |
    | `0010_accounts.sql` | any time | Table `accounts` (which shard holds each user's sessions); existing users get `core` |
 
-   On every **shard project** (ADR-012) run `db/migrations/shard/0001_sessions.sql` (once), then `shard/0002_purge_insufficient_sessions.sql` (enable pg_cron first), then list the shards in `SUPABASE_SHARDS`.
+   On every **shard project** (ADR-012) run `db/migration_shard/0001_sessions.sql` (once), then `migration_shard/0002_purge_insufficient_sessions.sql` (enable pg_cron first), then list the shards in `SUPABASE_SHARDS`.
 
    Deploy a backend version only after the migrations it needs have run.
 2. **Create test users** on `psc-main` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.
 3. **Create a `profiles` row for each test user.** Baselines, scripts and sessions reference `profiles(id)`, so saving fails for a user without a profile.
 4. Record a baseline once for your test user: with `BASELINE_REQUIRED=true`, `/api/evaluate` returns `409 baseline_required` until a baseline exists.
 
-> Never edit a merged migration, except its `Applied:` line. Add a new file (`0011_...sql`, or the next number in `shard/`) with the `Run` / `Applied` / `Effect` header. Run it on every project it is for (core or each shard).
+> Never edit a merged migration, except its `Applied:` line. Add a new file (`0011_...sql`, or the next number in `migration_shard/`) with the `Run` / `Applied` / `Effect` header. Run it on every project it is for (core or each shard).
 
 ### Testing
 
@@ -170,7 +170,8 @@ A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase p
 │   ├── pull_request_template.md
 │   └── issue_template.md
 ├── db/
-│   └── migrations/                # SQL migrations for Supabase (schema, RLS, buckets, functions)
+│   ├── migration_main/            # SQL migrations for the core project psc-main
+│   └── migration_shard/           # SQL migrations for every shard project psc-shard01..09
 ├── docs/
 │   ├── adr/                       # Architecture decision records
 │   ├── ai_use_log/                # AI usage logs, one file per member

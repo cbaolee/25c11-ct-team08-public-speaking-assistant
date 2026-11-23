@@ -14,6 +14,7 @@ Current structure of Public Speaking Coach: parts, responsibilities, data and th
 8. [Configuration](#8-configuration)
 9. [Testing](#9-testing)
 10. [Decision records](#10-decision-records)
+11. [Accounts](#11-accounts)
 
 ## 1. System overview
 
@@ -42,13 +43,17 @@ flowchart LR
 ## 2. Code map
 
 ```
-db/migrations/              SQL migrations for the core project, applied in file order (see 4.5)
-db/migrations/shard/        SQL migrations for every shard project
+db/migration_main/          SQL migrations for the core project, applied in file order (see 4.5)
+db/migration_shard/         SQL migrations for every shard project (see 4.5, 4.8)
 src/app/
-├── main.py                 FastAPI app: /api/config, /api/evaluate, /api/scripts*, /api/sessions*,
-│                           /api/generate-script*, /api/topics, static UI (Cache-Control: no-cache)
-├── routes/                 auth.py (/api/auth/*), profile.py (/api/profile*), baselines.py (/api/baseline*)
+├── main.py                 FastAPI app: /health, /api/config, /api/evaluate*, /api/scripts*,
+│                           /api/sessions*, /api/generate-script*, /api/script-chat/*, /api/topics,
+│                           static UI (Cache-Control: no-cache)
+├── routes/                 auth.py (/api/auth/*), profile.py (/api/profile*), baselines.py (/api/baseline*),
+│                           coach.py (/api/sessions/{id}/coach-note), practice.py (/api/practice/retry)
 ├── auth.py                 AuthProvider: Supabase Auth, or in-memory accounts in dev
+├── rate_limit.py           In-memory sliding-window rate limits
+├── uploads.py              Safe upload paths and size-capped upload saving
 ├── deps.py                 get_current_user: user from the Bearer access token
 ├── config.py               Settings from .env; limits from app_constants.toml; start-up checks
 ├── constants.py            Loads app_constants.toml
@@ -72,8 +77,11 @@ src/web/
     ├── api.js              fetch wrapper: Bearer token, refresh after 401
     ├── evaluate_client.js  Result mapping and follow-along maths; classic script, also run by node tests
     ├── line_numbers.js     Line numbers beside script text
+    ├── mic_device.js       Microphone choice kept per user; classic script, also run by node tests
+    ├── otp_utils.js        OTP input helpers; also run by node tests
+    ├── script_duplicate.js Duplicate saved-script notices; also run by node tests
     ├── screens/            home, practice, report, history, profile, landing, script_studio,
-    │                       saved_scripts, script_reader
+    │                       saved_scripts, script_reader, coach_mode, word_coach
     └── modals/             auth_panel, baseline_gate, settings_modal, profile_modal, confirm
 tests/                      pytest (tests/db: repositories and helpers); tests/web: node tests
 ```
@@ -92,7 +100,9 @@ tests/                      pytest (tests/db: repositories and helpers); tests/w
 | `POST /api/baseline`               | Analyse a voice sample; on `ok`, store it as the current baseline            |
 | `GET /api/baseline`                | Current baseline, or `null`                                                  |
 | `GET /api/baseline/audio`          | Signed URL of the current baseline recording                                 |
-| `POST /api/evaluate`               | Score a recording against the stored baseline, then save the session         |
+| `POST /api/evaluate`               | Start an evaluate job (202 `job_id`); the job scores the recording against the stored baseline, then saves the session |
+| `GET /api/evaluate/{job_id}`       | Job status and progress; the result when done                                |
+| `DELETE /api/evaluate/{job_id}`    | Cancel the caller's job                                                      |
 | `GET /api/sessions?limit=&cursor=` | Page of session summaries, newest first, with `next_cursor`                  |
 | `GET /api/sessions/{id}`           | One session: full result and signed audio URL, or compact summary            |
 | `DELETE /api/sessions/{id}`        | Delete the session files, then the row                                       |
@@ -127,7 +137,9 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 | 401    | `{"detail": "not_authenticated"}`                                        | No valid current user                              |
 | 400    | `{"error": "invalid_cursor"}`                                            | Malformed cursor                                   |
 | 404    | `{"error": "session_not_found"}`                                         | Unknown session or another user's session          |
+| 403    | `{"error_code": "wrong_password", ...}`                                  | Wrong current password (password change, account deletion) |
 | 409    | `{"error_code": "baseline_required", ...}`                               | Evaluate without a baseline                        |
+| 429    | `{"error_code": "rate_limited", ...}`                                    | An evaluate job of the caller is already running   |
 | 409    | `{"error_code": "script_limit_reached", "limit": N, "count": N, ...}`    | New saved script at the per-user cap               |
 | 409    | `{"error_code": "script_duplicate_body" \| "script_duplicate_title", "duplicate_id", "duplicate_title"}` | Duplicate saved script text or title |
 | 413    | `{"error_code": "avatar_too_large", ...}`                                | Avatar above `storage.avatar_max_bytes`            |
@@ -135,7 +147,9 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 | 422    | Validation error                                                         | Bad `preferences` value                            |
 | 503    | `{"error_code": "baseline_not_saved" \| "baseline_unavailable", ...}`   | Baseline could not be saved / loaded               |
 | 503    | `{"error": "session_storage_unavailable"}`                               | Database or storage error in session endpoints     |
+| 503    | `{"error_code": "script_storage_unavailable", ...}`                      | Database error in saved-script endpoints           |
 | 503    | `{"error_code": "profile_unavailable", ...}`                             | Database or storage error in profile endpoints     |
+| 503    | `{"error_code": "storage_unavailable", ...}`                             | Account deletion could not delete files or session rows; nothing after that step ran |
 
 ## 4. Database and storage
 
@@ -180,7 +194,7 @@ erDiagram
 | ----------- | ------------------------- | ----------------------------------------------------------------------------------------- |
 | `profiles`  | One row per user          | `id` = `auth.users.id`; delete cascades to all child rows; `avatar_path`; `preferences` jsonb |
 | `baselines` | Voice baseline measures   | Exactly one row per user, always `is_current`                                             |
-| `scripts`   | Saved scripts             | Cap `storage.max_saved_scripts` per user; `content_hash` finds duplicates; `source`: `generated_template`, `generated_llm`, `written` |
+| `scripts`   | Saved scripts             | Cap `storage.max_saved_scripts` per user; Only `title`, `body`, `content_hash`; unique `(user_id, lower(title))` and `(user_id, content_hash)` |
 | `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions; lives in the user's shard |
 | `accounts`  | Shard of each user        | Core only; `shard_ref` (`core` or a shard's project ref) set the first time the user saves a session or session file; no policy (service key only) |
 
@@ -206,27 +220,29 @@ All buckets are private. Files reach the browser only as signed URLs valid for `
 
 ### 4.5 Migrations
 
-Run by hand in the Supabase SQL Editor, in file order. Each file starts with `Run:` (`once` or `any time`), `Applied:` (database and date) and `Effect:` lines.
+Run by hand in the Supabase SQL Editor, in file order. Each file starts with `Run:` (`once`, `any time`, or `required, any time` for the pg_cron jobs), `Where:` (core or shard), `Applied:` (project and date) and `Effect:` lines. The `Run` column below copies that header.
 
-| File                                   | Run      | Creates                                                              |
-| -------------------------------------- | -------- | -------------------------------------------------------------------- |
-| `0001_init.sql`                        | once     | Tables, indexes, RLS policies, grants                                |
-| `0002_storage.sql`                     | once     | Buckets `audio`, `series`, `baselines` and folder policies           |
-| `0003_profile_avatar_preferences.sql`  | any time | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, `merge_profile_preferences` |
-| `0004_replace_baseline_fn.sql`         | any time | `replace_current_baseline` (replaced by `0008`)                      |
-| `0005_purge_insufficient_sessions.sql` | required | pg_cron job that deletes `insufficient_audio` sessions after 7 days |
-| `0006_scripts_title_body_only.sql`     | once     | `scripts` keeps title and body only; unique title and body per user  |
-| `0007_drop_profile_topics.sql`         | once     | Drops `profiles.topics`                                              |
-| `0008_replace_baseline_delete_old.sql` | any time | `replace_current_baseline` that keeps one baseline row per user      |
-| `0009_purge_unconfirmed_accounts.sql`  | required | pg_cron job that deletes unconfirmed accounts (ADR-011)              |
-| `0010_accounts.sql`                    | any time | `accounts` (user to shard); existing users get `core`                 |
+Core project (`db/migration_main/`):
 
-Shard projects run `db/migrations/shard/` instead:
+| File                                   | Run                | Creates                                                              |
+| -------------------------------------- | ------------------ | -------------------------------------------------------------------- |
+| `0001_init.sql`                        | once               | Tables, indexes, RLS policies, grants                                |
+| `0002_storage.sql`                     | once               | Buckets `audio`, `series`, `baselines` and folder policies           |
+| `0003_profile_avatar_preferences.sql`  | any time           | `profiles.avatar_path`, `profiles.preferences`, bucket `avatars`, `merge_profile_preferences` |
+| `0004_replace_baseline_fn.sql`         | any time, never after `0008` | `replace_current_baseline` (replaced by `0008`)            |
+| `0005_purge_insufficient_sessions.sql` | required, any time | pg_cron job that deletes `insufficient_audio` sessions after 7 days  |
+| `0006_scripts_title_body_only.sql`     | once               | `scripts` keeps title and body only; unique title and body per user  |
+| `0007_drop_profile_topics.sql`         | any time           | Drops `profiles.topics` (`drop column if exists`)                    |
+| `0008_replace_baseline_delete_old.sql` | any time           | `replace_current_baseline` that keeps one baseline row per user      |
+| `0009_purge_unconfirmed_accounts.sql`  | required, any time | pg_cron job that deletes unconfirmed accounts (ADR-011)              |
+| `0010_accounts.sql`                    | any time           | `accounts` (user to shard); existing users get `core`                |
 
-| File                                         | Run      | Creates                                                     |
-| -------------------------------------------- | -------- | ----------------------------------------------------------- |
-| `shard/0001_sessions.sql`                    | once     | `sessions` without foreign keys, buckets `audio`, `series`  |
-| `shard/0002_purge_insufficient_sessions.sql` | required | Same pg_cron job as `0005`                                  |
+Shard projects (`db/migration_shard/`):
+
+| File                                                   | Run                | Creates                                                    |
+| ------------------------------------------------------ | ------------------ | ---------------------------------------------------------- |
+| `migration_shard/0001_sessions.sql`                    | once               | `sessions` without foreign keys, buckets `audio`, `series` |
+| `migration_shard/0002_purge_insufficient_sessions.sql` | required, any time | Same pg_cron job as `0005`                                 |
 
 Merged migrations are never edited; a schema change is a new file. The backend is deployed only after its migrations have run.
 
@@ -248,7 +264,7 @@ flowchart LR
 | No shards configured: everything is in the core, but `accounts` rows are still written | Turning shards on later keeps old users where their data is |
 | Deleting an account: files, then shard session rows, then the auth user | The core cascade does not reach shards; the account goes last so a retry finishes the job |
 
-### 4.6 Retention
+### 4.7 Retention
 
 | Step | Rule | Reason |
 | ---- | ---- | ------ |
@@ -263,7 +279,7 @@ flowchart LR
 | Compact `mistakes`                 | 74,320    |
 | Whole compact row                  | 742,714   |
 
-### 4.7 Setting up a project
+### 4.8 Setting up a project
 
 Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `psc-shard09` (`SUPABASE_SHARDS`). Region Singapore, Free plan. **Every project needs the `pg_cron` extension** (Dashboard → Database → Extensions), because each one runs a cleanup job.
 
@@ -275,7 +291,7 @@ Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `
 | 2 | `0003_profile_avatar_preferences.sql` | any time |
 | 3 | `0006_scripts_title_body_only.sql` | once |
 | 4 | `0007_drop_profile_topics.sql`, `0008_replace_baseline_delete_old.sql` | any time |
-| 5 | `0005_purge_insufficient_sessions.sql`, `0009_purge_unconfirmed_accounts.sql` | any time, need `pg_cron` |
+| 5 | `0005_purge_insufficient_sessions.sql`, `0009_purge_unconfirmed_accounts.sql` | required, any time; need `pg_cron` |
 | 6 | `0010_accounts.sql` | any time |
 
 `0004` is skipped on a new core: `0008` creates the same function in its current form.
@@ -284,8 +300,8 @@ Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `
 
 | Order | File | Run |
 | ----- | ---- | --- |
-| 1 | `shard/0001_sessions.sql` | once |
-| 2 | `shard/0002_purge_insufficient_sessions.sql` | any time, needs `pg_cron` |
+| 1 | `migration_shard/0001_sessions.sql` | once |
+| 2 | `migration_shard/0002_purge_insufficient_sessions.sql` | required, any time; needs `pg_cron` |
 
 Then add `"https://<ref>.supabase.co": "<service key>"` to `SUPABASE_SHARDS` in `.env` and restart. New users can be placed there at once (never in the core); existing users stay where they are. Never run core migrations on a shard or shard migrations on the core.
 
@@ -298,26 +314,28 @@ After running a migration, update its `Applied:` line (project and date). Check 
 ```mermaid
 sequenceDiagram
     participant UI as Browser
-    participant API as POST /api/evaluate
+    participant API as /api/evaluate
+    participant J as Evaluate job
     participant P as Evaluate Pipeline
     participant R as Repos
-    UI->>API: audio + script (+ script_id, topic)
+    UI->>API: POST audio + script (+ script_id, topic)
     API->>R: get_current_baseline(user)
     alt no baseline and BASELINE_REQUIRED
         API-->>UI: 409 baseline_required
     end
-    API->>P: evaluate_session(audio, script, baseline)
-    P-->>API: result (schema 2.1)
-    API->>API: encode_opus, split_series
-    API->>R: upload audio + series
-    API->>R: create_session(row)
-    API->>R: compact beyond 10, delete compact beyond 30
+    API->>J: create job
+    API-->>UI: 202 job_id
+    J->>P: evaluate_session(audio, script, baseline)
+    P-->>J: result (schema 2.1)
+    J->>J: encode_opus, split_series
+    J->>R: upload audio + series (user's shard)
+    J->>R: create_session(row) (user's shard)
+    J->>R: compact beyond 10, delete compact beyond 30
     alt save failed
-        API->>R: delete uploaded files
-        API-->>UI: 200 result, saved=false, session_id=null
-    else saved
-        API-->>UI: 200 result, saved=true, session_id
+        J->>R: delete uploaded files
     end
+    UI->>API: GET /api/evaluate/{job_id} (repeated)
+    API-->>UI: progress, then result with saved and session_id (null if not saved)
 ```
 
 - A save error never hides the score ([ADR-002](docs/adr/ADR-002.md)); a compaction error does not change `saved`.
@@ -359,6 +377,7 @@ One loading screen covers the password check and all first data: profile, histor
 | `localStorage`   | `psa.auth`                | Access and refresh tokens (F5 keeps the login)      | Log out, session end                      |
 | `localStorage`   | `psa.chat.<user_id>`      | Latest Script Studio chat (data, not HTML), newest `chat_history_max_messages` | Log out, account deletion |
 | `localStorage`   | `psc.followWpm.<user_id>` | Follow-along speed not yet saved to the profile     | After a successful save                   |
+| `localStorage`   | `psa.mic.<user_id>`       | Chosen microphone `deviceId` (Audio settings)       | Choosing the default device again        |
 | Profile (server) | `preferences`             | Speed, slider range, auto speed (see 3.2)           | Account deletion                          |
 
 Per-user keys keep two accounts on one browser apart. Every `localStorage` access is wrapped in `try/catch`, so blocked storage only loses the convenience.
@@ -383,7 +402,8 @@ API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS`, `GROQ_API_KEYS`, each one or m
 | Setting                                                              | Default                                   | Meaning                                  |
 | -------------------------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
 | `APP_ENV`                                                            | `dev`                                     | `dev` allows in-memory repos and accounts |
-| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`                               | empty                                     | Use Supabase when the URL is set         |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`                               | empty                                     | Core project; use Supabase when the URL is set |
+| `SUPABASE_SHARDS`                                                    | empty                                     | JSON object shard project URL to service key (4.6); empty: everything in the core |
 | `AUDIO_BUCKET`, `SERIES_BUCKET`, `BASELINES_BUCKET`, `AVATARS_BUCKET` | `audio`, `series`, `baselines`, `avatars` | Bucket names                             |
 | `RETENTION_FULL_SESSIONS`                                            | `10`                                      | Full sessions kept per user              |
 | `MAX_COMPACT_SESSIONS`                                               | `30`                                      | Compact sessions kept per user           |
@@ -399,7 +419,7 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | -------------------------------- | --------------------------------------------------------------------------------- |
 | `uv run pytest`                  | Unit tests with `build_memory_repos()` and dependency overrides; no network or keys |
 | `uv run pytest -m integration`   | Real Supabase tests on `psc-main` and the shards (repositories, SQL functions, buckets, shard check)          |
-| `node --test tests/web/evaluate_client.test.js` | `evaluate_client.js`: result mapping, follow-along schedule, auto speed            |
+| `node --test tests/web/<file>.test.js` | UI helpers run by CI: `evaluate_client`, `otp_utils`, `coach_mode`, `script_duplicate`, `mic_device` |
 | `uv run ruff check .`            | Lint and import order                                                             |
 
 ## 10. Decision records
@@ -409,12 +429,18 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | [ADR-001](docs/adr/ADR-001.md) | Data model for profiles, baselines, scripts and practice sessions |
 | [ADR-002](docs/adr/ADR-002.md) | Report save status in the `/api/evaluate` response (schema 2.1)   |
 | [ADR-006](docs/adr/ADR-006.md) | Moderation layer 2 (Llama Guard via Ollama)                       |
+| [ADR-007](docs/adr/ADR-007.md) | Async evaluate job with progress                                  |
+| [ADR-008](docs/adr/ADR-008.md) | LLM feedback on results (Cerebras, rule-based fallback)           |
+| [ADR-009](docs/adr/ADR-009.md) | Retention of `insufficient_audio` sessions                        |
+| [ADR-010](docs/adr/ADR-010.md) | Email OTP verification on sign up                                 |
+| [ADR-011](docs/adr/ADR-011.md) | Re-auth for password change and account deletion, purge of unconfirmed accounts, microphone choice |
+| [ADR-012](docs/adr/ADR-012.md) | Database split into one core and shard projects by user           |
 
-## Accounts
+## 11. Accounts
 
 | Part                        | Role                                                                                                     |
 | --------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `src/app/auth.py`           | `SupabaseAuthProvider` (service key, server side) and `MemoryAuthProvider` (dev, tests); `get_auth()` picks one like `get_repos()` |
-| `src/app/routes/auth.py`    | `POST /api/auth/signup` creates the account and its `profiles` row (account removed if the profile fails); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password` |
+| `src/app/routes/auth.py`    | `POST /api/auth/signup` creates the account and its `profiles` row (account removed if the profile fails); `/verify-otp`, `/resend-otp` (ADR-010); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password` and `DELETE /api/auth/account` re-check the current password (ADR-011); account deletion removes files, then shard session rows, then the auth user (4.6) |
 | `src/app/routes/profile.py` | Profile, consent, `preferences`, avatar                                                                  |
 | `src/app/deps.py`           | Verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth is unreachable                      |

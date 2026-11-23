@@ -1,8 +1,8 @@
--- shard/0002_purge_insufficient_sessions.sql: same job as 0005, on every shard project (ADR-012)
+-- migration_shard/0002_purge_insufficient_sessions.sql: same job as 0005, on every shard project (ADR-012)
 -- Run: required, any time (safe to run again). Needs the pg_cron extension.
 --      Required because the UI tells users insufficient sessions are deleted after 7 days.
--- Where: every shard project (psc-shard01 ... psc-shard09), after shard/0001.
--- Applied: not yet
+-- Where: every shard project (psc-shard01 ... psc-shard09), after migration_shard/0001.
+-- Applied: psc-shard01 ... psc-shard09, last run 2026-11-23
 -- Effect: purges insufficient-audio sessions after their retention period.
 -- Source: app_constants.toml [retention] insufficient_days. If it changes, update
 -- this file and the fallback in src/web/static/js/state.js as well.
