@@ -96,8 +96,9 @@ export const TEXT = {
     blockedNext: 'Edit your message or material to remove anything unsafe, then send it again.',
     pickTopic: 'Pick the topic that fits best, or write freely without a template.', noTopics: 'No template matched. You can write freely without a template.',
     writeFreely: 'No template — Write freely (AI)', generate: 'Generate Script', thinking: 'Working on it...',
-    sessionFiles: 'Files used in this chat',
-    regenPlaceholder: 'Optional: what to adjust? (Leave blank to rewrite)', regenConfirm: 'Rewrite script'
+    sessionFiles: 'Files used in this chat', placeholderRegen: 'Type what to change, then press Regenerate',
+    regenHint: 'Attach a file to add material. To change the topic, start a New chat.',
+    tryAgain: 'Try again'
   },
   safety: { title: 'This material cannot be used', msg: 'It contains inappropriate or restricted language. Edit your text and try again.', ack: 'Edit my text' },
 

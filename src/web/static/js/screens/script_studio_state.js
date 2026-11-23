@@ -25,3 +25,22 @@ export function pickScriptTitle(result, fallback, maxChars) {
   if (!VISIBLE.test(title) || Array.from(title).length > limit) return fallback;   // by code point, like the saved-name limit
   return title;
 }
+
+/* Feedback sent with a Regenerate. Typed text is returned as typed (trimmed, never cut: the length limit is the caller's job).
+   A blank one becomes a fixed request for a new version; `attempt` (1 for the first Regenerate of a chat session) is added from
+   the second one on, because the backend caches by the feedback text and would otherwise hand back the old script.
+   A bad `attempt` (not a whole number above 1) counts as the first. A non-string `text` counts as blank. */
+export function regenerateFeedback(text, attempt) {
+  const typed = typeof text === 'string' ? text.trim() : '';
+  if (typed) return typed;
+  const base = 'Write a fresh variation of this speech';
+  return Number.isInteger(attempt) && attempt > 1 ? base + ' (variation ' + attempt + ').' : base + '.';
+}
+
+/* What the Composer's action button (#composerSend) is for. Once the chat session has a script (`hasScript` exactly true) it
+   is the Regenerate button and the Composer text is the feedback; before that it is Send. `busy` (any truthy value) disables it
+   and never changes the mode. A missing or broken `input` counts as "Send, enabled". */
+export function composerActionState(input) {
+  const { busy, hasScript } = input || {};
+  return { mode: hasScript === true ? 'regenerate' : 'send', disabled: !!busy };
+}
