@@ -305,7 +305,7 @@ function openOtpStep(email, { from, consent, resend, draft }) {
   otp = { email, from, consent, draft: draft || null, sentAt: resend ? null : Date.now(), timer: null };
   const current = otp, n = otpConfig().otp_length, input = $('#otpCode'), step = $('#otpStep'), a = $('#lAuth');
   $('#otpSentTo').textContent = T(from === 'in' ? 'auth.otpSentLogin' : 'auth.otpSent', { n, email });
-  $('#otpExpiry').textContent = T('auth.otpExpiry', { n: otpConfig().unconfirmed_ttl_min });   // purge: ADR-011, SQL 0006
+  $('#otpExpiry').textContent = T('auth.otpExpiry', { n: otpConfig().unconfirmed_ttl_min });   // purge: ADR-011, SQL 0009
   input.maxLength = n; input.style.setProperty('--otp-len', n); input.value = ''; input.removeAttribute('aria-invalid');
   clearErr($('#otpError')); $('#otpHint').hidden = true; $('#otpHint').textContent = '';
   startOtpCountdown();

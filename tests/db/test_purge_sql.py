@@ -27,7 +27,7 @@ def test_frontend_insufficient_days_matches_retention_constant():
 
 def _unconfirmed_sql() -> tuple[bytes, str]:
     path = Path(__file__).resolve().parents[2] / "db/migrations"
-    path = path / "0006_purge_unconfirmed_accounts.sql"
+    path = path / "0009_purge_unconfirmed_accounts.sql"
     return path.read_bytes(), path.read_text(encoding="utf-8")
 
 

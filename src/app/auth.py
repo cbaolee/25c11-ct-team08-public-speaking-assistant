@@ -161,7 +161,7 @@ class MemoryAuthProvider:
         on_purge: Callable[[UUID], None] | None = None,
     ) -> None:
         config = CONSTANTS["auth"]
-        # Same rule as SQL 0006 on Supabase: unconfirmed accounts expire after the TTL.
+        # Same rule as SQL 0009 on Supabase: unconfirmed accounts expire after the TTL.
         self._unconfirmed_ttl_s = (
             config["unconfirmed_ttl_min"] * 60 if unconfirmed_ttl_s is None else unconfirmed_ttl_s
         )

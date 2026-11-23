@@ -1,6 +1,6 @@
--- 0006_purge_unconfirmed_accounts.sql: delete accounts that never confirmed their email (ADR-011)
+-- 0009_purge_unconfirmed_accounts.sql: delete accounts that never confirmed their email (ADR-011)
 -- Run: optional, any time (after 0001). Needs the pg_cron extension.
--- Applied: psc-dev done | psc-prod not yet
+-- Applied: psc-dev done
 -- Effect: every 15 minutes (UTC), deletes auth.users rows whose email is still unconfirmed
 --         and whose last code was sent more than 60 minutes ago. `on delete cascade` then
 --         removes their profiles row (created at sign up, ADR-010 D4) and any other rows.
