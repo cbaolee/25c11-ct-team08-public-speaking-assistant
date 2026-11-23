@@ -872,6 +872,9 @@ async def script_chat_suggest_endpoint(
 
     if file_chunks:
         session.files_loaded.append(filename)
+        id_offset = len(session.chunks)
+        for idx, chunk in enumerate(file_chunks, start=1):
+            chunk.chunk_id = id_offset + idx
         session.chunks.extend(file_chunks)
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:
@@ -1039,6 +1042,9 @@ async def script_chat_message_endpoint(
         session.user_notes.append(clean_msg)
     if file_chunks:
         session.files_loaded.append(file.filename)
+        id_offset = len(session.chunks)
+        for idx, chunk in enumerate(file_chunks, start=1):
+            chunk.chunk_id = id_offset + idx
         session.chunks.extend(file_chunks)
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:

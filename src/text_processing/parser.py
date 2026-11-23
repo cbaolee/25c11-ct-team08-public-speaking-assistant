@@ -204,7 +204,11 @@ def validate_and_parse_document(
         return parse_input_to_chunks(pdf_path=file_path, ocr_runner=ocr_runner)
     text = validate_text_file(file_path)
     chunks = parse_input_to_chunks(raw_text=text)
+    fallback_heading = Path(filename or file_path).stem or "Document"
     if not chunks:
-        heading = Path(filename or file_path).stem or "Document"
-        chunks = [DocumentChunk(1, heading, 1, text.strip())]
+        chunks = [DocumentChunk(1, fallback_heading, 1, text.strip())]
+    else:
+        for chunk in chunks:
+            if chunk.heading == f"Page {chunk.page} Overview":
+                chunk.heading = fallback_heading
     return chunks

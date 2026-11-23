@@ -5,10 +5,13 @@ Saved scripts live in the `scripts` table (`/api/scripts*` in src/app/main.py), 
 
 import hashlib
 import logging
+import re
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
+
+from src.app.constants import CONSTANTS
 
 from .chat_session import ChatSessionStore, chat_session_store
 from .contracts import (
@@ -22,6 +25,7 @@ from .contracts import (
 from .generator import ScriptGenerator
 from .moderation import ContentModerator
 from .parser import DocumentParserError, parse_input_to_chunks, validate_pdf_file
+from .retrieval import align_script_citations
 from .sanitizer import sanitize_chunks, sanitize_text
 from .template_engine import (
     TemplateEngine,
@@ -31,6 +35,37 @@ from .template_engine import (
 from .template_store import TemplateStore
 
 logger = logging.getLogger(__name__)
+_CITATION_MIN_SUPPORT_SCORE = float(CONSTANTS["script"].get("citation_min_support_score", 0.52))
+
+
+def _build_chat_note_chunks(
+    notes: list[str],
+    start_chunk_id: int = 1,
+    min_words: int = 8,
+) -> list[DocumentChunk]:
+    """Turn substantive user chat notes into in-memory citable chunks (`page=0`)."""
+    note_chunks: list[DocumentChunk] = []
+    note_num = 0
+    for raw_note in notes:
+        cleaned = sanitize_text(raw_note).strip()
+        if len(cleaned.split()) < min_words:
+            continue
+        note_num += 1
+        lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
+        label = f"Chat note #{note_num}"
+        if len(lines) > 1:
+            first_line = re.sub(r"^[#*\-\s]+|[:.\s]+$", "", lines[0]).strip()
+            if 1 <= len(first_line.split()) <= 5 and len(first_line) <= 36:
+                label = f"Chat note #{note_num} · {first_line}"
+        note_chunks.append(
+            DocumentChunk(
+                chunk_id=start_chunk_id + len(note_chunks),
+                heading=label,
+                page=0,
+                content=cleaned,
+            )
+        )
+    return note_chunks
 
 
 class ScriptGenerationPipeline:
@@ -90,8 +125,15 @@ class ScriptGenerationPipeline:
             job.progress = progress
 
     @staticmethod
-    def _build_cache_key(request: ScriptGenerationRequest, chunks: list[DocumentChunk]) -> str:
+    def _build_cache_key(
+        request: ScriptGenerationRequest,
+        chunks: list[DocumentChunk],
+        chat_context: str | None = None,
+    ) -> str:
         chunk_text = "\n".join(f"{c.page}:{c.heading}:{c.content}" for c in chunks)
+        effective_chat = (
+            chat_context if chat_context is not None else (request.chat_context or "")
+        ).strip()
         raw = "|".join(
             [
                 request.user_id.strip(),
@@ -101,6 +143,7 @@ class ScriptGenerationPipeline:
                 (request.greeting or "").strip(),
                 chunk_text,
                 (request.user_feedback or "").strip().lower(),
+                effective_chat.lower(),
             ]
         )
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()
@@ -115,6 +158,8 @@ class ScriptGenerationPipeline:
         # Stage 1, 2, 3: Validate, Parse, and Sanitize input document (if provided)
         self._update_job(job_id, "extracting", 15)
         chunks: list[DocumentChunk] = []
+        chat_parts: list[str] = []
+        citable_notes: list[str] = []
         force_free_topic = False
         if request.session_id:
             sess = self.session_store.get(request.session_id, user_id=request.user_id)
@@ -122,17 +167,24 @@ class ScriptGenerationPipeline:
                 force_free_topic = sess.selected_template_id is None
                 if sess.chunks:
                     chunks.extend(sess.chunks)
+                if sess.initial_prompt and sess.initial_prompt.strip():
+                    cleaned_prompt = sanitize_text(sess.initial_prompt).strip()
+                    if cleaned_prompt:
+                        chat_parts.append(cleaned_prompt)
+                        if len(cleaned_prompt.split()) >= 15:
+                            citable_notes.append(cleaned_prompt)
                 if sess.user_notes:
-                    notes_text = sanitize_text("\n".join(sess.user_notes)).strip()
-                    if notes_text:
-                        chunks.append(
-                            DocumentChunk(
-                                chunk_id=len(chunks) + 1,
-                                heading="User Notes",
-                                page=1,
-                                content=notes_text,
-                            )
-                        )
+                    for note in sess.user_notes:
+                        cleaned_note = sanitize_text(note).strip()
+                        if cleaned_note:
+                            chat_parts.append(cleaned_note)
+                            citable_notes.append(cleaned_note)
+        if request.chat_context and request.chat_context.strip():
+            cleaned_ctx = sanitize_text(request.chat_context).strip()
+            if cleaned_ctx:
+                chat_parts.append(cleaned_ctx)
+                citable_notes.append(cleaned_ctx)
+        effective_chat_context = "\n".join(chat_parts).strip() or None
 
         if request.pdf_path or request.raw_text:
             try:
@@ -149,6 +201,9 @@ class ScriptGenerationPipeline:
                         message="No extractable text found in the provided document.",
                         status_code=422,
                     )
+                id_offset = len(chunks)
+                for idx, chunk in enumerate(sanitized, start=1):
+                    chunk.chunk_id = id_offset + idx
                 chunks.extend(sanitized)
             except DocumentParserError as exc:
                 no_text = exc.error_code in ("empty_pdf", "no_text_layer")
@@ -159,18 +214,27 @@ class ScriptGenerationPipeline:
                     status_code=422,
                 ) from exc
 
-        # Stage 4: Content Moderation on topic, greeting, user_feedback, and extracted chunks
+        if citable_notes:
+            note_chunks = _build_chat_note_chunks(
+                citable_notes,
+                start_chunk_id=len(chunks) + 1,
+            )
+            chunks.extend(note_chunks)
+
+        # Stage 4: Content Moderation on topic, greeting, user_feedback, chat_context, and chunks
         self._update_job(job_id, "moderating", 35)
         parts = [sanitize_text(request.topic)]
         if request.greeting:
             parts.append(sanitize_text(request.greeting))
         if request.user_feedback:
             parts.append(sanitize_text(request.user_feedback))
+        if effective_chat_context:
+            parts.append(effective_chat_context)
         parts.extend(c.content for c in chunks[:20])
         self.moderator.assert_safe("\n".join(parts), user_id=request.user_id)
 
         # Check LRU cache (D-10)
-        cache_key = self._build_cache_key(request, chunks)
+        cache_key = self._build_cache_key(request, chunks, chat_context=effective_chat_context)
         if cache_key in self._cache:
             self._cache.move_to_end(cache_key)
             return deepcopy(self._cache[cache_key])
@@ -193,9 +257,11 @@ class ScriptGenerationPipeline:
                     template_doc = None
 
         if template_doc is not None:
-            kwargs = {}
+            kwargs: dict[str, str] = {}
             if request.user_feedback:
                 kwargs["user_feedback"] = request.user_feedback
+            if effective_chat_context:
+                kwargs["chat_context"] = effective_chat_context
             try:
                 result = self.template_engine.fill_template(
                     template_doc, chunks=chunks or None, **kwargs
@@ -227,16 +293,35 @@ class ScriptGenerationPipeline:
                     client=client,
                     model_chain=model_chain,
                     limiter=limiter,
+                    chat_context=effective_chat_context,
+                    user_feedback=request.user_feedback,
                 )
                 if polished and polished.strip() and polished != result.script:
                     result.script = polished
                     result.word_count = len(polished.split())
             except Exception as exc:
                 logger.warning("Failed to polish script paragraphs: %s", exc)
+
+            if chunks:
+                retriever = getattr(self.template_engine, "retriever", None)
+                result.citations = align_script_citations(
+                    result.script,
+                    chunks,
+                    result.citations,
+                    retriever=retriever,
+                    min_support_score=_CITATION_MIN_SUPPORT_SCORE,
+                )
+                if any(c.status == "uncited" for c in result.citations):
+                    if "uncited" not in result.flags:
+                        result.flags.append("uncited")
+                elif "uncited" in result.flags:
+                    result.flags.remove("uncited")
         else:
             kwargs = {}
             if request.user_feedback:
                 kwargs["user_feedback"] = request.user_feedback
+            if effective_chat_context:
+                kwargs["chat_context"] = effective_chat_context
             try:
                 result = self.llm_generator.generate_free_topic_script(
                     topic=request.topic,

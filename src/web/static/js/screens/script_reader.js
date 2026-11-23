@@ -20,11 +20,15 @@ function paintBody(sc) {
   let h = '';
   paras.forEach((p, i) => {
     const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
-    const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc((c.heading ? c.heading + ' · ' : '') + (c.page ? T('script.page', { n: c.page }) : 'cited')) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
+    const cleanHeading = c && c.heading && !/^Page \d+ Overview$/i.test(c.heading) ? c.heading : '';
+    const citeLabel = c ? ((cleanHeading ? cleanHeading + (c.page ? ' · ' : '') : '') + (c.page ? T('script.page', { n: c.page }) : (cleanHeading ? '' : 'cited'))) : '';
+    const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc(citeLabel) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
     h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
   });
   if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';
-  h += '<p class="note" style="margin-top:10px">' + esc(cites.length ? T('script.uncitedHelp') : T('script.citeNone')) + '</p>';
+  const hasUncited = cites.some(x => x.status !== 'cited');
+  const citeNote = !cites.length ? T('script.citeNone') : (hasUncited ? T('script.uncitedHelp') : T('script.citeAllOk'));
+  h += '<p class="note" style="margin-top:10px">' + esc(citeNote) + '</p>';
   body.innerHTML = h;
   $$('.ptxt', body).forEach((el, i) => { el.textContent = paras[i]; });
   $('#mrTitle').textContent = sc.cardName || sc.title;
