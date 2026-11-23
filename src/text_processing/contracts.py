@@ -161,6 +161,7 @@ class ScriptGenerationRequest:
     user_id: str = "anonymous"
     session_id: str | None = None
     user_feedback: str | None = None
+    chat_context: str | None = None
 
 
 @dataclass
