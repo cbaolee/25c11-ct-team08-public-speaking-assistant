@@ -22,7 +22,7 @@ def repos():
 @pytest.fixture
 def client(repos):
     repos.profiles.upsert_profile(
-        TEST_USER_ID, ProfileUpsert(target_accent="American", display_name="ana", topics=["it"])
+        TEST_USER_ID, ProfileUpsert(target_accent="American", display_name="ana")
     )
     return TestClient(main.app)
 
@@ -42,10 +42,11 @@ def test_get_profile_missing_returns_404(repos):
 
 
 def test_patch_profile_changes_only_sent_fields(client):
-    r = client.patch("/api/profile", json={"age": 30, "topics": ["sports", "wildlife"]})
+    r = client.patch("/api/profile", json={"age": 30})
     assert r.status_code == 200
     body = r.json()
-    assert (body["age"], body["topics"]) == (30, ["sports", "wildlife"])
+    assert body["age"] == 30
+    assert "topics" not in body
     assert body["target_accent"] == "American"  # not sent, not changed
 
 

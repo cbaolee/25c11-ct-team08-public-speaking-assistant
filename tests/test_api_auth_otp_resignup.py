@@ -23,10 +23,9 @@ SECOND = {
     "password": "password-2",
     "target_accent": "British",
     "display_name": "Bee",
-    "topics": ["it"],
     "consent_recording": True,
 }
-PROFILE_KEYS = ("target_accent", "display_name", "topics", "consent_recording")
+PROFILE_KEYS = ("target_accent", "display_name", "consent_recording")
 SECOND_PROFILE = {key: SECOND[key] for key in PROFILE_KEYS}
 
 
@@ -73,7 +72,6 @@ def test_latest_form_is_saved_after_the_code_is_accepted(client):
     profile = _repos().profiles.get_profile(user_id)
     assert profile.target_accent == "British"
     assert profile.display_name == "Bee"
-    assert profile.topics == ["it"]
     assert profile.consent_recording is True
 
 

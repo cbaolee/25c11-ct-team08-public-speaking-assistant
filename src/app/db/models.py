@@ -57,7 +57,6 @@ class ProfileUpsert(BaseModel):
     display_name: str | None = Field(default=None, max_length=50)
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = None
-    topics: list[str] = Field(default_factory=list)
 
 
 class ProfilePatch(BaseModel):
@@ -65,7 +64,6 @@ class ProfilePatch(BaseModel):
     display_name: str | None = Field(default=None, max_length=50)
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = None
-    topics: list[str] | None = None
 
 
 class UserPreferences(BaseModel):
