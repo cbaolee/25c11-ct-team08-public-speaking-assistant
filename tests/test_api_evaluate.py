@@ -265,7 +265,7 @@ def test_save_webm_upload_stores_audio_and_series(monkeypatch, tmp_path):
     assert row.audio_path == f"{user_id}/{session_id}.webm"
     assert row.series_path == f"{user_id}/{session_id}.series.json"
     assert row.result["pitch_detail"]["contour_st"] is None
-    assert repos.files._state.files[("audio", row.audio_path)] == b"opus"
+    assert repos.profiles._state.files[("audio", row.audio_path)] == b"opus"
 
 
 def test_save_insufficient_audio_stores_row_without_files(monkeypatch):
@@ -283,7 +283,7 @@ def test_save_insufficient_audio_stores_row_without_files(monkeypatch):
     row = repos.sessions.get_session(user_id, UUID(session_id))
     assert row.status == "insufficient_audio"
     assert row.audio_path is None and row.series_path is None
-    assert repos.files._state.files == {}
+    assert repos.profiles._state.files == {}
 
 
 def test_save_insert_failure_removes_uploaded_files(monkeypatch, tmp_path):
@@ -305,7 +305,7 @@ def test_save_insert_failure_removes_uploaded_files(monkeypatch, tmp_path):
             result=_ok_result(),
             source_audio_path=upload,
         )
-    assert repos.files._state.files == {}
+    assert repos.profiles._state.files == {}
 
 
 # ---------- C2: script_id, topic and accent are saved with the session ----------

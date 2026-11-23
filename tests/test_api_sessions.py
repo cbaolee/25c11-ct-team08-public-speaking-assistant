@@ -190,8 +190,8 @@ def test_retention_compacts_sessions_beyond_ten(session_api):
     compacted_ids = {row.id for row in compacted}
     original_rows = [row for row in rows if row.id in compacted_ids]
     for row in original_rows:
-        assert (settings.audio_bucket, row.audio_path) not in repos.files._state.files
-        assert (settings.series_bucket, row.series_path) not in repos.files._state.files
+        assert (settings.audio_bucket, row.audio_path) not in repos.profiles._state.files
+        assert (settings.series_bucket, row.series_path) not in repos.profiles._state.files
 
 
 def test_retention_deletes_oldest_compact_sessions_beyond_cap(session_api, monkeypatch):
