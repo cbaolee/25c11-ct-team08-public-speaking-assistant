@@ -449,6 +449,9 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | ------------------------------ | ----------------------------------------------------------------- |
 | [ADR-001](docs/adr/ADR-001.md) | Data model for profiles, baselines, scripts and practice sessions |
 | [ADR-002](docs/adr/ADR-002.md) | Report save status in the `/api/evaluate` response (schema 2.1)   |
+| [ADR-003](docs/adr/ADR-003.md) | Scoring rubric: formulas, thresholds, flags (formerly `scoring_framework.md`) |
+| [ADR-004](docs/adr/ADR-004.md) | `EvaluationResult` v2 JSON contract                               |
+| [ADR-005](docs/adr/ADR-005.md) | Phonetic similarity, homophones and near-miss                     |
 | [ADR-006](docs/adr/ADR-006.md) | Moderation layer 2 (Llama Guard via Ollama)                       |
 | [ADR-007](docs/adr/ADR-007.md) | Async evaluate job with progress                                  |
 | [ADR-008](docs/adr/ADR-008.md) | LLM feedback on results (Cerebras, rule-based fallback)           |

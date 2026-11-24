@@ -225,7 +225,7 @@ A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase p
 ## Documentation
 
 - [Architecture](architecture.md)
-- Decision records: [ADR-001 Data model](docs/adr/ADR-001.md), [ADR-002 Evaluate response save status](docs/adr/ADR-002.md), [ADR-006 Moderation layer 2](docs/adr/ADR-006.md), [ADR-010 Email code on sign up](docs/adr/ADR-010.md), [ADR-011 Re-auth and account deletion](docs/adr/ADR-011.md), [ADR-012 Core and shard projects](docs/adr/ADR-012.md), [ADR-013 Consent, password reset, auth hardening](docs/adr/ADR-013.md)
+- Decision records: [ADR-001 Data model](docs/adr/ADR-001.md), [ADR-002 Evaluate response save status](docs/adr/ADR-002.md), [ADR-003 Scoring rubric](docs/adr/ADR-003.md), [ADR-004 EvaluationResult v2](docs/adr/ADR-004.md), [ADR-005 Phonetic similarity](docs/adr/ADR-005.md), [ADR-006 Moderation layer 2](docs/adr/ADR-006.md), [ADR-010 Email code on sign up](docs/adr/ADR-010.md), [ADR-011 Re-auth and account deletion](docs/adr/ADR-011.md), [ADR-012 Core and shard projects](docs/adr/ADR-012.md), [ADR-013 Consent, password reset, auth hardening](docs/adr/ADR-013.md)
 - [Technical challenge analysis](docs/challenge_analysis.md)
 - [Naming and coding conventions](docs/conventions/naming_conventions.md)
 - [AI use log conventions](docs/conventions/ai_use_log_conventions.md)
