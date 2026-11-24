@@ -3,48 +3,44 @@ topic: "Wide angle distortion, deep focus and extreme perspective in expressioni
 category: "Cinematography"
 duration_min: 20
 ---
-Good afternoon. Let us spend a few minutes on a question that sounds small and turns out to be big: how do wide angle distortion, deep focus and extreme perspective in expressionist cinema change the way we watch?
+Good afternoon. Today we will explore wide angle distortion, deep focus and extreme perspective in expressionist cinema.
 
-A good place to start is wide angle distortion. At its simplest, {{ argument_wide_angle_distortion_foundation }}.
+Let us begin at the foundation. Starting with wide angle distortion, {{ argument_wide_angle_distortion_foundation }}.
 
-Let us add deep focus to the picture. At heart, {{ argument_deep_focus_foundation }}.
+Next, we turn to deep focus. Specifically, {{ argument_deep_focus_foundation }}.
 
-Last of the core ideas is extreme perspective. What it comes down to is that {{ argument_extreme_perspective_foundation }}.
+Then we look at extreme perspective. In essence, {{ argument_extreme_perspective_foundation }}.
 
-This next point builds directly on that.
+Continuing from here, we turn to wide angle distortion. In this setting, {{ argument_wide_angle_distortion_development }}.
 
-Let us ground wide angle distortion in a real example. In one film, {{ argument_wide_angle_distortion_evidence }}.
+Now let us go one level deeper. In more detail, {{ argument_deep_focus_development }}.
 
-It helps to compare a second film. There, {{ argument_deep_focus_evidence }}.
+Let us now look at this from another angle. From that angle, {{ argument_extreme_perspective_development }}.
 
-Here is a quieter example of extreme perspective. Notice that {{ argument_extreme_perspective_evidence }}.
+Moving forward, let us consider deep focus. At this stage, {{ argument_deep_focus_development_2 }}.
 
-A second example makes the point clearer. In this case, {{ argument_wide_angle_distortion_evidence_2 }}.
+Let us examine another layer of extreme perspective. Looking closer, {{ argument_extreme_perspective_development_2 }}.
 
-Staying with this thread, we return to wide angle distortion. Within that thread, {{ argument_wide_angle_distortion_development }}.
+Staying with this thread, we return to wide angle distortion. Within that thread, {{ argument_wide_angle_distortion_development_2 }}.
 
-Moving forward, let us consider deep focus. At this stage, {{ argument_deep_focus_development }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_wide_angle_distortion_evidence }}.
 
-Building on that, extreme perspective becomes more interesting. Notice that {{ argument_extreme_perspective_development }}.
+We can also look at a supporting detail, because {{ argument_deep_focus_evidence }}.
 
-That brings us back to deep focus, now with more context. Because of this, {{ argument_deep_focus_development_2 }}.
+Let us add one more example. For example, {{ argument_extreme_perspective_evidence }}.
 
-Let us take a breath and keep going.
+One further case helps us here, since {{ argument_wide_angle_distortion_evidence_2 }}.
 
-Let us slow down on extreme perspective for a moment. What we see is that {{ argument_extreme_perspective_development_2 }}.
+Let us step back and place this in context. In expressionist cinema, {{ argument_expressionist_cinema_context }}.
 
-Let us follow that idea a little further. Further along, {{ argument_wide_angle_distortion_development_2 }}.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_wide_angle_distortion_counter_view }}.
 
-Seen from the wider history of expressionist cinema, {{ argument_expressionist_cinema_context }}.
-
-A different school of thought sees wide angle distortion differently. For them, {{ argument_wide_angle_distortion_counter_view }}.
-
-To be fair, there is a competing explanation. It holds that {{ argument_deep_focus_counter_view }}.
+Another reading is possible, since {{ argument_deep_focus_counter_view }}.
 
 A further counterpoint follows, because {{ argument_extreme_perspective_counter_view }}.
 
-No analysis is complete. A fair caveat is that {{ argument_wide_angle_distortion_limitation }}.
+Let us also look at where this analysis may fall short. One limit is that {{ argument_wide_angle_distortion_limitation }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_deep_focus_limitation }}.
+A second limit is that {{ argument_deep_focus_limitation }}.
 
-If you remember only one thing from today, let it be this: {{ argument_expressionist_cinema_synthesis }}. Thank you for your time.
+Taken together, these perspectives show that {{ argument_expressionist_cinema_synthesis }}. Thank you.

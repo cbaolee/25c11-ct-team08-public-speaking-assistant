@@ -3,26 +3,24 @@ topic: "Historical accuracy, period detail and personal tragedy in biographical 
 category: "Cinematography"
 duration_min: 10
 ---
-Welcome, everyone. Our topic today is historical accuracy, period detail and personal tragedy in biographical dramas, and I want to treat it the way a cinematographer would: one frame at a time.
+Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on historical accuracy, period detail and personal tragedy in biographical dramas.
 
-We will start with historical accuracy, because everything else rests on it. Here, {{ argument_historical_accuracy_foundation }}.
+Let us begin at the foundation. Starting with historical accuracy, {{ argument_historical_accuracy_foundation }}.
 
-Our next idea is period detail. To put it simply, {{ argument_period_detail_foundation }}.
+Next, we turn to period detail. Specifically, {{ argument_period_detail_foundation }}.
 
-Building on that, personal tragedy becomes more interesting. Notice that {{ argument_personal_tragedy_development }}.
+Continuing from here, we turn to personal tragedy. In this setting, {{ argument_personal_tragedy_development }}.
 
-Moving forward, let us consider historical accuracy. At this stage, {{ argument_historical_accuracy_development }}.
+Now let us go one level deeper. In more detail, {{ argument_historical_accuracy_development_2 }}.
 
-Let us slow down on period detail for a moment. What we see is that {{ argument_period_detail_development }}.
+Let us now look at this from another angle. From that angle, {{ argument_period_detail_development_3 }}.
 
-Let us ground historical accuracy in a real example. In one film, {{ argument_historical_accuracy_evidence }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_historical_accuracy_evidence }}.
 
-A second example makes the point clearer. In this case, {{ argument_period_detail_evidence }}.
+We can also look at a supporting detail, because {{ argument_period_detail_evidence_2 }}.
 
-Another reading is possible, since {{ argument_personal_tragedy_counter_view }}.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_personal_tragedy_counter_view }}.
 
-Let us keep this concrete.
+Let us also look at where this analysis may fall short. One limit is that {{ argument_historical_accuracy_limitation }}.
 
-It is worth being honest about the gaps. One weakness is that {{ argument_biographical_dramas_limitation }}.
-
-To bring it all together, {{ argument_biographical_dramas_synthesis }}. Thank you.
+Taken together, these perspectives show that {{ argument_biographical_dramas_synthesis }}. Thank you.

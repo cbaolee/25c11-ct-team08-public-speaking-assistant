@@ -3,16 +3,14 @@ topic: "Dialogue economy and suspense in mystery films"
 category: "Cinematography"
 duration_min: 5
 ---
-Good afternoon. Today we will explore dialogue economy and suspense in mystery films.
+Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on dialogue economy and suspense in mystery films.
 
-Start with dialogue economy. Before anything else, {{ argument_dialogue_economy_foundation }}.
+Let us begin at the foundation. Starting with dialogue economy, {{ argument_dialogue_economy_foundation }}.
 
-The second pillar is suspense. In practice, {{ argument_suspense_foundation }}.
+Next, we turn to suspense. Specifically, {{ argument_suspense_foundation }}.
 
-Consider a specific shot. Looking at it closely, {{ argument_dialogue_economy_evidence }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_dialogue_economy_evidence }}.
 
-A quick pause before we continue.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_suspense_counter_view }}.
 
-A further counterpoint follows, because {{ argument_suspense_counter_view }}.
-
-To bring it all together, {{ argument_mystery_films_synthesis }}. Thank you.
+Taken together, these perspectives show that {{ argument_mystery_films_synthesis }}. Thank you.

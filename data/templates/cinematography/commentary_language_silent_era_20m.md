@@ -3,48 +3,44 @@ topic: "Understanding social commentary, narrative form and visual language in s
 category: "Cinematography"
 duration_min: 20
 ---
-Most viewers never notice social commentary, and that is exactly the point. Today I want to show how social commentary, narrative form and visual language in silent era cinema shapes what an audience feels.
+Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on social commentary, narrative form and visual language in silent era cinema.
 
-Our first building block is social commentary. At the most basic level, {{ argument_social_commentary_foundation }}.
+Let us begin at the foundation. Starting with social commentary, {{ argument_social_commentary_foundation }}.
 
-Our next idea is narrative form. To put it simply, {{ argument_narrative_form_foundation }}.
+Next, we turn to narrative form. Specifically, {{ argument_narrative_form_foundation }}.
 
-Rounding out the basics is visual language. Put simply, {{ argument_visual_language_foundation }}.
+Then we look at visual language. In essence, {{ argument_visual_language_foundation }}.
 
-How does all of this look when we consider silent era cinema as a whole? Overall, {{ argument_silent_era_cinema_context }}.
+Continuing from here, we turn to social commentary. In this setting, {{ argument_social_commentary_development }}.
 
-Evidence helps here. Think of a well known moment in silent era cinema, where {{ argument_social_commentary_evidence }}.
+Now let us go one level deeper. In more detail, {{ argument_narrative_form_development }}.
 
-Hold that thought for a moment.
+Let us now look at this from another angle. From that angle, {{ argument_visual_language_development }}.
 
-One further case helps us here, since {{ argument_narrative_form_evidence }}.
+Moving forward, let us consider narrative form. At this stage, {{ argument_narrative_form_development_2 }}.
 
-Here is a quieter example of visual language. Notice that {{ argument_visual_language_evidence }}.
+Let us examine another layer of visual language. Looking closer, {{ argument_visual_language_development_2 }}.
 
-A smaller detail tells the same story. Look at how {{ argument_social_commentary_evidence_2 }}.
+Staying with this thread, we return to social commentary. Within that thread, {{ argument_social_commentary_development_2 }}.
 
-There is a further twist with social commentary. Namely, {{ argument_social_commentary_development }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_social_commentary_evidence }}.
 
-Think about how this plays out on screen. In practice, {{ argument_narrative_form_development }}.
+We can also look at a supporting detail, because {{ argument_narrative_form_evidence }}.
 
-Building on that, visual language becomes more interesting. Notice that {{ argument_visual_language_development }}.
+Let us add one more example. For example, {{ argument_visual_language_evidence }}.
 
-Let us slow down on narrative form for a moment. What we see is that {{ argument_narrative_form_development_2 }}.
+One further case helps us here, since {{ argument_social_commentary_evidence_2 }}.
 
-Staying with this thread, we return to visual language. Within that thread, {{ argument_visual_language_development_2 }}.
-
-Let us keep this concrete.
-
-Let us follow that idea a little further. Further along, {{ argument_social_commentary_development_2 }}.
+Let us step back and place this in context. In silent era cinema, {{ argument_silent_era_cinema_context }}.
 
 However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_social_commentary_counter_view }}.
 
-Let us play devil's advocate on narrative form. Suppose that {{ argument_narrative_form_counter_view }}.
+Another reading is possible, since {{ argument_narrative_form_counter_view }}.
 
-Another reading is possible, since {{ argument_visual_language_counter_view }}.
+A further counterpoint follows, because {{ argument_visual_language_counter_view }}.
 
-It is worth being honest about the gaps. One weakness is that {{ argument_social_commentary_limitation }}.
+Let us also look at where this analysis may fall short. One limit is that {{ argument_social_commentary_limitation }}.
 
-Another limit worth naming is that {{ argument_narrative_form_limitation }}.
+A second limit is that {{ argument_narrative_form_limitation }}.
 
-In the end, {{ argument_silent_era_cinema_synthesis }}. Thank you, and I welcome your questions.
+Taken together, these perspectives show that {{ argument_silent_era_cinema_synthesis }}. Thank you.

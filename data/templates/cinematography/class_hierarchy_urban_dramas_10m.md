@@ -3,26 +3,24 @@ topic: "Class division and spatial hierarchy in urban dramas"
 category: "Cinematography"
 duration_min: 10
 ---
-Pause almost any well made shot from urban dramas and you will find a decision hiding in it. Today we will look at class division and spatial hierarchy in urban dramas.
+Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on class division and spatial hierarchy in urban dramas.
 
-Our first building block is class division. At the most basic level, {{ argument_class_division_foundation }}.
+Let us begin at the foundation. Starting with class division, {{ argument_class_division_foundation }}.
 
-Spatial hierarchy comes next. In plain terms, {{ argument_spatial_hierarchy_foundation }}.
+Next, we turn to spatial hierarchy. Specifically, {{ argument_spatial_hierarchy_foundation }}.
 
-Let us ground class division in a real example. In one film, {{ argument_class_division_evidence }}.
+Continuing from here, we turn to class division. In this setting, {{ argument_class_division_development }}.
 
-Here is a quieter example of spatial hierarchy. Notice that {{ argument_spatial_hierarchy_evidence }}.
+Now let us go one level deeper. In more detail, {{ argument_spatial_hierarchy_development_2 }}.
 
-Stay with me, because this connects.
+Let us now look at this from another angle. From that angle, {{ argument_class_division_development_3 }}.
 
-That brings us back to class division, now with more context. Because of this, {{ argument_class_division_development }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_class_division_evidence }}.
 
-That is only part of the story. In addition, {{ argument_class_division_development_2 }}.
+We can also look at a supporting detail, because {{ argument_spatial_hierarchy_evidence_2 }}.
 
-Let us slow down on spatial hierarchy for a moment. What we see is that {{ argument_spatial_hierarchy_development }}.
-
-Let us play devil's advocate on class division. Suppose that {{ argument_class_division_counter_view }}.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_spatial_hierarchy_counter_view }}.
 
 Let us also look at where this analysis may fall short. One limit is that {{ argument_urban_dramas_limitation }}.
 
-When the lights come up, what stays with us is this: {{ argument_urban_dramas_synthesis }}. Thank you.
+Taken together, these perspectives show that {{ argument_urban_dramas_synthesis }}. Thank you.

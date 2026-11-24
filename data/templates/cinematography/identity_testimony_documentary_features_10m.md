@@ -3,26 +3,24 @@ topic: "Cultural identity, memory preservation and personal testimony in documen
 category: "Cinematography"
 duration_min: 10
 ---
-Thank you for being here. By the end of this talk, you should be able to explain cultural identity, memory preservation and personal testimony in documentary features in your own words, and to spot it the next time you watch a film.
+Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on cultural identity, memory preservation and personal testimony in documentary features.
 
-To set the scene, let us look at cultural identity. Put plainly, {{ argument_cultural_identity_foundation }}.
+Let us begin at the foundation. Starting with cultural identity, {{ argument_cultural_identity_foundation }}.
 
-Alongside that sits memory preservation. The key point is that {{ argument_memory_preservation_foundation }}.
+Next, we turn to memory preservation. Specifically, {{ argument_memory_preservation_foundation }}.
 
-There is a further twist with personal testimony. Namely, {{ argument_personal_testimony_development }}.
+Continuing from here, we turn to personal testimony. In this setting, {{ argument_personal_testimony_development }}.
 
-Continuing from here, we turn to cultural identity. In this setting, {{ argument_cultural_identity_development }}.
+Now let us go one level deeper. In more detail, {{ argument_cultural_identity_development_2 }}.
 
-Let us follow that idea a little further. Further along, {{ argument_memory_preservation_development }}.
+Let us now look at this from another angle. From that angle, {{ argument_memory_preservation_development_3 }}.
 
-Take a single scene as an example. In that scene, {{ argument_cultural_identity_evidence }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_cultural_identity_evidence }}.
 
-A smaller detail tells the same story. Look at how {{ argument_memory_preservation_evidence }}.
+We can also look at a supporting detail, because {{ argument_memory_preservation_evidence_2 }}.
 
-Let us take a breath and keep going.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_personal_testimony_counter_view }}.
 
-A different school of thought sees personal testimony differently. For them, {{ argument_personal_testimony_counter_view }}.
+Let us also look at where this analysis may fall short. One limit is that {{ argument_cultural_identity_limitation }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_documentary_features_limitation }}.
-
-So where does this leave us? {{ argument_documentary_features_synthesis }}. Thank you for listening.
+Taken together, these perspectives show that {{ argument_documentary_features_synthesis }}. Thank you.

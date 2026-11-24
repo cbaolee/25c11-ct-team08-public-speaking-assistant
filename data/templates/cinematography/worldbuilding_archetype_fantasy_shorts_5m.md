@@ -3,14 +3,14 @@ topic: "World building and character archetype in fantasy shorts"
 category: "Cinematography"
 duration_min: 5
 ---
-Pause almost any well made shot from fantasy shorts and you will find a decision hiding in it. Today we will look at world building and character archetype in fantasy shorts.
+Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on world building and character archetype in fantasy shorts.
 
-First, the basics. When we talk about world building, {{ argument_world_building_foundation }}.
+Let us begin at the foundation. Starting with world building, {{ argument_world_building_foundation }}.
 
-Character archetype comes next. In plain terms, {{ argument_character_archetype_foundation }}.
+Next, we turn to character archetype. Specifically, {{ argument_character_archetype_foundation }}.
 
-Take a single scene as an example. In that scene, {{ argument_world_building_evidence }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_world_building_evidence }}.
 
-There is a fair objection to raise. Namely, {{ argument_character_archetype_counter_view }}.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_character_archetype_counter_view }}.
 
-To bring it all together, {{ argument_fantasy_shorts_synthesis }}. Thank you.
+Taken together, these perspectives show that {{ argument_fantasy_shorts_synthesis }}. Thank you.

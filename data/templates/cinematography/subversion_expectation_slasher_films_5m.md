@@ -5,14 +5,12 @@ duration_min: 5
 ---
 Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on subversion of tropes and audience expectation in slasher films.
 
-A good place to start is subversion of tropes. At its simplest, {{ argument_subversion_of_tropes_foundation }}.
+Let us begin at the foundation. Starting with subversion of tropes, {{ argument_subversion_of_tropes_foundation }}.
 
-Now consider audience expectation. What matters most is that {{ argument_audience_expectation_foundation }}.
+Next, we turn to audience expectation. Specifically, {{ argument_audience_expectation_foundation }}.
 
-To make this less abstract, picture a scene built on subversion of tropes. In that scene, {{ argument_subversion_of_tropes_evidence }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_subversion_of_tropes_evidence }}.
 
-A quick pause before we continue.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_audience_expectation_counter_view }}.
 
-Not everyone agrees, though. Some critics argue that {{ argument_audience_expectation_counter_view }}.
-
-Looking back over everything we covered, {{ argument_slasher_films_synthesis }}. Thank you.
+Taken together, these perspectives show that {{ argument_slasher_films_synthesis }}. Thank you.

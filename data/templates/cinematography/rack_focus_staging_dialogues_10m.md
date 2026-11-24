@@ -3,26 +3,24 @@ topic: "Understanding rack focus, camera movement and depth staging in dramatic 
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will examine rack focus, camera movement and depth staging in dramatic dialogues.
+Good afternoon. Today we will explore rack focus, camera movement and depth staging in dramatic dialogues.
 
-Our first building block is rack focus. At the most basic level, {{ argument_rack_focus_foundation }}.
+Let us begin at the foundation. Starting with rack focus, {{ argument_rack_focus_foundation }}.
 
-Camera movement comes next. In plain terms, {{ argument_camera_movement_foundation }}.
+Next, we turn to camera movement. Specifically, {{ argument_camera_movement_foundation }}.
 
-Hold that thought for a moment.
+Continuing from here, we turn to depth staging. In this setting, {{ argument_depth_staging_development }}.
 
-Let us follow that idea a little further. Further along, {{ argument_depth_staging_development }}.
+Now let us go one level deeper. In more detail, {{ argument_rack_focus_development_2 }}.
 
-Staying with this thread, we return to rack focus. Within that thread, {{ argument_rack_focus_development }}.
+Let us now look at this from another angle. From that angle, {{ argument_camera_movement_development_3 }}.
 
-Continuing from here, we turn to camera movement. In this setting, {{ argument_camera_movement_development }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_rack_focus_evidence }}.
 
-Let us put rack focus under the microscope with a real scene. There, {{ argument_rack_focus_evidence }}.
-
-It helps to compare a second film. There, {{ argument_camera_movement_evidence }}.
+We can also look at a supporting detail, because {{ argument_camera_movement_evidence_2 }}.
 
 However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_depth_staging_counter_view }}.
 
-A caveat about rack focus also belongs here. In particular, {{ argument_dramatic_dialogues_limitation }}.
+Let us also look at where this analysis may fall short. One limit is that {{ argument_rack_focus_limitation }}.
 
-That is the thread running through all of this: {{ argument_dramatic_dialogues_synthesis }}. Thank you for listening.
+Taken together, these perspectives show that {{ argument_dramatic_dialogues_synthesis }}. Thank you.

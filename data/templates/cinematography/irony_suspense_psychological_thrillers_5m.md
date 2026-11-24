@@ -3,14 +3,14 @@ topic: "Dramatic irony and suspense in psychological thrillers"
 category: "Cinematography"
 duration_min: 5
 ---
-Filmmakers have argued about dramatic irony for as long as there has been a camera. Today we will see how it connects with suspense in psychological thrillers.
+Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on dramatic irony and suspense in psychological thrillers.
 
-Our first building block is dramatic irony. At the most basic level, {{ argument_dramatic_irony_foundation }}.
+Let us begin at the foundation. Starting with dramatic irony, {{ argument_dramatic_irony_foundation }}.
 
-With that in place, let us bring in suspense. Here, {{ argument_suspense_foundation }}.
+Next, we turn to suspense. Specifically, {{ argument_suspense_foundation }}.
 
-Take a single scene as an example. In that scene, {{ argument_dramatic_irony_evidence }}.
+To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_dramatic_irony_evidence }}.
 
-A further counterpoint follows, because {{ argument_suspense_counter_view }}.
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_suspense_counter_view }}.
 
-Looking back over everything we covered, {{ argument_psychological_thrillers_synthesis }}. Thank you.
+Taken together, these perspectives show that {{ argument_psychological_thrillers_synthesis }}. Thank you.
