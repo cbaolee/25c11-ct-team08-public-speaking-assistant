@@ -3,14 +3,14 @@ topic: "Atmospheric dread and sound design in haunted house films"
 category: "Cinematography"
 duration_min: 5
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on atmospheric dread and sound design in haunted house films.
+Good afternoon. I want to start with a simple claim: atmospheric dread and sound design in haunted house films is not decoration, it is how a film thinks.
 
-Let us begin at the foundation. Starting with atmospheric dread, {{ argument_atmospheric_dread_foundation }}.
+We will start with atmospheric dread, because everything else rests on it. Here, {{ argument_atmospheric_dread_foundation }}.
 
-Next, we turn to sound design. Specifically, {{ argument_sound_design_foundation }}.
+The second pillar is sound design. In practice, {{ argument_sound_design_foundation }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_atmospheric_dread_evidence }}.
+Consider a specific shot. Looking at it closely, {{ argument_atmospheric_dread_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_sound_design_counter_view }}.
+To be fair, there is a competing explanation. It holds that {{ argument_sound_design_counter_view }}.
 
 Taken together, these perspectives show that {{ argument_haunted_house_films_synthesis }}. Thank you.

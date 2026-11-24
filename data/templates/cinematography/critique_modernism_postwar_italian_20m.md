@@ -3,44 +3,48 @@ topic: "Analyzing social critique, existential melancholy and visual modernism i
 category: "Cinematography"
 duration_min: 20
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on social critique, existential melancholy and visual modernism in post war Italian cinema.
+Think about the last film that stayed with you. Chances are, social critique had something to do with it. Today we will talk about social critique, existential melancholy and visual modernism in post war Italian cinema.
 
-Let us begin at the foundation. Starting with social critique, {{ argument_social_critique_foundation }}.
+To set the scene, let us look at social critique. Put plainly, {{ argument_social_critique_foundation }}.
 
-Next, we turn to existential melancholy. Specifically, {{ argument_existential_melancholy_foundation }}.
+The second pillar is existential melancholy. In practice, {{ argument_existential_melancholy_foundation }}.
 
-Then we look at visual modernism. In essence, {{ argument_visual_modernism_foundation }}.
-
-Continuing from here, we turn to social critique. In this setting, {{ argument_social_critique_development }}.
-
-Now let us go one level deeper. In more detail, {{ argument_existential_melancholy_development }}.
-
-Let us now look at this from another angle. From that angle, {{ argument_visual_modernism_development }}.
-
-Moving forward, let us consider social critique. At this stage, {{ argument_social_critique_development_2 }}.
-
-Let us examine another layer of existential melancholy. Looking closer, {{ argument_existential_melancholy_development_2 }}.
-
-Staying with this thread, we return to visual modernism. Within that thread, {{ argument_visual_modernism_development_2 }}.
-
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_social_critique_evidence }}.
-
-We can also look at a supporting detail, because {{ argument_existential_melancholy_evidence }}.
-
-Let us add one more example. For example, {{ argument_visual_modernism_evidence }}.
-
-One further case helps us here, since {{ argument_social_critique_evidence_2 }}.
+Rounding out the basics is visual modernism. Put simply, {{ argument_visual_modernism_foundation }}.
 
 Let us step back and place this in context. In post war Italian cinema, {{ argument_post_war_italian_cinema_context }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_social_critique_counter_view }}.
+There is a further twist with social critique. Namely, {{ argument_social_critique_development }}.
 
-Another reading is possible, since {{ argument_existential_melancholy_counter_view }}.
+Now let us go one level deeper. In more detail, {{ argument_existential_melancholy_development }}.
 
-A further counterpoint follows, because {{ argument_visual_modernism_counter_view }}.
+Zooming in on visual modernism, we find more to say. For one thing, {{ argument_visual_modernism_development }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_social_critique_limitation }}.
+Continuing from here, we turn to existential melancholy. In this setting, {{ argument_existential_melancholy_development_2 }}.
 
-A second limit is that {{ argument_existential_melancholy_limitation }}.
+Let us follow that idea a little further. Further along, {{ argument_visual_modernism_development_2 }}.
 
-Taken together, these perspectives show that {{ argument_post_war_italian_cinema_synthesis }}. Thank you.
+Think about how this plays out on screen. In practice, {{ argument_social_critique_development_2 }}.
+
+Consider a specific shot. Looking at it closely, {{ argument_social_critique_evidence }}.
+
+Keep this in mind as we move on.
+
+A second example makes the point clearer. In this case, {{ argument_existential_melancholy_evidence }}.
+
+One further case helps us here, since {{ argument_visual_modernism_evidence }}.
+
+Let us add one more example. For example, {{ argument_social_critique_evidence_2 }}.
+
+Hold that thought for a moment.
+
+A different school of thought sees social critique differently. For them, {{ argument_social_critique_counter_view }}.
+
+However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_existential_melancholy_counter_view }}.
+
+There is a fair objection to raise. Namely, {{ argument_visual_modernism_counter_view }}.
+
+There is also a practical limit here. Specifically, {{ argument_social_critique_limitation }}.
+
+We should also note what this approach cannot tell us. For instance, {{ argument_existential_melancholy_limitation }}.
+
+That is the thread running through all of this: {{ argument_post_war_italian_cinema_synthesis }}. Thank you for listening.

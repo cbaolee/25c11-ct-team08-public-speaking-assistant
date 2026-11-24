@@ -3,14 +3,14 @@ topic: "Physical performance and comedic timing in slapstick comedy"
 category: "Cinematography"
 duration_min: 5
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on physical performance and comedic timing in slapstick comedy.
+Good afternoon. Let me start with {{ movie_title }} by {{ director_name }}, because a single film can open up physical performance and comedic timing in slapstick comedy.
 
-Let us begin at the foundation. Starting with physical performance, {{ argument_physical_performance_foundation }}.
+Our first building block is physical performance. At the most basic level, {{ argument_physical_performance_foundation }}.
 
-Next, we turn to comedic timing. Specifically, {{ argument_comedic_timing_foundation }}.
+Let us add comedic timing to the picture. At heart, {{ argument_comedic_timing_foundation }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_physical_performance_evidence }}.
+To make this less abstract, picture a scene built on physical performance. In that scene, {{ argument_physical_performance_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_comedic_timing_counter_view }}.
+Let us test this against a different view. A skeptic might say that {{ argument_comedic_timing_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_slapstick_comedy_synthesis }}. Thank you.
+In the end, {{ argument_slapstick_comedy_synthesis }}. Thank you, and I welcome your questions.

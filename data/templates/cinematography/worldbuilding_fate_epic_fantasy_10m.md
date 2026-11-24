@@ -3,24 +3,26 @@ topic: "World building, mythology and character fate in epic fantasy"
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on world building, mythology and character fate in epic fantasy.
+Picture the opening minutes of a film in epic fantasy: the lights go down and the room goes quiet. Every choice on screen was made on purpose. Today we will look at world building, mythology and character fate in epic fantasy.
 
 Let us begin at the foundation. Starting with world building, {{ argument_world_building_foundation }}.
 
-Next, we turn to mythology. Specifically, {{ argument_mythology_foundation }}.
+Let us add mythology to the picture. At heart, {{ argument_mythology_foundation }}.
 
-Continuing from here, we turn to character fate. In this setting, {{ argument_character_fate_development }}.
+To make this less abstract, picture a scene built on world building. In that scene, {{ argument_world_building_evidence }}.
 
-Now let us go one level deeper. In more detail, {{ argument_world_building_development_2 }}.
+It helps to compare a second film. There, {{ argument_mythology_evidence }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_mythology_development_3 }}.
+That is only part of the story. In addition, {{ argument_character_fate_development }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_world_building_evidence }}.
+Zooming in on world building, we find more to say. For one thing, {{ argument_world_building_development }}.
 
-We can also look at a supporting detail, because {{ argument_mythology_evidence_2 }}.
+Here is where it gets interesting.
+
+Think about how this plays out on screen. In practice, {{ argument_mythology_development }}.
 
 However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_character_fate_counter_view }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_world_building_limitation }}.
+It is worth being honest about the gaps. One weakness is that {{ argument_epic_fantasy_limitation }}.
 
-Taken together, these perspectives show that {{ argument_epic_fantasy_synthesis }}. Thank you.
+In the end, {{ argument_epic_fantasy_synthesis }}. Thank you, and I welcome your questions.

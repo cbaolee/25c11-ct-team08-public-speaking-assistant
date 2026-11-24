@@ -3,24 +3,26 @@ topic: "Folk mythology, atmospheric tension and moral decay in rural horror"
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on folk mythology, atmospheric tension and moral decay in rural horror.
+Picture the opening minutes of a film in rural horror: the lights go down and the room goes quiet. Every choice on screen was made on purpose. Today we will look at folk mythology, atmospheric tension and moral decay in rural horror.
 
-Let us begin at the foundation. Starting with folk mythology, {{ argument_folk_mythology_foundation }}.
+A good place to start is folk mythology. At its simplest, {{ argument_folk_mythology_foundation }}.
 
-Next, we turn to atmospheric tension. Specifically, {{ argument_atmospheric_tension_foundation }}.
+Atmospheric tension comes next. In plain terms, {{ argument_atmospheric_tension_foundation }}.
 
-Continuing from here, we turn to moral decay. In this setting, {{ argument_moral_decay_development }}.
+To make this less abstract, picture a scene built on folk mythology. In that scene, {{ argument_folk_mythology_evidence }}.
 
-Now let us go one level deeper. In more detail, {{ argument_folk_mythology_development_2 }}.
+A quick pause before we continue.
 
-Let us now look at this from another angle. From that angle, {{ argument_atmospheric_tension_development_3 }}.
+Let us add one more example. For example, {{ argument_atmospheric_tension_evidence }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_folk_mythology_evidence }}.
+Now let us go one level deeper. In more detail, {{ argument_moral_decay_development }}.
 
-We can also look at a supporting detail, because {{ argument_atmospheric_tension_evidence_2 }}.
+There is a further twist with folk mythology. Namely, {{ argument_folk_mythology_development }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_moral_decay_counter_view }}.
+Let us follow that idea a little further. Further along, {{ argument_atmospheric_tension_development }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_rural_horror_limitation }}.
+A further counterpoint follows, because {{ argument_moral_decay_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_rural_horror_synthesis }}. Thank you.
+No analysis is complete. A fair caveat is that {{ argument_rural_horror_limitation }}.
+
+To bring it all together, {{ argument_rural_horror_synthesis }}. Thank you.

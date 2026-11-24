@@ -3,24 +3,26 @@ topic: "Analyzing social commentary, allegory and class critique in monster movi
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on social commentary, allegory and class critique in monster movies.
+Imagine watching a favourite film with the sound turned off. What you can still read from the screen alone is what we will study today: social commentary, allegory and class critique in monster movies.
 
-Let us begin at the foundation. Starting with social commentary, {{ argument_social_commentary_foundation }}.
+To set the scene, let us look at social commentary. Put plainly, {{ argument_social_commentary_foundation }}.
 
-Next, we turn to allegory. Specifically, {{ argument_allegory_foundation }}.
+Now consider allegory. What matters most is that {{ argument_allegory_foundation }}.
 
-Continuing from here, we turn to class critique. In this setting, {{ argument_class_critique_development }}.
+Here is where class critique starts to matter in monster movies. Specifically, {{ argument_class_critique_development }}.
 
-Now let us go one level deeper. In more detail, {{ argument_social_commentary_development_2 }}.
+Here is where it gets interesting.
 
-Let us now look at this from another angle. From that angle, {{ argument_allegory_development_3 }}.
+Staying with this thread, we return to social commentary. Within that thread, {{ argument_social_commentary_development }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_social_commentary_evidence }}.
+Let us slow down on allegory for a moment. What we see is that {{ argument_allegory_development }}.
 
-We can also look at a supporting detail, because {{ argument_allegory_evidence_2 }}.
+To make this less abstract, picture a scene built on social commentary. In that scene, {{ argument_social_commentary_evidence }}.
+
+A second example makes the point clearer. In this case, {{ argument_allegory_evidence }}.
 
 However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_class_critique_counter_view }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_social_commentary_limitation }}.
+Let us also look at where this analysis may fall short. One limit is that {{ argument_monster_movies_limitation }}.
 
-Taken together, these perspectives show that {{ argument_monster_movies_synthesis }}. Thank you.
+In the end, {{ argument_monster_movies_synthesis }}. Thank you, and I welcome your questions.

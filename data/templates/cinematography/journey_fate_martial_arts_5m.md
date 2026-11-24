@@ -3,14 +3,14 @@ topic: "Heroic journey and tragic fate in martial arts films"
 category: "Cinematography"
 duration_min: 5
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on heroic journey and tragic fate in martial arts films.
+Filmmakers have argued about heroic journey for as long as there has been a camera. Today we will see how it connects with tragic fate in martial arts films.
 
-Let us begin at the foundation. Starting with heroic journey, {{ argument_heroic_journey_foundation }}.
+A good place to start is heroic journey. At its simplest, {{ argument_heroic_journey_foundation }}.
 
-Next, we turn to tragic fate. Specifically, {{ argument_tragic_fate_foundation }}.
+Our next idea is tragic fate. To put it simply, {{ argument_tragic_fate_foundation }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_heroic_journey_evidence }}.
+Let us ground heroic journey in a real example. In one film, {{ argument_heroic_journey_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_tragic_fate_counter_view }}.
+Let us test this against a different view. A skeptic might say that {{ argument_tragic_fate_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_martial_arts_films_synthesis }}. Thank you.
+In the end, {{ argument_martial_arts_films_synthesis }}. Thank you, and I welcome your questions.

@@ -3,24 +3,26 @@ topic: "Chiaroscuro lighting, shadow contrast and hard rim illumination in suspe
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will explore chiaroscuro lighting, shadow contrast and hard rim illumination in suspense scenes.
+Good morning. Let us spend a few minutes on a question that sounds small and turns out to be big: how do chiaroscuro lighting, shadow contrast and hard rim illumination in suspense scenes change the way we watch?
 
-Let us begin at the foundation. Starting with chiaroscuro lighting, {{ argument_chiaroscuro_lighting_foundation }}.
+To set the scene, let us look at chiaroscuro lighting. Put plainly, {{ argument_chiaroscuro_lighting_foundation }}.
 
-Next, we turn to shadow contrast. Specifically, {{ argument_shadow_contrast_foundation }}.
+The second pillar is shadow contrast. In practice, {{ argument_shadow_contrast_foundation }}.
 
-Continuing from here, we turn to hard rim illumination. In this setting, {{ argument_hard_rim_illumination_development }}.
+Let us take a breath and keep going.
 
-Now let us go one level deeper. In more detail, {{ argument_chiaroscuro_lighting_development_2 }}.
+Consider a specific shot. Looking at it closely, {{ argument_chiaroscuro_lighting_evidence }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_shadow_contrast_development_3 }}.
+Another scene points the same way. In it, {{ argument_shadow_contrast_evidence }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_chiaroscuro_lighting_evidence }}.
+Now let us go one level deeper. In more detail, {{ argument_hard_rim_illumination_development }}.
 
-We can also look at a supporting detail, because {{ argument_shadow_contrast_evidence_2 }}.
+Let us now look at this from another angle. From that angle, {{ argument_chiaroscuro_lighting_development }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_hard_rim_illumination_counter_view }}.
+Continuing from here, we turn to shadow contrast. In this setting, {{ argument_shadow_contrast_development }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_chiaroscuro_lighting_limitation }}.
+A different school of thought sees hard rim illumination differently. For them, {{ argument_hard_rim_illumination_counter_view }}.
+
+Let us also look at where this analysis may fall short. One limit is that {{ argument_suspense_scenes_limitation }}.
 
 Taken together, these perspectives show that {{ argument_suspense_scenes_synthesis }}. Thank you.

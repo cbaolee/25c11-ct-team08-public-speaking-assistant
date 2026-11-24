@@ -3,24 +3,26 @@ topic: "Ensemble storytelling, interwoven plots and collective destiny in disast
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on ensemble storytelling, interwoven plots and collective destiny in disaster movies.
+What can ensemble storytelling tell us about disaster movies? Over the next few minutes, we will look at ensemble storytelling, interwoven plots and collective destiny in disaster movies.
 
-Let us begin at the foundation. Starting with ensemble storytelling, {{ argument_ensemble_storytelling_foundation }}.
+Start with ensemble storytelling. Before anything else, {{ argument_ensemble_storytelling_foundation }}.
 
-Next, we turn to interwoven plots. Specifically, {{ argument_interwoven_plots_foundation }}.
+Our next idea is interwoven plots. To put it simply, {{ argument_interwoven_plots_foundation }}.
 
-Continuing from here, we turn to collective destiny. In this setting, {{ argument_collective_destiny_development }}.
+Keep this in mind as we move on.
 
-Now let us go one level deeper. In more detail, {{ argument_ensemble_storytelling_development_2 }}.
+That is only part of the story. In addition, {{ argument_collective_destiny_development }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_interwoven_plots_development_3 }}.
+There is a further twist with ensemble storytelling. Namely, {{ argument_ensemble_storytelling_development }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_ensemble_storytelling_evidence }}.
+Continuing from here, we turn to interwoven plots. In this setting, {{ argument_interwoven_plots_development }}.
 
-We can also look at a supporting detail, because {{ argument_interwoven_plots_evidence_2 }}.
+Evidence helps here. Think of a well known moment in disaster movies, where {{ argument_ensemble_storytelling_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_collective_destiny_counter_view }}.
+Another scene points the same way. In it, {{ argument_interwoven_plots_evidence }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_disaster_movies_limitation }}.
+To be fair, there is a competing explanation. It holds that {{ argument_collective_destiny_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_disaster_movies_synthesis }}. Thank you.
+We should also note what this approach cannot tell us. For instance, {{ argument_disaster_movies_limitation }}.
+
+That is the thread running through all of this: {{ argument_disaster_movies_synthesis }}. Thank you for listening.

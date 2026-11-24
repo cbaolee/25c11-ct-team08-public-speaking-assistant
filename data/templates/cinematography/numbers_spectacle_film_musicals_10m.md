@@ -3,24 +3,26 @@ topic: "Musical numbers, character emotion and theatrical spectacle in film musi
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on musical numbers, character emotion and theatrical spectacle in film musicals.
+What can musical numbers tell us about film musicals? Over the next few minutes, we will look at musical numbers, character emotion and theatrical spectacle in film musicals.
 
-Let us begin at the foundation. Starting with musical numbers, {{ argument_musical_numbers_foundation }}.
+Our first building block is musical numbers. At the most basic level, {{ argument_musical_numbers_foundation }}.
 
-Next, we turn to character emotion. Specifically, {{ argument_character_emotion_foundation }}.
+With that in place, let us bring in character emotion. Here, {{ argument_character_emotion_foundation }}.
 
-Continuing from here, we turn to theatrical spectacle. In this setting, {{ argument_theatrical_spectacle_development }}.
+Evidence helps here. Think of a well known moment in film musicals, where {{ argument_musical_numbers_evidence }}.
 
-Now let us go one level deeper. In more detail, {{ argument_musical_numbers_development_2 }}.
+It helps to compare a second film. There, {{ argument_character_emotion_evidence }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_character_emotion_development_3 }}.
+Building on that, theatrical spectacle becomes more interesting. Notice that {{ argument_theatrical_spectacle_development }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_musical_numbers_evidence }}.
+Think about how this plays out on screen. In practice, {{ argument_musical_numbers_development }}.
 
-We can also look at a supporting detail, because {{ argument_character_emotion_evidence_2 }}.
+Here is where character emotion starts to matter in film musicals. Specifically, {{ argument_character_emotion_development }}.
+
+Let us keep this concrete.
 
 However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_theatrical_spectacle_counter_view }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_film_musicals_limitation }}.
+We should also note what this approach cannot tell us. For instance, {{ argument_film_musicals_limitation }}.
 
-Taken together, these perspectives show that {{ argument_film_musicals_synthesis }}. Thank you.
+Looking back over everything we covered, {{ argument_film_musicals_synthesis }}. Thank you.

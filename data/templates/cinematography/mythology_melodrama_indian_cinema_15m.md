@@ -3,34 +3,38 @@ topic: "Heroic mythology, spectacle and melodrama in Indian cinema"
 category: "Cinematography"
 duration_min: 15
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on heroic mythology, spectacle and melodrama in Indian cinema.
+Picture the opening minutes of a film in Indian cinema: the lights go down and the room goes quiet. Every choice on screen was made on purpose. Today we will look at heroic mythology, spectacle and melodrama in Indian cinema.
 
-Let us begin at the foundation. Starting with heroic mythology, {{ argument_heroic_mythology_foundation }}.
+Start with heroic mythology. Before anything else, {{ argument_heroic_mythology_foundation }}.
 
-Next, we turn to spectacle. Specifically, {{ argument_spectacle_foundation }}.
+Our next idea is spectacle. To put it simply, {{ argument_spectacle_foundation }}.
 
 Then we look at melodrama. In essence, {{ argument_melodrama_foundation }}.
 
+Let us take a breath and keep going.
+
+How does all of this look when we consider Indian cinema as a whole? Overall, {{ argument_indian_cinema_context }}.
+
 Continuing from here, we turn to heroic mythology. In this setting, {{ argument_heroic_mythology_development }}.
 
-Now let us go one level deeper. In more detail, {{ argument_spectacle_development }}.
+Think about how this plays out on screen. In practice, {{ argument_spectacle_development }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_melodrama_development }}.
+Moving forward, let us consider melodrama. At this stage, {{ argument_melodrama_development }}.
 
-Moving forward, let us consider heroic mythology. At this stage, {{ argument_heroic_mythology_development_2 }}.
+Zooming in on heroic mythology, we find more to say. For one thing, {{ argument_heroic_mythology_development_2 }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_heroic_mythology_evidence }}.
+Let us ground heroic mythology in a real example. In one film, {{ argument_heroic_mythology_evidence }}.
 
-We can also look at a supporting detail, because {{ argument_spectacle_evidence }}.
+A second example makes the point clearer. In this case, {{ argument_spectacle_evidence }}.
 
-Let us add one more example. For example, {{ argument_melodrama_evidence }}.
+It helps to compare a second film. There, {{ argument_melodrama_evidence }}.
 
-Let us step back and place this in context. In Indian cinema, {{ argument_indian_cinema_context }}.
+Let us play devil's advocate on heroic mythology. Suppose that {{ argument_heroic_mythology_counter_view }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_heroic_mythology_counter_view }}.
+Hold that thought for a moment.
 
-Another reading is possible, since {{ argument_spectacle_counter_view }}.
+Not everyone agrees, though. Some critics argue that {{ argument_spectacle_counter_view }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_melodrama_limitation }}.
+There is also a practical limit here. Specifically, {{ argument_melodrama_limitation }}.
 
-Taken together, these perspectives show that {{ argument_indian_cinema_synthesis }}. Thank you.
+Looking back over everything we covered, {{ argument_indian_cinema_synthesis }}. Thank you.

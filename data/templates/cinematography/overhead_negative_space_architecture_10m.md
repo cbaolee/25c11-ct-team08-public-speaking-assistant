@@ -3,24 +3,26 @@ topic: "Overhead camera angles, negative space and geometric composition in arch
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will explore overhead camera angles, negative space and geometric composition in architectural framing.
+Picture the opening minutes of a film in architectural framing: the lights go down and the room goes quiet. Every choice on screen was made on purpose. Today we will look at overhead camera angles, negative space and geometric composition in architectural framing.
 
 Let us begin at the foundation. Starting with overhead camera angles, {{ argument_overhead_camera_angles_foundation }}.
 
-Next, we turn to negative space. Specifically, {{ argument_negative_space_foundation }}.
+Let us add negative space to the picture. At heart, {{ argument_negative_space_foundation }}.
 
-Continuing from here, we turn to geometric composition. In this setting, {{ argument_geometric_composition_development }}.
+Staying with this thread, we return to geometric composition. Within that thread, {{ argument_geometric_composition_development }}.
 
-Now let us go one level deeper. In more detail, {{ argument_overhead_camera_angles_development_2 }}.
+Let us slow down on overhead camera angles for a moment. What we see is that {{ argument_overhead_camera_angles_development }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_negative_space_development_3 }}.
+Let us keep this concrete.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_overhead_camera_angles_evidence }}.
+Think about how this plays out on screen. In practice, {{ argument_negative_space_development }}.
 
-We can also look at a supporting detail, because {{ argument_negative_space_evidence_2 }}.
+Let us ground overhead camera angles in a real example. In one film, {{ argument_overhead_camera_angles_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_geometric_composition_counter_view }}.
+A second example makes the point clearer. In this case, {{ argument_negative_space_evidence }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_overhead_camera_angles_limitation }}.
+Let us test this against a different view. A skeptic might say that {{ argument_geometric_composition_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_architectural_framing_synthesis }}. Thank you.
+It is worth being honest about the gaps. One weakness is that {{ argument_architectural_framing_limitation }}.
+
+In the end, {{ argument_architectural_framing_synthesis }}. Thank you, and I welcome your questions.

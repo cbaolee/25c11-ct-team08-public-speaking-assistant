@@ -3,34 +3,38 @@ topic: "Deep focus, wide angle composition and blocking in ensemble scenes"
 category: "Cinematography"
 duration_min: 15
 ---
-Good morning. Today we will explore deep focus, wide angle composition and blocking in ensemble scenes.
+Good afternoon. I want to start with a simple claim: deep focus, wide angle composition and blocking in ensemble scenes is not decoration, it is how a film thinks.
 
-Let us begin at the foundation. Starting with deep focus, {{ argument_deep_focus_foundation }}.
+A good place to start is deep focus. At its simplest, {{ argument_deep_focus_foundation }}.
 
-Next, we turn to wide angle composition. Specifically, {{ argument_wide_angle_composition_foundation }}.
+With that in place, let us bring in wide angle composition. Here, {{ argument_wide_angle_composition_foundation }}.
 
-Then we look at blocking. In essence, {{ argument_blocking_foundation }}.
+Here is where it gets interesting.
 
-Continuing from here, we turn to deep focus. In this setting, {{ argument_deep_focus_development }}.
+One more idea completes the base: blocking. Quite simply, {{ argument_blocking_foundation }}.
 
-Now let us go one level deeper. In more detail, {{ argument_wide_angle_composition_development }}.
+Let us put deep focus under the microscope with a real scene. There, {{ argument_deep_focus_evidence }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_blocking_development }}.
+Here is a quieter example of wide angle composition. Notice that {{ argument_wide_angle_composition_evidence }}.
 
-Moving forward, let us consider deep focus. At this stage, {{ argument_deep_focus_development_2 }}.
+One further case helps us here, since {{ argument_blocking_evidence }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_deep_focus_evidence }}.
+Zooming in on deep focus, we find more to say. For one thing, {{ argument_deep_focus_development }}.
 
-We can also look at a supporting detail, because {{ argument_wide_angle_composition_evidence }}.
+There is a further twist with wide angle composition. Namely, {{ argument_wide_angle_composition_development }}.
 
-Let us add one more example. For example, {{ argument_blocking_evidence }}.
+Let us examine another layer of blocking. Looking closer, {{ argument_blocking_development }}.
 
-Let us step back and place this in context. In ensemble scenes, {{ argument_ensemble_scenes_context }}.
+Staying with this thread, we return to deep focus. Within that thread, {{ argument_deep_focus_development_2 }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_deep_focus_counter_view }}.
+This next point builds directly on that.
 
-Another reading is possible, since {{ argument_wide_angle_composition_counter_view }}.
+How does all of this look when we consider ensemble scenes as a whole? Overall, {{ argument_ensemble_scenes_context }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_blocking_limitation }}.
+Not everyone agrees, though. Some critics argue that {{ argument_deep_focus_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_ensemble_scenes_synthesis }}. Thank you.
+Let us test this against a different view. A skeptic might say that {{ argument_wide_angle_composition_counter_view }}.
+
+Another limit worth naming is that {{ argument_blocking_limitation }}.
+
+Looking back over everything we covered, {{ argument_ensemble_scenes_synthesis }}. Thank you.

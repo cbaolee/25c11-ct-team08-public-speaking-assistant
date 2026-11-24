@@ -3,34 +3,38 @@ topic: "Anamorphic lens distortion, aspect ratio choice and lens flare in scienc
 category: "Cinematography"
 duration_min: 15
 ---
-Good morning. Today we will explore anamorphic lens distortion, aspect ratio choice and lens flare in science fiction cinematography.
+Picture the opening minutes of a film in science fiction cinematography: the lights go down and the room goes quiet. Every choice on screen was made on purpose. Today we will look at anamorphic lens distortion, aspect ratio choice and lens flare in science fiction cinematography.
 
-Let us begin at the foundation. Starting with anamorphic lens distortion, {{ argument_anamorphic_lens_distortion_foundation }}.
+First, the basics. When we talk about anamorphic lens distortion, {{ argument_anamorphic_lens_distortion_foundation }}.
 
-Next, we turn to aspect ratio choice. Specifically, {{ argument_aspect_ratio_choice_foundation }}.
+Aspect ratio choice comes next. In plain terms, {{ argument_aspect_ratio_choice_foundation }}.
 
-Then we look at lens flare. In essence, {{ argument_lens_flare_foundation }}.
+This next point builds directly on that.
 
-Continuing from here, we turn to anamorphic lens distortion. In this setting, {{ argument_anamorphic_lens_distortion_development }}.
+And then there is lens flare. The essential point is that {{ argument_lens_flare_foundation }}.
 
-Now let us go one level deeper. In more detail, {{ argument_aspect_ratio_choice_development }}.
+Zooming in on anamorphic lens distortion, we find more to say. For one thing, {{ argument_anamorphic_lens_distortion_development }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_lens_flare_development }}.
+Let us slow down on aspect ratio choice for a moment. What we see is that {{ argument_aspect_ratio_choice_development }}.
 
-Moving forward, let us consider anamorphic lens distortion. At this stage, {{ argument_anamorphic_lens_distortion_development_2 }}.
+Continuing from here, we turn to lens flare. In this setting, {{ argument_lens_flare_development }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_anamorphic_lens_distortion_evidence }}.
+Let us examine another layer of anamorphic lens distortion. Looking closer, {{ argument_anamorphic_lens_distortion_development_2 }}.
 
-We can also look at a supporting detail, because {{ argument_aspect_ratio_choice_evidence }}.
+How does all of this look when we consider science fiction cinematography as a whole? Overall, {{ argument_science_fiction_cinematography_context }}.
+
+Take a single scene as an example. In that scene, {{ argument_anamorphic_lens_distortion_evidence }}.
+
+Another scene points the same way. In it, {{ argument_aspect_ratio_choice_evidence }}.
 
 Let us add one more example. For example, {{ argument_lens_flare_evidence }}.
 
-Let us step back and place this in context. In science fiction cinematography, {{ argument_science_fiction_cinematography_context }}.
+Let us keep this concrete.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_anamorphic_lens_distortion_counter_view }}.
+There is a fair objection to raise. Namely, {{ argument_anamorphic_lens_distortion_counter_view }}.
 
-Another reading is possible, since {{ argument_aspect_ratio_choice_counter_view }}.
+To be fair, there is a competing explanation. It holds that {{ argument_aspect_ratio_choice_counter_view }}.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_lens_flare_limitation }}.
+Before we wrap up, a note of caution. In particular, {{ argument_lens_flare_limitation }}.
 
-Taken together, these perspectives show that {{ argument_science_fiction_cinematography_synthesis }}. Thank you.
+When the lights come up, what stays with us is this: {{ argument_science_fiction_cinematography_synthesis }}. Thank you.

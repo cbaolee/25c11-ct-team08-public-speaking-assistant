@@ -3,14 +3,14 @@ topic: "Evaluating narrative perspective and ethical dilemmas in investigative c
 category: "Cinematography"
 duration_min: 5
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on narrative perspective and ethical dilemmas in investigative cinema.
+What can narrative perspective tell us about investigative cinema? Over the next few minutes, we will look at narrative perspective and ethical dilemmas in investigative cinema.
 
-Let us begin at the foundation. Starting with narrative perspective, {{ argument_narrative_perspective_foundation }}.
+Our first building block is narrative perspective. At the most basic level, {{ argument_narrative_perspective_foundation }}.
 
-Next, we turn to ethical dilemmas. Specifically, {{ argument_ethical_dilemmas_foundation }}.
+Let us add ethical dilemmas to the picture. At heart, {{ argument_ethical_dilemmas_foundation }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_narrative_perspective_evidence }}.
+Evidence helps here. Think of a well known moment in investigative cinema, where {{ argument_narrative_perspective_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_ethical_dilemmas_counter_view }}.
+A different school of thought sees ethical dilemmas differently. For them, {{ argument_ethical_dilemmas_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_investigative_cinema_synthesis }}. Thank you.
+That is the thread running through all of this: {{ argument_investigative_cinema_synthesis }}. Thank you for listening.

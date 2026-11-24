@@ -3,14 +3,16 @@ topic: "Reading character growth and tragedy in coming of age films"
 category: "Cinematography"
 duration_min: 5
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on character growth and tragedy in coming of age films.
+Good afternoon. Our case study today is {{ movie_title }}, directed by {{ director_name }}, which gives us a clear way into character growth and tragedy in coming of age films.
 
-Let us begin at the foundation. Starting with character growth, {{ argument_character_growth_foundation }}.
+A good place to start is character growth. At its simplest, {{ argument_character_growth_foundation }}.
 
-Next, we turn to tragedy. Specifically, {{ argument_tragedy_foundation }}.
+Let us add tragedy to the picture. At heart, {{ argument_tragedy_foundation }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_character_growth_evidence }}.
+Stay with me, because this connects.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_tragedy_counter_view }}.
+Let us put character growth under the microscope with a real scene. There, {{ argument_character_growth_evidence }}.
 
-Taken together, these perspectives show that {{ argument_coming_of_age_films_synthesis }}. Thank you.
+To be fair, there is a competing explanation. It holds that {{ argument_tragedy_counter_view }}.
+
+So where does this leave us? {{ argument_coming_of_age_films_synthesis }}. Thank you for listening.

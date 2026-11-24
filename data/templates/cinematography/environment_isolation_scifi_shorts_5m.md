@@ -3,14 +3,14 @@ topic: "Environmental storytelling and isolation in science fiction shorts"
 category: "Cinematography"
 duration_min: 5
 ---
-Good morning. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on environmental storytelling and isolation in science fiction shorts.
+Have you ever watched {{ movie_title }} and felt something you could not quite name? Directed by {{ director_name }}, it is a good place to study environmental storytelling and isolation in science fiction shorts.
 
-Let us begin at the foundation. Starting with environmental storytelling, {{ argument_environmental_storytelling_foundation }}.
+Our first building block is environmental storytelling. At the most basic level, {{ argument_environmental_storytelling_foundation }}.
 
-Next, we turn to isolation. Specifically, {{ argument_isolation_foundation }}.
+Our next idea is isolation. To put it simply, {{ argument_isolation_foundation }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_environmental_storytelling_evidence }}.
+Consider a specific shot. Looking at it closely, {{ argument_environmental_storytelling_evidence }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_isolation_counter_view }}.
+A different school of thought sees isolation differently. For them, {{ argument_isolation_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_science_fiction_shorts_synthesis }}. Thank you.
+To bring it all together, {{ argument_science_fiction_shorts_synthesis }}. Thank you.

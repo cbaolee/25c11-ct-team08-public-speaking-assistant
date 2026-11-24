@@ -3,24 +3,26 @@ topic: "Tragic flaws and visual grandeur in historical dramas"
 category: "Cinematography"
 duration_min: 10
 ---
-Good afternoon. Today we will review {{ movie_title }}, directed by {{ director_name }}, with a focus on tragic flaws and visual grandeur in historical dramas.
+Filmmakers have argued about tragic flaws for as long as there has been a camera. Today we will see how it connects with visual grandeur in historical dramas.
 
-Let us begin at the foundation. Starting with tragic flaws, {{ argument_tragic_flaws_foundation }}.
+Our first building block is tragic flaws. At the most basic level, {{ argument_tragic_flaws_foundation }}.
 
-Next, we turn to visual grandeur. Specifically, {{ argument_visual_grandeur_foundation }}.
+Visual grandeur comes next. In plain terms, {{ argument_visual_grandeur_foundation }}.
 
-Continuing from here, we turn to tragic flaws. In this setting, {{ argument_tragic_flaws_development }}.
+Take a single scene as an example. In that scene, {{ argument_tragic_flaws_evidence }}.
 
-Now let us go one level deeper. In more detail, {{ argument_visual_grandeur_development_2 }}.
+It helps to compare a second film. There, {{ argument_visual_grandeur_evidence }}.
 
-Let us now look at this from another angle. From that angle, {{ argument_tragic_flaws_development_3 }}.
+Now let us go one level deeper. In more detail, {{ argument_tragic_flaws_development }}.
 
-To see these ideas in practice, let us turn to a concrete moment. In that moment, {{ argument_tragic_flaws_evidence }}.
+That is only part of the story. In addition, {{ argument_tragic_flaws_development_2 }}.
 
-We can also look at a supporting detail, because {{ argument_visual_grandeur_evidence_2 }}.
+Moving forward, let us consider visual grandeur. At this stage, {{ argument_visual_grandeur_development }}.
 
-However, this is not the only way to see it. In stark contrast, another interpretation suggests that {{ argument_visual_grandeur_counter_view }}.
+Stay with me, because this connects.
 
-Let us also look at where this analysis may fall short. One limit is that {{ argument_historical_dramas_limitation }}.
+Let us play devil's advocate on tragic flaws. Suppose that {{ argument_tragic_flaws_counter_view }}.
 
-Taken together, these perspectives show that {{ argument_historical_dramas_synthesis }}. Thank you.
+Before we wrap up, a note of caution. In particular, {{ argument_historical_dramas_limitation }}.
+
+Looking back over everything we covered, {{ argument_historical_dramas_synthesis }}. Thank you.
