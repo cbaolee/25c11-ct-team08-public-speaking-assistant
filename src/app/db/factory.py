@@ -9,6 +9,7 @@ from src.app.db.memory import (
     MemoryAudioStore,
     MemoryBaselineRepo,
     MemoryProfileRepo,
+    MemoryRateLimitRepo,
     MemoryScriptRepo,
     MemorySessionRepo,
     MemoryState,
@@ -19,6 +20,7 @@ from src.app.db.repositories import (
     AudioStore,
     BaselineRepo,
     ProfileRepo,
+    RateLimitRepo,
     ScriptRepo,
     SessionRepo,
 )
@@ -28,6 +30,7 @@ from src.app.db.supabase_repo import (
     SupabaseAudioStore,
     SupabaseBaselineRepo,
     SupabaseProfileRepo,
+    SupabaseRateLimitRepo,
     SupabaseScriptRepo,
     SupabaseSessionRepo,
 )
@@ -57,6 +60,7 @@ class Repos:
     sessions: SessionRepo
     files: AudioStore
     accounts: AccountRepo
+    rate_limits: RateLimitRepo
 
 
 def build_memory_repos(extra_shards: int = 0) -> Repos:
@@ -78,6 +82,7 @@ def build_memory_repos(extra_shards: int = 0) -> Repos:
         sessions=sessions,
         files=files,
         accounts=accounts,
+        rate_limits=MemoryRateLimitRepo(core),
     )
 
 
@@ -116,6 +121,7 @@ def build_supabase_repos() -> Repos:
         sessions=sessions,
         files=files,
         accounts=accounts,
+        rate_limits=SupabaseRateLimitRepo(client),
     )
 
 

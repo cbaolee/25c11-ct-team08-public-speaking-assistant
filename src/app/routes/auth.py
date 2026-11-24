@@ -35,7 +35,6 @@ from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import ProfileUpsert, StorageError
 from src.app.deps import CurrentUser, get_bearer_token, get_current_user
-from src.app.rate_limit import SlidingWindowLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -45,27 +44,36 @@ router = APIRouter(prefix="/api/auth")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 MAX_EMAIL_LENGTH = 254
 _auth_config = CONSTANTS["auth"]
-_resend_limiter = SlidingWindowLimiter(1, _auth_config["resend_cooldown_s"])
-_verify_limiter = SlidingWindowLimiter(
-    _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
-)
-# Re-auth (change password, delete account): own limiter, same budget as the OTP check (ADR-011)
-_reauth_limiter = SlidingWindowLimiter(
-    _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
-)
-# Forgot password: one code per email per cooldown, and the same budget as the OTP check to use it
-_reset_send_limiter = SlidingWindowLimiter(1, _auth_config["resend_cooldown_s"])
-_reset_verify_limiter = SlidingWindowLimiter(
-    _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
-)
+# Attempt limits per email (or per user for re-auth), counted in public.auth_rate_limits
+# (migration 0011) so they survive restarts and are shared by every worker.
+# bucket -> (max hits, fixed window in seconds)
+_RATE_LIMITS = {
+    "signup_resend": (1, _auth_config["resend_cooldown_s"]),
+    "signup_verify": (_auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]),
+    # Re-auth (change password, delete account): own budget, same size as the code check (ADR-011)
+    "reauth": (_auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]),
+    "reset_send": (1, _auth_config["resend_cooldown_s"]),
+    "reset_verify": (_auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]),
+}
 
 
-def reset_auth_limiters() -> None:
-    _resend_limiter.reset()
-    _verify_limiter.reset()
-    _reauth_limiter.reset()
-    _reset_send_limiter.reset()
-    _reset_verify_limiter.reset()
+def _hit_rate_limit(repos: Repos, bucket: str, key: str) -> bool:
+    """Count one attempt; False when the bucket is full for this key.
+
+    Fails open: when the counter cannot be reached the attempt is allowed and a warning is
+    logged. Supabase Auth keeps its own limits on emails and code checks, so a short database
+    outage must not lock everyone out of logging in or resetting a password.
+    """
+    max_hits, window_s = _RATE_LIMITS[bucket]
+    try:
+        return repos.rate_limits.hit(bucket, key, max_hits, window_s)
+    except StorageError:
+        logger.warning("Rate limit counter unavailable for %s; allowing the attempt", bucket)
+        return True
+
+
+async def _allowed(repos: Repos, bucket: str, key: str) -> bool:
+    return await run_in_threadpool(_hit_rate_limit, repos, bucket, key)
 
 
 def _email_key(email: str) -> str:
@@ -245,7 +253,7 @@ async def sign_up(
                 logger.warning("Profile save failed; preserving existing account and data")
             return _profile_not_saved()
     if result.needs_verification or not result.created:
-        _resend_limiter.hit(_email_key(email))
+        await _allowed(repos, "signup_resend", _email_key(email))  # starts the resend cooldown
     return JSONResponse(status_code=201 if result.created else 200, content={
         "user_id": str(user_id),
         "verification_required": result.needs_verification if result.created else True,
@@ -311,7 +319,7 @@ async def verify_otp(
         return _weak_password()  # checked first, so a bad password never uses up the code
     if payload.profile is not None and payload.profile.consent_recording is not True:
         return _consent_required()
-    if not _verify_limiter.hit(_email_key(email)):
+    if not await _allowed(repos, "signup_verify", _email_key(email)):
         return _rate_limited()
     try:
         user_id = await run_in_threadpool(auth.verify_signup_otp, email, token)
@@ -340,11 +348,15 @@ async def verify_otp(
 
 
 @router.post("/resend-otp")
-async def resend_otp(payload: OtpEmailPayload, auth: Annotated[AuthProvider, Depends(get_auth)]):
+async def resend_otp(
+    payload: OtpEmailPayload,
+    auth: Annotated[AuthProvider, Depends(get_auth)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
     email = _normalize_email(payload.email)
     if not _EMAIL_RE.match(email):
         return _error(422, "invalid_email", "Enter a valid email address.")
-    if not _resend_limiter.hit(_email_key(email)):
+    if not await _allowed(repos, "signup_resend", _email_key(email)):
         return _rate_limited()
     try:
         await run_in_threadpool(auth.resend_signup_otp, email)
@@ -357,7 +369,9 @@ async def resend_otp(payload: OtpEmailPayload, auth: Annotated[AuthProvider, Dep
 
 @router.post("/forgot-password")
 async def forgot_password(
-    payload: OtpEmailPayload, auth: Annotated[AuthProvider, Depends(get_auth)]
+    payload: OtpEmailPayload,
+    auth: Annotated[AuthProvider, Depends(get_auth)],
+    repos: Annotated[Repos, Depends(get_repos)],
 ):
     """Email a recovery code. Always `{"sent": true}`, so nobody learns which emails have accounts.
 
@@ -367,7 +381,7 @@ async def forgot_password(
     email = _normalize_email(payload.email)
     if not _EMAIL_RE.match(email):
         return _error(422, "invalid_email", "Enter a valid email address.")
-    if not _reset_send_limiter.hit(_email_key(email)):
+    if not await _allowed(repos, "reset_send", _email_key(email)):
         return _rate_limited()
     try:
         await run_in_threadpool(auth.send_password_reset, email)
@@ -380,7 +394,9 @@ async def forgot_password(
 
 @router.post("/reset-password")
 async def reset_password(
-    payload: ResetPasswordPayload, auth: Annotated[AuthProvider, Depends(get_auth)]
+    payload: ResetPasswordPayload,
+    auth: Annotated[AuthProvider, Depends(get_auth)],
+    repos: Annotated[Repos, Depends(get_repos)],
 ):
     """Set a new password with the recovery code; every session of the account ends.
 
@@ -394,7 +410,7 @@ async def reset_password(
     token = payload.token.strip()
     if not re.fullmatch(rf"[0-9]{{{_auth_config['otp_length']}}}", token):
         return _error(422, "otp_invalid", "Enter a valid verification code.")
-    if not _reset_verify_limiter.hit(_email_key(email)):
+    if not await _allowed(repos, "reset_verify", _email_key(email)):
         return _rate_limited()
     try:
         await run_in_threadpool(auth.reset_password_with_otp, email, token, payload.new_password)
@@ -460,14 +476,14 @@ def _user_key(user_id: UUID) -> str:
 
 
 async def _check_current_password(
-    auth: AuthProvider, user: CurrentUser, password: str
+    auth: AuthProvider, repos: Repos, user: CurrentUser, password: str
 ) -> JSONResponse | None:
     """Re-auth before a sensitive action. None when the password is right, else the error.
 
     A wrong password is 403, not 401: the browser treats every 401 as "session ended"
     (api.js refreshes the token and logs out), but the session is still valid here.
     """
-    if not _reauth_limiter.hit(_user_key(user.id)):
+    if not await _allowed(repos, "reauth", _user_key(user.id)):
         return _rate_limited()
     if not user.email:
         return _auth_unavailable()  # the token carries no email: cannot re-check the password
@@ -488,13 +504,14 @@ async def change_password(
     payload: PasswordChangePayload,
     user: Annotated[CurrentUser, Depends(get_current_user)],
     auth: Annotated[AuthProvider, Depends(get_auth)],
+    repos: Annotated[Repos, Depends(get_repos)],
 ):
     """Change the password after re-checking the current one; the session stays logged in."""
     if len(payload.new_password) < MIN_PASSWORD_LENGTH:
         return _weak_password()
     if payload.new_password == payload.current_password:
         return _error(422, "same_password", "Choose a password different from the current one.")
-    denied = await _check_current_password(auth, user, payload.current_password)
+    denied = await _check_current_password(auth, repos, user, payload.current_password)
     if denied is not None:
         return denied
     try:
@@ -538,7 +555,7 @@ async def delete_account(
        is gone, the account still works without history and the user can try again.
     Running evaluate jobs are not cancelled: the job store has no per-user cancel (see ADR-011).
     """
-    denied = await _check_current_password(auth, user, payload.password)
+    denied = await _check_current_password(auth, repos, user, payload.password)
     if denied is not None:
         return denied
     try:

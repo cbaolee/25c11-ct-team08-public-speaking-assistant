@@ -25,10 +25,14 @@ from src.app.db.factory import (
 )
 from src.app.deps import CurrentUser, get_current_user, require_recording_consent
 from src.app.main import app
-from src.app.routes.auth import reset_auth_limiters
 
 TEST_OTP = "123456"
 TEST_USER_ID = UUID("00000000-0000-4000-8000-000000000001")
+
+
+def reset_auth_limiters() -> None:
+    """Empty the attempt counters of the in-memory repositories (resend cooldown etc.)."""
+    app.dependency_overrides[get_repos]().rate_limits.reset()
 
 
 def _skip_consent_check(
@@ -49,7 +53,6 @@ def isolated_app(request, monkeypatch):
     monkeypatch.setattr(settings, "supabase_shards", {})
     for cached in (get_repos, get_auth, get_supabase_client, get_shard_client):
         cached.cache_clear()
-    reset_auth_limiters()
     repos, auth = build_memory_repos(), MemoryAuthProvider(code_factory=lambda: TEST_OTP)
     app.dependency_overrides[get_repos] = lambda: repos
     app.dependency_overrides[get_auth] = lambda: auth

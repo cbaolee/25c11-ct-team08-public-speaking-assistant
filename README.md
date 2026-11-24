@@ -115,6 +115,7 @@ Only needed when `SUPABASE_URL` is set.
    | `0008_replace_baseline_delete_old.sql` | any time | `replace_current_baseline` keeps one baseline row per user |
    | `0009_purge_unconfirmed_accounts.sql` | required, any time | pg_cron job (every 15 min) that deletes accounts whose email is still unconfirmed 60 minutes after the last code (must match `app_constants.toml` `[auth] unconfirmed_ttl_min`); accounts with files in Storage are skipped. Enable `pg_cron` first. Until it has run, unconfirmed accounts stay even though the "Check your email" step says they are deleted (ADR-011). |
    | `0010_accounts.sql` | any time | Table `accounts` (which shard holds each user's sessions); existing users get `core` |
+   | `0011_auth_rate_limits.sql` | required, any time | Table `auth_rate_limits`, function `hit_rate_limit` and an hourly pg_cron cleanup job: attempt limits of sign-up codes, password reset and re-auth, shared by every server worker. Enable `pg_cron` first. Until it has run, the backend lets every attempt through and logs a warning, so only Supabase Auth's own limits apply. |
 
    On every **shard project** (ADR-012) run `db/migration_shard/0001_sessions.sql` (once), then `migration_shard/0002_purge_insufficient_sessions.sql` (enable pg_cron first), then list the shards in `SUPABASE_SHARDS`.
 

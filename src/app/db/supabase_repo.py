@@ -409,6 +409,24 @@ class SupabaseSessionRepo:
         return len(resp.data or [])
 
 
+class SupabaseRateLimitRepo:
+    """public.hit_rate_limit() on the core project (db/migration_main/0011_auth_rate_limits.sql)."""
+
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool:
+        params = {"p_bucket": bucket, "p_key": key, "p_max": max_hits, "p_window_s": window_s}
+        data = _execute(self._client.rpc("hit_rate_limit", params)).data
+        if isinstance(data, list):  # some client versions wrap a scalar result in a list
+            data = data[0] if data else None
+        if isinstance(data, dict):
+            data = data.get("hit_rate_limit")
+        if not isinstance(data, bool):
+            raise StorageError("hit_rate_limit returned no answer")
+        return data
+
+
 class SupabaseAccountRepo:
     """public.accounts on the core project (db/migration_main/0010_accounts.sql)."""
 

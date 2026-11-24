@@ -105,6 +105,12 @@ class AccountRepo(Protocol):
     def count_by_shard(self) -> dict[str, int]: ...
 
 
+class RateLimitRepo(Protocol):
+    # Count one hit for (bucket, key) and say whether it is allowed: at most max_hits per
+    # fixed window of window_s seconds. key is a hash, never an email (0011_auth_rate_limits).
+    def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool: ...
+
+
 class AudioStore(Protocol):
     def upload_file(
         self,

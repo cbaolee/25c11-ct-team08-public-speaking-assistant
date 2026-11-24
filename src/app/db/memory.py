@@ -1,3 +1,5 @@
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from threading import RLock
@@ -42,6 +44,9 @@ class MemoryState:
     files: dict[tuple[str, str], bytes] = field(default_factory=dict)
     accounts: dict[UUID, str] = field(default_factory=dict)  # user_id -> shard_ref
     accounts_lock: RLock = field(default_factory=RLock)
+    # (bucket, key) -> (window start, hits), like public.auth_rate_limits
+    rate_limits: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict)
+    rate_limits_lock: RLock = field(default_factory=RLock)
 
 
 def _now() -> datetime:
@@ -391,6 +396,28 @@ class MemorySessionRepo:
         for session_id in ids:
             del self._state.sessions[session_id]
         return len(ids)
+
+
+class MemoryRateLimitRepo:
+    """Same fixed window as public.hit_rate_limit() (0011), kept in RAM for dev and tests."""
+
+    def __init__(self, state: MemoryState, clock: Callable[[], float] = time.monotonic) -> None:
+        self._state = state
+        self._clock = clock
+
+    def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool:
+        with self._state.rate_limits_lock:
+            now = self._clock()
+            start, hits = self._state.rate_limits.get((bucket, key), (now, 0))
+            if now - start >= window_s:
+                start, hits = now, 0
+            hits += 1
+            self._state.rate_limits[(bucket, key)] = (start, hits)
+            return hits <= max_hits
+
+    def reset(self) -> None:
+        with self._state.rate_limits_lock:
+            self._state.rate_limits.clear()
 
 
 class MemoryAccountRepo:

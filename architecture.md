@@ -52,7 +52,7 @@ src/app/
 ├── routes/                 auth.py (/api/auth/*), profile.py (/api/profile*), baselines.py (/api/baseline*),
 │                           coach.py (/api/sessions/{id}/coach-note), practice.py (/api/practice/retry)
 ├── auth.py                 AuthProvider: Supabase Auth, or in-memory accounts in dev
-├── rate_limit.py           In-memory sliding-window rate limits
+├── rate_limit.py           In-memory sliding-window limit for Word Coach retries (account limits: 4.3 `hit_rate_limit`)
 ├── uploads.py              Safe upload paths and size-capped upload saving
 ├── deps.py                 get_current_user: user from the Bearer access token
 ├── config.py               Settings from .env; limits from app_constants.toml; start-up checks
@@ -157,7 +157,7 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 
 ```mermaid
 flowchart TB
-    Routes["Endpoints"] -->|Depends(get_repos)| Repos["Repos<br/>profiles · baselines · scripts · sessions · files · accounts"]
+    Routes["Endpoints"] -->|Depends(get_repos)| Repos["Repos<br/>profiles · baselines · scripts · sessions · files · accounts · rate_limits"]
     Repos -.implements.-> Proto["Protocols<br/>repositories.py"]
     Factory["get_repos()"] -->|SUPABASE_URL set| Supa["Supabase*Repo<br/>SupabaseAudioStore"]
     Factory -->|no URL, APP_ENV=dev| Mem["Memory*Repo<br/>MemoryAudioStore"]
@@ -167,6 +167,7 @@ flowchart TB
 | Rule                                   | Reason                                                                 |
 | -------------------------------------- | ---------------------------------------------------------------------- |
 | Interfaces `ProfileRepo`, `BaselineRepo`, `ScriptRepo`, `SessionRepo`, `AudioStore`, `AccountRepo`; every method takes `user_id` first | Ownership is part of every call |
+| `RateLimitRepo.hit(bucket, key, max_hits, window_s)` takes a hashed key instead of `user_id` | Counts attempts of people who are not logged in (sign-up code, password reset) |
 | `sessions` and `files` are sharded wrappers (`sharding.py`); endpoints never pick a project | One place decides where a user's data lives (4.6) |
 | Supabase and memory versions behave the same | Unit tests and local runs need no project; production never falls back to memory |
 | Missing row and another user's row both return `None` / `False` | No way to probe other users' ids |
@@ -177,7 +178,7 @@ flowchart TB
 
 ### 4.2 Data model
 
-Five tables, all with row level security. Rationale in [ADR-001](docs/adr/ADR-001.md); `accounts` and shards in [ADR-012](docs/adr/ADR-012.md). The diagram shows the core project; in shard projects `sessions` has the same columns without foreign keys.
+Six tables, all with row level security. Rationale in [ADR-001](docs/adr/ADR-001.md); `accounts` and shards in [ADR-012](docs/adr/ADR-012.md). The diagram shows the core project; in shard projects `sessions` has the same columns without foreign keys.
 
 ```mermaid
 erDiagram
@@ -197,6 +198,7 @@ erDiagram
 | `scripts`   | Saved scripts             | Cap `storage.max_saved_scripts` per user; Only `title`, `body`, `content_hash`; unique `(user_id, lower(title))` and `(user_id, content_hash)` |
 | `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions; lives in the user's shard |
 | `accounts`  | Shard of each user        | Core only; `shard_ref` (`core` or a shard's project ref) set the first time the user saves a session or session file; no policy (service key only) |
+| `auth_rate_limits` | Attempt counters of the account endpoints | Core only; one row per `(bucket, key)`, key = SHA-256 of the email or user id (never the email); `window_start`, `hits`; rows older than one day deleted every hour by pg_cron; no policy (service key only) |
 
 ### 4.3 SQL functions
 
@@ -204,8 +206,9 @@ erDiagram
 | --------------------------- | --------- | ----------------------------------------------------------------------- | -------------------------------------------- |
 | `merge_profile_preferences` | `0003`    | Merges a jsonb patch into `profiles.preferences`, returns the row       | Atomic per-key merge                         |
 | `replace_current_baseline`  | `0008`    | Locks the current baseline, switches it off, inserts the new one, deletes the old rows, returns new and old | One transaction: a failed insert leaves the old baseline current |
+| `hit_rate_limit`            | `0011`    | Adds one hit to `(bucket, key)` in a fixed window (a new window starts once `window_s` has passed) and returns whether `hits <= max` | One `insert ... on conflict do update`: parallel requests cannot all slip under the limit |
 
-Both are `execute` for `service_role` only (revoked from `public`, `anon`, `authenticated`) and take `user_id` as a parameter, because the service key bypasses RLS.
+All are `execute` for `service_role` only (revoked from `public`, `anon`, `authenticated`). The first two take `user_id` as a parameter, because the service key bypasses RLS.
 
 ### 4.4 Object storage
 
@@ -236,6 +239,7 @@ Core project (`db/migration_main/`):
 | `0008_replace_baseline_delete_old.sql` | any time           | `replace_current_baseline` that keeps one baseline row per user      |
 | `0009_purge_unconfirmed_accounts.sql`  | required, any time | pg_cron job that deletes unconfirmed accounts (ADR-011)              |
 | `0010_accounts.sql`                    | any time           | `accounts` (user to shard); existing users get `core`                |
+| `0011_auth_rate_limits.sql`            | required, any time | `auth_rate_limits`, `hit_rate_limit`, hourly pg_cron cleanup job     |
 
 Shard projects (`db/migration_shard/`):
 
@@ -293,6 +297,7 @@ Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `
 | 4 | `0007_drop_profile_topics.sql`, `0008_replace_baseline_delete_old.sql` | any time |
 | 5 | `0005_purge_insufficient_sessions.sql`, `0009_purge_unconfirmed_accounts.sql` | required, any time; need `pg_cron` |
 | 6 | `0010_accounts.sql` | any time |
+| 7 | `0011_auth_rate_limits.sql` | required, any time; needs `pg_cron` |
 
 `0004` is skipped on a new core: `0008` creates the same function in its current form.
 

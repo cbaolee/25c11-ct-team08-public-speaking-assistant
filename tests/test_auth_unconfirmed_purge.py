@@ -3,6 +3,7 @@
 from uuid import UUID
 
 import pytest
+from conftest import reset_auth_limiters
 from fastapi.testclient import TestClient
 
 import src.app.main as main
@@ -15,7 +16,6 @@ from src.app.auth import (
 )
 from src.app.constants import CONSTANTS
 from src.app.db.factory import build_memory_repos, get_repos
-from src.app.routes.auth import reset_auth_limiters
 
 EMAIL, PASSWORD = "alice@example.com", "password-1"
 TTL_S = CONSTANTS["auth"]["unconfirmed_ttl_min"] * 60
