@@ -140,6 +140,24 @@ def test_generate_free_topic_script_ignores_unrelated_document_chunks() -> None:
     assert "uncited" in res.flags
 
 
+def test_parse_section_paragraphs_strips_stray_empty_brackets() -> None:
+    parsed = ScriptGenerator._parse_section_paragraphs(
+        {
+            "paragraphs": [
+                {
+                    "text": "Hello everyone, let us talk about clean energy. []",
+                    "source_chunk_ids": [],
+                },
+                {"text": "Wind power [] grows every year. [ ]", "source_chunk_ids": []},
+            ]
+        }
+    )
+    assert parsed == [
+        ("Hello everyone, let us talk about clean energy.", []),
+        ("Wind power grows every year.", []),
+    ]
+
+
 def test_generate_free_topic_script_fallback_chain_and_503_exhaustion() -> None:
     filler = " ".join(["word"] * 350)
 
