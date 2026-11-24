@@ -12,21 +12,25 @@ It turns out that evolution found more than one way to build a genius mind -- an
 
 Consider what a wild {{ argument_target_cognitive_bird_species }} does every morning to get its breakfast out of rotting logs. Wood-boring beetle larvae hide deep inside narrow crevices where no beak can reach.
 
-A {{ argument_target_cognitive_bird_species }} doesn't just pick up any random twig on the ground. It flies to a specific shrub -- {{ argument_tool_material_plant_name }} -- selects a forked stem, makes two precise cuts with its bill, strips away the side leaves, and then carefully sculpts a tiny wooden crochet hook at the base of the twig.
+A doesn't just pick up any random twig on the ground. Expanding on this key point for avian cognitive intelligence, tool manufacture, and rethinking the bird brain myth: {{ argument_primary_threat_drivers }}.
 
-Let me emphasize that: even chimpanzees, our closest living relatives, do not systematically manufacture hooked tools in the wild. In {{ argument_study_island_or_region_name }}, different valleys of {{ argument_target_cognitive_bird_species }} have distinct cultural tool designs -- from stepped pandanus-leaf probes to barbed hooks -- that young birds spend {{ argument_juvenile_learning_duration }} learning by peering intently over their parents' shoulders.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
+
+To frame avian cognitive intelligence, tool manufacture, and rethinking the bird brain myth in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
 And when they finish extracting a grub, they don't throw a good tool away; they tuck it safely under their foot or wedge it into a bark crevice so they can carry it to the next tree.
 
 In our field aviaries, where wild {{ argument_target_cognitive_bird_species }} voluntarily fly in for {{ argument_testing_duration_minutes }} to solve puzzles for meat rewards and then fly right back out into the forest, we tested just how deep their causal reasoning goes.
 
-We presented them with three-stage meta-tool puzzles: to get a piece of food out of a deep tube, the bird had to use a short stick it was holding to rake in a medium stick from a second box, and then use that medium stick to retrieve a long stick from a third box that could finally reach the food.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 Without trial-and-error pecking, {{ argument_success_percentage }} of the birds paused, looked at the setup for {{ argument_thinking_pause_seconds }}, and executed the exact sequence on the very first try.
 
-Even more remarkable is their capacity for mental time travel and social memory. Relatives in the same family, like {{ argument_related_corvid_or_parrot_species }}, remember the exact human face of a researcher who wore a specific mask while trapping them {{ argument_memory_duration_years }} earlier -- and actually teach their offspring and flockmates to scold that specific face before the young birds have ever seen the person do anything wrong.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 How is a bird accomplishing primate-level cognition with a brain that weighs just {{ argument_brain_weight_grams }}? In {{ argument_neurobiology_discovery_year }}, neurobiologists used isotropic fractionator techniques to actually count the individual neurons inside avian brains.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 The result shattered a century of textbook dogma. Because birds have to fly, evolution had to keep their heads extremely light and compact. It solved this weight limit by packing avian neurons at two to four times the density of a mammal's brain.
 

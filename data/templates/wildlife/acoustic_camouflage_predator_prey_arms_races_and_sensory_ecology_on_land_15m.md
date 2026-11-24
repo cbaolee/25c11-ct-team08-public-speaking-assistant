@@ -16,15 +16,19 @@ As it closes in on a flying insect, it cranks its pulse rate up to {{ argument_t
 
 With a hunter that sophisticated patrolling the night sky, how did nocturnal insects survive? Across {{ argument_insect_orders_count }} different groups of nocturnal insects, including {{ argument_eared_insect_groups_list }}, evolution independently invented ultrasonic ears -- tiny tympanal membranes located on their chests, wings, or even inside their mouths -- tuned specifically to the frequencies of {{ argument_echolocating_predator_species }}.
 
+To frame acoustic camouflage, predator-prey arms races, and sensory ecology on land in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 The moment a {{ argument_eared_moth_species }} hears a distant echolocation call from {{ argument_early_detection_distance }} away, it turns and flies in the opposite direction. If the predator is already close, the insect folds its wings into a chaotic power-dive, spiraling toward the ground to dodge the strike.
 
 Wait, it gets even wilder. What about species like the giant {{ argument_deaf_silkmoth_or_lunar_moth }}, which don't have ears at all? In our high-speed acoustic lab at {{ argument_university_or_institute_name }}, we fired ultrasonic beams at museum and live specimens of {{ argument_deaf_silkmoth_or_lunar_moth }} to find out how they survive without hearing.
 
- First, we discovered that the scales covering their bodies aren't flat like a butterfly's; they are elongated, porous hairs that act exactly like the acoustic foam on the walls of a recording studio, absorbing up to {{ argument_sound_absorption_percentage }} of the predator's sonar energy so virtually no echo bounces back.
+First, we discovered that the scales covering their bodies aren't flat like a butterfly's; they are elongated, porous hairs that act exactly like the acoustic foam on the walls of a recording studio, absorbing up to {{ argument_sound_absorption_percentage }} of the predator's sonar energy so virtually no echo bounces back.
 
 The moth is wrapped in a microscopic acoustic invisibility cloak.
 
 Even more astonishing was the secret of the long, twisted tails trailing behind the hindwings of {{ argument_tailed_moth_species }}. For two centuries, naturalists assumed those elegant tails were simply ornaments to attract mates.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 When we filmed {{ argument_echolocating_predator_species }} attacking {{ argument_tailed_moth_species }} at {{ argument_high_speed_camera_fps }} frames per second in our flight chamber, we saw the truth. As the moth flies, those twisted cup-shaped tails spin furiously, creating a bright ultrasonic glint behind the insect's actual body.
 
@@ -33,6 +37,8 @@ In {{ argument_decoy_deflection_percentage }} of attacks, the {{ argument_echolo
 And in the rainforests of {{ argument_tropical_research_site }},{{ argument_jamming_tiger_moth_species }} doesn't hide at all. When it hears a predator's terminal buzz, it flexes ribbed organs on its thorax called tymbals to fire back {{ argument_jamming_clicks_per_second }} ultrasonic clicks per second -- jamming the predator's sonar right at the moment of attack and scrambling its distance perception.
 
 Why does understanding this ancient sensory arms race matter for conservation today? Because every one of these delicate adaptations evolved against the backdrop of a naturally dark, acoustically clean forest.
+
+At the same time, real-world conservation around acoustic camouflage, predator-prey arms races, and sensory ecology on land is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
 
 When we construct a lit highway or an industrial facility next to {{ argument_protected_reserve_name }}, we inject sensory pollution right into the middle of this sixty-million-year-old duel.
 

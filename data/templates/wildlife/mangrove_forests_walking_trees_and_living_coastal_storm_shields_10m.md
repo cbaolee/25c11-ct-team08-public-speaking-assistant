@@ -12,15 +12,19 @@ Local fishermen call them "walking trees" because their arching prop roots look 
 
 How on earth does a {{ argument_target_mangrove_species }} thrive in a place that would kill any oak or pine tree in a week? Through three brilliant pieces of natural engineering.
 
-First, how do its roots breathe when they are buried deep in stinky, oxygen-free mud? The tree grows thousands of little vertical root snorkels -- called pneumatophores -- that poke straight up out of the mud like a bed of pencils to gulp fresh air whenever the tide goes out.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
-Second, how does it drink seawater without dying of thirst? The membranes in the roots of a {{ argument_target_mangrove_species }} act like an ultra-fine desalination plant, blocking {{ argument_salt_filtration_percentage }} of the salt right at the door so fresh water flows up into the trunk. Other species sweat the extra salt out through special glands on their leaves so you can literally lick pure salt crystals off the foliage.
+To frame mangrove forests, walking trees, and living coastal storm shields in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
-Third, how do you drop a seed into swirling tidal water without it drowning or washing out to sea? You don't drop a seed at all! The {{ argument_target_mangrove_species }} practices live birth: the seed germinates while still hanging on the mother branch, growing into a long, green, spear-shaped baby tree called a propagule. When it finally drops, it can float horizontally for {{ argument_floating_survival_months }} until it hits shallow mud, flips vertically to point its root end down, and plants itself in hours.
+Second, how does it drink seawater without dying of thirst. Expanding on this key point for mangrove forests, walking trees, and living coastal storm shields: {{ argument_habitat_dynamics_analysis }}.
 
-For decades, developers and governments across {{ argument_developing_coastline_region }} looked at mangrove swamps and saw only mosquitoes, mud, and wasted beachfront. Between {{ argument_historical_loss_start_year }} and {{ argument_historical_loss_end_year }}, the world bulldozed {{ argument_global_mangrove_loss_percentage }} of its mangrove forests to build luxury hotel beaches, ports, and commercial {{ argument_aquaculture_commodity }} ponds that went toxic and were abandoned after just five years.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
+
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
 Then came the super-typhoons and tsunamis of {{ argument_disaster_event_year }}.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 When our coastal engineering team surveyed the aftermath across {{ argument_surveyed_villages_count }} coastal villages in {{ argument_impact_region_name }}, the pattern was unmistakable. Villages where the mangroves had been cut down to build {{ argument_aquaculture_commodity }} ponds were completely wiped off the map by {{ argument_wave_height_statistic }} storm surges.
 
@@ -28,7 +32,9 @@ Just five kilometers down the exact same coast, villages tucked behind a {{ argu
 
 Those tangled stilts and aerial roots don't fight the ocean like a brittle concrete seawall that cracks in a storm; they absorb up to {{ argument_wave_energy_reduction_percentage }} of a wave's destructive energy, while trapping sediment so the land actually rises right along with rising sea levels.
 
-At the same time, down among those submerged roots lives a bustling nursery for {{ argument_juvenile_reef_and_commercial_fish_list }} that local fishing families depend on for {{ argument_local_protein_dependency_percentage }} of their daily protein, while the deep mud beneath locks away up to {{ argument_carbon_storage_multiplier }} times more carbon per hectare than dry land forests.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
+
+At the same time, real-world conservation around mangrove forests, walking trees, and living coastal storm shields is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
 
 Today, everyone wants to plant mangroves for carbon credits. Yet when we audited mass tree-planting projects across {{ argument_audit_region_name }}, we found a shocking secret: up to {{ argument_failed_planting_percentage }} of planted mangrove seedlings die within two years.
 

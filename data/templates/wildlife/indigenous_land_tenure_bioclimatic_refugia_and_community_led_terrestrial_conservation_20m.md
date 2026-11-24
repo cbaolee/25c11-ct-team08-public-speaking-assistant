@@ -24,6 +24,8 @@ Under the fortress model, millions of Indigenous and local stewards were forcibl
 
 And what happened when you kicked the ancestral guardians out of the forest and replaced them with underfunded government fences? Often, the ecosystem actually degraded.
 
+To frame indigenous land tenure, bioclimatic refugia, and community-led terrestrial conservation in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 Without constant community presence on the land, corrupt logging concessions, illegal gold miners, and commercial poaching syndicates moved into the vacuum, while displaced communities sitting in poverty outside the park boundaries grew understandably hostile toward the wildlife inside.
 
 Over the past {{ argument_research_timespan_years }}, my interdisciplinary team of ecologists, economists, and Indigenous cartographers analyzed {{ argument_analyzed_land_area_statistic }} of terrestrial habitat across {{ argument_study_continent_list }} using high-resolution LIDAR satellite imagery and {{ argument_camera_trap_station_count }} wildlife camera trap stations.
@@ -41,6 +43,8 @@ Let me give you a concrete example from our collaboration with the {{ argument_p
 When we sat down with {{ argument_elder_tracker_name }} and the community's elders, they immediately corrected our models. Through oral histories and daily tracking, they knew that during cyclic {{ argument_climate_oscillation_event }} drought years, the {{ argument_rare_forest_mammal_or_bird }} migrated up into specific {{ argument_upland_tree_species }} groves on rocky ridges that scientific surveys had completely ignored as "low-value scrub."
 
 When we placed camera traps and acoustic recorders in those exact upland groves identified by the elders, we discovered the primary climate refugium that kept the entire regional population of {{ argument_rare_forest_mammal_or_bird }} from going extinct during droughts.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 Western science excels at collecting wide-scale quantitative snapshots over short timeframes; Indigenous knowledge excels at deep, continuous qualitative observation over centuries. When you weave those two ways of knowing together on equal footing, conservation becomes unstoppable.
 

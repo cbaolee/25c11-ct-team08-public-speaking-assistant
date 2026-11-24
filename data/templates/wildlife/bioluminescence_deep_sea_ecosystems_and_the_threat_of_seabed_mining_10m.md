@@ -8,19 +8,21 @@ Imagine climbing inside a titanium sphere barely wide enough for three people to
 
 By two hundred meters, the blue sunlight fades into twilight. By one thousand meters, you are in total, absolute blackness. Not a single photon of sunlight has ever reached this place in the history of the Earth.
 
-That is the moment our submersible pilot reaches up and switches off the exterior floodlights. And when your eyes adjust for ten seconds, you realize the deep sea isn't dark at all. Outside the viewport, the water is exploding with living fireworks -- glowing blue pinwheels, neon green flashes, and pulsing red lanterns drifting past in the dark.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
 Over {{ argument_bioluminescent_species_percentage }} of all the animals living in the open deep ocean make their own light. It is the most common language on planet Earth, and almost none of us have ever seen it.
 
 In the deep sea -- which makes up {{ argument_deep_sea_volume_percentage }} of all the living space on our planet -- bioluminescence is how you survive.
 
-Some creatures use light as a fishing lure, like the {{ argument_anglerfish_or_viperfish_species }} dangling a glowing bacterial lantern right in front of its razor-sharp teeth. Others use light as a burglar alarm: when a small {{ argument_glowing_shrimp_or_jelly_species }} is grabbed by a predator, it vomits a blinding cloud of glowing blue sparks right into the attacker's face to attract an even bigger predator that will eat the attacker instead.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
-And some use light to hide in plain sight. Look up from underneath a {{ argument_hatchetfish_or_squid_species }} swimming in the twilight zone: its belly is lined with tiny biological spotlights tuned to match the exact brightness and color of the faint sunlight filtering down from above, erasing its own shadow so hunters below see nothing at all.
+And some use light to hide in plain sight. Expanding on this key point for bioluminescence, deep-sea ecosystems, and the threat of seabed mining: {{ argument_species_behavior_insight }}.
+
+To frame bioluminescence, deep-sea ecosystems, and the threat of seabed mining in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
 When our submersible finally touches down on the seafloor at {{ argument_abyssal_depth_statistic }} in the {{ argument_deep_sea_basin_name }}, it looks at first like a desert covered in potato-sized black rocks.
 
-Look closer, though, and every one of those black rocks -- called polymetallic nodules -- is an island of life. Growing right on top of the rocks are ghostly white {{ argument_deep_sea_sponge_or_coral_species }}, translucent sea cucumbers, and {{ argument_newly_discovered_species_example }} that have never been seen anywhere else on Earth.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
 Down here in the near-freezing water at {{ argument_deep_water_temperature }}, where the only food is a slow snowfall of organic crumbs drifting down from the surface called marine snow, life runs in extreme slow motion. A deep-sea coral or sponge that is only {{ argument_organism_size_statistic }} tall can be {{ argument_organism_age_statistic }} years old. Fish like the {{ argument_deep_sea_fish_species }} don't even have their first babies until they are {{ argument_fish_maturity_age }} years old.
 
@@ -28,13 +30,15 @@ In the deep ocean, everything is fragile because nothing is built for speed; it 
 
 Why am I telling you about these slow-growing creatures four kilometers beneath the waves? Because right now, international mining companies are preparing to lower giant robotic bulldozers the size of {{ argument_mining_machine_size_comparison }} down onto the floor of {{ argument_deep_sea_basin_name }} to vacuum up those black rocks for {{ argument_target_minerals_list }}.
 
-Even though we have better high-resolution maps of the surface of Mars and the Moon than we do of our own seafloor -- and even though every single time we dive in {{ argument_deep_sea_basin_name }}, {{ argument_new_species_per_dive_percentage }} of the animals we collect are brand-new to science -- we are on the verge of strip-mining an ecosystem before we even know who lives there.
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
+
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 When our team visited a test site where an experimental mining plow had scraped a track across the seafloor back in {{ argument_historical_test_year }}, the tracks looked as fresh as if they had been cut yesterday. Nothing had grown back in {{ argument_recovery_test_years }} years.
 
 And the damage wouldn't stay on the bottom. Giant sediment plumes pumped out by mining ships would cloud the crystal-clear water for {{ argument_plume_spread_distance_statistic }}, choking filter-feeders and blinding the bioluminescent flashes that deep-sea creatures need to find mates and food.
 
-Do we really need to wreck the oldest, largest ecosystem on Earth to build green technology on land? Engineers and battery manufacturers are already moving toward next-generation battery chemistries like {{ argument_alternative_battery_tech_list }} that don't even use deep-sea metals, alongside urban recycling programs that can recover {{ argument_recycling_potential_percentage }} of the minerals we need from old electronics sitting in our drawers right now.
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
 Already, {{ argument_moratorium_countries_count }} countries and major companies like {{ argument_corporate_pledge_examples }} have called for a precautionary pause or moratorium on deep-sea mining until science can prove whether the deep ocean could ever recover.
 

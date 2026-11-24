@@ -6,28 +6,28 @@ duration_min: 5
 
 What happens if you put a normal goldfish or a tropical tuna into a tank of seawater cooled down to minus {{ argument_subzero_water_temp_celsius }} degrees Celsius -- the normal year-round temperature of the Southern Ocean around Antarctica?
 
-Within sixty seconds, the fish freezes solid and dies. Because seawater is salty, the ocean around Antarctica stays liquid down to minus 1.9 degrees Celsius -- while the fresh water inside a normal fish's blood freezes at minus 0.8 degrees.
+Within sixty seconds, the fish freezes solid and dies. Expanding on this key point for antarctic icefish, antifreeze blood, and life in sub-zero polar seas: {{ argument_primary_threat_drivers }}.
 
 Yet when we drop an underwater camera through a hole in the Antarctic ice shelf at {{ argument_antarctic_research_station }}, the freezing water underneath is packed with fish swimming happily through clouds of ice crystals!
 
-And the weirdest of them all is the {{ argument_target_icefish_species }} -- the only animal with a backbone on planet Earth that has completely clear, white blood.
+A concrete example from the field brings this reality into sharp focus: {{ argument_local_case_evidence }}.
 
-Cut your finger, and your blood is bright red. Look inside a {{ argument_target_icefish_species }}, and its blood looks like water, its gills are creamy white, and its heart is the size of a golf ball!
+Cut your finger, and your blood is bright red. Expanding on this key point for antarctic icefish, antifreeze blood, and life in sub-zero polar seas: {{ argument_trophic_impact_analysis }}.
 
-Wait a second -- every high school biology book says no vertebrate can live without hemoglobin, the red iron protein in our blood that carries oxygen from our lungs to our muscles. If a human lost their hemoglobin, they would pass out in seconds.
+To frame antarctic icefish, antifreeze blood, and life in sub-zero polar seas in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
-How did the {{ argument_target_icefish_species }} throw away its red blood cells {{ argument_evolutionary_loss_million_years }} million years ago and survive?
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
-First, freezing cold water holds way more dissolved oxygen than warm tropical water -- and in sub-zero cold, red blood cells actually make blood thick and syrupy like cold motor oil, which is exhausting to pump.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
-By ditching red blood cells altogether, the {{ argument_target_icefish_species }} turned its blood into a thin, easy-flowing liquid that absorbs oxygen straight through its scaleless skin and giant gills, pushed through extra-wide blood vessels by a giant slow-beating heart four times bigger than a normal fish's!
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
-And why doesn't that watery blood turn into an ice cube at minus {{ argument_subzero_water_temp_celsius }} degrees?
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
-Because Antarctic fish brew their own biological antifreeze proteins! Whenever a microscopic ice crystal tries to form inside their body, these special proteins wrap around the crystal like a Velcro jacket and stop it from growing any bigger.
+Because Antarctic fish brew their own biological antifreeze proteins. Expanding on this key point for antarctic icefish, antifreeze blood, and life in sub-zero polar seas: {{ argument_species_behavior_insight }}.
 
-Today, doctors study the {{ argument_target_icefish_species }} to learn how to treat human osteoporosis and keep donor organs alive on ice for transplants.
+On the ground, conservation teams still face stubborn practical obstacles: {{ argument_conservation_challenge_detail }}.
 
-Yet the very adaptations that made the {{ argument_target_icefish_species }} the king of the freezing sea now put it in danger. Because it has no red blood cells to carry extra oxygen when the water warms up, a temperature rise of just {{ argument_lethal_warming_degrees }} degrees Celsius leaves it gasping for breath.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 In {{ argument_breeding_discovery_year }}, our deep-sea cameras in the {{ argument_antarctic_sea_name }} discovered the largest fish nursery on Earth: {{ argument_nest_count_statistic }} {{ argument_target_icefish_species }} nests guarded by devoted fathers on the seafloor. By turning that nursery into an international Marine Protected Area off-limits to commercial trawlers, we can keep the white-blooded wonders of Antarctica thriving under the ice. Thank you.

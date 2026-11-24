@@ -6,7 +6,7 @@ duration_min: 5
 
 If you walked into the cloud forests of {{ argument_mountain_region_name }} at dusk in {{ argument_historical_baseline_year }}, you had to shout to be heard over the chorus of {{ argument_target_amphibian_species }} and dozens of other frogs calling from every bromeliad and stream bank.
 
-When I returned to that exact same ridge just {{ argument_collapse_timeframe }} later, the mist was still rolling through the trees, the streams were still crystal clear, and not a single chainsaw had touched the forest. Yet the night was completely silent.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 We were witnessing the fastest loss of vertebrate biodiversity in recorded history, happening right inside untouched, strictly protected national parks.
 
@@ -20,7 +20,7 @@ Our team launched an emergency rescue mission called {{ argument_rescue_initiati
 
 For {{ argument_captive_breeding_duration }}, we learned how to replicate their exact seasonal rains, temperature drops, and specialized diets of {{ argument_specialized_prey_items }} to keep the lineage alive.
 
-Even more exciting, recent field surveys manned by local citizen scientists from {{ argument_local_community_name }} discovered a tiny remnant population of {{ argument_target_amphibian_species }} surviving in the wild. Genetic testing revealed they were evolving natural skin secretions that inhibit {{ argument_pathogen_scientific_name }}.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 By breeding these naturally resistant survivors with our captive colonies, we are now reintroducing frogs equipped to win the evolutionary arms race.
 
