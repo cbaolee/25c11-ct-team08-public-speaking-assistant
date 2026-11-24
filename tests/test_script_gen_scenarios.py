@@ -779,6 +779,27 @@ class TestScenario5FreeTopicAndRegenerateWithFeedback:
         assert "revised" in result.flags
         call_kwargs = mock_llm.generate_free_topic_script.call_args.kwargs
         assert call_kwargs["user_feedback"] == feedback_text
+        assert feedback_text in call_kwargs["chat_context"]
+        assert call_kwargs["chunks"] is not None
+        assert call_kwargs["chunks"][0].heading == "Chat note #1"
+        assert call_kwargs["chunks"][0].page == 0
+
+        # Subsequent blank regenerate keeps the earlier feedback in session context
+        # without persisting the auto-generated variation placeholder as a note.
+        req2 = ScriptGenerationRequest(
+            topic="Deep Sea Hydrothermal Vents",
+            category="free",
+            duration_min=5,
+            session_id=sid,
+            user_id=user_id,
+            user_feedback="Write a fresh variation of this speech.",
+        )
+        pipeline.run(req2)
+        updated_sess = chat_session_store.get(sid, user_id=user_id)
+        assert updated_sess is not None
+        assert updated_sess.user_notes == [feedback_text]
+        call_kwargs2 = mock_llm.generate_free_topic_script.call_args.kwargs
+        assert feedback_text in call_kwargs2["chat_context"]
 
     def test_chat_only_session_passes_chat_context_without_fake_user_notes_chunk(
         self, scenario_setup

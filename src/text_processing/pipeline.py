@@ -36,6 +36,7 @@ from .template_store import TemplateStore
 
 logger = logging.getLogger(__name__)
 _CITATION_MIN_SUPPORT_SCORE = float(CONSTANTS["script"].get("citation_min_support_score", 0.52))
+_AUTO_REGEN_FEEDBACK_PREFIX = "write a fresh variation of this speech"
 
 
 def _build_chat_note_chunks(
@@ -161,6 +162,8 @@ class ScriptGenerationPipeline:
         chat_parts: list[str] = []
         citable_notes: list[str] = []
         force_free_topic = False
+        sess = None
+        pending_feedback_note: str | None = None
         if request.session_id:
             sess = self.session_store.get(request.session_id, user_id=request.user_id)
             if sess:
@@ -179,6 +182,15 @@ class ScriptGenerationPipeline:
                         if cleaned_note:
                             chat_parts.append(cleaned_note)
                             citable_notes.append(cleaned_note)
+        if request.user_feedback and request.user_feedback.strip():
+            cleaned_fb = sanitize_text(request.user_feedback).strip()
+            is_auto_regen = cleaned_fb.lower().startswith(_AUTO_REGEN_FEEDBACK_PREFIX)
+            if cleaned_fb and not is_auto_regen:
+                if not chat_parts or chat_parts[-1] != cleaned_fb:
+                    chat_parts.append(cleaned_fb)
+                    citable_notes.append(cleaned_fb)
+                    if sess is not None:
+                        pending_feedback_note = cleaned_fb
         if request.chat_context and request.chat_context.strip():
             cleaned_ctx = sanitize_text(request.chat_context).strip()
             if cleaned_ctx:
@@ -232,6 +244,11 @@ class ScriptGenerationPipeline:
             parts.append(effective_chat_context)
         parts.extend(c.content for c in chunks[:20])
         self.moderator.assert_safe("\n".join(parts), user_id=request.user_id)
+
+        # Persist safe Regenerate prompt into session notes so context accumulates across turns
+        if sess is not None and pending_feedback_note:
+            sess.user_notes.append(pending_feedback_note)
+            self.session_store.put(sess)
 
         # Check LRU cache (D-10)
         cache_key = self._build_cache_key(request, chunks, chat_context=effective_chat_context)
