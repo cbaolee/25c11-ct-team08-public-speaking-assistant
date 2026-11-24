@@ -88,6 +88,7 @@
       <div class="pwwrap">
         <input type="password" id="authPassword" autocomplete="current-password">
       </div>
+      <button class="linkbtn forgot-link" type="button" id="forgotLink" data-t="reset.forgotLink"></button>
       <div id="pass2Wrap" hidden>
         <label for="authPassword2" data-t="auth.password2"></label>
         <input type="password" id="authPassword2" autocomplete="new-password">
@@ -116,6 +117,8 @@
     <section class="otp-step" id="otpStep" aria-labelledby="otpTitle" hidden>
       <h3 class="otp-title" id="otpTitle" data-t="auth.otpTitle"></h3>
       <p class="note otp-sent" id="otpSentTo"></p>
+      <button class="linkbtn otp-change" type="button" id="otpBack"></button>
+      <p class="note otp-spam" data-t="auth.otpSpam"></p>
       <div class="pill ok otp-hint" id="otpHint" role="status" hidden></div>
       <form id="otpForm" novalidate>
         <label for="otpCode" data-t="auth.otpLabel"></label>
@@ -125,9 +128,37 @@
       </form>
       <div class="otp-actions">
         <button class="linkbtn otp-resend" type="button" id="otpResend"></button>
-        <button class="linkbtn otp-back" type="button" id="otpBack" data-t="auth.otpBack"></button>
       </div>
       <p class="note otp-expiry" id="otpExpiry"></p>
+    </section>
+    <section class="otp-step reset-step" id="resetStep" aria-labelledby="resetTitle" hidden>
+      <h3 class="otp-title" id="resetTitle" data-t="reset.title"></h3>
+      <form id="resetEmailForm" novalidate>
+        <p class="note otp-sent" data-t="reset.emailSub"></p>
+        <label for="resetEmail" data-t="auth.username"></label>
+        <input type="email" id="resetEmail" autocomplete="email" autocapitalize="none" spellcheck="false" aria-describedby="resetEmailError">
+        <div class="ferr" id="resetEmailError" role="alert"></div>
+        <button class="btn btn-primary btn-lg otp-verify" type="submit" id="resetSend" data-t="reset.send"></button>
+      </form>
+      <form id="resetCodeForm" novalidate hidden>
+        <p class="note otp-sent" id="resetSentTo"></p>
+        <p class="note otp-spam" data-t="auth.otpSpam"></p>
+        <div class="pill ok otp-hint" id="resetHint" role="status" hidden></div>
+        <label for="resetCode" data-t="auth.otpLabel"></label>
+        <input class="otp-code" id="resetCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" autocapitalize="none" spellcheck="false" aria-describedby="resetSentTo resetError">
+        <label for="resetNew" data-t="pass.newPass"></label>
+        <input type="password" id="resetNew" autocomplete="new-password">
+        <label for="resetNew2" data-t="pass.newPass2"></label>
+        <input type="password" id="resetNew2" autocomplete="new-password">
+        <div class="ferr" id="resetError" role="alert"></div>
+        <button class="btn btn-primary btn-lg otp-verify" type="submit" id="resetSave" data-t="reset.save"></button>
+        <div class="otp-actions">
+          <button class="linkbtn otp-resend" type="button" id="resetResend"></button>
+        </div>
+      </form>
+      <div class="otp-actions">
+        <button class="linkbtn otp-back" type="button" id="resetBack" data-t="reset.back"></button>
+      </div>
     </section>
         </div>
       </div>
@@ -487,14 +518,33 @@
     <p class="note" data-t="pass.sub"></p>
     <label for="mpUser" data-t="pass.username"></label>
     <input type="email" id="mpUser" autocomplete="username" readonly>
-    <label for="mpCurrent" data-t="pass.current"></label>
-    <input type="password" id="mpCurrent" autocomplete="current-password">
-    <label for="mpNew" data-t="pass.newPass"></label>
-    <input type="password" id="mpNew" autocomplete="new-password">
-    <label for="mpNew2" data-t="pass.newPass2"></label>
-    <input type="password" id="mpNew2" autocomplete="new-password">
-    <div class="ferr" id="mpErr" role="alert"></div>
-    <div class="actions"><button class="btn btn-primary" type="button" id="passSave" data-t="common.save"></button></div>
+    <div id="mpWithCurrent">
+      <label for="mpCurrent" data-t="pass.current"></label>
+      <input type="password" id="mpCurrent" autocomplete="current-password">
+      <button class="linkbtn forgot-link" type="button" id="mpForgot" data-t="reset.forgotCurrent"></button>
+      <label for="mpNew" data-t="pass.newPass"></label>
+      <input type="password" id="mpNew" autocomplete="new-password">
+      <label for="mpNew2" data-t="pass.newPass2"></label>
+      <input type="password" id="mpNew2" autocomplete="new-password">
+      <div class="ferr" id="mpErr" role="alert"></div>
+      <div class="actions"><button class="btn btn-primary" type="button" id="passSave" data-t="common.save"></button></div>
+    </div>
+    <div id="mpWithCode" hidden>
+      <p class="note" id="mpCodeSentTo"></p>
+      <p class="note" data-t="reset.settingsNote"></p>
+      <label for="mpCode" data-t="auth.otpLabel"></label>
+      <input id="mpCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" autocapitalize="none" spellcheck="false">
+      <label for="mpCodeNew" data-t="pass.newPass"></label>
+      <input type="password" id="mpCodeNew" autocomplete="new-password">
+      <label for="mpCodeNew2" data-t="pass.newPass2"></label>
+      <input type="password" id="mpCodeNew2" autocomplete="new-password">
+      <div class="ferr" id="mpCodeErr" role="alert"></div>
+      <div class="actions">
+        <button class="linkbtn" type="button" id="mpCodeResend"></button>
+        <button class="btn" type="button" id="mpCodeCancel" data-t="common.cancel"></button>
+        <button class="btn btn-primary" type="button" id="mpCodeSave" data-t="reset.save"></button>
+      </div>
+    </div>
   </section>
   <section id="settingsDelete" data-pane="delete" hidden>
     <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
@@ -647,6 +697,7 @@
 <script src="/static/js/evaluate_client.js"></script>
 <script src="/static/js/otp_utils.js"></script>
 <script src="/static/js/signup_form.js"></script>
+<script src="/static/js/reset_form.js"></script>
 <script src="/static/js/mic_device.js"></script>
 <script src="/static/js/script_duplicate.js"></script>
 <script type="module" src="/static/js/main.js"></script>

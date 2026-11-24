@@ -58,6 +58,15 @@ export function sessionEnded() {
   if (S.user) { logout(true); toast(T('auth.expired'), true); }
 }
 
+/* Forgot password (Log in and Settings): POST without the access token, so a 401 never logs out.
+   Both resolve to readJson's { res, ok, status, j }. */
+function postJson(url, body) {
+  return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(readJson);
+}
+export const sendResetCode = email => postJson('/api/auth/forgot-password', { email });
+export const resetPassword = (email, token, newPassword) => postJson('/api/auth/reset-password', { email, token, new_password: newPassword });
+export const RESET_ERR = { otp_invalid: 'auth.errOtpInvalid', otp_expired: 'auth.errOtpExpired', rate_limited: 'auth.errRateLimited', invalid_email: 'auth.errEmail', weak_password: 'auth.errWeak' };
+
 /* Settings > Delete account: DELETE /api/auth/account with the current password (ADR-011).
    A wrong password is 403 wrong_password, so api() does not treat it as a session that ended. */
 export function deleteAccount(password) {

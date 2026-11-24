@@ -122,6 +122,12 @@ class AuthProvider(Protocol):
     # Re-auth for sensitive actions (ADR-011): True only when the password is the account's.
     def verify_password(self, email: str, password: str) -> bool: ...
 
+    # Forgot password: email a recovery code. Silent when no confirmed account has this email.
+    def send_password_reset(self, email: str) -> None: ...
+
+    # Check the recovery code, set the new password, then end every session of the account.
+    def reset_password_with_otp(self, email: str, token: str, new_password: str) -> UUID: ...
+
 
 # ---------- in-memory provider (dev without Supabase, tests) ----------
 
@@ -137,6 +143,9 @@ class _MemoryAccount:
     otp_expires_at: float = 0
     otp_attempts: int = 0
     otp_sent_at: float = 0  # last time a code was sent: the unconfirmed TTL counts from here
+    reset_hash: str | None = None  # forgot-password code, kept apart from the sign-up code
+    reset_expires_at: float = 0
+    reset_attempts: int = 0
 
 
 def _mask_email(email: str) -> str:
@@ -350,6 +359,43 @@ class MemoryAuthProvider:
                 return False
             # Constant-time compare: the time taken does not tell how much of the hash matched.
             return hmac.compare_digest(account.password_hash, self._hash(password, account.salt))
+
+    def send_password_reset(self, email: str) -> None:
+        with self._lock:
+            self._purge_unconfirmed()
+            account = self._accounts.get(email.strip().lower())
+            if account is None or not account.confirmed:
+                return  # same answer as for a real account: nothing tells the caller it is unknown
+            code = self._code_factory()
+            account.reset_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+            account.reset_expires_at = self._clock() + self._otp_ttl_s
+            account.reset_attempts = 0
+            if self._log_codes:
+                logger.info("dev reset code for %s : %s", _mask_email(account.email), code)
+
+    def reset_password_with_otp(self, email: str, token: str, new_password: str) -> UUID:
+        if len(new_password) < MIN_PASSWORD_LENGTH:
+            raise WeakPasswordError()
+        with self._lock:
+            account = self._accounts.get(email.strip().lower())
+            if account is None or account.reset_hash is None:
+                raise OtpInvalidError()
+            if self._clock() >= account.reset_expires_at:
+                account.reset_hash = None
+                raise OtpExpiredError()
+            digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            if not hmac.compare_digest(account.reset_hash, digest):
+                account.reset_attempts += 1
+                if account.reset_attempts >= self._max_attempts:
+                    account.reset_hash = None
+                raise OtpInvalidError()
+            account.reset_hash = None
+            account.salt = secrets.token_bytes(16)
+            account.password_hash = self._hash(new_password, account.salt)
+            # Every session on every device ends, like scope="global" on Supabase
+            self._access = {t: v for t, v in self._access.items() if v[0] != account.id}
+            self._refresh = {t: u for t, u in self._refresh.items() if u != account.id}
+            return account.id
 
 
 # ---------- Supabase Auth provider ----------
@@ -572,6 +618,52 @@ class SupabaseAuthProvider:
             raise AuthUnavailableError("Could not check the password") from err
         self._revoke_response_session(resp)
         return True
+
+    def send_password_reset(self, email: str) -> None:
+        """Supabase sends the "Reset password" email; its template must show `{{ .Token }}`.
+
+        Supabase answers the same way for unknown emails, so nothing leaks from here either.
+        """
+        try:
+            self._new_client().reset_password_for_email(email)
+        except Exception as err:
+            if _is_rate_limited(err):
+                raise AuthRateLimitedError() from err
+            if isinstance(err, AuthApiError) and 400 <= err.status < 500:
+                return
+            raise AuthUnavailableError("Could not send the reset code") from err
+
+    def reset_password_with_otp(self, email: str, token: str, new_password: str) -> UUID:
+        """Verify the recovery code, set the password (admin API), then end every session.
+
+        verify_otp returns a session for the account; signing it out with scope="global"
+        revokes every refresh token of the user, including that new session.
+        """
+        try:
+            resp = self._new_client().verify_otp(
+                {"email": email, "token": token, "type": "recovery"}
+            )
+        except Exception as err:
+            if _is_rate_limited(err):
+                raise AuthRateLimitedError() from err
+            if isinstance(err, AuthApiError) and (err.code or "") == "otp_expired":
+                raise OtpExpiredError() from err
+            if isinstance(err, AuthApiError) and 400 <= err.status < 500:
+                raise OtpInvalidError() from err
+            raise AuthUnavailableError("Could not verify the reset code") from err
+        user, session = getattr(resp, "user", None), getattr(resp, "session", None)
+        if user is None or not user.id:
+            raise AuthUnavailableError("Reset answer has no user")
+        user_id = UUID(str(user.id))
+        try:
+            self.update_password(user_id, new_password)
+        finally:
+            if session is not None:
+                try:
+                    self._admin_client.admin.sign_out(session.access_token, scope="global")
+                except Exception:
+                    logger.warning("Could not end the sessions after a password reset")
+        return user_id
 
 
 def _drop_memory_profile(user_id: UUID) -> None:

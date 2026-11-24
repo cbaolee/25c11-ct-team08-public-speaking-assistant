@@ -6,7 +6,7 @@ import { $$ } from './utils.js';
    ===================================================================== */
 export const TEXT = {
   app: { loading: 'Loading your practice…', name: 'Public Speaking Assistant', tagline: 'Read your script aloud. See exactly where to improve.' },
-  busy: { saving: 'Saving…', deleting: 'Deleting…', loading: 'Loading…', signingIn: 'Logging in…', signingUp: 'Creating your account…', verifying: 'Checking the code…' },
+  busy: { saving: 'Saving…', sending: 'Sending the code…', deleting: 'Deleting…', loading: 'Loading…', signingIn: 'Logging in…', signingUp: 'Creating your account…', verifying: 'Checking the code…' },
   common: { skip: 'Skip to content', back: 'Back', cancel: 'Cancel', save: 'Save', close: 'Close', play: 'Play', pause: 'Pause', delete: 'Delete', na: 'N/A' },
   /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
@@ -27,7 +27,7 @@ export const TEXT = {
 
   auth: {
     otpTitle: 'Check your email', otpSent: 'We sent a {n}-digit code to {email}.', otpSentLogin: 'Confirm your email first. We sent a {n}-digit code to {email}.',
-    otpLabel: 'Verification code', otpVerify: 'Verify email', otpResend: 'Resend code', otpResendIn: 'Resend code in {t}', otpResending: 'Sending…', otpResent: 'We sent a new code.', otpBack: 'Use a different email',
+    otpLabel: 'Verification code', otpVerify: 'Verify email', otpResend: 'Resend code', otpResendIn: 'Resend code in {t}', otpResending: 'Sending…', otpResent: 'We sent a new code.', otpChangeEmail: 'Wrong email? Change it', otpBackLogin: 'Back to Log in', otpSpam: 'Not received? Check your spam folder.',
     otpExpiry: 'If you do not confirm, this account is deleted {n} minutes after the last code we sent.',
     errOtpFormat: 'Enter the {n}-digit code from the email.', errOtpInvalid: "That code doesn't match. Use the latest email, or send a new code.", errOtpExpired: 'This code has expired. Send a new one.', errRateLimited: 'Too many tries. Wait a moment, then try again.',
     hintVerified: 'Email verified. Log in to continue.', hintVerifiedOldPassword: 'Email verified, but your new password could not be saved. Log in with the password you set first.', okVerified: 'Email verified.',
@@ -153,6 +153,16 @@ export const TEXT = {
     dupBodyT: 'This script is already saved', dupBodyMsg: 'Your saved script "{title}" has exactly the same text, so this one was not saved.',
     dupTitleT: 'This name is already used', dupTitleMsg: 'You already have a saved script named "{title}". Pick another name.',
     fullTitle: 'Your script list is full', fullMsg: 'You can keep up to {max} saved scripts. Delete one before you save another.'
+  },
+
+  reset: {
+    forgotLink: 'Forgot password?', forgotCurrent: 'Forgot your current password?',
+    title: 'Reset password', emailSub: 'Enter the email of your account. We will send a code to reset your password.',
+    send: 'Send code', sent: 'If an account uses {email}, we sent it a {n}-digit code.', save: 'Reset password', back: 'Back to Log in',
+    done: 'Password changed. Log in with your new password.',
+    settingsSent: 'We sent a {n}-digit code to {email}.',
+    settingsNote: 'After the reset you are logged out on every device, including this one.',
+    errCode: 'Enter the {n}-digit code from the email.', errNew: 'Enter a new password and repeat it.'
   },
 
   consent: {

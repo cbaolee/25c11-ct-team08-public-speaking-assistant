@@ -80,6 +80,7 @@ export function applyAuthMode(mode) {
   $('#pass2Wrap').hidden = mode !== 'up'; $('#authPassword2').value = ''; $('#authPassword2').removeAttribute('aria-invalid');
   $('#lAuth').classList.toggle('signup', mode === 'up');
   $('#signupConsentNote').hidden = mode !== 'up';
+  $('#forgotLink').hidden = mode !== 'in';
   $('#loginHint').hidden = true;
   clearErr($('#authError'));
   updateSignupButton();
@@ -272,7 +273,7 @@ const OTP_ERR = { otp_invalid: 'auth.errOtpInvalid', otp_expired: 'auth.errOtpEx
 let otp = null, otpMotion = null, otpBusy = false, otpInitialized = false;
 const otpConfig = () => ({ otp_length: CONFIG.auth?.otp_length ?? 6, resend_cooldown_s: CONFIG.auth?.resend_cooldown_s ?? 60, unconfirmed_ttl_min: CONFIG.auth?.unconfirmed_ttl_min ?? 60 });
 
-function morphAuthCard(leavingEls, apply, enteringEls) {
+export function morphAuthCard(leavingEls, apply, enteringEls) {
   const a = $('#lAuth');
   otpMotion = null;
   [a, ...leavingEls, ...enteringEls].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
@@ -298,7 +299,8 @@ function resetOtpStep() {
   otp = null; otpMotion = null; otpBusy = false;
   const a = $('#lAuth');
   [a, a.querySelector('.seg'), $('#authForm'), $('#otpStep')].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
-  a.style.overflow = ''; a.querySelector('.seg').hidden = false; $('#authForm').hidden = false; $('#otpStep').hidden = true;
+  [$('#resetStep')].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
+  a.style.overflow = ''; a.querySelector('.seg').hidden = false; $('#authForm').hidden = false; $('#otpStep').hidden = true; $('#resetStep').hidden = true;
   $('#otpVerify').disabled = false; $('#otpVerify').removeAttribute('aria-busy');
 }
 function updateOtpCountdown() {
@@ -319,7 +321,8 @@ function openOtpStep(email, { from, resend, draft }) {
   otp = { email, from, draft: draft || null, sentAt: resend ? null : Date.now(), timer: null };
   const current = otp, n = otpConfig().otp_length, input = $('#otpCode'), step = $('#otpStep'), a = $('#lAuth');
   $('#otpSentTo').textContent = T(from === 'in' ? 'auth.otpSentLogin' : 'auth.otpSent', { n, email });
-  $('#otpExpiry').textContent = T('auth.otpExpiry', { n: otpConfig().unconfirmed_ttl_min });   // purge: ADR-011, SQL 0009
+  $('#otpExpiry').textContent = T('auth.otpExpiry', { n: otpConfig().unconfirmed_ttl_min });
+  $('#otpBack').textContent = T(from === 'up' ? 'auth.otpChangeEmail' : 'auth.otpBackLogin');   // purge: ADR-011, SQL 0009
   input.maxLength = n; input.style.setProperty('--otp-len', n); input.value = ''; input.removeAttribute('aria-invalid');
   clearErr($('#otpError')); $('#otpHint').hidden = true; $('#otpHint').textContent = '';
   startOtpCountdown();
@@ -389,10 +392,17 @@ function initOtp() {
   });
   $('#otpForm').addEventListener('submit', submitOtp);
   $('#otpResend').addEventListener('click', resendOtp);
+  /* From Sign up: "Wrong email? Change it" goes back to the filled form (passwords too, from the draft)
+     with the email selected. The unconfirmed account of the wrong email is deleted by itself (SQL 0009).
+     From Log in: back to the Log in form. */
   $('#otpBack').addEventListener('click', () => {
     if (!otp || otpBusy) return;
-    const mode = otp.from;
-    $('#authPassword').value = ''; $('#authPassword2').value = '';
-    closeOtpStep(mode).then(() => { if (!otp) $('#authEmail').focus(); });
+    const mode = otp.from, d = otp.draft;
+    $('#authPassword').value = d ? d.password : ''; $('#authPassword2').value = d ? d.password : '';
+    closeOtpStep(mode).then(() => {
+      if (otp) return;
+      updateSignupButton();
+      $('#authEmail').focus(); $('#authEmail').select();
+    });
   });
 }

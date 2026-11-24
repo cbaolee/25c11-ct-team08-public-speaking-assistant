@@ -53,12 +53,19 @@ _verify_limiter = SlidingWindowLimiter(
 _reauth_limiter = SlidingWindowLimiter(
     _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
 )
+# Forgot password: one code per email per cooldown, and the same budget as the OTP check to use it
+_reset_send_limiter = SlidingWindowLimiter(1, _auth_config["resend_cooldown_s"])
+_reset_verify_limiter = SlidingWindowLimiter(
+    _auth_config["verify_attempts_per_window"], _auth_config["verify_window_s"]
+)
 
 
 def reset_auth_limiters() -> None:
     _resend_limiter.reset()
     _verify_limiter.reset()
     _reauth_limiter.reset()
+    _reset_send_limiter.reset()
+    _reset_verify_limiter.reset()
 
 
 def _email_key(email: str) -> str:
@@ -99,6 +106,11 @@ class VerifyOtpPayload(OtpEmailPayload):
     # Latest sign-up form (ADR-010 D3, amended 21/11): applied only after the code is accepted.
     password: str | None = Field(default=None, max_length=MAX_PASSWORD_LENGTH)
     profile: SignupDetails | None = None
+
+
+class ResetPasswordPayload(OtpEmailPayload):
+    token: str = Field(max_length=32)
+    new_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
 class RefreshPayload(BaseModel):
@@ -321,6 +333,62 @@ async def resend_otp(payload: OtpEmailPayload, auth: Annotated[AuthProvider, Dep
     except AuthUnavailableError:
         return _auth_unavailable()
     return {"sent": True}
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    payload: OtpEmailPayload, auth: Annotated[AuthProvider, Depends(get_auth)]
+):
+    """Email a recovery code. Always `{"sent": true}`, so nobody learns which emails have accounts.
+
+    Used from Log in (Forgot password?) and from Settings > Change password, where the browser
+    sends the logged-in account's email.
+    """
+    email = _normalize_email(payload.email)
+    if not _EMAIL_RE.match(email):
+        return _error(422, "invalid_email", "Enter a valid email address.")
+    if not _reset_send_limiter.hit(_email_key(email)):
+        return _rate_limited()
+    try:
+        await run_in_threadpool(auth.send_password_reset, email)
+    except AuthRateLimitedError:
+        return _rate_limited()
+    except AuthUnavailableError:
+        return _auth_unavailable()
+    return {"sent": True}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordPayload, auth: Annotated[AuthProvider, Depends(get_auth)]
+):
+    """Set a new password with the recovery code; every session of the account ends.
+
+    The password length is checked first, so a weak password never uses up a try.
+    """
+    email = _normalize_email(payload.email)
+    if not _EMAIL_RE.match(email):
+        return _error(422, "invalid_email", "Enter a valid email address.")
+    if len(payload.new_password) < MIN_PASSWORD_LENGTH:
+        return _weak_password()
+    token = payload.token.strip()
+    if not re.fullmatch(rf"[0-9]{{{_auth_config['otp_length']}}}", token):
+        return _error(422, "otp_invalid", "Enter a valid verification code.")
+    if not _reset_verify_limiter.hit(_email_key(email)):
+        return _rate_limited()
+    try:
+        await run_in_threadpool(auth.reset_password_with_otp, email, token, payload.new_password)
+    except OtpInvalidError:
+        return _error(422, "otp_invalid", "The verification code is invalid.")
+    except OtpExpiredError:
+        return _error(422, "otp_expired", "The verification code has expired.")
+    except WeakPasswordError:
+        return _weak_password()
+    except AuthRateLimitedError:
+        return _rate_limited()
+    except AuthUnavailableError:
+        return _auth_unavailable()
+    return {"reset": True}
 
 
 @router.post("/login")

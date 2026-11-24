@@ -206,3 +206,6 @@ button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1
   .gate-box[data-phase="analysing"] .bar i { animation: none; }
   .gate-spin { animation-duration: 2.4s; }
 }
+.settings-pane .forgot-link { display: inline-block; margin-top: 8px; font-size: 14px; }
+#mpCodeResend { margin-right: auto; font-size: 14px; }
+#mpCodeResend:disabled { color: var(--muted); cursor: default; text-decoration: none; font-variant-numeric: tabular-nums; }

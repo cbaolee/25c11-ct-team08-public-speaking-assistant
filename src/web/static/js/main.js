@@ -24,6 +24,7 @@ import './modals/settings_modal.js';
 import { api, loadAuth } from './api.js';
 import { T, TOPICS, applyText } from './i18n.js';
 import { onAuthSubmit, openAuth, setAuthMode, startSession, updateSignupButton } from './modals/auth_panel.js';
+import { openResetStep } from './modals/reset_panel.js';
 import { logout, onGateAgree, onGatePause } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
 import { openProfileModal, saveConsent, saveProfileModal } from './modals/profile_modal.js';
@@ -152,6 +153,7 @@ export function init() {
   $('#authLoginTab').onclick = () => setAuthMode('in'); $('#authSignupTab').onclick = () => setAuthMode('up');
   $('#authForm').addEventListener('submit', onAuthSubmit);
   ['input', 'change'].forEach(type => $('#authForm').addEventListener(type, updateSignupButton));
+  $('#forgotLink').onclick = openResetStep;
   setupPwEyes();
   setupSelects();
   setupUserMenuHover();

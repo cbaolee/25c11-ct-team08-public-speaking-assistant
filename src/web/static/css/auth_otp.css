@@ -1,6 +1,12 @@
 .l-auth.signup:has(> .otp-step:not([hidden])) { max-width: 420px; }
+.l-auth .reset-step input[type=password] { margin-bottom: 0; }
 .l-auth .otp-title { font: 600 22px/1.2 var(--sans); color: #fff; margin: 18px 0 4px; }
-.l-auth .otp-sent { margin-bottom: 12px; overflow-wrap: anywhere; }
+.l-auth .otp-sent { margin-bottom: 4px; overflow-wrap: anywhere; }
+.l-auth .otp-change { color: #C9D0DB; margin-bottom: 8px; }
+.l-auth p.otp-spam { font: 400 14px/1.4 var(--sans); color: #AEB8C8; margin: 0 0 12px; }
+.l-auth .reset-step .otp-sent { margin-bottom: 12px; }
+.l-auth .forgot-link { color: #C9D0DB; margin-top: 8px; font-size: 14px; }
+.l-auth .otp-change:hover, .l-auth .otp-change:focus-visible, .l-auth .forgot-link:hover, .l-auth .forgot-link:focus-visible { color: #fff; outline: 3px solid rgba(143,176,255,.35); outline-offset: 2px; }
 .l-auth .otp-hint { margin: 0 0 10px; }
 .l-auth .otp-code.otp-code {
   --otp-slot: 1.6em;

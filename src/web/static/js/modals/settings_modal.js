@@ -1,5 +1,6 @@
-import { MIN_PASSWORD, api, deleteAccount, readJson } from '../api.js';
+import { MIN_PASSWORD, RESET_ERR, api, deleteAccount, readJson, resetPassword, sendResetCode } from '../api.js';
 import { T } from '../i18n.js';
+import { openAuth } from './auth_panel.js';
 import { logout } from './baseline_gate.js';
 import { saveConsent } from './profile_modal.js';
 import { levelAnim } from '../recorder.js';
@@ -147,6 +148,61 @@ const PASS_ERR = { wrong_password: 'pass.errWrong', same_password: 'pass.errSame
 function clearPassFields() { ['#mpCurrent', '#mpNew', '#mpNew2'].forEach(id => { $(id).value = ''; }); }
 function fillPassword() {
   $('#mpUser').value = S.user.email || ''; clearPassFields(); clearErr($('#mpErr'));
+  showCodeForm(false);
+}
+
+/* ---- Change password > Forgot your current password?: a code to the account's email, then a new
+   password. The reset ends every session (this one too), so the user logs in again. ---- */
+let codeSentAt = null, codeTimer = null, codeBusy = false;
+const otpLength = () => CONFIG.auth?.otp_length ?? 6;
+const cooldownS = () => CONFIG.auth?.resend_cooldown_s ?? 60;
+function stopCodeCountdown() { clearInterval(codeTimer); codeTimer = null; }
+function updateCodeCountdown() {
+  const left = window.OtpUtils.cooldownLeft(codeSentAt, Date.now(), cooldownS()), button = $('#mpCodeResend');
+  button.disabled = left > 0;
+  button.textContent = left ? T('auth.otpResendIn', { t: window.OtpUtils.formatCountdown(left) }) : T('auth.otpResend');
+  if (!left || $('#mpWithCode').hidden) stopCodeCountdown();
+}
+function showCodeForm(on) {
+  $('#mpWithCurrent').hidden = on; $('#mpWithCode').hidden = !on;
+  ['#mpCode', '#mpCodeNew', '#mpCodeNew2'].forEach(id => { $(id).value = ''; });
+  clearErr($('#mpCodeErr'));
+  if (!on) { stopCodeCountdown(); codeSentAt = null; }
+}
+async function sendCode() {
+  if (codeBusy || !S.user) return;
+  codeBusy = true; $('#mpForgot').disabled = true; $('#mpCodeResend').disabled = true;
+  try {
+    const { ok, status } = await withBusy(sendResetCode(S.user.email), T('busy.sending'));
+    if (!ok && status !== 429) { showErr($($('#mpWithCode').hidden ? '#mpErr' : '#mpCodeErr'), T('auth.errServer')); $('#mpCodeResend').disabled = false; return; }
+    if ($('#mpWithCode').hidden) showCodeForm(true);
+    $('#mpCodeSentTo').textContent = T('reset.settingsSent', { email: S.user.email, n: otpLength() });
+    $('#mpCode').maxLength = otpLength();
+    if (!ok) showErr($('#mpCodeErr'), T('auth.errRateLimited'));
+    codeSentAt = Date.now(); stopCodeCountdown(); updateCodeCountdown(); codeTimer = setInterval(updateCodeCountdown, 1000);
+    $('#mpCode').focus();
+  } catch (_) { showErr($('#mpErr'), T('auth.errServer')); }
+  finally { codeBusy = false; $('#mpForgot').disabled = false; }
+}
+async function saveWithCode() {
+  if (codeBusy || !S.user) return;
+  const err = $('#mpCodeErr'), email = S.user.email;
+  const form = { code: $('#mpCode').value, password: $('#mpCodeNew').value, password2: $('#mpCodeNew2').value };
+  const problem = window.ResetForm.resetFormError(form, otpLength(), MIN_PASSWORD);
+  if (problem) { showErr(err, T(problem, { n: otpLength() })); $(problem === 'reset.errCode' ? '#mpCode' : '#mpCodeNew').focus(); return; }
+  codeBusy = true; $('#mpCodeSave').disabled = true; clearErr(err);
+  try {
+    const { ok, j } = await withBusy(resetPassword(email, form.code, form.password), T('busy.saving'));
+    if (!ok) { const code = j && j.error_code; showErr(err, RESET_ERR[code] ? T(RESET_ERR[code]) : (j && j.message) || T('auth.errServer')); return; }
+    showCodeForm(false);
+    logout(true);   // the server already ended this session
+    openAuth('in');
+    $('#authEmail').value = email;
+    $('#loginHint').textContent = T('reset.done'); $('#loginHint').hidden = false;
+    $('#authPassword').focus();
+    toast(T('reset.done'));
+  } catch (_) { showErr(err, T('auth.errServer')); }
+  finally { codeBusy = false; $('#mpCodeSave').disabled = false; }
 }
 export function savePass() {
   const cur = $('#mpCurrent').value, a = $('#mpNew').value, b = $('#mpNew2').value, err = $('#mpErr');
@@ -205,6 +261,11 @@ export function setupSettings() {
   $$('[data-settings]').forEach(b => { b.onclick = () => showPane(b.getAttribute('data-settings')); });
   $$('[data-settings-back]').forEach(b => { b.onclick = () => showList(true); });
   $('#permSave').onclick = savePermissions;
+  $('#mpForgot').onclick = sendCode;
+  $('#mpCodeResend').onclick = sendCode;
+  $('#mpCodeSave').onclick = saveWithCode;
+  $('#mpCodeCancel').onclick = () => showCodeForm(false);
+  $('#mpCode').addEventListener('input', () => { $('#mpCode').value = window.OtpUtils.normalizeOtp($('#mpCode').value, otpLength()); });
   $('#pmChk').addEventListener('change', showPermWarning);
   $('#passSave').onclick = savePass;
   $('#speedSave').onclick = saveSpeed;
