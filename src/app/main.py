@@ -62,7 +62,12 @@ from src.app.db.session_helpers import (
     merge_series,
     split_series,
 )
-from src.app.deps import CurrentUser, get_current_user
+from src.app.deps import (
+    CurrentUser,
+    RecordingConsentRequiredError,
+    get_current_user,
+    require_recording_consent,
+)
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
@@ -205,6 +210,18 @@ async def index(request: Request):
 async def audio_rejected_handler(request: Request, exc: AudioRejected):
     """422 `{error_code, message}` when probe or decode refuses the audio file."""
     return JSONResponse(status_code=422, content={"error_code": exc.code, "message": exc.message})
+
+
+@app.exception_handler(RecordingConsentRequiredError)
+async def recording_consent_handler(request: Request, exc: RecordingConsentRequiredError):
+    """403 while the user has recording turned off (Settings > Permissions)."""
+    return JSONResponse(
+        status_code=403,
+        content={
+            "error_code": "consent_required",
+            "message": "Turn on recording in Settings to use this feature.",
+        },
+    )
 
 
 @app.exception_handler(SttUnavailable)
@@ -523,7 +540,7 @@ def _load_profile_accent(repos: Repos, user_id: UUID) -> str | None:
 
 @app.post("/api/evaluate")
 async def evaluate_endpoint(
-    user: Annotated[CurrentUser, Depends(get_current_user)],
+    user: Annotated[CurrentUser, Depends(require_recording_consent)],
     repos: Annotated[Repos, Depends(get_repos)],
     audio: Annotated[UploadFile, File()],
     script: Annotated[str, Form()],

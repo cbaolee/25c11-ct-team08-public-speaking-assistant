@@ -521,7 +521,7 @@ export function onAudioFile(e) {
 export function runEval() {
   const txt = S.texts[S.pickerTab];
   if (!txt || !S.audio) return;
-  runEvalReal(txt);
+  requireConsent(() => runEvalReal(txt));   // an uploaded file is a recording too
 }
 export function cancelEval() {
   const ev = S.evaluation;
@@ -596,6 +596,7 @@ export function runEvalReal(txt) {
   const end = () => { stopEvalTimers(ev); if (active()) S.evaluation = null; closeModal('evaluatingOverlay', false); };
   const fail = j => {
     end(); hideEvalDock(true);
+    if (j && j.error_code === 'consent_required') return;   // api() already opened the Consent Modal
     if (j && j.error_code === 'baseline_required') { S.baseline = null; toast(T('eval.errBaselineRequired'), true); openBaselineGate(); return; }
     showEvalError(j && j.error_code && EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : ((j && j.message) || T('eval.errServer')));
   };

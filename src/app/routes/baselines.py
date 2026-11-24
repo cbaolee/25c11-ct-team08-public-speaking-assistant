@@ -14,7 +14,7 @@ from src.app.config import max_upload_bytes, settings
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import BaselineRow, NewBaseline, StorageError, build_object_path
 from src.app.db.session_helpers import AudioEncodingError, encode_opus
-from src.app.deps import CurrentUser, get_current_user
+from src.app.deps import CurrentUser, get_current_user, require_recording_consent
 from src.app.uploads import safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import BaselineProfile, InsufficientAudio, VadParams
 from src.audio_processing.pipeline import analyze_baseline
@@ -65,7 +65,7 @@ def _save_baseline(
 @router.post("/baseline")
 async def create_baseline(
     audio: Annotated[UploadFile, File()],
-    user: Annotated[CurrentUser, Depends(get_current_user)],
+    user: Annotated[CurrentUser, Depends(require_recording_consent)],
     repos: Annotated[Repos, Depends(get_repos)],
 ):
     """Analyse a baseline recording; when the status is ok, store it as the current baseline."""

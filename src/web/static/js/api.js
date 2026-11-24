@@ -1,7 +1,7 @@
 import { T } from './i18n.js';
 import { logout } from './modals/baseline_gate.js';
 import { S } from './state.js';
-import { toast } from './ui.js';
+import { openModal, toast } from './ui.js';
 
 /* ---------- API calls + login session ----------
    The tokens from POST /api/auth/login are kept in localStorage, so F5 keeps the person logged in.
@@ -38,11 +38,21 @@ export function api(url, opts) {
     return fetch(url, Object.assign({}, o, { headers: h }));
   };
   return send().then(res => {
+    if (res.status === 403) checkConsentLost(res);
     if (res.status !== 401 || !S.auth) return res;
     return refreshAuth().then(ok => { if (ok) return send(); sessionEnded(); return res; }, () => res);
   });
 }
 export const readJson = res => res.json().catch(() => null).then(j => ({ res, ok: res.ok, status: res.status, j }));
+/* 403 consent_required: recording was turned off (for example in another tab). The caller still
+   gets the response; the Consent Modal opens so the user can turn recording on again. */
+function checkConsentLost(res) {
+  res.clone().json().then(j => {
+    if (!j || j.error_code !== 'consent_required' || !S.user) return;
+    S.consent = false;
+    openModal('consentModal', { focus: '#mcAllow' });
+  }).catch(() => {});
+}
 export function sessionEnded() {
   storeAuth(null);
   if (S.user) { logout(true); toast(T('auth.expired'), true); }

@@ -43,8 +43,9 @@ export function saveProfileModal() {
       if (RENDER[S.screen]) RENDER[S.screen]();
     }).catch(() => { $('#mpSave').disabled = false; toast(T('pm.saveErr'), true); });
 }
-/* Keep profiles.consent_recording in step with the Consent Modal and Permissions. */
+/* Keep profiles.consent_recording in step with the Consent Modal and Permissions.
+   Resolves true once the server has saved it; false (no toast) when it could not. */
 export function saveConsent(on) {
-  if (!S.user) return;   // during sign up the answer goes with POST /api/auth/signup
-  api('/api/profile', { method: 'PATCH', json: { consent_recording: on } }).then(r => { if (!r.ok && r.status !== 401) toast(T('pm.saveErr'), true); }).catch(() => toast(T('pm.saveErr'), true));
+  if (!S.user) return Promise.resolve(false);
+  return api('/api/profile', { method: 'PATCH', json: { consent_recording: on } }).then(r => r.ok, () => false);
 }

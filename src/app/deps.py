@@ -6,6 +6,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 
 from src.app.auth import AuthProvider, AuthUnavailableError, get_auth
+from src.app.db.factory import Repos, get_repos
+from src.app.db.models import StorageError
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -48,3 +50,27 @@ def get_current_user(
     if token_user is None:
         raise _not_authenticated()
     return CurrentUser(id=token_user.id, email=token_user.email)
+
+
+class RecordingConsentRequiredError(Exception):
+    """The user turned recording off; `main.py` answers 403 `consent_required`."""
+
+
+def require_recording_consent(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+) -> CurrentUser:
+    """The logged-in user, only when their profile allows recording.
+
+    Use it instead of `get_current_user` on every route that takes a recording. Routes that
+    read past results (sessions, reports, saved audio) stay open. 403 (not 401) so the
+    browser does not treat it as a session that ended; 503 `profile_unavailable` when the
+    profile cannot be read.
+    """
+    try:
+        profile = repos.profiles.get_profile(user.id)
+    except StorageError as err:
+        raise HTTPException(status_code=503, detail="profile_unavailable") from err
+    if profile is None or not profile.consent_recording:
+        raise RecordingConsentRequiredError()
+    return user

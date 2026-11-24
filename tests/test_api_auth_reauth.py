@@ -25,6 +25,7 @@ def _auth():
 def _token(client) -> dict:
     client.post("/api/auth/signup", json={
         "email": EMAIL, "password": PASSWORD, "target_accent": "American",
+        "consent_recording": True,
     })
     assert client.post(
         "/api/auth/verify-otp", json={"email": EMAIL, "token": TEST_OTP}

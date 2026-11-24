@@ -254,6 +254,12 @@ table.t tr:last-child td { border-bottom: 0; }
 .l-auth .opts label { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .26); color: #E6EAF1; }
 .l-auth .opts label:has(input:checked) { background: rgba(143, 176, 255, .22); border-color: #8FB0FF; color: #fff; }
 .l-auth .opts input { accent-color: #8FB0FF; }
+.l-auth .signup-consent { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .26); margin-top: 18px; }
+.l-auth .signup-consent:has(input:checked) { background: rgba(143, 176, 255, .16); border-color: #8FB0FF; }
+.l-auth .signup-consent input { accent-color: #8FB0FF; flex: none; }
+.l-auth .signup-consent label { font-size: 15px; line-height: 1.45; cursor: pointer; }
+.l-auth p.signup-consent-note { font: 400 14px/1.4 var(--sans); color: #AEB8C8; margin: 10px 0 0; text-align: center; }
+.l-auth #authSubmit:disabled { opacity: .55; cursor: not-allowed; }
 .l-auth .pill.ok { background: rgba(134, 239, 172, .16); color: #BBF7D0; }
 
 /* ---------- round 2: red log-out, clickable steps, overview ---------- */

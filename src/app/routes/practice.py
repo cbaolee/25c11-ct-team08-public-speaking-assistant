@@ -16,7 +16,7 @@ from src.app.config import (
     settings,
 )
 from src.app.constants import CONSTANTS
-from src.app.deps import CurrentUser, get_current_user
+from src.app.deps import CurrentUser, require_recording_consent
 from src.app.rate_limit import SlidingWindowLimiter
 from src.app.uploads import safe_upload_path, save_upload_limited
 from src.audio_processing.alignment import align
@@ -68,7 +68,7 @@ async def retry(
     audio: Annotated[UploadFile, File()],
     target_text: Annotated[str, Form()],
     kind: Annotated[str, Form()],
-    user: Annotated[CurrentUser, Depends(get_current_user)],
+    user: Annotated[CurrentUser, Depends(require_recording_consent)],
 ):
     if kind not in {"word", "sentence"}:
         return JSONResponse(status_code=422, content={"error_code": "invalid_kind"})

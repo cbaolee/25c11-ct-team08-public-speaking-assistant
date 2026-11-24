@@ -153,7 +153,7 @@ export function logout(expired) {
   [S.rec, S.brec, S.grec].forEach(r => { if (r) r.cancel(); });
   stopAudioTest();
   S.sessions.forEach(revokeAudio); revokeAudio(S.currentSession);
-  S.rec = S.brec = S.grec = null; S.bbusy = null; S.follow = null; S.baselineGate = null; S.afterConsent = null; S.onDeny = null;
+  S.rec = S.brec = S.grec = null; S.bbusy = null; S.follow = null; S.baselineGate = null; S.afterConsent = null;
   dropEval();
   S.modal.slice().forEach(id => closeModal(id, false));
   S.user = null; S.profile = null; S.sessions = []; S.audio = null; S.currentSession = null; S.baseline = null; S.consent = false; S.avatar = null; S.savedScripts = null; S.savedScriptTotal = 0; S.ownSaved = null; S.readerScript = null; S.chatHistory = [];

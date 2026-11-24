@@ -94,6 +94,7 @@ def test_api_after_purge_keeps_existing_error_codes_and_drops_profile():
     client = TestClient(main.app)
     r = client.post("/api/auth/signup", json={
         "email": EMAIL, "password": PASSWORD, "target_accent": "American",
+        "consent_recording": True,
     })
     user_id = UUID(r.json()["user_id"])
     assert repos.profiles.get_profile(user_id) is not None
@@ -106,5 +107,6 @@ def test_api_after_purge_keeps_existing_error_codes_and_drops_profile():
     assert resend.status_code == 200 and resend.json() == {"sent": True}  # hides existence
     again = client.post("/api/auth/signup", json={
         "email": EMAIL, "password": PASSWORD, "target_accent": "British",
+        "consent_recording": True,
     })
     assert again.status_code == 201 and UUID(again.json()["user_id"]) != user_id

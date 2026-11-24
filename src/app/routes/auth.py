@@ -132,6 +132,10 @@ def _weak_password() -> JSONResponse:
     )
 
 
+def _consent_required() -> JSONResponse:
+    return _error(422, "consent_required", "Recording consent is required to create an account.")
+
+
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -164,6 +168,8 @@ async def sign_up(
         return _error(422, "invalid_email", "Enter a valid email address.")
     if len(payload.password) < MIN_PASSWORD_LENGTH:
         return _weak_password()
+    if payload.consent_recording is not True:
+        return _consent_required()
     try:
         result = await run_in_threadpool(auth.sign_up, email, payload.password)
     except EmailTakenError:
@@ -195,8 +201,7 @@ async def sign_up(
         try:
             await run_in_threadpool(repos.profiles.upsert_profile, user_id, profile)
             profile_created_here = True
-            if payload.consent_recording:
-                await run_in_threadpool(repos.profiles.set_consent, user_id, True)
+            await run_in_threadpool(repos.profiles.set_consent, user_id, True)
         except StorageError:
             if result.created and result.needs_verification:
                 await run_in_threadpool(
@@ -244,7 +249,7 @@ def _apply_profile(repos: Repos, user_id: UUID, details: SignupDetails, email: s
     )
     try:
         repos.profiles.upsert_profile(user_id, profile)
-        repos.profiles.set_consent(user_id, details.consent_recording)
+        repos.profiles.set_consent(user_id, True)
     except StorageError:
         logger.warning("Verified account: the latest sign-up profile could not be saved")
         return False
@@ -272,6 +277,8 @@ async def verify_otp(
         return _error(422, "otp_invalid", "Enter a valid verification code.")
     if payload.password is not None and len(payload.password) < MIN_PASSWORD_LENGTH:
         return _weak_password()  # checked first, so a bad password never uses up the code
+    if payload.profile is not None and payload.profile.consent_recording is not True:
+        return _consent_required()
     if not _verify_limiter.hit(_email_key(email)):
         return _rate_limited()
     try:

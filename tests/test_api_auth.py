@@ -262,3 +262,22 @@ def test_supabase_verify_token_bad_jwt_returns_none_and_outage_raises():
     assert _provider(SimpleNamespace(get_claims=bad)).verify_token("jwt") is None
     with pytest.raises(AuthUnavailableError):
         _provider(SimpleNamespace(get_claims=down)).verify_token("jwt")
+
+
+# Recording consent is required to create an account
+@pytest.mark.parametrize("consent", [None, False])
+def test_signup_without_recording_consent_is_rejected(client, consent):
+    payload = {key: value for key, value in SIGNUP.items() if key != "consent_recording"}
+    if consent is not None:
+        payload["consent_recording"] = consent
+    response = client.post("/api/auth/signup", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "consent_required"
+    assert SIGNUP["email"].lower() not in _auth()._accounts  # no account was created
+
+
+def test_signup_with_recording_consent_saves_it(client):
+    response = client.post("/api/auth/signup", json=SIGNUP)
+    assert response.status_code == 201
+    profile = _repos().profiles.get_profile(UUID(response.json()["user_id"]))
+    assert profile.consent_recording is True

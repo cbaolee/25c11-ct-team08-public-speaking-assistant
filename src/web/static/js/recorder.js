@@ -122,7 +122,9 @@ export function startRecorder(o) {
   }).catch(fail);
   return r;
 }
+/* Every place that starts a recording goes through here. While recording is off for the account,
+   the Consent Modal opens: Allow saves consent and then runs cb; Not now runs nothing. */
 export function requireConsent(cb) {
   if (S.consent) { cb(); return; }
-  S.afterConsent = cb; openModal('consentModal');
+  S.afterConsent = cb; openModal('consentModal', { focus: '#mcAllow' });
 }

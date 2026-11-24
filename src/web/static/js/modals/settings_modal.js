@@ -35,7 +35,7 @@ function showList(focus) {
 function showPane(name) {
   current = name;
   PANES.forEach(k => { $('[data-pane="' + k + '"]').hidden = k !== name; });
-  if (name === 'permissions') $('#pmChk').checked = S.consent;
+  if (name === 'permissions') { $('#pmChk').checked = S.consent; showPermWarning(); }
   else if (name === 'audio') fillAudio();
   else if (name === 'speed') fillSpeed();
   else if (name === 'password') fillPassword();
@@ -49,12 +49,20 @@ function showPane(name) {
 }
 
 /* ---- Permissions ---- */
+/* Turning recording off locks practice and recording; say so before it is saved. */
+function showPermWarning() { $('#pmOffWarning').classList.toggle('show', !$('#pmChk').checked); }
 function savePermissions() {
-  const on = $('#pmChk').checked, changed = on !== S.consent;
-  S.consent = on;
-  if (changed) saveConsent(on);
-  toast(T(S.consent ? 'consent.toastOn' : 'consent.toastOff'));
-  showList(true);
+  const on = $('#pmChk').checked;
+  if (on === S.consent) { showList(true); return; }
+  const btn = $('#permSave');
+  btn.disabled = true;
+  saveConsent(on).then(ok => {
+    btn.disabled = false;
+    if (!ok) { toast(T('pm.saveErr'), true); return; }
+    S.consent = on;
+    toast(T(on ? 'consent.toastOn' : 'consent.toastOff'));
+    showList(true);
+  });
 }
 
 /* ---- Reading speed: the user's own slider range, kept in profiles.preferences ---- */
@@ -197,6 +205,7 @@ export function setupSettings() {
   $$('[data-settings]').forEach(b => { b.onclick = () => showPane(b.getAttribute('data-settings')); });
   $$('[data-settings-back]').forEach(b => { b.onclick = () => showList(true); });
   $('#permSave').onclick = savePermissions;
+  $('#pmChk').addEventListener('change', showPermWarning);
   $('#passSave').onclick = savePass;
   $('#speedSave').onclick = saveSpeed;
   $('#speedReset').onclick = resetSpeed;

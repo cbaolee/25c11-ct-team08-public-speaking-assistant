@@ -104,9 +104,14 @@
         <div class="lbl" id="lblSuAccent" data-t="pm.accent"></div>
         <div class="opts" id="signupExtraAccents" role="radiogroup" aria-labelledby="lblSuAccent"></div>
         <div class="ferr" id="eSuAccent" role="alert" data-t="pm.errAccent"></div>
+        <div class="switch signup-consent">
+          <input type="checkbox" id="signupConsent" aria-describedby="signupConsentNote">
+          <label for="signupConsent" data-t="auth.consentLabel"></label>
+        </div>
       </div>
       <div class="ferr" id="authError" role="alert"></div>
       <button class="btn btn-primary btn-lg" type="submit" id="authSubmit" style="width:100%;margin-top:22px"></button>
+      <p class="note signup-consent-note" id="signupConsentNote" data-t="auth.consentNote" hidden></p>
     </form>
     <section class="otp-step" id="otpStep" aria-labelledby="otpTitle" hidden>
       <h3 class="otp-title" id="otpTitle" data-t="auth.otpTitle"></h3>
@@ -416,6 +421,7 @@
 
 <div class="mbg" id="consentModal" role="dialog" aria-modal="true" aria-labelledby="mcTitle"><div class="box">
   <h2 id="mcTitle" data-t="consent.title"></h2>
+  <p class="note" data-t="consent.locked"></p>
   <p data-t="consent.msg"></p>
   <ul style="margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:15px">
     <li data-t="consent.p1"></li><li data-t="consent.p2"></li><li data-t="consent.p3"></li>
@@ -446,6 +452,7 @@
     <input type="checkbox" id="pmChk">
     <div><label for="pmChk" data-t="perm.allow"></label><div class="note" data-t="perm.note"></div></div>
     </div>
+    <p class="ferr" id="pmOffWarning" role="alert" data-t="perm.offWarning"></p>
     <div class="actions"><button class="btn btn-primary" type="button" id="permSave" data-t="common.save"></button></div>
   </section>
   <section id="settingsAudio" data-pane="audio" hidden>
@@ -639,6 +646,7 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>
 <script src="/static/js/otp_utils.js"></script>
+<script src="/static/js/signup_form.js"></script>
 <script src="/static/js/mic_device.js"></script>
 <script src="/static/js/script_duplicate.js"></script>
 <script type="module" src="/static/js/main.js"></script>

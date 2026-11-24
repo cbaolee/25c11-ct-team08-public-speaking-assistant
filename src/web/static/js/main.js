@@ -23,7 +23,7 @@ import './modals/profile_modal.js';
 import './modals/settings_modal.js';
 import { api, loadAuth } from './api.js';
 import { T, TOPICS, applyText } from './i18n.js';
-import { onAuthSubmit, openAuth, setAuthMode, startSession } from './modals/auth_panel.js';
+import { onAuthSubmit, openAuth, setAuthMode, startSession, updateSignupButton } from './modals/auth_panel.js';
 import { logout, onGateAgree, onGatePause } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
 import { openProfileModal, saveConsent, saveProfileModal } from './modals/profile_modal.js';
@@ -151,6 +151,7 @@ export function init() {
   $('#authBack').onclick = () => { setStageAuth(false); $('#lLogin').focus({ preventScroll: true }); };
   $('#authLoginTab').onclick = () => setAuthMode('in'); $('#authSignupTab').onclick = () => setAuthMode('up');
   $('#authForm').addEventListener('submit', onAuthSubmit);
+  ['input', 'change'].forEach(type => $('#authForm').addEventListener(type, updateSignupButton));
   setupPwEyes();
   setupSelects();
   setupUserMenuHover();
@@ -283,8 +284,19 @@ export function init() {
   // modals
   $('#mpSave').onclick = saveProfileModal;
   $('#mpCancel').onclick = () => closeModal('profileModal');
-  $('#mcAllow').onclick = () => { S.consent = true; saveConsent(true); S.onDeny = null; closeModal('consentModal'); toast(T('consent.toastOn')); const cb = S.afterConsent; S.afterConsent = null; if (cb) cb(); };
-  $('#mcDeny').onclick = () => { S.afterConsent = null; const cb = S.onDeny; S.onDeny = null; closeModal('consentModal'); if (cb) cb(); else toast(T('consent.toastDenied')); };
+  // Consent Modal: the locked feature runs only after the server has saved consent_recording = true
+  $('#mcAllow').onclick = () => {
+    const btn = $('#mcAllow');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    saveConsent(true).then(ok => {
+      btn.disabled = false;
+      if (!ok) { toast(T('consent.errSave'), true); return; }
+      S.consent = true; closeModal('consentModal'); toast(T('consent.toastOn'));
+      const cb = S.afterConsent; S.afterConsent = null; if (cb) cb();
+    });
+  };
+  $('#mcDeny').onclick = () => { S.afterConsent = null; closeModal('consentModal'); toast(T('consent.toastDenied')); };
   setupSettings();
 
   window.addEventListener('resize', () => { syncHeader(); syncStage(); moveNavPill(false); moveSegPills(false); moveSegPills(false, $('#lAuth')); });

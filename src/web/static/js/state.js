@@ -53,7 +53,7 @@ export const S = {
   audio: null, rec: null, brec: null, voiceTab: 'rec',
   sessions: [], currentSession: null, nextId: 1,
   play: { t: 0, on: false, iv: null },
-  evaluation: null, modal: [], confirmCb: null, afterConsent: null, onDeny: null, pmFirst: false,
+  evaluation: null, modal: [], confirmCb: null, afterConsent: null, pmFirst: false,
   signupDraft: null, choosing: true, followWpm: 145, baselineGate: null, grec: null, follow: null, auth: null
 };
 /* Screen renderers: each screens/*.js module registers RENDER.<screen> when it loads. */

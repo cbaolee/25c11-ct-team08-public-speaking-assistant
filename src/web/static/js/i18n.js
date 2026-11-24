@@ -30,14 +30,16 @@ export const TEXT = {
     otpLabel: 'Verification code', otpVerify: 'Verify email', otpResend: 'Resend code', otpResendIn: 'Resend code in {t}', otpResending: 'Sending…', otpResent: 'We sent a new code.', otpBack: 'Use a different email',
     otpExpiry: 'If you do not confirm, this account is deleted {n} minutes after the last code we sent.',
     errOtpFormat: 'Enter the {n}-digit code from the email.', errOtpInvalid: "That code doesn't match. Use the latest email, or send a new code.", errOtpExpired: 'This code has expired. Send a new one.', errRateLimited: 'Too many tries. Wait a moment, then try again.',
-    hintVerified: 'Email verified. Log in to continue.', hintVerifiedOldPassword: 'Email verified, but your new password could not be saved. Log in with the password you set first.', okVerified: 'Email verified.', okVerifiedOff: 'Email verified. Recording is off: you can turn it on in Permissions after you log in.',
+    hintVerified: 'Email verified. Log in to continue.', hintVerifiedOldPassword: 'Email verified, but your new password could not be saved. Log in with the password you set first.', okVerified: 'Email verified.',
     tabLogin: 'Log in', tabSignup: 'Sign up', btnLogin: 'Log in', btnSignup: 'Create account',
     username: 'Email', password: 'Password', show: 'Show', hide: 'Hide',
     errEmpty: 'Enter your email and a password.', errEmail: 'Enter a valid email address.',
     errWeak: 'Use a password with at least 8 characters.', errLogin: 'Wrong email or password.',
     errServer: 'Could not reach the account service. Please try again.',
     expired: 'Your session has ended. Please log in again.',
-    okSignup: 'Account created. Please log in.', okSignupOff: 'Account created. Recording is off: you can turn it on in Permissions after you log in.', okLogin: 'Signed in.',
+    okSignup: 'Account created. Please log in.', okLogin: 'Signed in.',
+    consentLabel: 'I agree that the app records my voice to analyse my speaking. Recording is required to use the app.',
+    consentNote: 'You cannot create an account without agreeing to recording.', errConsent: 'Tick the recording box to create an account.',
     errTaken: 'An account with this email already exists. Log in instead.', password2: 'Repeat password', errMismatch: 'The two passwords do not match.', errRepeat: 'Repeat your password.', hintSignedUp: 'Account created. Log in to continue.'
   },
 
@@ -154,14 +156,15 @@ export const TEXT = {
   },
 
   consent: {
-    title: 'Allow recording?',
-    msg: 'To score your speech we need to record your voice in this browser.',
-    p1: 'Your audio is sent to an external speech-to-text service to get the words and their timing.',
-    p2: 'Pitch and pauses are measured on our server.',
-    p3: 'Recordings are kept in your History until you delete them.',
-    note: 'You can change this any time in Permissions.',
+    title: 'This feature needs recording',
+    locked: 'Recording is turned off for your account, so practice and recording are locked.',
+    msg: 'To score your speech, the app records your voice in this browser.',
+    p1: 'Your audio is sent to a speech-to-text service to get the words and their timing.',
+    p2: 'Pitch and pauses are measured on our server, and the result is saved to your History.',
+    p3: 'You can delete any recording from History, or delete your account in Settings.',
+    note: 'You can turn recording off again any time in Settings > Permissions.',
     deny: 'Not now', allow: 'Allow recording',
-    toastOn: 'Recording allowed.', toastDenied: 'Recording is off. You can turn it on in Permissions.', toastOff: 'Recording turned off.'
+    toastOn: 'Recording allowed.', toastDenied: 'Recording is off. Practice stays locked until you allow it.', toastOff: 'Recording turned off.', errSave: 'Could not turn on recording. Please try again.'
   },
 
   eval: {
@@ -304,7 +307,7 @@ export const TEXT = {
     auto: 'Auto speed', autoNote: 'While recording, tap the sentence you have reached: the speed slider adjusts to how fast you read. You can still move it yourself.', wpm: '{n} wpm', reset: 'Use default',
     errOrder: 'The slowest speed must be lower than the fastest speed.', ok: 'Reading speed saved.', err: 'Could not save the reading speed. Please try again.'
   },
-  perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.' },
+  perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.', offWarning: 'Practice and recording are locked until you turn this on again. Your past reports stay available.' },
   overview: {
     title: 'Overview',
     verdict_good: 'A strong take. Keep it this steady.',

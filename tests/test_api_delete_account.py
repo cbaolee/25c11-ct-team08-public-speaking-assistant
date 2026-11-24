@@ -44,6 +44,7 @@ def _account(client) -> tuple[UUID, dict]:
             "email": EMAIL,
             "password": PASSWORD,
             "target_accent": "American",
+            "consent_recording": True,
         },
     )
     user_id = UUID(r.json()["user_id"])

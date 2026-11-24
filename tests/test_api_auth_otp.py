@@ -14,7 +14,9 @@ from src.app.main import app
 from src.app.routes.auth import _resend_limiter, _verify_limiter, reset_auth_limiters
 
 EMAIL = "otp@example.com"
-PAYLOAD = {"email": EMAIL, "password": "password-1", "target_accent": "American"}
+PAYLOAD = {
+    "email": EMAIL, "password": "password-1", "target_accent": "American", "consent_recording": True
+}
 
 
 @pytest.fixture
