@@ -4,7 +4,7 @@
 --      request. Until it has run, the backend lets every request through (it fails open and
 --      logs a warning), so only Supabase Auth's own limits apply.
 -- Where: core project only (psc-main). Never on a shard project.
--- Applied: not yet
+-- Applied: psc-main, last run 2026-11-24
 -- Effect: creates public.auth_rate_limits (one row per bucket and key) with RLS on and no
 --         policy, and public.hit_rate_limit(), which only the service key can run.
 --         Schedules the pg_cron job purge_auth_rate_limits (every hour, UTC) that deletes rows

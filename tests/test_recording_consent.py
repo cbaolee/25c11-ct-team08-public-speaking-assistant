@@ -5,12 +5,14 @@ Removes the `require_recording_consent` override from tests/conftest.py so the r
 
 import pytest
 from conftest import TEST_USER_ID
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 import src.app.main as main
 from src.app.db.factory import get_repos
 from src.app.db.models import ProfileUpsert, StorageError
 from src.app.deps import require_recording_consent
+from src.app.routes import baselines, practice
 
 RECORDING_ROUTES = [
     ("/api/evaluate", {"script": "Hello."}),
@@ -52,9 +54,18 @@ def test_recording_routes_return_403_without_a_profile(client, url, form):
 
 
 @pytest.mark.parametrize(("url", "form"), RECORDING_ROUTES)
-def test_recording_routes_pass_the_check_with_consent(client, url, form):
+def test_recording_routes_pass_the_check_with_consent(client, url, form, monkeypatch):
+    """With consent the route goes on to save the upload. The save is stopped there (418), so
+    the test never needs ffmpeg/ffprobe, which CI does not install."""
+
+    def stop_after_the_consent_check(*_args, **_kwargs):
+        raise HTTPException(status_code=418)
+
+    for module in (main, baselines, practice):
+        monkeypatch.setattr(module, "save_upload_limited", stop_after_the_consent_check)
+    monkeypatch.setattr(main.settings, "baseline_required", False)  # evaluate checks it first
     _make_profile(consent=True)
-    assert _post_audio(client, url, form).status_code != 403
+    assert _post_audio(client, url, form).status_code == 418
 
 
 def test_profile_read_error_is_503(client, monkeypatch):

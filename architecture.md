@@ -138,6 +138,12 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 | 400    | `{"error": "invalid_cursor"}`                                            | Malformed cursor                                   |
 | 404    | `{"error": "session_not_found"}`                                         | Unknown session or another user's session          |
 | 403    | `{"error_code": "wrong_password", ...}`                                  | Wrong current password (password change, account deletion) |
+| 403    | `{"error_code": "consent_required", ...}`                                | Recording route (`/api/evaluate`, `/api/baseline` POST, `/api/practice/retry`) while recording consent is off |
+| 422    | `{"error_code": "consent_required", ...}`                                | Sign up, or the sign-up form sent with the code, without recording consent |
+| 403    | `{"error_code": "origin_mismatch", ...}`                                 | `/api/auth/refresh` or `/api/auth/logout` from another site's `Origin` |
+| 401    | `{"error_code": "invalid_refresh_token", ...}`                           | `/api/auth/refresh` without a valid `psa_refresh` cookie; the cookie is cleared |
+| 422    | `{"error_code": "otp_invalid" \| "otp_expired" \| "weak_password", ...}` | Wrong or expired code, or a short new password (sign-up code, password reset) |
+| 429    | `{"error_code": "rate_limited", ...}`                                    | Account endpoints: too many codes or tries for one email or user (4.3 `hit_rate_limit`) |
 | 409    | `{"error_code": "baseline_required", ...}`                               | Evaluate without a baseline                        |
 | 429    | `{"error_code": "rate_limited", ...}`                                    | An evaluate job of the caller is already running   |
 | 409    | `{"error_code": "script_limit_reached", "limit": N, "count": N, ...}`    | New saved script at the per-user cap               |
@@ -373,13 +379,16 @@ sequenceDiagram
 
 ### 5.5 Log in
 
-One loading screen covers the password check and all first data: profile, history with the latest full scores, baseline, saved-script list, web fonts. Home is drawn once after all of them, so nothing on it changes after it appears.
+Two steps. The Busy Overlay ("Logging in…") covers the password check; a wrong password or an unconfirmed email ends there. A correct one cross-fades into the App Loader ("Loading your practice…"), which covers all first data: profile, history with the latest full scores, baseline, saved-script list, web fonts. Home is drawn once after all of them, so nothing on it changes after it appears.
+
+A page load (F5) calls `POST /api/auth/refresh` under the App Loader: the `psa_refresh` cookie gives a new access token and the same first data loads; without a valid cookie the Landing page shows.
 
 ## 6. Browser state
 
 | Store            | Key                       | Content                                             | Cleared                                  |
 | ---------------- | ------------------------- | --------------------------------------------------- | ---------------------------------------- |
-| `localStorage`   | `psa.auth`                | Access and refresh tokens (F5 keeps the login)      | Log out, session end                      |
+| Memory (`S.auth`) | –                        | Access token only; gone on page close or F5         | Log out, session end                      |
+| Cookie (HttpOnly) | `psa_refresh`            | Refresh token; JavaScript cannot read it; sent only to `/api/auth/*`, `SameSite=Strict`, `refresh_cookie_days` | Log out, password reset, account deletion, a refused refresh |
 | `localStorage`   | `psa.chat.<user_id>`      | Latest Script Studio chat (data, not HTML), newest `chat_history_max_messages` | Log out, account deletion |
 | `localStorage`   | `psc.followWpm.<user_id>` | Follow-along speed not yet saved to the profile     | After a successful save                   |
 | `localStorage`   | `psa.mic.<user_id>`       | Chosen microphone `deviceId` (Audio settings)       | Choosing the default device again        |
@@ -391,7 +400,11 @@ Per-user keys keep two accounts on one browser apart. Every `localStorage` acces
 
 | Layer       | Mechanism                                                                                                   |
 | ----------- | ----------------------------------------------------------------------------------------------------------- |
-| Identity    | `get_current_user` verifies the `Authorization: Bearer` token (Supabase Auth, or memory accounts in dev); 401 `not_authenticated`. |
+| Identity    | `get_current_user` verifies the `Authorization: Bearer` token (Supabase Auth, or memory accounts in dev); 401 `not_authenticated`. The access token lives only in page memory; the refresh token only in the `psa_refresh` HttpOnly cookie (6). |
+| CSRF        | The refresh cookie is `SameSite=Strict` and scoped to `/api/auth`; `/refresh` and `/logout` also refuse a foreign `Origin` (403 `origin_mismatch`). Other routes need the Bearer header, which another site cannot add. |
+| Browser     | HTML responses carry a Content-Security-Policy (own scripts only, styles and fonts from Google Fonts, images and audio from `*.supabase.co`, no framing); every response has `X-Content-Type-Options: nosniff` and `Referrer-Policy: same-origin` (`main.py`). |
+| Abuse       | Codes, password resets and re-auth are counted per hashed email or user id in `auth_rate_limits` (4.3); a counter error lets the attempt through and logs a warning, Supabase Auth keeps its own limits. |
+| Consent     | Sign up requires recording consent (422); recording routes return 403 `consent_required` while it is off (`deps.require_recording_consent`); past results stay readable. |
 | Application | The service key bypasses RLS, so every query and SQL function filters by `user_id` in code. Other users' rows return 404. |
 | Database    | Core tables `profiles`, `baselines`, `scripts`, `sessions` have RLS with owner-only policies (`auth.uid()`); `accounts` and every shard project have RLS with no policy (service key only); tables granted to `authenticated` and `service_role`, not `anon`; SQL functions executable by `service_role` only. |
 | Storage     | Private buckets; policies limit each user to the folder `{user_id}/`.                                       |
@@ -414,7 +427,10 @@ API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS`, `GROQ_API_KEYS`, each one or m
 | `MAX_COMPACT_SESSIONS`                                               | `30`                                      | Compact sessions kept per user           |
 | `SIGNED_URL_TTL_S`                                                   | `600`                                     | Signed URL lifetime, seconds             |
 | `BASELINE_REQUIRED`                                                  | `true`                                    | Reject evaluation without a baseline     |
+| `AUTH_COOKIE_SECURE`                                                 | `true`                                    | `Secure` flag of the `psa_refresh` cookie; browsers accept it on `http://localhost` |
 | `DEV_USER_ID`, `DEV2_USER_ID`                                        | empty                                     | Test users, read only by integration tests |
+
+Account limits in `app_constants.toml` `[auth]`: `otp_length` (6), `resend_cooldown_s` (60), `verify_attempts_per_window` (5) per `verify_window_s` (600), `unconfirmed_ttl_min` (60), `refresh_cookie_days` (30).
 
 Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `script_title_max_chars` (70), `max_list_page_size` (50), `avatar_max_bytes` (2 MB), `avatar_size_px` (256), `avatar_max_side_px` (4096), `max_upload_bytes` (100 MB).
 
@@ -423,8 +439,8 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | Command                          | Covers                                                                            |
 | -------------------------------- | --------------------------------------------------------------------------------- |
 | `uv run pytest`                  | Unit tests with `build_memory_repos()` and dependency overrides; no network or keys |
-| `uv run pytest -m integration`   | Real Supabase tests on `psc-main` and the shards (repositories, SQL functions, buckets, shard check)          |
-| `node --test tests/web/<file>.test.js` | UI helpers run by CI: `evaluate_client`, `otp_utils`, `coach_mode`, `script_duplicate`, `mic_device` |
+| `uv run pytest -m integration`   | Real Supabase tests on `psc-main` and the shards (repositories, SQL functions including `hit_rate_limit`, buckets, shard check)          |
+| `node --test tests/web/<file>.test.js` | UI helpers run by CI: `evaluate_client`, `otp_utils`, `coach_mode`, `script_duplicate`, `mic_device`, `signup_form`, `reset_form` |
 | `uv run ruff check .`            | Lint and import order                                                             |
 
 ## 10. Decision records
@@ -440,12 +456,14 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | [ADR-010](docs/adr/ADR-010.md) | Email OTP verification on sign up                                 |
 | [ADR-011](docs/adr/ADR-011.md) | Re-auth for password change and account deletion, purge of unconfirmed accounts, microphone choice |
 | [ADR-012](docs/adr/ADR-012.md) | Database split into one core and shard projects by user           |
+| [ADR-013](docs/adr/ADR-013.md) | Required recording consent, password reset by email code, refresh token in an HttpOnly cookie, rate limits in Postgres |
 
 ## 11. Accounts
 
 | Part                        | Role                                                                                                     |
 | --------------------------- | -------------------------------------------------------------------------------------------------------- |
 | `src/app/auth.py`           | `SupabaseAuthProvider` (service key, server side) and `MemoryAuthProvider` (dev, tests); `get_auth()` picks one like `get_repos()` |
-| `src/app/routes/auth.py`    | `POST /api/auth/signup` creates the account and its `profiles` row (account removed if the profile fails); `/verify-otp`, `/resend-otp` (ADR-010); `/login`, `/refresh`, `/logout`; `PUT /api/auth/password` and `DELETE /api/auth/account` re-check the current password (ADR-011); account deletion removes files, then shard session rows, then the auth user (4.6) |
-| `src/app/routes/profile.py` | Profile, consent, `preferences`, avatar                                                                  |
-| `src/app/deps.py`           | Verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth is unreachable                      |
+| `src/app/routes/auth.py`    | `POST /api/auth/signup` needs recording consent and creates the account and its `profiles` row (account removed if the profile fails); `/verify-otp`, `/resend-otp` (ADR-010); `/forgot-password`, `/reset-password` send a recovery code and set a new password, ending every session (ADR-013); `/login` and `/refresh` return the access token and set the `psa_refresh` cookie, `/refresh` reads only that cookie, `/logout` clears it (ADR-013); `PUT /api/auth/password` and `DELETE /api/auth/account` re-check the current password (ADR-011); account deletion removes files, then shard session rows, then the auth user (4.6) |
+| `src/app/routes/profile.py` | Profile, consent, `preferences`, avatar; a new display name is copied to the account's user metadata for the email greeting |
+| `docs/email_templates/`     | Supabase Auth emails (sign-up code, reset code), pasted into the Supabase dashboard; they need a custom SMTP server (README, Email) |
+| `src/app/deps.py`           | Verifies the Bearer token; 503 `auth_unavailable` when Supabase Auth is unreachable; `require_recording_consent` guards the recording routes |

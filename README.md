@@ -31,8 +31,8 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 | **Session History**   | Each evaluated session is saved with its audio and chart data. The newest 10 sessions stay complete; the next 30 keep only scores, script and mistakes; older ones are deleted. |
 | **Saved Scripts**     | Up to 10 named scripts per user, editable, shared by Practice and Script Studio. Practising a script does not save it.                                                                                        |
 | **Follow-along**      | While recording, the current sentence is highlighted at a chosen speed. Tapping a sentence moves the highlight there; with Auto speed on, the taps also set the speed. Range and Auto speed are in Settings. |
-| **Profile**           | Display name, accent, recording consent, profile picture and reading-speed preferences, stored per account.                                                                                       |
-| **Account**           | Email + password with email verification. Changing the password or deleting the account asks for the current password; deleting removes recordings, baseline, scripts and history. Settings > Audio picks the microphone (kept in this browser). |
+| **Profile**           | Display name, accent, recording consent, profile picture and reading-speed preferences, stored per account. Recording consent is required to sign up; while it is off in Settings, practice and recording are locked and past reports stay readable. |
+| **Account**           | Email + password with email verification. _Forgot password?_ sends a code by email; the new password ends every session. Changing the password or deleting the account asks for the current password; deleting removes recordings, baseline, scripts and history. The login lasts in an HttpOnly cookie that page scripts cannot read. Settings > Audio picks the microphone (kept in this browser). |
 
 ## Tech Stack
 
@@ -167,7 +167,7 @@ uv run uvicorn src.app.main:app --reload --port 8000
 Then open <http://localhost:8000> in the browser on the same machine. Browsers only allow the
 microphone on `localhost` or HTTPS.
 
-1. **Sign up** with an email and a password (at least 8 characters), choose your accent.
+1. **Sign up** with an email and a password (at least 8 characters), choose your accent, agree to recording, then enter the 6-digit code from the email.
 2. **Record your baseline**: the Baseline Gate asks for 30 seconds of normal reading once.
 3. **Script Studio**: pick a template topic or describe your event (or attach a PDF up to 10 pages), then save the script.
 4. **Practice**: choose a saved script, your own text or a sample, then record (pause and resume allowed) or upload your voice.
@@ -225,7 +225,7 @@ A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase p
 ## Documentation
 
 - [Architecture](architecture.md)
-- Decision records: [ADR-001 Data model](docs/adr/ADR-001.md), [ADR-002 Evaluate response save status](docs/adr/ADR-002.md), [ADR-006 Moderation layer 2](docs/adr/ADR-006.md)
+- Decision records: [ADR-001 Data model](docs/adr/ADR-001.md), [ADR-002 Evaluate response save status](docs/adr/ADR-002.md), [ADR-006 Moderation layer 2](docs/adr/ADR-006.md), [ADR-010 Email code on sign up](docs/adr/ADR-010.md), [ADR-011 Re-auth and account deletion](docs/adr/ADR-011.md), [ADR-012 Core and shard projects](docs/adr/ADR-012.md), [ADR-013 Consent, password reset, auth hardening](docs/adr/ADR-013.md)
 - [Technical challenge analysis](docs/challenge_analysis.md)
 - [Naming and coding conventions](docs/conventions/naming_conventions.md)
 - [AI use log conventions](docs/conventions/ai_use_log_conventions.md)
