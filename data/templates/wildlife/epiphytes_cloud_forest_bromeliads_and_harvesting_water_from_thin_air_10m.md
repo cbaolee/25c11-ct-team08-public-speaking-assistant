@@ -10,35 +10,43 @@ Now hike up {{ argument_cloud_forest_altitude }} into the misty mountains of {{ 
 
 Perched along every limb -- packed shoulder to shoulder like spectators in a stadium -- are thousands of wild orchids, bromeliads, ferns, and mosses weighing up to {{ argument_epiphyte_weight_per_tree_tons }} tons on a single tree.
 
-And here is the amazing thing: not a single one of those plants has roots in the ground. And they aren't parasites stealing sap from the tree, either! Biologists call them epiphytes -- or air plants -- plants that fired the dirt millions of years ago and moved into penthouse apartments in the sky, pulling 100% of their water and nutrients straight out of the blowing clouds and rain.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
 In a tropical cloud forest, up to {{ argument_cloud_forest_plant_percentage }} of all plant species live up in the air without ever touching the ground.
 
+To frame epiphytes, cloud forest bromeliads, and harvesting water from thin air in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 My favorite air plants in {{ argument_cloud_forest_location }} are the giant tank bromeliads -- wild cousins of the pineapple.
 
-Because a bromeliad sitting thirty meters up on a bare branch has no soil to soak up rain, it overlaps its stiff, waxy leaves tightly at the base to build a waterproof living bucket. A single big bromeliad can hold up to {{ argument_water_per_bromeliad_liters }} liters of pure rainwater and cloud mist right up in the treetops. Multiply that across a single hectare of cloud forest, and these hanging plant buckets hold over {{ argument_canopy_water_per_hectare_liters }} liters of suspended water in the sky!
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 When my students and I climb up to peek inside one of those leafy buckets with an endoscope, it isn't just a cup of water; it is a miniature suspended lake bursting with wildlife.
 
-Swimming inside the leaves of one single plant, we have found {{ argument_bromeliad_fauna_list }} -- including the {{ argument_bromeliad_frog_species }}, a devoted mother frog who carries her tadpoles one by one on her back all the way up the tree trunk, drops each baby into its own private bromeliad swimming pool, and climbs back up every few days to lay unfertilized eggs in the water to feed them like baby bottles!
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 These sky-gardens don't just shelter tree frogs; they are the water towers for millions of people living in the valleys below.
 
 Even during the dry season in {{ argument_cloud_forest_location }} when zero rain falls from the sky for months, thick white clouds and fog roll continuously through the mountain passes. Bare rock or cattle pasture cannot catch fog -- the cloud just blows right past.
 
-When that same cloud blows through a tree branch covered in hanging mosses and {{ argument_epiphyte_species_list }}, their millions of tiny fuzzy leaf scales act like microscopic fog nets, combing moisture droplets out of the air and dripping steady, crystal-clear water down the tree trunks into the mountain streams that supply {{ argument_downstream_city_water_percentage }} of the drinking water and hydroelectric power for {{ argument_downstream_city_name }}.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
+
+At the same time, real-world conservation around epiphytes, cloud forest bromeliads, and harvesting water from thin air is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
 
 Strip the air plants out of the cloud forest, and the rivers in {{ argument_downstream_city_name }} run dry in the summer and flood with mud in the winter.
 
 Because air plants have no deep roots buried in the damp earth to fall back on during a hot week, they are the canaries in the coal mine for climate change.
 
-As lowland deforestation and warming temperatures push the condensation level of mountain clouds {{ argument_cloud_base_rise_meters }} meters higher up the mountain slopes, the lower cloud forests in {{ argument_cloud_forest_location }} are drying out. Within just {{ argument_desiccation_timeframe }} without daily mist, sixty-year-old tank bromeliads shrivel up, and the canopy frogs vanish with them.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
 At the same time, illegal collectors strip truckloads of wild mosses and blooming bromeliads off lower mountain trees during {{ argument_holiday_or_market_season }} to sell as cheap floral decorations in city markets.
 
+Turning insight into lasting protection requires pairing ecological science with practical community stewardship and policy action: {{ argument_community_stewardship_practice }}.
+
 To keep the cloud sponges alive, our team in {{ argument_cloud_forest_location }} launched a two-part rescue mission.
 
-First, we realized that when windstorms blow giant, epiphyte-covered branches down onto the dark forest floor or onto farm pastures, all the air plants on those fallen branches quickly rot and die in the mud. So we trained local youth brigades as Canopy Gardeners who collect fallen bromeliads and orchids from the ground, nurse them on elevated bamboo frames, and hoist them back up into the crowns of young reforested trees along the {{ argument_elevational_corridor_name }} -- helping slow-dispersing plants move uphill with the rising clouds.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 Second, we partnered with the municipal water utility of {{ argument_downstream_city_name }} to add a tiny {{ argument_water_bill_conservation_fee }} "Cloud Forest Fee" onto urban water bills, paying mountain landowners directly to let pastures regrow into mossy cloud forest.
 

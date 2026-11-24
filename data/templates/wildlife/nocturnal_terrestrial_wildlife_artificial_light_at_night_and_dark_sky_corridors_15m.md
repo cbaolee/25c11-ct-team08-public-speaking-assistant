@@ -16,6 +16,8 @@ In my research studying the sensory ecology of nocturnal wildlife across {{ argu
 
 Start with the base of the food web: nocturnal insects like {{ argument_nocturnal_moth_or_beetle_species }}. Drawn into the "vacuum cleaner effect" of harsh, blue-white LED streetlamps, roughly {{ argument_insect_mortality_per_lamp_statistic }} insects die every night around a single unshielded light fixture -- either from exhaustion or by being picked off by opportunistic predators. Meanwhile, night-blooming plants like {{ argument_night_pollinated_plant_species }} go unpollinated because their nocturnal visitors never arrive.
 
+To frame nocturnal terrestrial wildlife, artificial light at night, and dark sky corridors in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 Move up the food chain to amphibians and mammals. The eyes of a {{ argument_nocturnal_amphibian_or_mammal_species }} are so sensitive they can see color in starlight. When exposed to the glare of a floodlight or illuminated highway, their retinas are temporarily bleached blind for {{ argument_night_vision_recovery_time }}.
 
 And for the {{ argument_migratory_songbird_count }} terrestrial songbirds that migrate at night across {{ argument_migration_flyway_name }} using magnetic sensors in their eyes calibrated to starlight, glowing city skylines act as lethal traps. Disoriented by lit skyscrapers, up to {{ argument_bird_collision_mortality_statistic }} birds die from building collisions every year in {{ argument_country_name }} alone.
@@ -27,6 +29,8 @@ Even where we had preserved lush green corridors connecting two nature reserves,
 Even worse, constant nighttime illumination suppresses the hormone melatonin, throwing off seasonal breeding cues so that animals give birth out of sync with their spring food supply.
 
 Here is why working on light pollution gives me more hope than almost any other field in environmental science: photons do not linger in the environment. Unlike microplastics or forever chemicals that stay in the soil for centuries, the very microsecond you shield or switch off a light, the habitat is restored to pristine condition at the speed of light.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 Over the past {{ argument_dark_sky_project_years }}, our team has worked with lighting engineers and municipal leaders in {{ argument_partner_municipality_name }} to design the {{ argument_dark_sky_corridor_name }} -- a continuous ribbon of darkness linking {{ argument_reserve_a_name }} to {{ argument_reserve_b_name }}.
 

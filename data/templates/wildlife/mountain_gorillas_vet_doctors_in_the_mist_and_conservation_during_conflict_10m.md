@@ -8,15 +8,15 @@ Hike for three hours through stinging nettles, bamboo thickets, and cold volcani
 
 Sitting three meters away in a clearing of wild celery is a {{ argument_silverback_weight_kg }}-kilogram silverback {{ argument_target_gorilla_subspecies }}.
 
-His chest is as wide as a barrel, his canine teeth are the size of your thumb, and he has the strength of ten adult men.
+On the ground, conservation teams still face stubborn practical obstacles: {{ argument_conservation_challenge_detail }}.
 
-Yet as you crouch down slowly and bow your head to show respect, he doesn't roar or charge. He leans back against a mossy tree trunk, picks a delicate purple flower off a vine to munch on, and looks straight into your eyes with warm, deep brown eyes that hold 98.3% of your own human DNA -- while his two-month-old baby tumbles over his silver back like a furry acrobat!
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
-When primatologist {{ argument_pioneer_primatologist_name }} counted the {{ argument_target_gorilla_subspecies }} of the {{ argument_volcano_range_name }} back in {{ argument_low_point_year }}, there were only {{ argument_lowest_population_count }} individuals left alive -- and she predicted that without urgent action, the subspecies would be 100% extinct before the year 2000.
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
 Today, the {{ argument_target_gorilla_subspecies }} is not extinct. In fact, it is the only great ape on planet Earth whose numbers are actually rising!
 
-How did the {{ argument_target_gorilla_subspecies }} go from a death sentence in {{ argument_low_point_year }} to moving down a threat category on the IUCN Red List from Critically Endangered to Endangered in {{ argument_downlisting_year }}?
+Tracing the ripple effects through the wider ecosystem demonstrates that {{ argument_trophic_impact_analysis }}.
 
 Because the people living around the volcanoes decided to practice what we call "Extreme Conservation."
 
@@ -26,26 +26,28 @@ Habitat clearing and snares: Surrounded by some of the highest rural human popul
 Armed conflict: Civil wars and armed militias swept directly through the forests of {{ argument_park_names_list }}, turning the gorillas' only home into a battleground where over {{ argument_fallen_rangers_count }} courageous park rangers lost their lives protecting the wildlife and their communities.
 Human germs: Because {{ argument_target_gorilla_subspecies }} are so genetically close to us, a common human cold, flu, or measles virus carried into the forest by a tourist, a ranger, or a villager can give a gorilla fatal pneumonia!
 
-To beat those three threats, field rangers and wildlife veterinarians built a safety net unlike anything else in the wild animal kingdom.
+Working alongside local communities has opened up more durable solutions: {{ argument_community_solution_practice }}.
 
-Today, every single habituated {{ argument_target_gorilla_subspecies }} in {{ argument_volcano_range_name }} has a name, a family tree, and a team of field doctors -- the {{ argument_gorilla_vet_project_name }} -- who hike into the mountains every month to give them visual check-ups!
+To frame mountain gorillas, vet doctors in the mist, and conservation during conflict in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
 
 Wait -- you don't medicate a wild gorilla for a natural scratch or an old-age ache; nature still takes its course.
 
-When a baby gorilla gets a man-made wire snare wrapped around its wrist, however, or catches a human-linked respiratory infection that threatens the whole family group, the {{ argument_gorilla_vet_project_name }} team springs into action.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
 Picture how brave you have to be to do a field intervention inside a wild gorilla family:
 
-While the {{ argument_silverback_weight_kg }}-kilogram silverback dad stands five meters away screaming and beating his chest to protect his baby, rangers form a calm human shield -- speaking to the silverback in low, reassuring "belch vocalizations" that mean "We are peaceful, we aren't hurting your child" -- while the vets quickly anesthetize the mother and baby, cut the deadly wire snare off the infant's wrist, give it antibiotics, and wake them both up in the forest in under {{ argument_intervention_minutes }} minutes!
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
-Our long-term population models showed that veterinary snare removals and health care alone accounted for up to {{ argument_vet_contribution_percentage }} of the population's growth over the last thirty years!
+A concrete example from the field brings this reality into sharp focus: {{ argument_local_case_evidence }}.
 
-Even before the rest of the world learned about surgical masks and social distancing in 2020, anyone visiting the {{ argument_target_gorilla_subspecies }} in {{ argument_volcano_range_name }} had to wear a surgical mask, disinfect their boots, and stay {{ argument_safe_viewing_distance_meters }} meters back so human respiratory viruses never jump to our closest cousins.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
 And what changed the minds of the human communities living right outside the park boundary?
 
 In {{ argument_revenue_sharing_country_list }}, governments enacted a historic Tourism Revenue Sharing policy: {{ argument_community_revenue_share_percentage }} of every single gorilla trekking permit fee paid by international visitors goes directly into a community fund for the villages bordering the park -- building {{ argument_community_projects_built_list }}, while former poachers are employed as respected Gorilla Guardians and porters who chase wandering gorillas safely out of farm fields and cut thousands of snares out of the bamboo!
 
-Today, census teams have counted over {{ argument_current_population_count }} {{ argument_target_gorilla_subspecies }} living across their two mountain homes -- more than quadruple the number {{ argument_pioneer_primatologist_name }} feared would be the last.
+Balancing ecological protection with human livelihoods raises difficult tradeoffs: {{ argument_economic_tradeoff_critique }}.
 
 The {{ argument_target_gorilla_subspecies }} is living proof that even in the middle of poverty, disease, and human conflict, when local rangers, doctors, and communities join hands, no species is beyond saving. Thank you.
