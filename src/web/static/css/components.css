@@ -175,3 +175,34 @@ button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1
 /* Script Studio: the Composer's lists (Category, Duration, Show my scripts) open upward, so the arrow points up */
 #screenScriptStudio .csel-btn svg { transform: rotate(180deg); }
 #screenScriptStudio .csel-btn[aria-expanded="true"] svg { transform: none; }
+
+/* Baseline Gate: every phase change (idle, recording, analysing, saved, error) is animated */
+.gate-box .passage, .gate-box .timer, .gate-box .bar i { transition: border-color .35s ease, box-shadow .35s ease, color .35s ease, background-color .35s ease, width .4s cubic-bezier(.2, .7, .3, 1); }
+.gate-box[data-phase="recording"] .passage { border-color: var(--record); box-shadow: 0 0 0 3px color-mix(in srgb, var(--record) 14%, transparent); }
+.gate-box[data-phase="recording"] .timer { color: var(--record); }
+.gate-box[data-phase="analysing"] .timer, .gate-box[data-phase="analysing"] .passage { opacity: .55; transition: opacity .35s ease; }
+.gate-box[data-phase="analysing"] .bar i { background-image: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .55) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.gate-box[data-phase="saved"] .bar i { background-color: var(--ok); }
+.gate-box .actions .btn { transition: opacity .25s ease, transform .25s ease, background-color .25s ease; }
+.gate-box .actions .btn:disabled { transform: scale(.97); }
+.gate-box #baselineGateLogout:not([hidden]) { animation: gateFadeIn .3s ease-out; }
+.gate-spin { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: gateSpin .8s linear infinite; }
+.gate-lbl { display: inline-flex; align-items: center; }
+.gate-swap { animation: gateSwap .28s cubic-bezier(.2, .7, .3, 1); }
+.gate-pop { animation: gatePop .32s cubic-bezier(.2, .7, .3, 1); }
+.gate-shake, body.app-view .mbg.show .box.gate-shake { animation: gateShake .4s ease; }
+.gate-glow { animation: gateGlow 1s ease-out; }
+.gate-in { animation: gateFadeIn .3s ease-out; }
+.gate-box[data-phase="paused"] .timer { color: var(--muted, inherit); }
+@keyframes gateSpin { to { transform: rotate(360deg); } }
+@keyframes gateSwap { from { opacity: 0; transform: translateY(6px); } }
+@keyframes gatePop { from { opacity: 0; transform: scale(.92); } }
+@keyframes gateFadeIn { from { opacity: 0; } }
+@keyframes gateShake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes gateGlow { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } to { box-shadow: 0 0 0 12px transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .gate-box .passage, .gate-box .timer, .gate-box .bar i, .gate-box .actions .btn { transition: none; }
+  .gate-in, .gate-swap, .gate-pop, .gate-shake, body.app-view .mbg.show .box.gate-shake, .gate-glow, .gate-box #baselineGateLogout:not([hidden]) { animation: none; }
+  .gate-box[data-phase="analysing"] .bar i { animation: none; }
+  .gate-spin { animation-duration: 2.4s; }
+}

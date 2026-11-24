@@ -580,17 +580,16 @@
   <div class="actions"><button class="btn" type="button" id="baselineRecorderClose" data-close data-t="common.close"></button></div>
 </div></div>
 
-<div class="mbg" id="baselineGate" role="dialog" aria-modal="true" aria-labelledby="baselineGateTitle" aria-describedby="baselineGateMessage"><div class="box wide">
+<div class="mbg" id="baselineGate" role="dialog" aria-modal="true" aria-labelledby="baselineGateTitle" aria-describedby="baselineGateMessage"><div class="box wide gate-box" id="baselineGateBox" data-phase="idle">
   <h2 id="baselineGateTitle" data-t="gate.title"></h2>
   <p id="baselineGateMessage" data-t="gate.msg"></p>
-  <div class="lbl" id="baselineGateLabel" data-t="gate.passageLabel"></div>
   <p class="passage" id="baselineGatePassage" data-t="gate.passage"></p>
   <div class="timer" id="baselineGateTimer" role="timer" aria-live="off"></div>
   <div class="lvl" id="baselineGateLevel" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="baselineGateBarWrap" data-t-aria="profile.progress"><i id="baselineGateBar"></i></div>
   <div class="row" style="margin-top:12px"><span class="pill" id="baselineGateStatus" role="status"></span></div>
   <p class="note" style="margin-top:12px" data-t="gate.note"></p>
-  <div class="actions"><button class="btn btn-danger" type="button" id="baselineGateLogout" data-t="gate.logout"></button><button class="btn btn-primary" type="button" id="baselineGateAgree"></button></div>
+  <div class="actions"><button class="btn btn-danger" type="button" id="baselineGateLogout" data-t="gate.logout"></button><button class="btn" type="button" id="baselineGatePause" hidden></button><button class="btn btn-primary" type="button" id="baselineGateAgree"></button></div>
 </div></div>
 
 <div class="mbg" id="componentDetail" role="dialog" aria-modal="true" aria-labelledby="mpartTitle"><div class="box wide">

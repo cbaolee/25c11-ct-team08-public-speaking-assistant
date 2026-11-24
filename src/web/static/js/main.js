@@ -24,7 +24,7 @@ import './modals/settings_modal.js';
 import { api, loadAuth } from './api.js';
 import { T, TOPICS, applyText } from './i18n.js';
 import { onAuthSubmit, openAuth, setAuthMode, startSession } from './modals/auth_panel.js';
-import { logout, onGateAgree } from './modals/baseline_gate.js';
+import { logout, onGateAgree, onGatePause } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
 import { openProfileModal, saveConsent, saveProfileModal } from './modals/profile_modal.js';
 import { openSettings, setupSettings } from './modals/settings_modal.js';
@@ -260,6 +260,7 @@ export function init() {
 
   // baseline window (after log in)
   $('#baselineGateAgree').onclick = onGateAgree;
+  $('#baselineGatePause').onclick = onGatePause;
   $('#baselineGateLogout').onclick = () => logout();
 
   // report: hover notes, score details

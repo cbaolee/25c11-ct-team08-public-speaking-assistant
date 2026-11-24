@@ -334,10 +334,9 @@ export const TEXT = {
   gate: {
     title: 'Record your baseline voice',
     msg: 'We compare your pitch and pauses with your own voice. Read the passage below once, in a natural voice. It takes about 30 seconds.',
-    passageLabel: 'Read this passage aloud',
     passage: 'Good morning, everyone, and thank you for joining me today. My name is Alex, and I would like to share a short story about learning to speak with confidence. At first, my voice shook, and my words felt too fast. Slowly, I learned to breathe, to pause, and to look at my audience. Now, each time I speak, I try to be clear, calm, and kind. Thank you for listening.',
     note: 'Your baseline is only used to compare your pitch and pauses. You can record it again in Profile.',
-    agree: 'Agree and continue to record', logout: 'No record and log out', done: 'Continue'
+    start: 'Start recording', retry: 'Record again', analysingBtn: 'Analysing...', logout: 'No record and log out', done: 'Continue'
   },
   tip: {
     wrong: 'Wrong word: heard as a different word. Counts against Accuracy.',

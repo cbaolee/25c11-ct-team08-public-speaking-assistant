@@ -46,23 +46,78 @@ export function postBaseline(rec, cb) {
 /* ---------- baseline window (opens after log in) ---------- */
 export function openBaselineGate() {
   S.baselineGate = { saved: false };
+  $('#baselineGateBox').classList.remove('gate-shake');   // a left-over shake would replace the opening animation
   renderGate();
   openModal('baselineGate', { lock: true, focus: '#baselineGateAgree' });
 }
+/* Phases: idle -> recording (<-> paused) -> analysing -> saved, or back to error (message, record again).
+   Only a phase change (or a new message) redraws the buttons and the status, so the ticks
+   while recording move the timer and bar without restarting the animations. */
+function gatePhase(g, msg) {
+  if (S.grec) return S.grec.paused ? 'paused' : 'recording';
+  if (g.busy) return 'analysing';
+  if (g.saved) return 'saved';
+  return msg ? 'error' : 'idle';
+}
+function replay(el, cls) {   // restart a one-shot CSS animation; the class goes when it ends
+  el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+  const done = e => { if (e.target === el) { el.classList.remove(cls); el.removeEventListener('animationend', done); } };
+  el.addEventListener('animationend', done);
+}
 export function renderGate(sec, msg) {
-  const rec = !!S.grec, g = S.baselineGate || {}, s = sec || 0;
+  const g = S.baselineGate || {}, phase = gatePhase(g, msg);
+  const s = sec === undefined && S.grec ? (g.sec || 0) : (sec || 0);   // pause / resume keep the time
+  g.sec = s;
+  const box = $('#baselineGateBox');
   $('#baselineGateTimer').textContent = fmtTime(s) + T('profile.timerSuffix', { t: fmtTime(CONFIG.BASELINE_SECONDS) });
-  const pct = Math.min(100, Math.round(s / CONFIG.BASELINE_SECONDS * 100));
-  $('#baselineGateBar').style.width = pct + '%'; $('#baselineGateBarWrap').setAttribute('aria-valuenow', String(pct));
-  const ag = $('#baselineGateAgree');
-  ag.innerHTML = rec ? '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('profile.stop')) : esc(T(g.saved ? 'gate.done' : 'gate.agree'));
-  ag.classList.toggle('btn-record', rec); ag.classList.toggle('btn-primary', !rec);
-  $('#baselineGateLogout').hidden = !!g.saved; $('#baselineGateLogout').disabled = rec;
+  const pct = phase === 'saved' ? 100 : Math.min(100, Math.round(s / CONFIG.BASELINE_SECONDS * 100));
+  $('#baselineGateBar').style.width = (phase === 'analysing' ? 100 : pct) + '%';
+  $('#baselineGateBarWrap').setAttribute('aria-valuenow', String(pct));
+  const key = phase + '|' + (msg || '');
+  if (g.drawn === key) return;
+  g.drawn = key;
+  box.dataset.phase = phase;
+
+  const ag = $('#baselineGateAgree'), out = $('#baselineGateLogout'), pz = $('#baselineGatePause');
+  const live = phase === 'recording' || phase === 'paused';
+  const label = {
+    idle: esc(T('gate.start')),
+    error: esc(T('gate.retry')),
+    recording: '<span class="rec-dot" aria-hidden="true"></span>' + esc(T('profile.stop')),
+    paused: esc(T('profile.stop')),
+    analysing: '<span class="gate-spin" aria-hidden="true"></span>' + esc(T('gate.analysingBtn')),
+    saved: esc(T('gate.done'))
+  }[phase];
+  const was = ag.dataset.label;
+  ag.dataset.label = label;
+  if (was !== label) ag.innerHTML = '<span class="gate-lbl">' + label + '</span>';
+  ag.classList.toggle('btn-record', live); ag.classList.toggle('btn-primary', !live);
+  ag.disabled = phase === 'analysing';
+  ag.setAttribute('aria-busy', String(phase === 'analysing'));
+  const pzWas = pz.hidden;
+  pz.hidden = !live;
+  pz.textContent = T(phase === 'paused' ? 'practice.resume' : 'practice.pause');
+  if (pzWas && live) replay(pz, 'gate-in');
+  out.hidden = phase === 'saved';
+  out.disabled = live || phase === 'analysing';
+
   const st = $('#baselineGateStatus');
-  if (rec) { st.className = 'pill'; st.textContent = T('profile.recording'); }
-  else if (msg) { st.className = 'pill warn'; st.textContent = msg; }
-  else if (g.saved) { st.className = 'pill ok'; st.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg><span></span>'; $('span', st).textContent = T('profile.saved', { date: fmtDayLong(S.baseline.ts) }); }
+  if (phase === 'recording') { st.className = 'pill info'; st.textContent = T('profile.recording'); }
+  else if (phase === 'paused') { st.className = 'pill'; st.textContent = T('practice.pausedNote'); }
+  else if (phase === 'analysing') { st.className = 'pill info'; st.textContent = T('profile.analysing'); }
+  else if (phase === 'error') { st.className = 'pill warn'; st.textContent = msg; }
+  else if (phase === 'saved') { st.className = 'pill ok'; st.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg><span></span>'; $('span', st).textContent = T('profile.saved', { date: fmtDayLong(S.baseline.ts) }); }
   else { st.className = 'pill'; st.textContent = T('profile.none'); }
+  if (phase === 'error') { replay(box, 'gate-shake'); return; }   // the shake alone, no fade on top
+  replay(st, 'gate-pop');
+  if (was !== label) replay($('.gate-lbl', ag), 'gate-swap');
+  if (phase === 'saved') replay(ag, 'gate-glow');
+}
+export function onGatePause() {
+  const r = S.grec;
+  if (!r) return;
+  if (r.paused) r.resume(); else r.pause();
+  renderGate();
 }
 export function onGateAgree() {
   if (S.grec) { S.grec.stop(false); return; }
