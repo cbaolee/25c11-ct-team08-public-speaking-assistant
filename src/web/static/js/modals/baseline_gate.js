@@ -146,7 +146,7 @@ export function onGateAgree() {
 }
 export function logout(expired) {
   if (!expired) clearChatHistory(S.user && S.user.id);   // session expiry keeps the chat for the next login
-  if (!expired && S.auth) api('/api/auth/logout', { method: 'POST' }).catch(() => {});   // best effort: revoke on the server
+  if (!expired) api('/api/auth/logout', { method: 'POST' }).catch(() => {});   // revokes the session and deletes the refresh cookie
   storeAuth(null);
   clearFollowWpm(S.user && S.user.id);
   hideTip(); stopPlayback(); resetBaselineAudio();   // no signed URL of this user may survive for the next one

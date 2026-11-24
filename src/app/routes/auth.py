@@ -9,7 +9,7 @@ import re
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -34,7 +34,7 @@ from src.app.config import settings
 from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import ProfileUpsert, StorageError
-from src.app.deps import CurrentUser, get_bearer_token, get_current_user
+from src.app.deps import CurrentUser, get_current_user
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +121,6 @@ class ResetPasswordPayload(OtpEmailPayload):
     new_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
 
 
-class RefreshPayload(BaseModel):
-    refresh_token: str = Field(min_length=1, max_length=4096)
-
-
 class PasswordChangePayload(BaseModel):
     current_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
     new_password: str = Field(max_length=MAX_PASSWORD_LENGTH)
@@ -132,6 +128,66 @@ class PasswordChangePayload(BaseModel):
 
 class DeleteAccountPayload(BaseModel):
     password: str = Field(max_length=MAX_PASSWORD_LENGTH)
+
+
+# Refresh token: only in an HttpOnly cookie that JavaScript cannot read, sent only to
+# /api/auth/* and never by another site (SameSite=Strict). The access token is returned in the
+# body and lives only in the page's memory.
+REFRESH_COOKIE = "psa_refresh"
+REFRESH_COOKIE_PATH = "/api/auth"
+MAX_REFRESH_TOKEN_LENGTH = 4096
+
+
+def _set_refresh_cookie(response: JSONResponse, refresh_token: str) -> None:
+    response.set_cookie(
+        REFRESH_COOKIE,
+        refresh_token,
+        max_age=_auth_config["refresh_cookie_days"] * 24 * 3600,
+        path=REFRESH_COOKIE_PATH,
+        secure=settings.auth_cookie_secure,
+        httponly=True,
+        samesite="strict",
+    )
+
+
+def _clear_refresh_cookie(response: JSONResponse) -> JSONResponse:
+    response.delete_cookie(
+        REFRESH_COOKIE,
+        path=REFRESH_COOKIE_PATH,
+        secure=settings.auth_cookie_secure,
+        httponly=True,
+        samesite="strict",
+    )
+    return response
+
+
+def _session_response(session) -> JSONResponse:
+    """Body `{access_token, expires_in, user_id}`; the refresh token goes in the cookie only."""
+    response = JSONResponse({
+        "access_token": session.access_token,
+        "expires_in": session.expires_in,
+        "user_id": str(session.user_id),
+    })
+    _set_refresh_cookie(response, session.refresh_token)
+    return response
+
+
+def _is_foreign_origin(request: Request) -> bool:
+    """True when the browser says the request comes from another site.
+
+    SameSite=Strict already keeps the cookie off cross-site requests; this second check
+    covers old browsers. A request without `Origin` (not a browser, or a same-origin GET)
+    passes: it cannot carry the cookie from another site anyway.
+    """
+    origin = request.headers.get("origin")
+    if origin is None:
+        return False
+    host = request.headers.get("host", "")
+    return origin.split("://", 1)[-1].rstrip("/") != host
+
+
+def _foreign_origin() -> JSONResponse:
+    return _error(403, "origin_mismatch", "This request must come from the app itself.")
 
 
 def _error(status_code: int, error_code: str, message: str) -> JSONResponse:
@@ -424,12 +480,13 @@ async def reset_password(
         return _rate_limited()
     except AuthUnavailableError:
         return _auth_unavailable()
-    return {"reset": True}
+    # Every session ended, this browser's too: drop its refresh cookie
+    return _clear_refresh_cookie(JSONResponse({"reset": True}))
 
 
 @router.post("/login")
 async def log_in(payload: LoginPayload, auth: Annotated[AuthProvider, Depends(get_auth)]):
-    """Return `{access_token, refresh_token, expires_in, user_id}`; 401 for a wrong login."""
+    """Return `{access_token, expires_in, user_id}` and set the refresh cookie; 401: wrong login."""
     try:
         session = await run_in_threadpool(
             auth.sign_in, _normalize_email(payload.email), payload.password
@@ -444,31 +501,46 @@ async def log_in(payload: LoginPayload, auth: Annotated[AuthProvider, Depends(ge
     except AuthUnavailableError:
         logger.exception("Log in failed at the account service")
         return _auth_unavailable()
-    return session.model_dump(mode="json")
+    return _session_response(session)
 
 
 @router.post("/refresh")
-async def refresh(payload: RefreshPayload, auth: Annotated[AuthProvider, Depends(get_auth)]):
-    """Swap a refresh token for a new session (a refresh token works once)."""
+async def refresh(request: Request, auth: Annotated[AuthProvider, Depends(get_auth)]):
+    """Swap the refresh cookie for a new session and a new cookie (a refresh token works once).
+
+    The page calls this on load (F5) and when the access token expires. No body.
+    """
+    if _is_foreign_origin(request):
+        return _foreign_origin()
+    refresh_token = request.cookies.get(REFRESH_COOKIE, "")
+    ended = _error(401, "invalid_refresh_token", "Your session has ended. Please log in.")
+    if not refresh_token or len(refresh_token) > MAX_REFRESH_TOKEN_LENGTH:
+        return _clear_refresh_cookie(ended) if refresh_token else ended
     try:
-        session = await run_in_threadpool(auth.refresh, payload.refresh_token)
+        session = await run_in_threadpool(auth.refresh, refresh_token)
     except InvalidCredentialsError:
-        return _error(401, "invalid_refresh_token", "Your session has ended. Please log in.")
+        return _clear_refresh_cookie(ended)
     except AuthUnavailableError:
         logger.exception("Refresh failed at the account service")
-        return _auth_unavailable()
-    return session.model_dump(mode="json")
+        return _auth_unavailable()  # the cookie stays: the session may still be valid
+    return _session_response(session)
 
 
 @router.post("/logout")
-async def log_out(
-    _: Annotated[CurrentUser, Depends(get_current_user)],
-    token: Annotated[str, Depends(get_bearer_token)],
-    auth: Annotated[AuthProvider, Depends(get_auth)],
-):
-    """Revoke the current session (best effort); the browser drops its tokens anyway."""
-    await run_in_threadpool(auth.sign_out, token)
-    return {"logged_out": True}
+async def log_out(request: Request, auth: Annotated[AuthProvider, Depends(get_auth)]):
+    """Revoke the session (best effort) and always delete the refresh cookie.
+
+    Works without a valid access token, so an expired page can still log out cleanly.
+    """
+    if _is_foreign_origin(request):
+        return _foreign_origin()
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    if scheme.lower() == "bearer" and token:
+        try:
+            await run_in_threadpool(auth.sign_out, token)
+        except AuthProviderError:
+            logger.warning("Log out: could not revoke the session")
+    return _clear_refresh_cookie(JSONResponse({"logged_out": True}))
 
 
 def _user_key(user_id: UUID) -> str:
@@ -586,4 +658,4 @@ async def delete_account(
         await run_in_threadpool(repos.profiles.delete_profile, user.id)
     except StorageError:
         logger.warning("Delete account: account deleted, profile cleanup failed")
-    return {"deleted": True}
+    return _clear_refresh_cookie(JSONResponse({"deleted": True}))

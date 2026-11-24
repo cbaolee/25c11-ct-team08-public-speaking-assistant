@@ -121,22 +121,28 @@ export function applyProfile(p) {
   S.avatar = p.avatar_url || null;
   applyFollowWpm(p.preferences);
 }
-/* Full-screen loading screen: from the Log in click (or page load with stored tokens) until Home is
-   drawn with everything it needs. Only one loading screen: checking the password is part of it. */
-export function showAppLoader(on) {
+/* Full-screen loading screen ("Loading your practice…"): from a correct log in (or a page load whose
+   refresh cookie still works) until Home is drawn with everything it needs. Checking the password
+   comes before it, under the Busy Overlay ("Logging in…"), so a wrong password never shows it. */
+export function showAppLoader(on, { fadeIn = false } = {}) {
   const el = $('#appLoader');
-  if (on) { el.hidden = false; el.classList.remove('out'); return; }
+  if (on) {
+    const wasHidden = el.hidden;
+    el.hidden = false; el.classList.remove('out');
+    el.classList.toggle('fade-in', fadeIn && wasHidden);   // fade in only when it was not already up
+    return;
+  }
   if (el.hidden) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.hidden = true; return; }
   el.classList.add('out');   // .out lets clicks and scrolling through while it fades
-  setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 400);
+  setTimeout(() => { el.hidden = true; el.classList.remove('out', 'fade-in'); }, 400);
 }
-/* After log in, and on page load when tokens are stored. Everything Home and the first screens show
+/* After log in, and on page load when the refresh cookie gave a new access token. Everything Home and the first screens show
    is loaded first, under the loading screen: the profile, history with the latest full scores, the
    baseline, the saved script list and the web fonts. Only then is the app shown, drawn once, and
    Home slides in. Nothing on Home changes afterwards. The Baseline Gate (if needed) opens after. */
 export function startSession(fresh) {
-  showAppLoader(true);
+  showAppLoader(true, { fadeIn: fresh });   // fresh log in: cross-fade from "Logging in…"
   const fail = msg => {
     showAppLoader(false);
     if (fresh) showErr($('#authError'), msg || T('auth.errServer')); else toast(T('auth.errServer'), true);
@@ -247,11 +253,13 @@ export function finishSignup() {
 export function logIn(email, password) {
   const err = $('#authError');
   setAuthBusy(true);
-  showAppLoader(true);   // the same loading screen stays up until Home is ready
-  fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+  // Step 1, "Logging in…": the account and password are checked. Step 2, the App Loader
+  // ("Loading your practice…"), comes only once they are right (startSession).
+  const checking = fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+  withBusy(checking, T('busy.signingIn'), 0)
     .then(readJson).then(({ ok, j }) => {
       if (!ok) {
-        setAuthBusy(false); showAppLoader(false);
+        setAuthBusy(false);
         const code = j && j.error_code;
         if (code === 'email_not_confirmed') {
           $('#authPassword').value = '';

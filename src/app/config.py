@@ -169,6 +169,9 @@ class Settings(BaseSettings):
     max_compact_sessions: int = Field(default_factory=_from_toml("storage", "max_compact_sessions"))
     signed_url_ttl_s: int = Field(default_factory=_from_toml("storage", "signed_url_ttl_s"))
     baseline_required: bool = True  # no current baseline -> /api/evaluate returns 409
+    # `Secure` flag of the refresh-token cookie. Browsers accept Secure cookies on
+    # http://localhost, so it stays on in dev; turn off only for plain-http hosts in tests.
+    auth_cookie_secure: bool = True
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 

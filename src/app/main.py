@@ -127,6 +127,32 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
 
+# Only the app's own scripts run. Styles allow 'unsafe-inline' for the style="" attributes in
+# index.html. Audio and pictures come from signed Supabase Storage URLs (core and shards).
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https://*.supabase.co",
+    "media-src 'self' blob: https://*.supabase.co",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+])
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """No MIME sniffing and no full URL in Referer on every response; CSP on HTML pages."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "same-origin"
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    return response
+
 
 class RevalidatedStaticFiles(StaticFiles):
     """Static UI files the browser checks again before reuse, so changed CSS/JS is never stale.

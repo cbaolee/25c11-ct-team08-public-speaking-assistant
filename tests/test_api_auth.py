@@ -111,7 +111,7 @@ def test_login_returns_tokens_that_open_the_api(client):
     r = _login(client, email=" ANA@example.com ")
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"access_token", "refresh_token", "expires_in", "user_id"}
+    assert set(body) == {"access_token", "expires_in", "user_id"}  # refresh token: cookie only
     profile = client.get("/api/profile", headers=_bearer(body["access_token"]))
     assert profile.status_code == 200
     assert profile.json()["email"] == "ana@example.com"
@@ -129,17 +129,6 @@ def test_api_without_token_returns_401(client):
         r = client.get(path)
         assert r.status_code == 401, path
         assert r.json() == {"detail": "not_authenticated"}
-
-
-def test_refresh_gives_new_session_and_old_refresh_token_stops_working(client):
-    _signup_and_verify(client)
-    first = _login(client).json()
-    r = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
-    assert r.status_code == 200
-    assert client.get("/api/profile", headers=_bearer(r.json()["access_token"])).status_code == 200
-    again = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
-    assert again.status_code == 401
-    assert again.json()["error_code"] == "invalid_refresh_token"
 
 
 def test_logout_revokes_the_access_token(client):

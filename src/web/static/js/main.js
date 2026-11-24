@@ -21,9 +21,9 @@ import './screens/report.js';
 import './screens/profile.js';
 import './modals/profile_modal.js';
 import './modals/settings_modal.js';
-import { api, loadAuth } from './api.js';
+import { api, dropOldStoredTokens, refreshAuth } from './api.js';
 import { T, TOPICS, applyText } from './i18n.js';
-import { onAuthSubmit, openAuth, setAuthMode, startSession, updateSignupButton } from './modals/auth_panel.js';
+import { onAuthSubmit, openAuth, setAuthMode, showAppLoader, startSession, updateSignupButton } from './modals/auth_panel.js';
 import { openResetStep } from './modals/reset_panel.js';
 import { logout, onGateAgree, onGatePause } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
@@ -305,7 +305,10 @@ export function init() {
   window.addEventListener('scroll', () => { syncHero(); kickFollow(); }, { passive: true });
   if (window.ResizeObserver) new ResizeObserver(syncStage).observe($('#lStage'));
   showView('landing'); renderAccount();
-  S.auth = loadAuth();
-  if (S.auth) startSession(false);
+  // Page load: the refresh cookie (if any) gives a new access token. The loading screen stays up
+  // meanwhile, so the Landing page does not flash before Home.
+  dropOldStoredTokens();
+  showAppLoader(true);
+  refreshAuth().then(ok => { if (ok) startSession(false); else showAppLoader(false); }, () => showAppLoader(false));
 }
 loadConfig().then(init);

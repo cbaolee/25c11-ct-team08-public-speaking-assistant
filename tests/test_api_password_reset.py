@@ -25,7 +25,7 @@ NEW_PASSWORD = "new-password"
 @pytest.fixture
 def client():
     main.app.dependency_overrides.pop(get_current_user, None)
-    return TestClient(main.app)
+    return TestClient(main.app, base_url="https://testserver")  # the refresh cookie is Secure
 
 
 def _auth():
@@ -40,7 +40,7 @@ def _account(client) -> dict:
     client.post("/api/auth/verify-otp", json={"email": EMAIL, "token": TEST_OTP})
     login = client.post("/api/auth/login", json={"email": EMAIL, "password": OLD_PASSWORD})
     assert login.status_code == 200
-    return login.json()
+    return {**login.json(), "refresh_cookie": login.cookies["psa_refresh"]}
 
 
 def _reset(client, token=TEST_OTP, password=NEW_PASSWORD, email=EMAIL):
@@ -66,6 +66,8 @@ def test_code_sets_new_password_and_ends_every_session(client):
     client.post("/api/auth/forgot-password", json={"email": EMAIL})
     response = _reset(client)
     assert response.status_code == 200 and response.json() == {"reset": True}
+    assert "psa_refresh=" in response.headers["set-cookie"]  # this browser's cookie is cleared
+    assert "Max-Age=0" in response.headers["set-cookie"]
 
     old = client.post("/api/auth/login", json={"email": EMAIL, "password": OLD_PASSWORD})
     assert old.status_code == 401
@@ -73,8 +75,10 @@ def test_code_sets_new_password_and_ends_every_session(client):
     assert new.status_code == 200
     headers = {"Authorization": f"Bearer {tokens['access_token']}"}
     assert client.get("/api/profile", headers=headers).status_code == 401
-    refresh = client.post("/api/auth/refresh", json={"refresh_token": tokens["refresh_token"]})
-    assert refresh.status_code == 401
+    stale = TestClient(
+        main.app, base_url="https://testserver", cookies={"psa_refresh": tokens["refresh_cookie"]}
+    )
+    assert stale.post("/api/auth/refresh").status_code == 401  # the old refresh token is revoked
 
 
 def test_code_works_once(client):

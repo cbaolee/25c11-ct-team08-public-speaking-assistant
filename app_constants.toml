@@ -136,6 +136,9 @@ require_email_otp = true
 # Unconfirmed accounts are deleted this long after the last code was sent (ADR-011).
 # Must match the interval in db/migration_main/0009_purge_unconfirmed_accounts.sql.
 unconfirmed_ttl_min = 60
+# Lifetime of the HttpOnly refresh-token cookie (psa_refresh). Each refresh sets it again,
+# so this is how long a browser stays logged in without opening the app.
+refresh_cookie_days = 30
 
 [retry]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.
