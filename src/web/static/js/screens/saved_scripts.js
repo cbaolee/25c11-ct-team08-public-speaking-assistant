@@ -13,10 +13,6 @@ import { $, $$, IC, clearErr, esc, showErr } from '../utils.js';
 
 const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"/></svg>';
 const TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
-/* GeneratedScript.source ("template" / "llm") -> the scripts.source value the API stores. */
-export const SCRIPT_SOURCE = { template: 'generated_template', llm: 'generated_llm' };
-export const SCRIPT_DURATIONS = [5, 10, 15, 20];   // fixed by the scripts.duration_min check in SQL
-
 export function savedScriptLimit() {
   return CONFIG.MAX_SAVED_SCRIPTS;
 }
@@ -38,16 +34,16 @@ export function loadSavedScripts() {
   }).catch(() => {});
 }
 
-/* Meta line shared by the lists and the Practice preview: "5 min · 658 words" (no minutes when unknown). */
-export function scriptMeta(durationMin, wordCount) {
-  return durationMin ? T('saved.meta', { d: durationMin, n: wordCount }) : T('saved.words', { n: wordCount });
+/* Meta line shared by the lists and the Practice preview: "658 words". */
+export function scriptMeta(wordCount) {
+  return T('saved.words', { n: wordCount });
 }
 /* Same card as a script in the Chat Feed: file icon, name, meta; then Edit and Delete icons. */
 function itemHtml(script, selectedId) {
   const on = script.id === selectedId;
   return '<li class="fcard saved-item' + (on ? ' is-on' : '') + '" data-id="' + esc(script.id) + '">' +
     '<button type="button" class="saved-pick" data-act="open"' + (on ? ' aria-current="true"' : '') + '>' + IC.file +
-    '<span class="fc-main"><span class="fc-name">' + esc(script.title) + '</span><span class="note">' + esc(scriptMeta(script.duration_min, script.word_count)) + '</span></span></button>' +
+    '<span class="fc-main"><span class="fc-name">' + esc(script.title) + '</span><span class="note">' + esc(scriptMeta(script.word_count)) + '</span></span></button>' +
     '<button type="button" class="btn btn-ghost iconbtn saved-act" data-act="edit" aria-label="' + esc(T('saved.editAria', { title: script.title })) + '" title="' + esc(T('saved.edit')) + '">' + PENCIL + '</button>' +
     '<button type="button" class="btn btn-ghost iconbtn saved-act saved-del" data-act="delete" aria-label="' + esc(T('saved.deleteAria', { title: script.title })) + '" title="' + esc(T('common.delete')) + '">' + TRASH + '</button>' +
     '</li>';
@@ -121,29 +117,35 @@ function openNotice(title, message) {
   $('#scriptListFullMessage').textContent = message;
   openModal('scriptListFull', { focus: '[data-close]' });
 }
+/* 409 duplicate name or text: its notice. False for any other error. */
+function openDuplicateNotice(j) {
+  const notice = j && window.ScriptDuplicate.duplicateNotice(j.error_code);
+  if (notice) openNotice(T(notice.title), T(notice.message, { title: j.duplicate_title }));
+  return !!notice;
+}
 export function openListFull() {
   openNotice(T('saved.fullTitle'), T('saved.fullMsg', { max: savedScriptLimit() }));
 }
 
-/* Save a script under a name the user picks. `sc`: { title, text, source, topic, duration_min, template_id, models_used, citations }.
-   Resolves with the saved row, or null when nothing was saved (cancelled, list full, error shown). */
-export function saveScriptAs(sc) {
-  if (isSavedListFull()) { openListFull(); return Promise.resolve(null); }
-  return askScriptName(T('saved.saveTitle'), T('common.save'), sc.title).then(name => {
-    const d = +sc.duration_min;
-    return withBusy(api('/api/scripts', { method: 'POST', json: {
-      title: name, body: sc.text, source: SCRIPT_SOURCE[sc.source] || 'written',
-      duration_min: SCRIPT_DURATIONS.indexOf(d) >= 0 ? d : null, topic: sc.title ? sc.title.slice(0, CONFIG.SCRIPT_TITLE_MAX_CHARS) : null,
-      category: sc.topic || null, template_id: sc.template_id || null, models_used: sc.models_used || [], citations: sc.citations || []
-    } }), T('busy.saving')).then(readJson).then(({ ok, status, j }) => {
+/* Save a script to the database. `sc`: { title, cardName?, text }. `askName`: ask for a name first (Own tab,
+   which has no name field); otherwise the script keeps the name it already shows. A duplicate name or text
+   shows its notice and nothing is saved. Resolves with the saved row, or null when nothing was saved. */
+export function saveScriptAs(sc, askName) {
+  if (askName && isSavedListFull()) { openListFull(); return Promise.resolve(null); }
+  const named = askName
+    ? askScriptName(T('saved.saveTitle'), T('common.save'), sc.title)
+    : Promise.resolve((sc.cardName || sc.title || '').slice(0, CONFIG.SCRIPT_TITLE_MAX_CHARS));
+  return named.then(name => {
+    return withBusy(api('/api/scripts', { method: 'POST', json: { title: name, body: sc.text } }), T('busy.saving')).then(readJson).then(({ ok, j }) => {
       if (!ok) {
         const code = j && j.error_code;
         if (code === 'script_limit_reached') { openListFull(); loadSavedScripts(); return null; }
         if (code === 'content_rejected') { openModal('safetyAlert'); return null; }
+        if (openDuplicateNotice(j)) return null;
         toast((j && j.message) || T('eval.errServer'), true);
         return null;
       }
-      toast(T(status === 200 ? 'saved.already' : 'saved.saved', { title: j.title }));
+      toast(T('saved.saved', { title: j.title }));
       loadSavedScripts();
       return j;
     }).catch(() => { toast(T('eval.errNet'), true); return null; });
@@ -156,7 +158,7 @@ export function patchSavedScript(id, patch, errorBox) {
   return withBusy(api('/api/scripts/' + encodeURIComponent(id), { method: 'PATCH', json: patch }), T('busy.saving')).then(readJson).then(({ ok, j }) => {
     if (!ok) {
       if (j && j.error_code === 'content_rejected') openModal('safetyAlert');
-      else if (j && j.error_code === 'script_duplicate') openNotice(T('saved.duplicateTitle'), T('saved.duplicateMsg', { title: j.duplicate_title }));
+      else if (openDuplicateNotice(j)) { /* notice shown */ }
       else showErr(errorBox, (j && j.message) || T('eval.errServer'));
       return null;
     }
@@ -220,8 +222,7 @@ export function openSavedScript(id, edit) {
   closeStudioSavedMenu(false);
   withBusy(api('/api/scripts/' + encodeURIComponent(id)), T('busy.loading')).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) { toast(T('eval.errServer'), true); return; }
-    openReader({ title: s.title, cardName: s.title, text: s.body, citations: s.citations || [], warnings: [], savedId: s.id, fromList: true,
-      topic: s.category || null, duration_min: s.duration_min, source: s.source }, { edit });
+    openReader({ title: s.title, cardName: s.title, text: s.body, citations: [], warnings: [], savedId: s.id, fromList: true }, { edit });
   }).catch(() => toast(T('eval.errNet'), true));
 }
 

@@ -21,10 +21,11 @@ import './screens/report.js';
 import './screens/profile.js';
 import './modals/profile_modal.js';
 import './modals/settings_modal.js';
-import { api, loadAuth } from './api.js';
+import { api, dropOldStoredTokens, refreshAuth } from './api.js';
 import { T, TOPICS, applyText } from './i18n.js';
-import { onAuthSubmit, openAuth, setAuthMode, startSession } from './modals/auth_panel.js';
-import { logout, onGateAgree } from './modals/baseline_gate.js';
+import { onAuthSubmit, openAuth, setAuthMode, showAppLoader, startSession, updateSignupButton } from './modals/auth_panel.js';
+import { openResetStep } from './modals/reset_panel.js';
+import { logout, onGateAgree, onGatePause } from './modals/baseline_gate.js';
 import { openConfirmDialog } from './modals/confirm.js';
 import { openProfileModal, saveConsent, saveProfileModal } from './modals/profile_modal.js';
 import { openSettings, setupSettings } from './modals/settings_modal.js';
@@ -57,6 +58,7 @@ export function loadConfig() {
     const retry = c.retry || {};
     CONFIG.RETRY = { minRatio: retry.sentence_min_error_ratio ?? CONFIG.RETRY.minRatio, wordMax: retry.word_max_seconds ?? CONFIG.RETRY.wordMax, sentenceMax: retry.sentence_max_seconds ?? CONFIG.RETRY.sentenceMax, clipPad: retry.clip_pad_s ?? CONFIG.RETRY.clipPad };
     CONFIG.OWN_MAX_WORDS = c.own_max_words ?? CONFIG.OWN_MAX_WORDS;
+    CONFIG.MAX_AUDIO_SECONDS = c.max_audio_seconds ?? CONFIG.MAX_AUDIO_SECONDS;
     CONFIG.BASELINE_SECONDS = c.baseline_seconds ?? CONFIG.BASELINE_SECONDS;
     CONFIG.BASELINE_MIN_SECONDS = c.baseline_min_seconds ?? CONFIG.BASELINE_MIN_SECONDS;
     CONFIG.SPEAKING_WPM_FOR_ESTIMATE = c.speaking_wpm_for_estimate ?? CONFIG.SPEAKING_WPM_FOR_ESTIMATE;
@@ -150,6 +152,8 @@ export function init() {
   $('#authBack').onclick = () => { setStageAuth(false); $('#lLogin').focus({ preventScroll: true }); };
   $('#authLoginTab').onclick = () => setAuthMode('in'); $('#authSignupTab').onclick = () => setAuthMode('up');
   $('#authForm').addEventListener('submit', onAuthSubmit);
+  ['input', 'change'].forEach(type => $('#authForm').addEventListener(type, updateSignupButton));
+  $('#forgotLink').onclick = openResetStep;
   setupPwEyes();
   setupSelects();
   setupUserMenuHover();
@@ -259,6 +263,7 @@ export function init() {
 
   // baseline window (after log in)
   $('#baselineGateAgree').onclick = onGateAgree;
+  $('#baselineGatePause').onclick = onGatePause;
   $('#baselineGateLogout').onclick = () => logout();
 
   // report: hover notes, score details
@@ -281,15 +286,29 @@ export function init() {
   // modals
   $('#mpSave').onclick = saveProfileModal;
   $('#mpCancel').onclick = () => closeModal('profileModal');
-  $('#mcAllow').onclick = () => { S.consent = true; saveConsent(true); S.onDeny = null; closeModal('consentModal'); toast(T('consent.toastOn')); const cb = S.afterConsent; S.afterConsent = null; if (cb) cb(); };
-  $('#mcDeny').onclick = () => { S.afterConsent = null; const cb = S.onDeny; S.onDeny = null; closeModal('consentModal'); if (cb) cb(); else toast(T('consent.toastDenied')); };
+  // Consent Modal: the locked feature runs only after the server has saved consent_recording = true
+  $('#mcAllow').onclick = () => {
+    const btn = $('#mcAllow');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    saveConsent(true).then(ok => {
+      btn.disabled = false;
+      if (!ok) { toast(T('consent.errSave'), true); return; }
+      S.consent = true; closeModal('consentModal'); toast(T('consent.toastOn'));
+      const cb = S.afterConsent; S.afterConsent = null; if (cb) cb();
+    });
+  };
+  $('#mcDeny').onclick = () => { S.afterConsent = null; closeModal('consentModal'); toast(T('consent.toastDenied')); };
   setupSettings();
 
   window.addEventListener('resize', () => { syncHeader(); syncStage(); moveNavPill(false); moveSegPills(false); moveSegPills(false, $('#lAuth')); });
   window.addEventListener('scroll', () => { syncHero(); kickFollow(); }, { passive: true });
   if (window.ResizeObserver) new ResizeObserver(syncStage).observe($('#lStage'));
   showView('landing'); renderAccount();
-  S.auth = loadAuth();
-  if (S.auth) startSession(false);
+  // Page load: the refresh cookie (if any) gives a new access token. The loading screen stays up
+  // meanwhile, so the Landing page does not flash before Home.
+  dropOldStoredTokens();
+  showAppLoader(true);
+  refreshAuth().then(ok => { if (ok) startSession(false); else showAppLoader(false); }, () => showAppLoader(false));
 }
 loadConfig().then(init);

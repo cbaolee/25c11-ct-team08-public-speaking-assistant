@@ -49,6 +49,8 @@ class ScriptRepo(Protocol):
 
     def find_script_by_hash(self, user_id: UUID, content_hash: str) -> ScriptRow | None: ...
 
+    def find_script_by_title(self, user_id: UUID, title: str) -> ScriptRow | None: ...
+
     def list_scripts(
         self, user_id: UUID, limit: int, cursor: str | None
     ) -> list[ScriptSummary]: ...
@@ -87,6 +89,27 @@ class SessionRepo(Protocol):
 
     def delete_session(self, user_id: UUID, session_id: UUID) -> bool: ...
 
+    # Every session row of the user, for deleting an account. Returns how many were deleted.
+    def delete_user_sessions(self, user_id: UUID) -> int: ...
+
+
+# Which shard project holds a user's sessions and session files (core project, ADR-012).
+class AccountRepo(Protocol):
+    # Shard ref: "core" or a shard project's ref (config.ShardProject.ref).
+    def get_shard(self, user_id: UUID) -> str | None: ...
+
+    # Keeps the shard already stored for the user, so two first requests agree on one shard.
+    def assign_shard(self, user_id: UUID, shard_ref: str) -> str: ...
+
+    # Users per shard ref; shards with no user are missing from the dict.
+    def count_by_shard(self) -> dict[str, int]: ...
+
+
+class RateLimitRepo(Protocol):
+    # Count one hit for (bucket, key) and say whether it is allowed: at most max_hits per
+    # fixed window of window_s seconds. key is a hash, never an email (0011_auth_rate_limits).
+    def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool: ...
+
 
 class AudioStore(Protocol):
     def upload_file(
@@ -104,3 +127,9 @@ class AudioStore(Protocol):
     def delete_files(self, user_id: UUID, bucket: str, paths: list[str]) -> None: ...
 
     def create_signed_url(self, user_id: UUID, bucket: str, path: str, ttl_s: int) -> str: ...
+
+    # Every object under `{user_id}/` in the bucket (all pages), for deleting an account.
+    def list_user_files(self, user_id: UUID, bucket: str) -> list[str]: ...
+
+    # Delete every object under `{user_id}/`, then list again; StorageError unless it is empty.
+    def delete_user_folder(self, user_id: UUID, bucket: str) -> None: ...

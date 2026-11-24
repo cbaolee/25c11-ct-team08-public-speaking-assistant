@@ -1,7 +1,7 @@
 """Tests for the Supabase repositories.
 
 Unit tests at the top run offline. Tests marked `integration` call the real
-psc-dev project and are skipped by default; run them with:
+psc-main project and are skipped by default; run them with:
     uv run pytest -m integration
 They need SUPABASE_URL, SUPABASE_SERVICE_KEY, DEV_USER_ID and DEV2_USER_ID
 (the second test user) in .env, and both users must already have a profiles row.
@@ -16,6 +16,7 @@ import httpx
 import pytest
 from dotenv import dotenv_values
 from PIL import Image
+from postgrest.exceptions import APIError
 
 from src.app import main as app_main
 from src.app.config import max_list_page_size, settings
@@ -25,7 +26,11 @@ from src.app.db.models import (
     NewBaseline,
     NewScript,
     NewSession,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptLimitReachedError,
+    ScriptPatch,
+    ScriptRow,
     StorageError,
     build_avatar_path,
     build_content_hash,
@@ -33,7 +38,9 @@ from src.app.db.models import (
     encode_cursor,
 )
 from src.app.db.supabase_repo import (
+    SupabaseAccountRepo,
     SupabaseBaselineRepo,
+    SupabaseScriptRepo,
     SupabaseSessionRepo,
     _execute,
     _newest_page,
@@ -119,6 +126,118 @@ def test_newest_page_rejects_bad_limit():
         _newest_page(None, max_list_page_size + 1, None)
 
 
+def _chain_client(data):
+    client = MagicMock()
+    query = client.table.return_value
+    for name in ("select", "eq", "limit", "upsert", "delete"):
+        getattr(query, name).return_value = query
+    query.execute.return_value.data = data
+    return client, query
+
+
+def test_assign_shard_inserts_without_overwriting_offline():
+    client, query = _chain_client([{"shard_ref": "bbbb"}])
+    user_id = uuid4()
+    assert SupabaseAccountRepo(client).assign_shard(user_id, "aaaa") == "bbbb"  # stored wins
+    client.table.assert_any_call("accounts")
+    query.upsert.assert_called_once_with(
+        {"user_id": str(user_id), "shard_ref": "aaaa"},
+        on_conflict="user_id",
+        ignore_duplicates=True,
+    )
+
+
+def test_get_shard_without_row_is_none_offline():
+    client, _ = _chain_client([])
+    assert SupabaseAccountRepo(client).get_shard(uuid4()) is None
+
+
+def test_count_by_shard_offline():
+    client, _ = _chain_client([{"shard_ref": "core"}, {"shard_ref": "b"}, {"shard_ref": "b"}])
+    assert SupabaseAccountRepo(client).count_by_shard() == {"core": 1, "b": 2}
+
+
+def test_delete_user_sessions_filters_by_user_offline():
+    client, query = _chain_client([{"id": "a"}, {"id": "b"}])
+    user_id = uuid4()
+    assert SupabaseSessionRepo(client).delete_user_sessions(user_id) == 2
+    query.eq.assert_called_once_with("user_id", str(user_id))
+
+
+def _script_row(user_id: UUID, title: str, body: str) -> ScriptRow:
+    return ScriptRow(
+        id=uuid4(),
+        user_id=user_id,
+        title=title,
+        body=body,
+        content_hash=build_content_hash(body),
+        created_at="2026-11-22T00:00:00+00:00",
+    )
+
+
+def _script(title: str, body: str) -> NewScript:
+    return NewScript(title=title, body=body, content_hash=build_content_hash(body))
+
+
+def _unique_violation_repo(monkeypatch, *, by_hash=None, by_title=None) -> SupabaseScriptRepo:
+    """A script repo whose insert/update hits Postgres 23505; the twin lookups return fixed rows."""
+    client = MagicMock()
+    violation = APIError({"code": "23505", "message": "duplicate key value"})
+    table = client.table.return_value
+    table.insert.return_value.execute.side_effect = violation
+    table.update.return_value.eq.return_value.eq.return_value.execute.side_effect = violation
+    repo = SupabaseScriptRepo(client)
+    monkeypatch.setattr(repo, "find_script_by_hash", lambda user_id, content_hash: by_hash)
+    monkeypatch.setattr(repo, "find_script_by_title", lambda user_id, title: by_title)
+    return repo
+
+
+def test_create_script_unique_violation_on_body_raises_duplicate_body(monkeypatch):
+    owner = uuid4()
+    twin = _script_row(owner, "Old talk", "Same text.")
+    repo = _unique_violation_repo(monkeypatch, by_hash=twin, by_title=twin)
+    with pytest.raises(ScriptDuplicateBodyError) as err:
+        repo.create_script(owner, _script("Old talk", "Same text."))
+    assert err.value.twin.id == twin.id  # both match: the body wins
+
+
+def test_create_script_unique_violation_on_title_raises_duplicate_title(monkeypatch):
+    owner = uuid4()
+    twin = _script_row(owner, "My Talk", "Other text.")
+    repo = _unique_violation_repo(monkeypatch, by_title=twin)
+    with pytest.raises(ScriptDuplicateTitleError) as err:
+        repo.create_script(owner, _script("my talk", "New text."))
+    assert err.value.twin.id == twin.id
+
+
+def test_create_script_unique_violation_without_twin_stays_conflict(monkeypatch):
+    repo = _unique_violation_repo(monkeypatch)
+    with pytest.raises(ConflictError) as err:
+        repo.create_script(uuid4(), _script("A", "B."))
+    assert not isinstance(err.value, (ScriptDuplicateBodyError, ScriptDuplicateTitleError))
+
+
+def test_update_script_unique_violation_maps_to_the_other_script(monkeypatch):
+    owner, script_id = uuid4(), uuid4()
+    other = _script_row(owner, "Taken", "Taken text.")
+    repo = _unique_violation_repo(monkeypatch, by_title=other)
+    with pytest.raises(ScriptDuplicateTitleError):
+        repo.update_script(owner, script_id, ScriptPatch(title="taken"))
+    repo = _unique_violation_repo(monkeypatch, by_hash=other)
+    with pytest.raises(ScriptDuplicateBodyError):
+        patch = ScriptPatch(body="Taken text.", content_hash=other.content_hash)
+        repo.update_script(owner, script_id, patch)
+
+
+def test_update_script_unique_violation_on_itself_stays_conflict(monkeypatch):
+    owner = uuid4()
+    own = _script_row(owner, "Mine", "Mine text.")
+    repo = _unique_violation_repo(monkeypatch, by_title=own)
+    with pytest.raises(ConflictError) as err:
+        repo.update_script(owner, own.id, ScriptPatch(title="Mine"))
+    assert not isinstance(err.value, ScriptDuplicateTitleError)
+
+
 class _FakeRpcClient:
     """Stands in for the Supabase client: records the RPC call, returns fixed data."""
 
@@ -188,7 +307,7 @@ def test_replace_baseline_without_new_row_raises(data):
         SupabaseBaselineRepo(_FakeRpcClient(data)).replace_current_baseline(uuid4(), new)
 
 
-# ---------- integration tests (psc-dev only) ----------
+# ---------- integration tests (psc-main only) ----------
 
 
 def _test_user_id(name: str) -> str:
@@ -339,8 +458,6 @@ def test_script_owner_only_and_find_by_hash(env):
         NewScript(
             title="IT",
             body="Hello there.",
-            word_count=2,
-            source="written",
             content_hash=content_hash,
         ),
     )
@@ -360,8 +477,6 @@ def test_count_scripts_counts_only_own_rows(env):
         NewScript(
             title="IT",
             body="Count me.",
-            word_count=2,
-            source="written",
             content_hash=f"it-{uuid4()}",
         ),
     )
@@ -440,7 +555,7 @@ def test_audio_store_upload_conflict_signed_url_and_delete(env):
         repos.files.download_file(owner, bucket, path)
 
 
-# ---------- avatar and preferences (psc-dev, needs db/migrations/0003) ----------
+# ---------- avatar and preferences (psc-main, needs db/migration_main/0003) ----------
 
 
 @pytest.fixture
@@ -496,15 +611,13 @@ def test_merge_preferences_keeps_other_keys(profile_restore):
     assert repos.profiles.get_profile(owner).preferences["follow_wpm"] == 155
 
 
-# ---------- saved-script cap and list (psc-dev) ----------
+# ---------- saved-script cap and list (psc-main) ----------
 
 
 def _new_script(body: str) -> NewScript:
     return NewScript(
-        title="Integration test script",
+        title=f"Integration test script {uuid4()}",  # titles are unique per user
         body=body,
-        word_count=len(body.split()),
-        source="written",
         content_hash=build_content_hash(body),
     )
 
@@ -523,7 +636,7 @@ def test_list_scripts_returns_more_than_twenty(env):
 
 
 @pytest.mark.integration
-def test_save_script_at_cap_raises_and_duplicate_still_returns(env, monkeypatch):
+def test_save_script_at_cap_raises_and_duplicate_body_wins(env, monkeypatch):
     repos, owner, _, created = env
     first = repos.scripts.create_script(owner, _new_script(f"Cap test {uuid4()}."))
     created["scripts"].append(first.id)
@@ -534,8 +647,9 @@ def test_save_script_at_cap_raises_and_duplicate_still_returns(env, monkeypatch)
         app_main._save_script_row(repos, owner, _new_script(f"New text {uuid4()}."))
     assert (err.value.limit, err.value.count) == (count, count)
 
-    same, created_new = app_main._save_script_row(repos, owner, _new_script(first.body))
-    assert (same.id, created_new) == (first.id, False)  # a duplicate wins even at the cap
+    with pytest.raises(ScriptDuplicateBodyError) as dup:
+        app_main._save_script_row(repos, owner, _new_script(first.body))
+    assert dup.value.twin.id == first.id  # a duplicate is reported even at the cap
 
 
 @pytest.mark.integration

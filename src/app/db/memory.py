@@ -1,5 +1,8 @@
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from threading import RLock
 from typing import Any
 from urllib.parse import quote
 from uuid import UUID, uuid4
@@ -15,6 +18,8 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptPatch,
     ScriptRow,
     ScriptSummary,
@@ -32,9 +37,16 @@ from src.app.db.models import (
 class MemoryState:
     profiles: dict[UUID, ProfileRow] = field(default_factory=dict)
     baselines: dict[UUID, list[BaselineRow]] = field(default_factory=dict)
+    baselines_lock: RLock = field(default_factory=RLock)
     scripts: dict[UUID, ScriptRow] = field(default_factory=dict)
+    scripts_lock: RLock = field(default_factory=RLock)
     sessions: dict[UUID, SessionRow] = field(default_factory=dict)
     files: dict[tuple[str, str], bytes] = field(default_factory=dict)
+    accounts: dict[UUID, str] = field(default_factory=dict)  # user_id -> shard_ref
+    accounts_lock: RLock = field(default_factory=RLock)
+    # (bucket, key) -> (window start, hits), like public.auth_rate_limits
+    rate_limits: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict)
+    rate_limits_lock: RLock = field(default_factory=RLock)
 
 
 def _now() -> datetime:
@@ -146,6 +158,7 @@ class MemoryProfileRepo:
         for session_id, row in list(self._state.sessions.items()):
             if row.user_id == user_id:
                 del self._state.sessions[session_id]
+        self._state.accounts.pop(user_id, None)  # Supabase: accounts cascade from auth.users
         return True
 
 
@@ -163,28 +176,28 @@ class MemoryBaselineRepo:
     def replace_current_baseline(
         self, user_id: UUID, data: NewBaseline
     ) -> tuple[BaselineRow, BaselineRow | None]:
-        if any(row.id == data.id for rows in self._state.baselines.values() for row in rows):
-            raise ConflictError(f"Baseline already exists: {data.id}")
-        existing_rows = self._state.baselines.get(user_id, [])
-        previous = next((row for row in existing_rows if row.is_current), None)
-        new_row = BaselineRow(
-            user_id=user_id,
-            is_current=True,
-            recorded_at=_now(),
-            **data.model_dump(),
-        )
-        updated_rows = [
-            row.model_copy(update={"is_current": False}, deep=True)
-            if row.is_current
-            else row.model_copy(deep=True)
-            for row in existing_rows
-        ]
-        updated_rows.append(new_row.model_copy(deep=True))
-        self._state.baselines[user_id] = updated_rows
-        return (
-            new_row.model_copy(deep=True),
-            previous.model_copy(deep=True) if previous is not None else None,
-        )
+        """Same steps as the SQL function: copy the old row, add the new one, drop the old ones."""
+        with self._state.baselines_lock:
+            if any(row.id == data.id for rows in self._state.baselines.values() for row in rows):
+                raise ConflictError(f"Baseline already exists: {data.id}")
+            existing_rows = self._state.baselines.get(user_id, [])
+            previous = next((row for row in existing_rows if row.is_current), None)
+            previous = previous.model_copy(deep=True) if previous is not None else None
+            new_row = BaselineRow(
+                user_id=user_id,
+                is_current=True,
+                recorded_at=_now(),
+                **data.model_dump(),
+            )
+            self._state.baselines[user_id] = [new_row.model_copy(deep=True)]
+            # sessions.baseline_id is "on delete set null" in the database
+            dropped_ids = {row.id for row in existing_rows}
+            for session_id, session in self._state.sessions.items():
+                if session.baseline_id in dropped_ids:
+                    self._state.sessions[session_id] = session.model_copy(
+                        update={"baseline_id": None}
+                    )
+            return new_row.model_copy(deep=True), previous
 
 
 class MemoryScriptRepo:
@@ -192,14 +205,21 @@ class MemoryScriptRepo:
         self._state = state
 
     def create_script(self, user_id: UUID, data: NewScript) -> ScriptRow:
-        row = ScriptRow(
-            id=uuid4(),
-            user_id=user_id,
-            created_at=_now(),
-            **data.model_dump(),
-        )
-        self._state.scripts[row.id] = row.model_copy(deep=True)
-        return row.model_copy(deep=True)
+        with self._state.scripts_lock:
+            twin = self.find_script_by_hash(user_id, data.content_hash)
+            if twin is not None:
+                raise ScriptDuplicateBodyError(twin)
+            twin = self.find_script_by_title(user_id, data.title)
+            if twin is not None:
+                raise ScriptDuplicateTitleError(twin)
+            row = ScriptRow(
+                id=uuid4(),
+                user_id=user_id,
+                created_at=_now(),
+                **data.model_dump(),
+            )
+            self._state.scripts[row.id] = row.model_copy(deep=True)
+            return row.model_copy(deep=True)
 
     def get_script(self, user_id: UUID, script_id: UUID) -> ScriptRow | None:
         row = self._state.scripts.get(script_id)
@@ -215,22 +235,49 @@ class MemoryScriptRepo:
         )
         return matches[0].model_copy(deep=True) if matches else None
 
+    def find_script_by_title(self, user_id: UUID, title: str) -> ScriptRow | None:
+        normalized = title.strip().lower()
+        matches = _newest_first(
+            row
+            for row in self._state.scripts.values()
+            if row.user_id == user_id and row.title.strip().lower() == normalized
+        )
+        return matches[0].model_copy(deep=True) if matches else None
+
     def list_scripts(self, user_id: UUID, limit: int, cursor: str | None) -> list[ScriptSummary]:
         _validate_limit(limit)
         rows = _newest_first(row for row in self._state.scripts.values() if row.user_id == user_id)
         rows = _after_cursor(rows, cursor)
-        return [ScriptSummary.model_validate(row.model_dump()) for row in rows[:limit]]
+        return [
+            ScriptSummary(
+                id=row.id,
+                title=row.title,
+                word_count=len(row.body.split()),
+                created_at=row.created_at,
+            )
+            for row in rows[:limit]
+        ]
 
     def count_scripts(self, user_id: UUID) -> int:
         return sum(1 for row in self._state.scripts.values() if row.user_id == user_id)
 
     def update_script(self, user_id: UUID, script_id: UUID, patch: ScriptPatch) -> ScriptRow | None:
-        row = self._state.scripts.get(script_id)
-        if row is None or row.user_id != user_id:
-            return None
-        renamed = row.model_copy(update=patch.model_dump(exclude_none=True), deep=True)
-        self._state.scripts[script_id] = renamed
-        return renamed.model_copy(deep=True)
+        with self._state.scripts_lock:
+            row = self._state.scripts.get(script_id)
+            if row is None or row.user_id != user_id:
+                return None
+            values = patch.model_dump(exclude_none=True)
+            if values.get("content_hash"):
+                twin = self.find_script_by_hash(user_id, values["content_hash"])
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateBodyError(twin)
+            if values.get("title"):
+                twin = self.find_script_by_title(user_id, values["title"])
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateTitleError(twin)
+            renamed = row.model_copy(update=values, deep=True)
+            self._state.scripts[script_id] = renamed
+            return renamed.model_copy(deep=True)
 
     def delete_script(self, user_id: UUID, script_id: UUID) -> bool:
         row = self._state.scripts.get(script_id)
@@ -344,6 +391,54 @@ class MemorySessionRepo:
         del self._state.sessions[session_id]
         return True
 
+    def delete_user_sessions(self, user_id: UUID) -> int:
+        ids = [sid for sid, row in self._state.sessions.items() if row.user_id == user_id]
+        for session_id in ids:
+            del self._state.sessions[session_id]
+        return len(ids)
+
+
+class MemoryRateLimitRepo:
+    """Same fixed window as public.hit_rate_limit() (0011), kept in RAM for dev and tests."""
+
+    def __init__(self, state: MemoryState, clock: Callable[[], float] = time.monotonic) -> None:
+        self._state = state
+        self._clock = clock
+
+    def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool:
+        with self._state.rate_limits_lock:
+            now = self._clock()
+            start, hits = self._state.rate_limits.get((bucket, key), (now, 0))
+            if now - start >= window_s:
+                start, hits = now, 0
+            hits += 1
+            self._state.rate_limits[(bucket, key)] = (start, hits)
+            return hits <= max_hits
+
+    def reset(self) -> None:
+        with self._state.rate_limits_lock:
+            self._state.rate_limits.clear()
+
+
+class MemoryAccountRepo:
+    def __init__(self, state: MemoryState) -> None:
+        self._state = state
+
+    def get_shard(self, user_id: UUID) -> str | None:
+        return self._state.accounts.get(user_id)
+
+    def assign_shard(self, user_id: UUID, shard_ref: str) -> str:
+        if not shard_ref:
+            raise ValueError("shard_ref must not be empty")
+        with self._state.accounts_lock:
+            return self._state.accounts.setdefault(user_id, shard_ref)
+
+    def count_by_shard(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for shard_ref in list(self._state.accounts.values()):
+            counts[shard_ref] = counts.get(shard_ref, 0) + 1
+        return counts
+
 
 class MemoryAudioStore:
     def __init__(self, state: MemoryState) -> None:
@@ -402,3 +497,13 @@ class MemoryAudioStore:
         if (bucket, path) not in self._state.files:
             raise StorageError(f"Object not found: {bucket}/{path}")
         return f"memory://{quote(bucket, safe='')}/{quote(path, safe='/')}?ttl={ttl_s}"
+
+    def list_user_files(self, user_id: UUID, bucket: str) -> list[str]:
+        prefix = f"{user_id}/"
+        return sorted(p for b, p in self._state.files if b == bucket and p.startswith(prefix))
+
+    def delete_user_folder(self, user_id: UUID, bucket: str) -> None:
+        for path in self.list_user_files(user_id, bucket):
+            self._state.files.pop((bucket, path), None)
+        if self.list_user_files(user_id, bucket):
+            raise StorageError(f"Folder not empty after delete in bucket {bucket}")

@@ -65,12 +65,14 @@ def test_api_config_returns_web_section():
     data = constants.load_constants()
     assert all(body[key] == value for key, value in data["web"].items())
     assert body["max_saved_scripts"] == config.max_saved_scripts
+    assert body["max_audio_seconds"] == config.max_audio_seconds
     assert body["script_title_max_chars"] == config.script_title_max_chars
     assert body["max_pdf_size_bytes"] == data["script"]["max_pdf_size_bytes"]
     assert body["max_pdf_pages"] == data["script"]["max_pdf_pages"]
     assert body["auth"] == {
-        key: data["auth"][key] for key in ("otp_length", "resend_cooldown_s")
+        key: data["auth"][key] for key in ("otp_length", "resend_cooldown_s", "unconfirmed_ttl_min")
     }
+    assert data["auth"]["unconfirmed_ttl_min"] == 60
     assert body["retention"]["insufficient_days"] == data["retention"]["insufficient_days"] == 7
     assert body["retry"]["sentence_min_error_ratio"] == 0.30
     for key in ("stt_estimate_tau_s", "done_close_delay_ms", "announce_step_pct"):

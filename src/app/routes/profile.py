@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, Field
 
+from src.app.auth import AuthProvider, get_auth
 from src.app.config import avatar_max_bytes, avatar_max_side_px, avatar_size_px, settings
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
@@ -20,6 +21,7 @@ from src.app.db.models import (
     build_avatar_path,
 )
 from src.app.deps import CurrentUser, get_current_user
+from src.app.routes.auth import sync_display_name
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,6 @@ class ProfileUpdatePayload(BaseModel):
     display_name: str | None = Field(default=None, max_length=50)
     age: int | None = Field(default=None, ge=1, le=120)
     gender: str | None = Field(default=None, max_length=50)
-    topics: list[str] | None = Field(default=None, max_length=20)
     consent_recording: bool | None = None
     preferences: UserPreferences | None = None
 
@@ -206,6 +207,7 @@ async def update_profile(
     payload: ProfileUpdatePayload,
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
+    auth: Annotated[AuthProvider, Depends(get_auth)],
 ):
     sent = payload.model_dump(exclude_unset=True)
     if "target_accent" in sent and sent["target_accent"] is None:
@@ -225,4 +227,6 @@ async def update_profile(
         return _unavailable()
     if row is None:
         return _not_found()
+    if sent.get("display_name") and row.display_name:
+        await run_in_threadpool(sync_display_name, auth, user.id, row.display_name)
     return await _to_payload(row, user, repos)

@@ -17,16 +17,17 @@ from src.app.db.models import StorageError
 from src.app.main import app
 
 EMAIL = "again@example.com"
-FIRST = {"email": EMAIL, "password": "password-1", "target_accent": "American"}
+FIRST = {
+    "email": EMAIL, "password": "password-1", "target_accent": "American", "consent_recording": True
+}
 SECOND = {
     "email": EMAIL,
     "password": "password-2",
     "target_accent": "British",
     "display_name": "Bee",
-    "topics": ["it"],
     "consent_recording": True,
 }
-PROFILE_KEYS = ("target_accent", "display_name", "topics", "consent_recording")
+PROFILE_KEYS = ("target_accent", "display_name", "consent_recording")
 SECOND_PROFILE = {key: SECOND[key] for key in PROFILE_KEYS}
 
 
@@ -73,7 +74,6 @@ def test_latest_form_is_saved_after_the_code_is_accepted(client):
     profile = _repos().profiles.get_profile(user_id)
     assert profile.target_accent == "British"
     assert profile.display_name == "Bee"
-    assert profile.topics == ["it"]
     assert profile.consent_recording is True
 
 
@@ -128,3 +128,12 @@ def test_confirmed_account_cannot_be_changed_through_verify(client):
     assert response.status_code == 422 and response.json()["error_code"] == "otp_invalid"
     assert _login(client, FIRST["password"]).status_code == 200
     assert _login(client, "password-evil").status_code == 401
+
+
+def test_code_with_a_form_without_consent_is_rejected_before_the_code_is_used(client):
+    user_id = _sign_up_twice(client)
+    response = _verify(client, profile={**SECOND_PROFILE, "consent_recording": False})
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "consent_required"
+    assert _repos().profiles.get_profile(user_id).target_accent == "American"
+    assert _verify(client, profile=SECOND_PROFILE).status_code == 200  # the code still works

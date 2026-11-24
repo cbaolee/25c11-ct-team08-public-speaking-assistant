@@ -110,6 +110,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); min-height: 28px; 
 .fcard .fc-name { font: 600 16px var(--sans); overflow-wrap: anywhere; }
 .fcard .fc-main .note { font-size: 15px; }
 .fcard .fc-main > span { display: block; }
+/* Script Title can be long (AI-made, emoji, stacked Vietnamese marks): at most 2 lines with an ellipsis, only in the Script Bubble.
+   Explicit line-height because the `font` shorthand above resets it to normal and the clamp would clip the marks. */
+button.fcard-open .fc-main > .fc-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.4; overflow-wrap: anywhere; }
 /* the chat's file card is itself the button that opens the reader */
 button.fcard-open { width: 100%; text-align: left; font: inherit; color: var(--ink); cursor: pointer; transition: border-color .2s, box-shadow .2s; }
 button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
@@ -140,6 +143,17 @@ button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1
 #screenScriptStudio .composer select, #screenScriptStudio .composer .csel-btn { font-size: 15px; }
 #screenScriptStudio .composer .btn { min-height: 44px; }
 #screenScriptStudio .composer .iconbtn { width: 44px; height: 44px; padding: 0; }
+/* Send turns into Regenerate once the chat has a script (script_studio.js toggles .is-regen once; the width is not animated
+   so the text box does not jitter). Arrow icon + label; the label is hidden on narrow screens and the button stays 44px square. */
+#screenScriptStudio .composer .composer-send .ic-regen, #screenScriptStudio .composer .composer-send .lbl-regen { display: none; }
+#screenScriptStudio .composer .composer-send.is-regen .ic-send { display: none; }
+#screenScriptStudio .composer .composer-send.is-regen .ic-regen { display: block; }
+#screenScriptStudio .composer .composer-send.is-regen .lbl-regen { display: inline; white-space: nowrap; }
+#screenScriptStudio .composer .iconbtn.composer-send.is-regen { width: auto; padding: 0 14px; }
+@media (max-width: 560px) {
+  #screenScriptStudio .composer .composer-send.is-regen .lbl-regen { display: none; }
+  #screenScriptStudio .composer .iconbtn.composer-send.is-regen { width: 44px; padding: 0; }
+}
 .fchip { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-pill); padding: 3px 4px 3px 12px; font: 500 14px var(--sans); margin-bottom: 10px; }
 .composer > .row:has(#composerTopic) { padding-right: 36px; }   /* room for the fold arrow at the top right */
 /* Category / Duration row: labels centred on the selects, and the selects a little shorter than the 44px buttons */
@@ -175,3 +189,37 @@ button.fcard-open:hover { border-color: var(--accent); box-shadow: inset 0 0 0 1
 /* Script Studio: the Composer's lists (Category, Duration, Show my scripts) open upward, so the arrow points up */
 #screenScriptStudio .csel-btn svg { transform: rotate(180deg); }
 #screenScriptStudio .csel-btn[aria-expanded="true"] svg { transform: none; }
+
+/* Baseline Gate: every phase change (idle, recording, analysing, saved, error) is animated */
+.gate-box .passage, .gate-box .timer, .gate-box .bar i { transition: border-color .35s ease, box-shadow .35s ease, color .35s ease, background-color .35s ease, width .4s cubic-bezier(.2, .7, .3, 1); }
+.gate-box[data-phase="recording"] .passage { border-color: var(--record); box-shadow: 0 0 0 3px color-mix(in srgb, var(--record) 14%, transparent); }
+.gate-box[data-phase="recording"] .timer { color: var(--record); }
+.gate-box[data-phase="analysing"] .timer, .gate-box[data-phase="analysing"] .passage { opacity: .55; transition: opacity .35s ease; }
+.gate-box[data-phase="analysing"] .bar i { background-image: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, .55) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
+.gate-box[data-phase="saved"] .bar i { background-color: var(--ok); }
+.gate-box .actions .btn { transition: opacity .25s ease, transform .25s ease, background-color .25s ease; }
+.gate-box .actions .btn:disabled { transform: scale(.97); }
+.gate-box #baselineGateLogout:not([hidden]) { animation: gateFadeIn .3s ease-out; }
+.gate-spin { display: inline-block; width: 14px; height: 14px; margin-right: 8px; vertical-align: -2px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: gateSpin .8s linear infinite; }
+.gate-lbl { display: inline-flex; align-items: center; }
+.gate-swap { animation: gateSwap .28s cubic-bezier(.2, .7, .3, 1); }
+.gate-pop { animation: gatePop .32s cubic-bezier(.2, .7, .3, 1); }
+.gate-shake, body.app-view .mbg.show .box.gate-shake { animation: gateShake .4s ease; }
+.gate-glow { animation: gateGlow 1s ease-out; }
+.gate-in { animation: gateFadeIn .3s ease-out; }
+.gate-box[data-phase="paused"] .timer { color: var(--muted, inherit); }
+@keyframes gateSpin { to { transform: rotate(360deg); } }
+@keyframes gateSwap { from { opacity: 0; transform: translateY(6px); } }
+@keyframes gatePop { from { opacity: 0; transform: scale(.92); } }
+@keyframes gateFadeIn { from { opacity: 0; } }
+@keyframes gateShake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+@keyframes gateGlow { from { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent); } to { box-shadow: 0 0 0 12px transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .gate-box .passage, .gate-box .timer, .gate-box .bar i, .gate-box .actions .btn { transition: none; }
+  .gate-in, .gate-swap, .gate-pop, .gate-shake, body.app-view .mbg.show .box.gate-shake, .gate-glow, .gate-box #baselineGateLogout:not([hidden]) { animation: none; }
+  .gate-box[data-phase="analysing"] .bar i { animation: none; }
+  .gate-spin { animation-duration: 2.4s; }
+}
+.settings-pane .forgot-link { display: inline-block; margin-top: 8px; font-size: 14px; }
+#mpCodeResend { margin-right: auto; font-size: 14px; }
+#mpCodeResend:disabled { color: var(--muted); cursor: default; text-decoration: none; font-variant-numeric: tabular-nums; }

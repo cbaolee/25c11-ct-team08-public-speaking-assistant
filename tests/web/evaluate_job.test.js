@@ -17,7 +17,7 @@ function harness(replies) {
     get classList() { const c = this.classes; return { add: (...x) => x.forEach(n => c.add(n)), remove: (...x) => x.forEach(n => c.delete(n)), contains: n => c.has(n), toggle: (n, on) => (on ? c.add(n) : c.delete(n)) }; } });
   const $ = key => { if (!nodes.has(key)) nodes.set(key, node()); return nodes.get(key); };
   const ctx = { S: { audio: { kind: 'file', name: 'a.wav', file: 'audio' } },
-    CONFIG: { EVALUATE_BACKGROUND_AFTER_MS: BACKGROUND_MS, EVAL_COUNT_STEP_MS: COUNT_MS, EVAL_DOCK_HOLD_MS: HOLD_MS, EVAL_JOB: { pollMs: 700, maxWaitS: 300, weights: {}, tauS: 20, closeDelayMs: 400, announcePct: 25 } },
+    CONFIG: { EVALUATE_BACKGROUND_AFTER_MS: BACKGROUND_MS, EVAL_COUNT_STEP_MS: COUNT_MS, EVAL_DOCK_HOLD_MS: HOLD_MS, EVAL_JOB: { pollMs: 700, maxWaitS: 360, weights: {}, tauS: 20, closeDelayMs: 400, announcePct: 25 } },
     EvaluateClient: client, AbortController, Date, encodeURIComponent,
     FormData: class { append() {} }, $, $$: sel => sel.includes('#evBar') ? [$('#evBar'), $('#evDockBar')] : [], T: (x) => x, openModal() {}, closeModal(...args) { closed.push(args); }, toast() {}, openBaselineGate() {}, showEvalError: null,
     openConfirmDialog: (...args) => dialogs.push(args), go: name => screens.push(name), safeRun: fn => fn(),

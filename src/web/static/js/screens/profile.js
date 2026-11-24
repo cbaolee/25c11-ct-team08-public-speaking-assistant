@@ -1,9 +1,9 @@
 import { api, readJson } from '../api.js';
-import { T, TOPICS } from '../i18n.js';
+import { T } from '../i18n.js';
 import { postBaseline } from '../modals/baseline_gate.js';
 import { paintAvatar } from '../nav.js';
 import { practiceLocked } from '../screens/practice.js';
-import { startRecorder } from '../recorder.js';
+import { requireConsent, startRecorder } from '../recorder.js';
 import { CONFIG, RENDER, S } from '../state.js';
 import { closeModal, openModal, toast, withBusy } from '../ui.js';
 import { $, esc, fmtDayLong, fmtTime } from '../utils.js';
@@ -14,7 +14,7 @@ RENDER.profile = function () {
   const p = S.profile || {}, ns = T('profile.rowNotSet');
   const rows = [
     [T('profile.rowName'), S.user.name], [T('profile.rowGender'), p.gender || ns], [T('profile.rowAge'), p.age != null ? p.age : ns],
-    [T('profile.rowAccent'), p.accent || ns], [T('profile.rowTopics'), p.topics && p.topics.length ? p.topics.map(k => TOPICS[k]).join(', ') : ns]
+    [T('profile.rowAccent'), p.accent || ns]
   ];
   $('#pfBaseline').textContent = S.baseline ? T('profile.rowBaselineDone', { date: fmtDayLong(S.baseline.ts) }) : T('profile.none');
   $('#pfSummary').innerHTML = rows.map(r => '<tr><th scope="row">' + esc(r[0]) + '</th><td>' + esc(r[1]) + '</td></tr>').join('');
@@ -68,13 +68,15 @@ export function listenBaseline() {
   }).catch(() => { if (!stale()) fail('profile.errListen'); })
     .finally(() => { if (S.blLoad === tok) { S.blLoad = null; lb.disabled = !!S.brec || !!S.bbusy; } });
 }
-/* Profile > Record again: opens the Baseline Recorder. No consent step here: the account already
-   agreed to recording when it recorded its first baseline in the Baseline Gate. */
+/* Profile > Record again: opens the Baseline Recorder. While recording is off for the account,
+   the Consent Modal opens first (requireConsent). */
 export function openBaselineRecorder() {
   if (S.brec || S.bbusy) return;
-  resetBaselineAudio();
-  renderBaseline(0);
-  openModal('baselineRecorder', { focus: '#profileBaselineStart' });
+  requireConsent(() => {
+    resetBaselineAudio();
+    renderBaseline(0);
+    openModal('baselineRecorder', { focus: '#profileBaselineStart' });
+  });
 }
 export function toggleBaseline() {
   if (S.brec) { S.brec.stop(false); return; }

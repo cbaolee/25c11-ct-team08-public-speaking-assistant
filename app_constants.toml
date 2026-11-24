@@ -33,21 +33,23 @@ max_upload_bytes = 104_857_600
 [audio]
 # Pauses shorter than this are ignored, in seconds
 min_pause_s = 0.35
-# Longest practice recording accepted, in seconds (22 min)
-max_audio_seconds = 1320
+# Longest practice recording accepted, in seconds (32 min)
+max_audio_seconds = 1920
 # Baseline recording accepted only inside [min, max], in seconds
 baseline_min_seconds = 10
 baseline_max_seconds = 60
-# Longest ffmpeg decode before it is stopped, in seconds
-decode_timeout_s = 60
+# Longest ffmpeg decode or Opus encode before it is stopped, in seconds.
+# A 32-minute file takes about 5 s to decode and 24-29 s to encode on a dev laptop.
+decode_timeout_s = 90
 # Extra seconds decoded past max_audio_seconds before the file is cut
 duration_cap_margin_s = 10
-# STT HTTP timeouts, in seconds: time to connect, longest wait between two reads
-stt_connect_timeout_s = 5
+# STT HTTP timeouts, in seconds. The connect timeout is also the longest stall while the
+# audio file is being sent; the read timeout is the longest wait between two reads.
+stt_connect_timeout_s = 30
 stt_read_timeout_s = 120
 
 [script]
-# Practice script limits. 1320 s at 175 WPM is 3850 words; 4000 leaves a small margin.
+# Practice script limits: 4000 words takes 32 minutes at 125 WPM.
 # The character cap stops a few huge "words".
 max_script_words = 4000
 max_script_chars = 40_000
@@ -65,6 +67,9 @@ slot_fill_max_words = 150
 # Template topic suggester: max topics shown (4-5) and min cosine score for a strong match
 topic_suggest_top_k = 5
 topic_suggest_min_score = 0.35
+# Minimum cosine similarity for retrieving document chunks and verifying paragraph citations
+retrieval_min_score = 0.25
+citation_min_support_score = 0.52
 
 [api_keys]
 # How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.
@@ -131,6 +136,12 @@ resend_cooldown_s = 60
 verify_attempts_per_window = 5
 verify_window_s = 600
 require_email_otp = true
+# Unconfirmed accounts are deleted this long after the last code was sent (ADR-011).
+# Must match the interval in db/migration_main/0009_purge_unconfirmed_accounts.sql.
+unconfirmed_ttl_min = 60
+# Lifetime of the HttpOnly refresh-token cookie (psa_refresh). Each refresh sets it again,
+# so this is how long a browser stays logged in without opening the app.
+refresh_cookie_days = 30
 
 [retry]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.
@@ -159,11 +170,14 @@ max_completion_tokens = 1024  # includes reasoning tokens; Cerebras checks quota
 reasoning_effort = "low"      # supported by both Cerebras models in use
 
 [evaluate_job]
-# Provisional values, not yet measured (voice_evaluate_tasks.md 11.1). Calibrate in M7.
+# Measured with a 32-minute recording (two different scripts, 4000-word script) on a dev
+# laptop: Deepgram 138 s (decode 5, VAD 34, STT 54 incl. 24 s Opus encode, align 23,
+# semantic 20), Gladia 118 s, then 29 s of Opus encoding before saving. max_wait_s covers
+# about 170 s plus a Deepgram failure, the coach note and the storage upload.
 job_ttl_s = 900
 max_running_per_user = 1
 poll_interval_ms = 700
-max_wait_s = 300
+max_wait_s = 360  # must equal EVAL_JOB.maxWaitS in state.js
 stt_estimate_tau_s = 20  # client-side estimate inside the stt stage (not measured progress)
 done_close_delay_ms = 400  # pause at 100% before the report opens (0 with reduced motion)
 announce_step_pct = 25   # screen reader hears the percent every N points or on a stage change

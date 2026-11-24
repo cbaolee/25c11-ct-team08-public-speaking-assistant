@@ -3,7 +3,7 @@ import logging
 from uuid import UUID, uuid4
 
 import pytest
-from conftest import TEST_OTP
+from conftest import TEST_OTP, reset_auth_limiters
 from fastapi.testclient import TestClient
 
 from src.app.auth import InvalidCredentialsError, MemoryAuthProvider, SignUpResult, get_auth
@@ -11,10 +11,11 @@ from src.app.db.factory import get_repos
 from src.app.db.models import NewBaseline, NewSession, ProfileUpsert, StorageError
 from src.app.deps import get_current_user
 from src.app.main import app
-from src.app.routes.auth import _resend_limiter, _verify_limiter, reset_auth_limiters
 
 EMAIL = "otp@example.com"
-PAYLOAD = {"email": EMAIL, "password": "password-1", "target_accent": "American"}
+PAYLOAD = {
+    "email": EMAIL, "password": "password-1", "target_accent": "American", "consent_recording": True
+}
 
 
 @pytest.fixture
@@ -52,15 +53,17 @@ def test_verify_limit(client):
 
 def test_resend_and_hash(client):
     client.post("/api/auth/signup", json=PAYLOAD)
-    assert EMAIL not in _resend_limiter._hits
-    assert hashlib.sha256(EMAIL.encode()).hexdigest() in _resend_limiter._hits
+    counters = app.dependency_overrides[get_repos]().rate_limits
+    keys = {key for _bucket, key in counters._state.rate_limits}
+    assert EMAIL not in keys  # only the hash of the email is stored
+    assert hashlib.sha256(EMAIL.encode()).hexdigest() in keys
     assert client.post("/api/auth/resend-otp", json={"email": EMAIL}).status_code == 429
     reset_auth_limiters()
     a = client.post("/api/auth/resend-otp", json={"email": EMAIL})
     assert a.json() == {"sent": True}
     assert client.post("/api/auth/resend-otp", json={"email": EMAIL}).status_code == 429
     assert verify(client).status_code == 200
-    assert EMAIL not in _verify_limiter._hits
+    assert EMAIL not in {key for _bucket, key in counters._state.rate_limits}
     reset_auth_limiters()
     b = client.post("/api/auth/resend-otp", json={"email": EMAIL})
     c = client.post("/api/auth/resend-otp", json={"email": "missing@example.com"})
@@ -111,7 +114,9 @@ def test_signup_failure_preserves_safe_accounts(client, monkeypatch, mode):
 def test_config_and_no_sensitive_logs(client, caplog, monkeypatch):
     caplog.set_level(logging.DEBUG)
     config = client.get("/api/config").json()
-    assert config["auth"] == {"otp_length": 6, "resend_cooldown_s": 60}
+    assert config["auth"] == {
+        "otp_length": 6, "resend_cooldown_s": 60, "unconfirmed_ttl_min": 60
+    }
     from src.app.constants import CONSTANTS
 
     assert all(config[k] == v for k, v in CONSTANTS["web"].items())

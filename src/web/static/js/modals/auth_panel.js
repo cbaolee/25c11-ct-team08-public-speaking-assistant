@@ -1,5 +1,5 @@
 import { AUTH_ERR, EMAIL_RE, MIN_PASSWORD, api, readJson, storeAuth } from '../api.js';
-import { T, TOPICS } from '../i18n.js';
+import { T } from '../i18n.js';
 import { loadBaseline, openBaselineGate } from '../modals/baseline_gate.js';
 import { go, moveNavPill, moveSegPills, renderAccount, showView, slideIn, syncHeader } from '../nav.js';
 import { heroLightsOn } from '../screens/home.js';
@@ -9,7 +9,7 @@ import { loadSavedScripts } from '../screens/saved_scripts.js';
 import { applyFollowWpm } from '../screens/practice.js';
 import { addBubble, fillTopicSelect, renderChatFile, restoreChat } from '../screens/script_studio.js';
 import { CONFIG, RENDER, S } from '../state.js';
-import { openModal, toast, withBusy } from '../ui.js';
+import { toast, withBusy } from '../ui.js';
 import { $, $$, clearErr, esc, showErr } from '../utils.js';
 
 export function fillSignupForm(reset) {
@@ -21,8 +21,22 @@ export function fillSignupForm(reset) {
   $('#signupExtraDisplayName').value = ''; $('#signupExtraDisplayName').removeAttribute('aria-invalid');
   $('#signupExtraAge').value = p.age != null ? p.age : ''; $('#signupExtraAge').removeAttribute('aria-invalid');
   $('#signupExtraAccents').innerHTML = T('pm.accents').map(a => '<label><input type="radio" name="signupExtraAccent" value="' + esc(a) + '"' + (p.accent === a ? ' checked' : '') + '> ' + esc(a) + '</label>').join('');
-  $('#signupExtraTopics').innerHTML = Object.keys(TOPICS).map(k => '<label><input type="checkbox" name="signupExtraTopic" value="' + k + '"' + (p.topics && p.topics.indexOf(k) >= 0 ? ' checked' : '') + '> ' + esc(TOPICS[k]) + '</label>').join('');
-  ['eSuName', 'eSuAge', 'eSuAccent', 'eSuTopics'].forEach(i => $('#' + i).classList.remove('show'));
+  ['eSuName', 'eSuAge', 'eSuAccent'].forEach(i => $('#' + i).classList.remove('show'));
+  $('#signupConsent').checked = false;
+  updateSignupButton();
+}
+/* Sign up: Create account stays off until the form is valid and the recording box is ticked.
+   Called on every input/change in the form (main.js) and when the mode changes. */
+function isSignupFormReady() {
+  const acc = $('input[name=signupExtraAccent]:checked');
+  return window.SignupForm.isSignupReady({
+    email: $('#authEmail').value, password: $('#authPassword').value, password2: $('#authPassword2').value,
+    displayName: $('#signupExtraDisplayName').value, age: $('#signupExtraAge').value,
+    accent: acc ? acc.value : null, consent: $('#signupConsent').checked,
+  }, MIN_PASSWORD);
+}
+export function updateSignupButton() {
+  $('#authSubmit').disabled = !!S.authBusy || (S.authMode === 'up' && !isSignupFormReady());
 }
 /* Log in <-> Sign up on the open panel: the card blurs, shrinks and swipes out, the form changes while it is
    invisible (so the size jump never shows), then it swipes in from the other side. Sign up moves left, log in moves right. */
@@ -31,7 +45,7 @@ export function setAuthMode(mode) {
   const a = $('#lAuth'), calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   /* Log in <-> Sign up: the tab pill slides; fields that leave fade out; the card then grows or shrinks
      (width and height) to its new size while the new fields fade in. Fields shared by both stay put. */
-  const extra = [$('#pass2Wrap'), $('#signupExtra')], btn = $('#authSubmit');
+  const extra = [$('#pass2Wrap'), $('#signupExtra'), $('#signupConsentNote')], btn = $('#authSubmit');
   [a, btn].concat(extra).forEach(el => el.getAnimations().forEach(x => x.cancel()));   // a fast second click starts clean
   authSwipe = null;
   if (mode === S.authMode || !$('#lStage').classList.contains('is-auth') || calm || !a.animate) { applyAuthMode(mode); moveSegPills(false, a); return; }
@@ -65,8 +79,11 @@ export function applyAuthMode(mode) {
   $('#signupExtra').hidden = mode !== 'up';
   $('#pass2Wrap').hidden = mode !== 'up'; $('#authPassword2').value = ''; $('#authPassword2').removeAttribute('aria-invalid');
   $('#lAuth').classList.toggle('signup', mode === 'up');
+  $('#signupConsentNote').hidden = mode !== 'up';
+  $('#forgotLink').hidden = mode !== 'in';
   $('#loginHint').hidden = true;
   clearErr($('#authError'));
+  updateSignupButton();
 }
 export function openAuth(mode) {
   resetOtpStep();
@@ -99,27 +116,33 @@ export function userName(displayName, email) {
 /* GET /api/profile -> S.user / S.profile / S.consent (the profile row is made at sign up). */
 export function applyProfile(p) {
   S.user = { id: p.id, email: p.email, name: userName(p.display_name, p.email) };
-  S.profile = { displayName: p.display_name || null, gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent, topics: p.topics || [] };
+  S.profile = { displayName: p.display_name || null, gender: p.gender || null, age: p.age != null ? p.age : null, accent: p.target_accent };
   S.consent = !!p.consent_recording;
   S.avatar = p.avatar_url || null;
   applyFollowWpm(p.preferences);
 }
-/* Full-screen loading screen: from the Log in click (or page load with stored tokens) until Home is
-   drawn with everything it needs. Only one loading screen: checking the password is part of it. */
-export function showAppLoader(on) {
+/* Full-screen loading screen ("Loading your practice…"): from a correct log in (or a page load whose
+   refresh cookie still works) until Home is drawn with everything it needs. Checking the password
+   comes before it, under the Busy Overlay ("Logging in…"), so a wrong password never shows it. */
+export function showAppLoader(on, { fadeIn = false } = {}) {
   const el = $('#appLoader');
-  if (on) { el.hidden = false; el.classList.remove('out'); return; }
+  if (on) {
+    const wasHidden = el.hidden;
+    el.hidden = false; el.classList.remove('out');
+    el.classList.toggle('fade-in', fadeIn && wasHidden);   // fade in only when it was not already up
+    return;
+  }
   if (el.hidden) return;
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) { el.hidden = true; return; }
   el.classList.add('out');   // .out lets clicks and scrolling through while it fades
-  setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 400);
+  setTimeout(() => { el.hidden = true; el.classList.remove('out', 'fade-in'); }, 400);
 }
-/* After log in, and on page load when tokens are stored. Everything Home and the first screens show
+/* After log in, and on page load when the refresh cookie gave a new access token. Everything Home and the first screens show
    is loaded first, under the loading screen: the profile, history with the latest full scores, the
    baseline, the saved script list and the web fonts. Only then is the app shown, drawn once, and
    Home slides in. Nothing on Home changes afterwards. The Baseline Gate (if needed) opens after. */
 export function startSession(fresh) {
-  showAppLoader(true);
+  showAppLoader(true, { fadeIn: fresh });   // fresh log in: cross-fade from "Logging in…"
   const fail = msg => {
     showAppLoader(false);
     if (fresh) showErr($('#authError'), msg || T('auth.errServer')); else toast(T('auth.errServer'), true);
@@ -161,17 +184,16 @@ export function startSession(fresh) {
 }
 export function readSignupProfile() {
   const name = $('#signupExtraDisplayName').value.trim();
-  const age = $('#signupExtraAge').value.trim(), acc = $('input[name=signupExtraAccent]:checked'), tops = $$('input[name=signupExtraTopic]:checked').map(i => i.value);
+  const age = $('#signupExtraAge').value.trim(), acc = $('input[name=signupExtraAccent]:checked');
   const n = age === '' ? null : Number(age);
   const okAge = n === null || (Number.isInteger(n) && n >= 1 && n <= 120);
   $('#eSuName').classList.toggle('show', !name); $('#signupExtraDisplayName').setAttribute('aria-invalid', String(!name));
   $('#eSuAge').classList.toggle('show', !okAge); $('#signupExtraAge').setAttribute('aria-invalid', String(!okAge));
-  $('#eSuAccent').classList.toggle('show', !acc); $('#eSuTopics').classList.toggle('show', !tops.length);
+  $('#eSuAccent').classList.toggle('show', !acc);
   if (!name) { $('#signupExtraDisplayName').focus(); return null; }
   if (!okAge) { $('#signupExtraAge').focus(); return null; }
   if (!acc) { $('input[name=signupExtraAccent]').focus(); return null; }
-  if (!tops.length) { $('input[name=signupExtraTopic]').focus(); return null; }
-  return { displayName: name, gender: $('#signupExtraGender').value || null, age: n, accent: acc.value, topics: tops };
+  return { displayName: name, gender: $('#signupExtraGender').value || null, age: n, accent: acc.value };
 }
 export function onAuthSubmit(e) {
   e.preventDefault();
@@ -189,25 +211,22 @@ export function onAuthSubmit(e) {
     if (p2 !== p) { showErr(err, T('auth.errMismatch')); $('#authPassword').setAttribute('aria-invalid', 'true'); $('#authPassword2').focus(); return; }
     const prof = readSignupProfile();
     if (!prof) return;
-    // Step 2 of sign up: ask for recording permission. The account is created when the person answers.
+    if (!$('#signupConsent').checked) { showErr(err, T('auth.errConsent')); $('#signupConsent').focus(); return; }
     S.signupDraft = { email: u, password: p, profile: prof };
-    S.consent = false;
-    S.afterConsent = () => finishSignup(true);
-    S.onDeny = () => finishSignup(false);
-    openModal('consentModal', { lock: true, focus: '#mcAllow' });
+    finishSignup();
     return;
   }
   logIn(u, p);
 }
-export function setAuthBusy(on) { S.authBusy = on; $('#authSubmit').disabled = on; }
-/* POST /api/auth/signup: creates the account and its profiles row (with the consent answer). */
-export function finishSignup(consent) {
+export function setAuthBusy(on) { S.authBusy = on; updateSignupButton(); }
+/* POST /api/auth/signup: creates the account and its profiles row. Recording consent is required
+   (the form only sends once the box is ticked; the server answers 422 consent_required otherwise). */
+export function finishSignup() {
   const d = S.signupDraft; S.signupDraft = null;
   if (!d) return;
-  S.consent = false;                  // nobody is logged in yet; the answer is stored on the account
   const err = $('#authError');
   setAuthBusy(true);
-  withBusy(api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: consent } }), T('busy.signingUp'))
+  withBusy(api('/api/auth/signup', { method: 'POST', json: { email: d.email, password: d.password, display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, consent_recording: true } }), T('busy.signingUp'))
     .then(readJson).then(({ ok, j }) => {
       setAuthBusy(false);
       const code = j && j.error_code;
@@ -218,7 +237,7 @@ export function finishSignup(consent) {
       }
       if (j && j.verification_required === true) {
         $('#authPassword').value = ''; $('#authPassword2').value = '';
-        openOtpStep(d.email, { from: 'up', consent, draft: d });   // the form goes with the code: a repeat sign-up keeps its new password
+        openOtpStep(d.email, { from: 'up', draft: d });   // the form goes with the code: a repeat sign-up keeps its new password
         return;
       }
       $('#authPassword').value = ''; $('#authPassword').removeAttribute('aria-invalid'); $('#authEmail').removeAttribute('aria-invalid');
@@ -226,7 +245,7 @@ export function finishSignup(consent) {
       setAuthMode('in');
       $('#authEmail').value = d.email;
       $('#loginHint').textContent = T('auth.hintSignedUp'); $('#loginHint').hidden = false;
-      toast(T(consent ? 'auth.okSignup' : 'auth.okSignupOff'));
+      toast(T('auth.okSignup'));
       $('#authPassword').focus();
     }).catch(() => { setAuthBusy(false); showErr(err, T('auth.errServer')); });
 }
@@ -234,11 +253,13 @@ export function finishSignup(consent) {
 export function logIn(email, password) {
   const err = $('#authError');
   setAuthBusy(true);
-  showAppLoader(true);   // the same loading screen stays up until Home is ready
-  fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
+  // Step 1, "Logging in…": the account and password are checked. Step 2, the App Loader
+  // ("Loading your practice…"), comes only once they are right (startSession).
+  const checking = fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
+  withBusy(checking, T('busy.signingIn'), 0)
     .then(readJson).then(({ ok, j }) => {
       if (!ok) {
-        setAuthBusy(false); showAppLoader(false);
+        setAuthBusy(false);
         const code = j && j.error_code;
         if (code === 'email_not_confirmed') {
           $('#authPassword').value = '';
@@ -258,9 +279,9 @@ export function logIn(email, password) {
 
 const OTP_ERR = { otp_invalid: 'auth.errOtpInvalid', otp_expired: 'auth.errOtpExpired', rate_limited: 'auth.errRateLimited', invalid_email: 'auth.errEmail' };
 let otp = null, otpMotion = null, otpBusy = false, otpInitialized = false;
-const otpConfig = () => ({ otp_length: CONFIG.auth?.otp_length ?? 6, resend_cooldown_s: CONFIG.auth?.resend_cooldown_s ?? 60 });
+const otpConfig = () => ({ otp_length: CONFIG.auth?.otp_length ?? 6, resend_cooldown_s: CONFIG.auth?.resend_cooldown_s ?? 60, unconfirmed_ttl_min: CONFIG.auth?.unconfirmed_ttl_min ?? 60 });
 
-function morphAuthCard(leavingEls, apply, enteringEls) {
+export function morphAuthCard(leavingEls, apply, enteringEls) {
   const a = $('#lAuth');
   otpMotion = null;
   [a, ...leavingEls, ...enteringEls].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
@@ -286,7 +307,8 @@ function resetOtpStep() {
   otp = null; otpMotion = null; otpBusy = false;
   const a = $('#lAuth');
   [a, a.querySelector('.seg'), $('#authForm'), $('#otpStep')].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
-  a.style.overflow = ''; a.querySelector('.seg').hidden = false; $('#authForm').hidden = false; $('#otpStep').hidden = true;
+  [$('#resetStep')].forEach(el => el.getAnimations().forEach(animation => animation.cancel()));
+  a.style.overflow = ''; a.querySelector('.seg').hidden = false; $('#authForm').hidden = false; $('#otpStep').hidden = true; $('#resetStep').hidden = true;
   $('#otpVerify').disabled = false; $('#otpVerify').removeAttribute('aria-busy');
 }
 function updateOtpCountdown() {
@@ -301,12 +323,14 @@ function startOtpCountdown() {
   clearInterval(otp.timer); otp.timer = null; updateOtpCountdown();
   if (otp && window.OtpUtils.cooldownLeft(otp.sentAt, Date.now(), otpConfig().resend_cooldown_s) > 0) otp.timer = setInterval(updateOtpCountdown, 1000);
 }
-function openOtpStep(email, { from, consent, resend, draft }) {
+function openOtpStep(email, { from, resend, draft }) {
   initOtp();
   if (otp) clearInterval(otp.timer);
-  otp = { email, from, consent, draft: draft || null, sentAt: resend ? null : Date.now(), timer: null };
+  otp = { email, from, draft: draft || null, sentAt: resend ? null : Date.now(), timer: null };
   const current = otp, n = otpConfig().otp_length, input = $('#otpCode'), step = $('#otpStep'), a = $('#lAuth');
   $('#otpSentTo').textContent = T(from === 'in' ? 'auth.otpSentLogin' : 'auth.otpSent', { n, email });
+  $('#otpExpiry').textContent = T('auth.otpExpiry', { n: otpConfig().unconfirmed_ttl_min });
+  $('#otpBack').textContent = T(from === 'up' ? 'auth.otpChangeEmail' : 'auth.otpBackLogin');   // purge: ADR-011, SQL 0009
   input.maxLength = n; input.style.setProperty('--otp-len', n); input.value = ''; input.removeAttribute('aria-invalid');
   clearErr($('#otpError')); $('#otpHint').hidden = true; $('#otpHint').textContent = '';
   startOtpCountdown();
@@ -346,7 +370,7 @@ async function submitOtp(e) {
     /* From Sign up the latest form goes with the code (ADR-010 D3, amended): signing up again with an email that is
        not confirmed yet keeps the first password otherwise. The server applies it only after the code is accepted. */
     const body = { email: current.email, token: input.value }, d = current.draft;
-    if (d) Object.assign(body, { password: d.password, profile: { display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, topics: d.profile.topics, consent_recording: current.consent === true } });
+    if (d) Object.assign(body, { password: d.password, profile: { display_name: d.profile.displayName, target_accent: d.profile.accent, age: d.profile.age, gender: d.profile.gender, consent_recording: true } });
     const { ok, j } = await readJson(await withBusy(fetch('/api/auth/verify-otp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), T('busy.verifying')));
     if (otp !== current) return;
     if (ok) {
@@ -355,7 +379,7 @@ async function submitOtp(e) {
       if (otp) return;
       $('#authEmail').value = current.email; $('#authPassword').value = ''; $('#authPassword2').value = '';
       $('#loginHint').textContent = T(j && j.password_updated === false ? 'auth.hintVerifiedOldPassword' : 'auth.hintVerified'); $('#loginHint').hidden = false;
-      toast(T(current.consent === false ? 'auth.okVerifiedOff' : 'auth.okVerified')); $('#authPassword').focus();
+      toast(T('auth.okVerified')); $('#authPassword').focus();
     } else {
       const code = j && j.error_code;
       showErr(error, OTP_ERR[code] ? T(OTP_ERR[code]) : (j && j.message) || T('auth.errServer'));
@@ -376,10 +400,17 @@ function initOtp() {
   });
   $('#otpForm').addEventListener('submit', submitOtp);
   $('#otpResend').addEventListener('click', resendOtp);
+  /* From Sign up: "Wrong email? Change it" goes back to the filled form (passwords too, from the draft)
+     with the email selected. The unconfirmed account of the wrong email is deleted by itself (SQL 0009).
+     From Log in: back to the Log in form. */
   $('#otpBack').addEventListener('click', () => {
     if (!otp || otpBusy) return;
-    const mode = otp.from;
-    $('#authPassword').value = ''; $('#authPassword2').value = '';
-    closeOtpStep(mode).then(() => { if (!otp) $('#authEmail').focus(); });
+    const mode = otp.from, d = otp.draft;
+    $('#authPassword').value = d ? d.password : ''; $('#authPassword2').value = d ? d.password : '';
+    closeOtpStep(mode).then(() => {
+      if (otp) return;
+      updateSignupButton();
+      $('#authEmail').focus(); $('#authEmail').select();
+    });
   });
 }

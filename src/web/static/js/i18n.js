@@ -6,7 +6,7 @@ import { $$ } from './utils.js';
    ===================================================================== */
 export const TEXT = {
   app: { loading: 'Loading your practice…', name: 'Public Speaking Assistant', tagline: 'Read your script aloud. See exactly where to improve.' },
-  busy: { saving: 'Saving…', deleting: 'Deleting…', loading: 'Loading…', signingIn: 'Logging in…', signingUp: 'Creating your account…', verifying: 'Checking the code…' },
+  busy: { saving: 'Saving…', sending: 'Sending the code…', deleting: 'Deleting…', loading: 'Loading…', signingIn: 'Logging in…', signingUp: 'Creating your account…', verifying: 'Checking the code…' },
   common: { skip: 'Skip to content', back: 'Back', cancel: 'Cancel', save: 'Save', close: 'Close', play: 'Play', pause: 'Pause', delete: 'Delete', na: 'N/A' },
   /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
@@ -27,16 +27,19 @@ export const TEXT = {
 
   auth: {
     otpTitle: 'Check your email', otpSent: 'We sent a {n}-digit code to {email}.', otpSentLogin: 'Confirm your email first. We sent a {n}-digit code to {email}.',
-    otpLabel: 'Verification code', otpVerify: 'Verify email', otpResend: 'Resend code', otpResendIn: 'Resend code in {t}', otpResending: 'Sending…', otpResent: 'We sent a new code.', otpBack: 'Use a different email',
+    otpLabel: 'Verification code', otpVerify: 'Verify email', otpResend: 'Resend code', otpResendIn: 'Resend code in {t}', otpResending: 'Sending…', otpResent: 'We sent a new code.', otpChangeEmail: 'Wrong email? Change it', otpBackLogin: 'Back to Log in', otpSpam: 'Not received? Check your spam folder.',
+    otpExpiry: 'If you do not confirm, this account is deleted {n} minutes after the last code we sent.',
     errOtpFormat: 'Enter the {n}-digit code from the email.', errOtpInvalid: "That code doesn't match. Use the latest email, or send a new code.", errOtpExpired: 'This code has expired. Send a new one.', errRateLimited: 'Too many tries. Wait a moment, then try again.',
-    hintVerified: 'Email verified. Log in to continue.', hintVerifiedOldPassword: 'Email verified, but your new password could not be saved. Log in with the password you set first.', okVerified: 'Email verified.', okVerifiedOff: 'Email verified. Recording is off: you can turn it on in Permissions after you log in.',
+    hintVerified: 'Email verified. Log in to continue.', hintVerifiedOldPassword: 'Email verified, but your new password could not be saved. Log in with the password you set first.', okVerified: 'Email verified.',
     tabLogin: 'Log in', tabSignup: 'Sign up', btnLogin: 'Log in', btnSignup: 'Create account',
     username: 'Email', password: 'Password', show: 'Show', hide: 'Hide',
     errEmpty: 'Enter your email and a password.', errEmail: 'Enter a valid email address.',
     errWeak: 'Use a password with at least 8 characters.', errLogin: 'Wrong email or password.',
     errServer: 'Could not reach the account service. Please try again.',
     expired: 'Your session has ended. Please log in again.',
-    okSignup: 'Account created. Please log in.', okSignupOff: 'Account created. Recording is off: you can turn it on in Permissions after you log in.', okLogin: 'Signed in.',
+    okSignup: 'Account created. Please log in.', okLogin: 'Signed in.',
+    consentLabel: 'I agree that the app records my voice to analyse my speaking. Recording is required to use the app.',
+    consentNote: 'You cannot create an account without agreeing to recording.', errConsent: 'Tick the recording box to create an account.',
     errTaken: 'An account with this email already exists. Log in instead.', password2: 'Repeat password', errMismatch: 'The two passwords do not match.', errRepeat: 'Repeat your password.', hintSignedUp: 'Account created. Log in to continue.'
   },
 
@@ -87,8 +90,9 @@ export const TEXT = {
     viewNow: 'View now', viewAria: 'View script: {title}', words: 'words', min: 'min', readerLabel: 'Script text', hasNotes: 'Has notes. Open to read.',
     practice: 'Practise with this script', copy: 'Copy text', download: 'Download', regenerate: 'Regenerate',
     copied: 'Script copied.', copyFail: 'Copy is not available in this browser.', downloadName: 'script.txt',
-    citeNone: 'No source document attached, so this script has no citations. Attach a PDF to get citations.',
-    uncited: 'uncited', uncitedHelp: 'No matching passage was found in your PDF for this paragraph.',
+    citeNone: 'No source document or detailed chat notes attached, so this script has no citations.',
+    citeAllOk: 'Citations show the attached document section or chat note supporting each paragraph.',
+    uncited: 'uncited', uncitedHelp: 'Paragraphs marked "uncited" use general knowledge rather than a specific passage from your attached document or chat notes.',
     checking: 'Checking your request against the content rules...',
     blockedTag: 'Blocked by content rules',
     blockedTitle: 'Cannot generate script based on regulations.',
@@ -96,8 +100,9 @@ export const TEXT = {
     blockedNext: 'Edit your message or material to remove anything unsafe, then send it again.',
     pickTopic: 'Pick the topic that fits best, or write freely without a template.', noTopics: 'No template matched. You can write freely without a template.',
     writeFreely: 'No template — Write freely (AI)', generate: 'Generate Script', thinking: 'Working on it...',
-    sessionFiles: 'Files used in this chat',
-    regenPlaceholder: 'Optional: what to adjust? (Leave blank to rewrite)', regenConfirm: 'Rewrite script'
+    sessionFiles: 'Files used in this chat', placeholderRegen: 'Type what to change, then press Regenerate',
+    regenHint: 'Attach a file to add material. To change the topic, start a New chat.',
+    tryAgain: 'Try again'
   },
   safety: { title: 'This material cannot be used', msg: 'It contains inappropriate or restricted language. Edit your text and try again.', ack: 'Edit my text' },
 
@@ -107,7 +112,7 @@ export const TEXT = {
     tabsLabel: 'Text to read', tabMine: 'My script', tabSample: 'Sample', tabOwn: 'Write my own',
     sheetLabel: 'Text to read aloud',
     makeScript: 'Generate a script',
-    emptySampleT: 'No sample chosen yet.', sampleBtn: 'Show a sample', sampleAnother: 'Show another sample', sampleNote: 'Picked from your topics.',
+    emptySampleT: 'No sample chosen yet.', sampleBtn: 'Show a sample', sampleAnother: 'Show another sample',
     emptyOwnT: 'Type your text in the box, then choose Use this script.',
     ownLabel: 'Your text', ownCounter: '{n} / {max} words', errOwnMax: 'Keep the text to {max} words or fewer.', errOwnEmpty: 'Type some text first.',
     fromScript: 'From Script · {title}', sampleTitle: 'Sample · {title}', ownTitle: 'Your own text',
@@ -142,25 +147,36 @@ export const TEXT = {
     empty: 'No saved scripts yet. Save a script in Script, or write your own and save it.',
     pickOne: 'No script chosen yet. Choose a script on the left to see its text here.', notSaved: 'Not saved',
     saveScript: 'Save script', saveTitle: 'Save script', nameLabel: 'Script name', errNameEmpty: 'Enter a name for the script.',
-    saved: 'Saved as "{title}".', already: 'This script is already in your list as "{title}".',
+    saved: 'Saved as "{title}".',
     nameCount: '{n} / {max} characters', foldList: 'Hide the script list', unfoldList: 'Show the script list',
     edit: 'Edit', editTitle: 'Edit script', editAria: 'Edit {title}', bodyLabel: 'Script text', errBodyEmpty: 'The script text cannot be empty.', edited: 'Script updated.',
-    meta: '{d} min · {n} words',
     deleteAria: 'Delete {title}', deleteTitle: 'Delete this script?', deleteMsg: '"{title}" will be removed from your list. Reports of sessions you practised with it stay.',
     deleted: 'Script deleted.',
-    duplicateTitle: 'This script already exists', duplicateMsg: 'The text you wrote is the same as your saved script "{title}". Change the text, or keep using that script.',
+    dupBodyT: 'This script is already saved', dupBodyMsg: 'Your saved script "{title}" has exactly the same text, so this one was not saved.',
+    dupTitleT: 'This name is already used', dupTitleMsg: 'You already have a saved script named "{title}". Pick another name.',
     fullTitle: 'Your script list is full', fullMsg: 'You can keep up to {max} saved scripts. Delete one before you save another.'
   },
 
+  reset: {
+    forgotLink: 'Forgot password?', forgotCurrent: 'Forgot your current password?',
+    title: 'Reset password', emailSub: 'Enter the email of your account. We will send a code to reset your password.',
+    send: 'Send code', sent: 'If an account uses {email}, we sent it a {n}-digit code.', save: 'Reset password', back: 'Back to Log in',
+    done: 'Password changed. Log in with your new password.',
+    settingsSent: 'We sent a {n}-digit code to {email}.',
+    settingsNote: 'After the reset you are logged out on every device, including this one.',
+    errCode: 'Enter the {n}-digit code from the email.', errNew: 'Enter a new password and repeat it.'
+  },
+
   consent: {
-    title: 'Allow recording?',
-    msg: 'To score your speech we need to record your voice in this browser.',
-    p1: 'Your audio is sent to an external speech-to-text service to get the words and their timing.',
-    p2: 'Pitch and pauses are measured on our server.',
-    p3: 'Recordings are kept in your History until you delete them.',
-    note: 'You can change this any time in Permissions.',
+    title: 'This feature needs recording',
+    locked: 'Recording is turned off for your account, so practice and recording are locked.',
+    msg: 'To score your speech, the app records your voice in this browser.',
+    p1: 'Your audio is sent to a speech-to-text service to get the words and their timing.',
+    p2: 'Pitch and pauses are measured on our server, and the result is saved to your History.',
+    p3: 'You can delete any recording from History, or delete your account in Settings.',
+    note: 'You can turn recording off again any time in Settings > Permissions.',
     deny: 'Not now', allow: 'Allow recording',
-    toastOn: 'Recording allowed.', toastDenied: 'Recording is off. You can turn it on in Permissions.', toastOff: 'Recording turned off.'
+    toastOn: 'Recording allowed.', toastDenied: 'Recording is off. Practice stays locked until you allow it.', toastOff: 'Recording turned off.', errSave: 'Could not turn on recording. Please try again.'
   },
 
   eval: {
@@ -181,7 +197,7 @@ export const TEXT = {
     errScriptTooLong: 'The practice text is too long. Please use a shorter text.',
     errScriptStorage: 'Saved scripts are not available right now. Please try again.',
     errTooLong: 'This recording is longer than the allowed limit. Please choose a shorter one.',
-    errTooLarge: 'This file is too large. Please choose a smaller one.',
+    errTooLarge: 'This file is too large (maximum 100 MB). Please send the recording as MP3 or M4A.',
     errNoStream: 'No audio was found in this file. Please check the file and try again.',
     errFormat: 'This file format is not supported. Please upload an audio-only file.',
     errCorrupt: 'This audio could not be read. It may be damaged; try another file or record again.',
@@ -250,7 +266,7 @@ export const TEXT = {
   profile: {
     title: 'Profile', sub: 'Your details and your 30-second baseline voice.',
     userInfo: 'Your details', editInfo: 'Edit details', changeAvatar: 'Change photo', removeAvatar: 'Remove photo',
-    rowName: 'Name', rowGender: 'Gender', rowAge: 'Age', rowAccent: 'Target accent', rowTopics: 'Script topics', rowBaseline: 'Baseline voice', rowBaselineDone: 'Recorded on {date}', rowNotSet: 'Not set',
+    rowName: 'Name', rowGender: 'Gender', rowAge: 'Age', rowAccent: 'Target accent', rowBaseline: 'Baseline voice', rowBaselineDone: 'Recorded on {date}', rowNotSet: 'Not set',
     baselineTitle: 'Baseline voice', baselineNote: 'Read the passage naturally, as in a normal conversation. Your pitch and pauses are compared with this recording.',
     start: 'Start recording', stop: 'Stop recording', again: 'Record again', recording: 'Recording...',
     saved: 'Baseline saved on {date}', none: 'No baseline yet', tooShort: 'Too short: record at least {n} s',
@@ -268,25 +284,33 @@ export const TEXT = {
   pm: {
     displayName: 'Your name', displayNamePh: 'What should we call you?', errName: 'Enter your name.',
     titleFirst: 'Welcome. Tell us how you want to practise', titleEdit: 'Edit your details',
-    subFirst: 'Choose your accent and topics to continue. Gender and age are optional.',
+    subFirst: 'Choose your accent to continue. Gender and age are optional.',
     subEdit: 'Update your details and press Save.',
     gender: 'Gender', optional: '(optional)', genderPh: 'Prefer not to say', genders: ['Male', 'Female', 'Other'],
     age: 'Age', agePh: 'For example 21',
     accent: 'Target accent', accents: ['American English', 'British English'],
-    topics: 'Script topics', topicsHint: '(choose at least one)',
-    errAge: 'Enter an age between 1 and 120, or leave it empty.', errAccent: 'Choose one accent.', errTopics: 'Choose at least one topic.',
+    errAge: 'Enter an age between 1 and 120, or leave it empty.', errAccent: 'Choose one accent.',
     saved: 'Details saved.', saveErr: 'Could not save your details. Please try again.'
   },
-  pass: { title: 'Change password', sub: 'Choose a new password for your account.', username: 'Email', newPass: 'New password', newPass2: 'Repeat new password', errEmpty: 'Fill in both password fields.', errMismatch: 'The two passwords do not match.', ok: 'Password changed.' },
+  pass: {
+    title: 'Change password', sub: 'Enter your current password, then choose a new one. You stay logged in.', username: 'Email',
+    current: 'Current password', newPass: 'New password', newPass2: 'Repeat new password',
+    errEmpty: 'Fill in all three password fields.', errMismatch: 'The two new passwords do not match.',
+    errSame: 'The new password must be different from the current one.', errWrong: 'The current password is not correct.',
+    errRate: 'Too many attempts. Please wait a few minutes and try again.', ok: 'Password changed.'
+  },
   audio: {
-    title: 'Audio settings', sub: 'Choose your microphone and volume.', mic: 'Microphone',
-    mics: ['Default microphone', 'USB headset microphone', 'Bluetooth microphone'],
-    recVol: 'Recording volume', playVol: 'Playback volume', test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
+    title: 'Audio settings', sub: 'Choose the microphone used for practice, your baseline and the word and sentence coach.', mic: 'Microphone',
+    micDefault: 'Default microphone', micN: 'Microphone {n}',
+    micHint: 'Device names are hidden until you allow the microphone. Press Test microphone to show them.',
+    micGone: 'The chosen microphone was not found. Using the default microphone.',
+    test: 'Test microphone', testing: 'Say a few words...', testOk: 'The microphone is working.', ok: 'Audio settings saved.'
   },
   settings: { title: 'Settings', back: 'Back', permissions: 'Permissions', audio: 'Audio', speed: 'Reading speed', password: 'Change password', delete: 'Delete account' },
   del: {
-    title: 'Delete account', sub: 'This deletes your account, your scripts, your recordings and your baseline. It cannot be undone.',
-    typeEmail: 'Type your email to confirm', confirm: 'Delete my account', mismatch: 'The email does not match your account.',
+    title: 'Delete account', sub: 'This permanently deletes your account with all your recordings, your baseline, your scripts and your practice history. It cannot be undone.',
+    password: 'Enter your current password to confirm', agree: 'Agree',
+    errWrong: 'The password is not correct. Nothing was deleted.', errRate: 'Too many attempts. Please wait a few minutes and try again.',
     failed: 'Your account could not be deleted right now. Please try again later.', done: 'Your account was deleted.'
   },
   speed: {
@@ -295,7 +319,7 @@ export const TEXT = {
     auto: 'Auto speed', autoNote: 'While recording, tap the sentence you have reached: the speed slider adjusts to how fast you read. You can still move it yourself.', wpm: '{n} wpm', reset: 'Use default',
     errOrder: 'The slowest speed must be lower than the fastest speed.', ok: 'Reading speed saved.', err: 'Could not save the reading speed. Please try again.'
   },
-  perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.' },
+  perm: { title: 'Permissions', sub: 'Control recording in this browser.', allow: 'Allow recording', note: 'Needed to record and score your speech.', offWarning: 'Practice and recording are locked until you turn this on again. Your past reports stay available.' },
   overview: {
     title: 'Overview',
     verdict_good: 'A strong take. Keep it this steady.',
@@ -325,10 +349,9 @@ export const TEXT = {
   gate: {
     title: 'Record your baseline voice',
     msg: 'We compare your pitch and pauses with your own voice. Read the passage below once, in a natural voice. It takes about 30 seconds.',
-    passageLabel: 'Read this passage aloud',
     passage: 'Good morning, everyone, and thank you for joining me today. My name is Alex, and I would like to share a short story about learning to speak with confidence. At first, my voice shook, and my words felt too fast. Slowly, I learned to breathe, to pause, and to look at my audience. Now, each time I speak, I try to be clear, calm, and kind. Thank you for listening.',
     note: 'Your baseline is only used to compare your pitch and pauses. You can record it again in Profile.',
-    agree: 'Agree and continue to record', logout: 'No record and log out', done: 'Continue'
+    start: 'Start recording', retry: 'Record again', analysingBtn: 'Analysing...', logout: 'No record and log out', done: 'Continue'
   },
   tip: {
     wrong: 'Wrong word: heard as a different word. Counts against Accuracy.',

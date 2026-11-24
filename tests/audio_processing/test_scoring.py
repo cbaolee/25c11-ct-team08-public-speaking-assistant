@@ -1,6 +1,6 @@
-"""Test cho compute_overall / get_label (scoring_framework.md §3, §11, §12).
+"""Test cho compute_overall / get_label (docs/adr/ADR-003.md §3, §11, §12).
 
-The numbers below are made-up hand-computed examples from scoring_framework.md §12,
+The numbers below are made-up hand-computed examples from docs/adr/ADR-003.md §12,
 not measured from real data.
 
 §12 lists F = 89.17 as a rounded number; the test uses the exact value
@@ -428,7 +428,7 @@ def test_get_label_uses_rounded_value(overall, expected):
 
 
 # ---------- Item 3.6 Phase 3: score_accuracy, score_clarity, accuracy_scores ----------
-# Every number below is hand-computed (scoring_framework.md §12 and made up), not measured.
+# Every number below is hand-computed (docs/adr/ADR-003.md §12 and made up), not measured.
 
 import dataclasses  # noqa: E402
 
@@ -596,7 +596,7 @@ def test_matches_jiwer_when_no_homophone_or_near_miss(ref, hyp):
 
 
 # ---------- Item 3.7 Phase 3: speech_span, WPM, H, filler, compute_fluency ----------
-# Every number below is hand-computed (scoring_framework.md §12 and made up), not measured.
+# Every number below is hand-computed (docs/adr/ADR-003.md §12 and made up), not measured.
 # Import at module level; tests call `scoring.<name>`
 # so a missing function fails with AttributeError.
 

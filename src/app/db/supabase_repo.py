@@ -25,6 +25,8 @@ from src.app.db.models import (
     ProfileRow,
     ProfileUpsert,
     ScorePoint,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptPatch,
     ScriptRow,
     ScriptSummary,
@@ -38,8 +40,10 @@ from src.app.db.models import (
 
 UNIQUE_VIOLATION = "23505"
 MAX_BEYOND_ROWS = 1000
+STORAGE_LIST_PAGE = 100  # objects per Storage list call (and per remove call)
+MAX_STORAGE_LIST_CALLS = 1000  # guard against a listing that never ends
 
-SCRIPT_SUMMARY_COLUMNS = "id,title,topic,source,word_count,duration_min,created_at"
+SCRIPT_SUMMARY_COLUMNS = "id,title,body,created_at"
 # PostgREST JSON paths ("alias:result->section->key") read the chart numbers inside result
 SESSION_SUMMARY_COLUMNS = ",".join(
     [
@@ -125,7 +129,7 @@ class SupabaseProfileRepo:
         return ProfileRow.model_validate(row) if row else None
 
     def merge_preferences(self, user_id: UUID, patch: dict[str, Any]) -> ProfileRow | None:
-        # One SQL statement (db/migrations/0003): keys not in `patch` are kept.
+        # One SQL statement (db/migration_main/0003): keys not in `patch` are kept.
         params = {"p_user_id": str(user_id), "p_patch": patch}
         resp = _execute(self._client.rpc("merge_profile_preferences", params))
         row = _first(resp.data)
@@ -194,7 +198,16 @@ class SupabaseScriptRepo:
 
     def create_script(self, user_id: UUID, data: NewScript) -> ScriptRow:
         values = {**data.model_dump(mode="json"), "user_id": str(user_id)}
-        resp = _execute(self._table().insert(values))
+        try:
+            resp = _execute(self._table().insert(values))
+        except ConflictError as err:
+            twin = self.find_script_by_hash(user_id, data.content_hash)
+            if twin is not None:
+                raise ScriptDuplicateBodyError(twin) from err
+            twin = self.find_script_by_title(user_id, data.title)
+            if twin is not None:
+                raise ScriptDuplicateTitleError(twin) from err
+            raise
         row = _first(resp.data)
         if row is None:
             raise StorageError("Script insert returned no row")
@@ -220,10 +233,32 @@ class SupabaseScriptRepo:
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
 
+    def find_script_by_title(self, user_id: UUID, title: str) -> ScriptRow | None:
+        resp = _execute(
+            self._table()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .order("created_at", desc=True)
+            .order("id", desc=True)
+        )
+        normalized = title.strip().lower()
+        for row in resp.data:
+            if str(row.get("title", "")).strip().lower() == normalized:
+                return ScriptRow.model_validate(row)
+        return None
+
     def list_scripts(self, user_id: UUID, limit: int, cursor: str | None) -> list[ScriptSummary]:
         query = self._table().select(SCRIPT_SUMMARY_COLUMNS).eq("user_id", str(user_id))
         resp = _execute(_newest_page(query, limit, cursor))
-        return [ScriptSummary.model_validate(row) for row in resp.data]
+        return [
+            ScriptSummary(
+                id=row["id"],
+                title=row["title"],
+                word_count=len(row["body"].split()),
+                created_at=row["created_at"],
+            )
+            for row in resp.data
+        ]
 
     def count_scripts(self, user_id: UUID) -> int:
         resp = _execute(
@@ -235,9 +270,20 @@ class SupabaseScriptRepo:
         values = patch.model_dump(exclude_none=True)
         if not values:
             return self.get_script(user_id, script_id)
-        resp = _execute(
-            self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
-        )
+        try:
+            resp = _execute(
+                self._table().update(values).eq("id", str(script_id)).eq("user_id", str(user_id))
+            )
+        except ConflictError as err:
+            if patch.content_hash is not None:
+                twin = self.find_script_by_hash(user_id, patch.content_hash)
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateBodyError(twin) from err
+            if patch.title is not None:
+                twin = self.find_script_by_title(user_id, patch.title)
+                if twin is not None and twin.id != script_id:
+                    raise ScriptDuplicateTitleError(twin) from err
+            raise
         row = _first(resp.data)
         return ScriptRow.model_validate(row) if row else None
 
@@ -358,6 +404,68 @@ class SupabaseSessionRepo:
         )
         return len(resp.data) > 0
 
+    def delete_user_sessions(self, user_id: UUID) -> int:
+        resp = _execute(self._table().delete().eq("user_id", str(user_id)))
+        return len(resp.data or [])
+
+
+class SupabaseRateLimitRepo:
+    """public.hit_rate_limit() on the core project (db/migration_main/0011_auth_rate_limits.sql)."""
+
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool:
+        params = {"p_bucket": bucket, "p_key": key, "p_max": max_hits, "p_window_s": window_s}
+        data = _execute(self._client.rpc("hit_rate_limit", params)).data
+        if isinstance(data, list):  # some client versions wrap a scalar result in a list
+            data = data[0] if data else None
+        if isinstance(data, dict):
+            data = data.get("hit_rate_limit")
+        if not isinstance(data, bool):
+            raise StorageError("hit_rate_limit returned no answer")
+        return data
+
+
+class SupabaseAccountRepo:
+    """public.accounts on the core project (db/migration_main/0010_accounts.sql)."""
+
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    def _table(self):
+        return self._client.table("accounts")
+
+    def get_shard(self, user_id: UUID) -> str | None:
+        resp = _execute(self._table().select("shard_ref").eq("user_id", str(user_id)).limit(1))
+        row = _first(resp.data)
+        return None if row is None else str(row["shard_ref"])
+
+    def assign_shard(self, user_id: UUID, shard_ref: str) -> str:
+        """Insert unless a row exists (`on conflict do nothing`), then read the stored shard."""
+        if not shard_ref:
+            raise ValueError("shard_ref must not be empty")
+        _execute(
+            self._table().upsert(
+                {"user_id": str(user_id), "shard_ref": shard_ref},
+                on_conflict="user_id",
+                ignore_duplicates=True,
+            )
+        )
+        stored = self.get_shard(user_id)
+        if stored is None:
+            raise StorageError("Account insert returned no row")
+        return stored
+
+    def count_by_shard(self) -> dict[str, int]:
+        """One small row per user (100 users at most, ADR-012), so the count is done here."""
+        resp = _execute(self._table().select("shard_ref"))
+        counts: dict[str, int] = {}
+        for row in resp.data or []:
+            shard_ref = str(row["shard_ref"])
+            counts[shard_ref] = counts.get(shard_ref, 0) + 1
+        return counts
+
 
 def _validate_object_path(user_id: UUID, path: str) -> None:
     """Allow only paths made by build_object_path inside the user's own folder."""
@@ -442,3 +550,54 @@ class SupabaseAudioStore:
         if not url:
             raise StorageError(f"Object not found: {bucket}/{path}")
         return url
+
+    def list_user_files(self, user_id: UUID, bucket: str) -> list[str]:
+        """All object paths under `{user_id}/`, page by page (Storage returns `limit` per call).
+
+        A listing returns files (with an id) and sub-folders (id is null); sub-folders are
+        listed too, so nothing is missed even though our own paths are flat.
+        """
+        root = str(user_id)
+        folders, paths, calls = [root], [], 0
+        while folders:
+            folder, offset = folders.pop(), 0
+            while True:
+                calls += 1
+                if calls > MAX_STORAGE_LIST_CALLS:
+                    raise StorageError(f"Listing did not end in bucket {bucket}")
+                options = {
+                    "limit": STORAGE_LIST_PAGE,
+                    "offset": offset,
+                    "sortBy": {"column": "name", "order": "asc"},
+                }
+                try:
+                    page = self._bucket(bucket).list(folder, options)
+                except Exception as err:
+                    raise StorageError(f"List failed in bucket {bucket}") from err
+                for entry in page or []:
+                    name = entry.get("name") if isinstance(entry, dict) else None
+                    if not name or "/" in name or name in {".", ".."}:
+                        continue
+                    child = f"{folder}/{name}"
+                    (paths if entry.get("id") is not None else folders).append(child)
+                if len(page or []) < STORAGE_LIST_PAGE:
+                    break
+                offset += STORAGE_LIST_PAGE
+        return sorted(paths)
+
+    def delete_user_folder(self, user_id: UUID, bucket: str) -> None:
+        """Delete the whole `{user_id}/` folder in batches, then check it is empty.
+
+        Idempotent: running it again after a failure deletes what is left.
+        """
+        paths = self.list_user_files(user_id, bucket)
+        prefix = f"{user_id}/"
+        if any(not p.startswith(prefix) for p in paths):
+            raise StorageError("Object path must be scoped to the current user")
+        for start in range(0, len(paths), STORAGE_LIST_PAGE):
+            try:
+                self._bucket(bucket).remove(paths[start : start + STORAGE_LIST_PAGE])
+            except Exception as err:
+                raise StorageError(f"Delete failed in bucket {bucket}") from err
+        if self.list_user_files(user_id, bucket):
+            raise StorageError(f"Folder not empty after delete in bucket {bucket}")

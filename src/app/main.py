@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import (
+    max_audio_seconds,
     max_list_page_size,
     max_request_bytes,
     max_saved_scripts,
@@ -44,11 +45,11 @@ from src.app.db.factory import Repos, get_repos
 from src.app.db.models import (
     NewScript,
     NewSession,
-    ScriptDuration,
+    ScriptDuplicateBodyError,
+    ScriptDuplicateTitleError,
     ScriptLimitReachedError,
     ScriptPatch,
     ScriptRow,
-    ScriptSource,
     SessionRow,
     StorageError,
     build_content_hash,
@@ -61,7 +62,12 @@ from src.app.db.session_helpers import (
     merge_series,
     split_series,
 )
-from src.app.deps import CurrentUser, get_current_user
+from src.app.deps import (
+    CurrentUser,
+    RecordingConsentRequiredError,
+    get_current_user,
+    require_recording_consent,
+)
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
@@ -121,6 +127,32 @@ async def lifespan(_: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.add_middleware(BodySizeLimitMiddleware, max_bytes=max_request_bytes)
 
+# Only the app's own scripts run. Styles allow 'unsafe-inline' for the style="" attributes in
+# index.html. Audio and pictures come from signed Supabase Storage URLs (core and shards).
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https://*.supabase.co",
+    "media-src 'self' blob: https://*.supabase.co",
+    "connect-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+])
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    """No MIME sniffing and no full URL in Referer on every response; CSP on HTML pages."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "same-origin"
+    if response.headers.get("content-type", "").startswith("text/html"):
+        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+    return response
+
 
 class RevalidatedStaticFiles(StaticFiles):
     """Static UI files the browser checks again before reuse, so changed CSS/JS is never stale.
@@ -161,21 +193,8 @@ def get_script_pipeline() -> ScriptGenerationPipeline:
 
 
 class SaveScriptPayload(BaseModel):
-    """Request body for `POST /api/scripts`; values match the `scripts` table.
-
-    `source`: `generated_template` / `generated_llm` for Script Pipeline output (its
-    `GeneratedScript.source` "template" / "llm"), `written` for text the user typed.
-    """
-
     title: str = Field(default="Untitled Script", max_length=script_title_max_chars)
     body: str
-    source: ScriptSource
-    duration_min: ScriptDuration | None = None
-    topic: str | None = Field(default=None, max_length=200)
-    category: str | None = Field(default=None, max_length=100)
-    template_id: str | None = Field(default=None, max_length=200)
-    models_used: list[str] = Field(default_factory=list, max_length=10)
-    citations: list[dict] = Field(default_factory=list, max_length=500)
 
 
 @app.get("/health")
@@ -189,10 +208,13 @@ async def web_config() -> dict[str, Any]:
     return {
         **CONSTANTS["web"],
         "max_saved_scripts": max_saved_scripts,
+        "max_audio_seconds": max_audio_seconds,
         "script_title_max_chars": script_title_max_chars,
         "max_pdf_size_bytes": CONSTANTS["script"]["max_pdf_size_bytes"],
         "max_pdf_pages": CONSTANTS["script"]["max_pdf_pages"],
-        "auth": {key: CONSTANTS["auth"][key] for key in ("otp_length", "resend_cooldown_s")},
+        "auth": {key: CONSTANTS["auth"][key] for key in (
+            "otp_length", "resend_cooldown_s", "unconfirmed_ttl_min"
+        )},
         "retry": {key: CONSTANTS["retry"][key] for key in (
             "sentence_min_error_ratio", "word_max_seconds", "sentence_max_seconds", "clip_pad_s"
         )},
@@ -214,6 +236,18 @@ async def index(request: Request):
 async def audio_rejected_handler(request: Request, exc: AudioRejected):
     """422 `{error_code, message}` when probe or decode refuses the audio file."""
     return JSONResponse(status_code=422, content={"error_code": exc.code, "message": exc.message})
+
+
+@app.exception_handler(RecordingConsentRequiredError)
+async def recording_consent_handler(request: Request, exc: RecordingConsentRequiredError):
+    """403 while the user has recording turned off (Settings > Permissions)."""
+    return JSONResponse(
+        status_code=403,
+        content={
+            "error_code": "consent_required",
+            "message": "Turn on recording in Settings to use this feature.",
+        },
+    )
 
 
 @app.exception_handler(SttUnavailable)
@@ -532,7 +566,7 @@ def _load_profile_accent(repos: Repos, user_id: UUID) -> str | None:
 
 @app.post("/api/evaluate")
 async def evaluate_endpoint(
-    user: Annotated[CurrentUser, Depends(get_current_user)],
+    user: Annotated[CurrentUser, Depends(require_recording_consent)],
     repos: Annotated[Repos, Depends(get_repos)],
     audio: Annotated[UploadFile, File()],
     script: Annotated[str, Form()],
@@ -584,7 +618,7 @@ async def evaluate_endpoint(
                     "message": "The selected script no longer exists.",
                 },
             )
-    session_topic = topic.strip()[:MAX_TOPIC_CHARS] or (script_row.topic if script_row else None)
+    session_topic = topic.strip()[:MAX_TOPIC_CHARS] or (script_row.title if script_row else None)
 
     # Default VAD settings
     vad_params = VadParams()
@@ -734,7 +768,7 @@ async def generate_script_endpoint(
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
             pdf_path = tmp_file.name
         await run_in_threadpool(
-            save_upload_limited, pdf, Path(pdf_path), max_bytes=max_upload_bytes
+            save_upload_limited, pdf, Path(pdf_path), max_bytes=max_upload_bytes, audio=False
         )
 
     clean_topic = topic.strip()
@@ -838,6 +872,9 @@ async def script_chat_suggest_endpoint(
 
     if file_chunks:
         session.files_loaded.append(filename)
+        id_offset = len(session.chunks)
+        for idx, chunk in enumerate(file_chunks, start=1):
+            chunk.chunk_id = id_offset + idx
         session.chunks.extend(file_chunks)
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:
@@ -1005,6 +1042,9 @@ async def script_chat_message_endpoint(
         session.user_notes.append(clean_msg)
     if file_chunks:
         session.files_loaded.append(file.filename)
+        id_offset = len(session.chunks)
+        for idx, chunk in enumerate(file_chunks, start=1):
+            chunk.chunk_id = id_offset + idx
         session.chunks.extend(file_chunks)
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:
@@ -1095,14 +1135,35 @@ def _script_not_found() -> JSONResponse:
 
 
 def _script_payload(row: ScriptRow) -> dict[str, Any]:
-    return row.model_dump(mode="json", exclude={"user_id", "content_hash"})
+    payload = row.model_dump(mode="json", exclude={"user_id", "content_hash"})
+    payload["word_count"] = len(row.body.split())
+    return payload
+
+
+def _script_duplicate(code: str, twin: ScriptRow) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error_code": code,
+            "message": (
+                f'This text is the same as your saved script "{twin.title}".'
+                if code == "script_duplicate_body"
+                else f'You already have a saved script named "{twin.title}".'
+            ),
+            "duplicate_id": str(twin.id),
+            "duplicate_title": twin.title,
+        },
+    )
 
 
 def _save_script_row(repos: Repos, user_id: UUID, data: NewScript) -> tuple[ScriptRow, bool]:
-    """Return (row, created). The same text saved again returns the existing row."""
-    existing = repos.scripts.find_script_by_hash(user_id, data.content_hash)
-    if existing is not None:
-        return existing, False
+    """Return (row, created), rejecting duplicate body/title in deterministic order."""
+    twin = repos.scripts.find_script_by_hash(user_id, data.content_hash)
+    if twin is not None:
+        raise ScriptDuplicateBodyError(twin)
+    twin = repos.scripts.find_script_by_title(user_id, data.title)
+    if twin is not None:
+        raise ScriptDuplicateTitleError(twin)
     count = repos.scripts.count_scripts(user_id)
     if count >= max_saved_scripts:
         raise ScriptLimitReachedError(limit=max_saved_scripts, count=count)
@@ -1116,43 +1177,32 @@ async def create_saved_script_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     repos: Annotated[Repos, Depends(get_repos)],
 ) -> Any:
-    """Save a generated or user-written script after Stage 4 moderation.
-
-    201 for a new script; 200 when identical text is already saved; 409 at the per-user cap.
-    """
+    """Save a script after Stage 4 moderation."""
     clean_title = sanitize_text(payload.title).strip() or "Untitled Script"
     clean_body = sanitize_text(payload.body).strip()
     body_error = _validate_script(clean_body)
     if body_error is not None:
         return body_error
-    # User-written scripts go through full Layer 1 + Layer 2 moderation.
-    # Pipeline-generated scripts already passed Stage 4 input moderation; running Layer 2
-    # again on long AI-generated prose causes frequent false positives in llama-guard3:1b.
+    # Only Layer 1 runs here; this is the explicit saved-script moderation contract.
     get_script_pipeline().moderator.assert_safe(
         f"{clean_title}\n{clean_body}",
         user_id=str(user.id),
-        use_layer2=(payload.source == "written"),
+        use_layer2=False,
     )
     data = NewScript(
         title=clean_title,
         body=clean_body,
-        word_count=len(clean_body.split()),
-        source=payload.source,
         content_hash=build_content_hash(clean_body),
-        topic=payload.topic,
-        category=payload.category,
-        duration_min=payload.duration_min,
-        citations=payload.citations,
-        template_id=payload.template_id,
-        models_used=payload.models_used,
     )
     try:
         row, created = await run_in_threadpool(_save_script_row, repos, user.id, data)
+    except ScriptDuplicateBodyError as err:
+        return _script_duplicate("script_duplicate_body", err.twin)
+    except ScriptDuplicateTitleError as err:
+        return _script_duplicate("script_duplicate_title", err.twin)
     except StorageError:
         logger.exception("Could not save script")
         return _script_storage_unavailable()
-    if not created:
-        response.status_code = 200
     return _script_payload(row)
 
 
@@ -1225,7 +1275,6 @@ async def edit_saved_script_endpoint(
         if body_error is not None:
             return body_error
         patch.body = clean_body
-        patch.word_count = len(clean_body.split())
         patch.content_hash = build_content_hash(clean_body)
         checked.append(clean_body)
     try:
@@ -1237,15 +1286,13 @@ async def edit_saved_script_endpoint(
                 repos.scripts.find_script_by_hash, user.id, patch.content_hash
             )
             if twin is not None and twin.id != script_id:
-                return JSONResponse(
-                    status_code=409,
-                    content={
-                        "error_code": "script_duplicate",
-                        "message": f'This text is the same as your saved script "{twin.title}".',
-                        "duplicate_id": str(twin.id),
-                        "duplicate_title": twin.title,
-                    },
-                )
+                return _script_duplicate("script_duplicate_body", twin)
+        if patch.title is not None:
+            twin = await run_in_threadpool(
+                repos.scripts.find_script_by_title, user.id, patch.title
+            )
+            if twin is not None and twin.id != script_id:
+                return _script_duplicate("script_duplicate_title", twin)
     except StorageError:
         logger.exception("Could not check script before edit")
         return _script_storage_unavailable()
@@ -1253,6 +1300,10 @@ async def edit_saved_script_endpoint(
         get_script_pipeline().moderator.assert_safe("\n".join(checked), user_id=str(user.id))
     try:
         row = await run_in_threadpool(repos.scripts.update_script, user.id, script_id, patch)
+    except ScriptDuplicateBodyError as err:
+        return _script_duplicate("script_duplicate_body", err.twin)
+    except ScriptDuplicateTitleError as err:
+        return _script_duplicate("script_duplicate_title", err.twin)
     except StorageError:
         logger.exception("Could not edit script")
         return _script_storage_unavailable()

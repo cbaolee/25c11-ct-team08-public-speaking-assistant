@@ -11,7 +11,11 @@ import numpy as np
 import pytest
 
 from src.text_processing.contracts import DocumentChunk
-from src.text_processing.retrieval import SemanticRetriever, verify_paragraph_citation
+from src.text_processing.retrieval import (
+    SemanticRetriever,
+    align_script_citations,
+    verify_paragraph_citation,
+)
 
 
 class MockSentenceTransformer:
@@ -176,6 +180,26 @@ class TestSemanticRetriever:
         m2 = SemanticRetriever.get_model()
         assert m1 is m2
 
+    def test_retrieve_top_k_min_score_filters_unrelated_chunks(
+        self, sample_chunks: list[DocumentChunk]
+    ) -> None:
+        retriever = SemanticRetriever()
+        filtered = retriever.retrieve_top_k(
+            "amphibian populations tropical regions",
+            sample_chunks,
+            k=3,
+            min_score=0.25,
+        )
+        assert [c.chunk_id for c in filtered] == [2]
+
+        unrelated = retriever.retrieve_top_k(
+            "quantum cryptography blockchain",
+            sample_chunks,
+            k=3,
+            min_score=0.25,
+        )
+        assert unrelated == []
+
 
 # ---------------------------------------------------------------------------
 # Citation Verification Tests
@@ -250,3 +274,89 @@ class TestVerifyParagraphCitation:
                 retrieved_chunks=sample_chunks,
             )
             assert citation.paragraph == idx
+
+    def test_verify_citation_rejects_unrelated_paragraph_text(
+        self, sample_chunks: list[DocumentChunk]
+    ) -> None:
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks,
+            paragraph_text=(
+                "Good morning everyone, today we will explore medieval architecture "
+                "and gothic cathedrals across Western Europe."
+            ),
+            min_support_score=0.25,
+        )
+        assert citation.status == "uncited"
+        assert citation.chunk_id is None
+        assert citation.heading is None
+
+    def test_verify_citation_accepts_supported_paragraph_and_inline_fact(
+        self, sample_chunks: list[DocumentChunk]
+    ) -> None:
+        supported = verify_paragraph_citation(
+            paragraph_index=2,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks,
+            paragraph_text=(
+                "Field evidence shows a severe decline in amphibian populations "
+                "throughout tropical regions."
+            ),
+            min_support_score=0.25,
+        )
+        assert supported.status == "cited"
+        assert supported.chunk_id == 2
+        assert supported.heading == "Results"
+
+        inline_fact = verify_paragraph_citation(
+            paragraph_index=3,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks,
+            paragraph_text="tropical regions",
+            min_support_score=0.25,
+        )
+        assert inline_fact.status == "cited"
+        assert inline_fact.chunk_id == 2
+
+    def test_align_script_citations_with_chat_note_chunks_page_zero(self) -> None:
+        chat_chunks = [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Chat note #1 · Overview",
+                page=0,
+                content=(
+                    "Overview\nThe Tasmanian tiger was a dog-like marsupial distinguished "
+                    "by dark stripes across its back, a stiff tail, and a wide jaw gape."
+                ),
+            ),
+            DocumentChunk(
+                chunk_id=2,
+                heading="Chat note #2 · Historically found across",
+                page=0,
+                content=(
+                    "Historically found across:\nTasmania\nMainland Australia\n"
+                    "Papua New Guinea\nIt survived longest in Tasmania due to "
+                    "isolation from dingoes."
+                ),
+            ),
+        ]
+        # Same-topic paragraph that only mentions "Tasmanian" and "thylacine" without using
+        # facts from either chat note must NOT be falsely cited (same-topic leakage guard).
+        script = (
+            "Inside the cage paces a marsupial with dark stripes across its back, "
+            "a stiff tail, and an unusually wide jaw gape.\n\n"
+            "Historically it lived across Tasmania, Mainland Australia, and Papua New Guinea, "
+            "surviving longest in Tasmania due to isolation from dingoes.\n\n"
+            "In 1936 the Tasmanian government passed a law protecting the thylacine "
+            "just fifty-nine days before the last captive animal died on a concrete floor."
+        )
+        citations = align_script_citations(script, chat_chunks, min_support_score=0.52)
+        assert len(citations) == 3
+        assert citations[0].status == "cited"
+        assert citations[0].heading == "Chat note #1 · Overview"
+        assert citations[0].page is None
+        assert citations[1].status == "cited"
+        assert citations[1].heading == "Chat note #2 · Historically found across"
+        assert citations[1].page is None
+        assert citations[2].status == "uncited"

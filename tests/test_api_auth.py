@@ -31,7 +31,6 @@ SIGNUP = {
     "target_accent": "American",
     "age": 21,
     "gender": "Female",
-    "topics": ["sports"],
     "consent_recording": True,
 }
 
@@ -74,7 +73,6 @@ def test_signup_creates_account_and_profile(client):
     profile = _repos().profiles.get_profile(user_id)
     assert profile.target_accent == "American"
     assert profile.display_name == "ana"  # email is lower-cased, name from its first part
-    assert profile.topics == ["sports"]
     assert profile.consent_recording is True
 
 
@@ -113,7 +111,7 @@ def test_login_returns_tokens_that_open_the_api(client):
     r = _login(client, email=" ANA@example.com ")
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"access_token", "refresh_token", "expires_in", "user_id"}
+    assert set(body) == {"access_token", "expires_in", "user_id"}  # refresh token: cookie only
     profile = client.get("/api/profile", headers=_bearer(body["access_token"]))
     assert profile.status_code == 200
     assert profile.json()["email"] == "ana@example.com"
@@ -133,17 +131,6 @@ def test_api_without_token_returns_401(client):
         assert r.json() == {"detail": "not_authenticated"}
 
 
-def test_refresh_gives_new_session_and_old_refresh_token_stops_working(client):
-    _signup_and_verify(client)
-    first = _login(client).json()
-    r = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
-    assert r.status_code == 200
-    assert client.get("/api/profile", headers=_bearer(r.json()["access_token"])).status_code == 200
-    again = client.post("/api/auth/refresh", json={"refresh_token": first["refresh_token"]})
-    assert again.status_code == 401
-    assert again.json()["error_code"] == "invalid_refresh_token"
-
-
 def test_logout_revokes_the_access_token(client):
     _signup_and_verify(client)
     token = _login(client).json()["access_token"]
@@ -154,12 +141,19 @@ def test_logout_revokes_the_access_token(client):
 def test_change_password_then_login_with_new_one(client):
     _signup_and_verify(client)
     token = _login(client).json()["access_token"]
-    short = client.put("/api/auth/password", json={"password": "short"}, headers=_bearer(token))
+    short = client.put(
+        "/api/auth/password",
+        json={"current_password": "correct-horse", "new_password": "short"},
+        headers=_bearer(token),
+    )
     assert short.status_code == 422
     r = client.put(
-        "/api/auth/password", json={"password": "new-password-9"}, headers=_bearer(token)
+        "/api/auth/password",
+        json={"current_password": "correct-horse", "new_password": "new-password-9"},
+        headers=_bearer(token),
     )
     assert r.json() == {"updated": True}
+    assert client.get("/api/profile", headers=_bearer(token)).status_code == 200  # session kept
     assert _login(client).status_code == 401
     assert _login(client, password="new-password-9").status_code == 200
 
@@ -257,3 +251,22 @@ def test_supabase_verify_token_bad_jwt_returns_none_and_outage_raises():
     assert _provider(SimpleNamespace(get_claims=bad)).verify_token("jwt") is None
     with pytest.raises(AuthUnavailableError):
         _provider(SimpleNamespace(get_claims=down)).verify_token("jwt")
+
+
+# Recording consent is required to create an account
+@pytest.mark.parametrize("consent", [None, False])
+def test_signup_without_recording_consent_is_rejected(client, consent):
+    payload = {key: value for key, value in SIGNUP.items() if key != "consent_recording"}
+    if consent is not None:
+        payload["consent_recording"] = consent
+    response = client.post("/api/auth/signup", json=payload)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "consent_required"
+    assert SIGNUP["email"].lower() not in _auth()._accounts  # no account was created
+
+
+def test_signup_with_recording_consent_saves_it(client):
+    response = client.post("/api/auth/signup", json=SIGNUP)
+    assert response.status_code == 201
+    profile = _repos().profiles.get_profile(UUID(response.json()["user_id"]))
+    assert profile.consent_recording is True

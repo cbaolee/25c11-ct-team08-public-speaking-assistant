@@ -6,26 +6,28 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 
 | Tên gọi           | Các phần bên trong |
 | ----------------- | ------------------ |
-| **Landing**       | **Landing Stage** (khung trên cùng, có **Mic Scene**: hình micro và ánh sáng động). Trong Landing Stage là **Intro** (tiêu đề, nút **Get Started** và **Log in**) hoặc **Auth Panel** (nút Back, 2 tab _Log in_ / _Sign up_, form, kèm **Signup Extra**: tên hiển thị, giới tính, tuổi, giọng, chủ đề). Bên dưới: **Sample Card** (đoạn transcript mẫu đã tô màu và 3 số WPM / pause / pitch) và **How It Works** (3 bước đánh số). |
+| **Landing**       | **Landing Stage** (khung trên cùng, có **Mic Scene**: hình micro và ánh sáng động). Trong Landing Stage là **Intro** (tiêu đề, nút **Get Started** và **Log in**) hoặc **Auth Panel** (nút Back, 2 tab _Log in_ / _Sign up_, form, kèm **Signup Extra**: tên hiển thị, giới tính, tuổi, giọng; cuối form Sign up là **Signup Consent** (checkbox đồng ý ghi âm, bắt buộc, chưa tick thì nút Create account khoá); dưới ô mật khẩu ở form Log in là **Forgot Password Link**). Auth Panel còn 2 bước thay chỗ form: **Code Step** ("Check your email", nhập mã 6 số, nút **Change Email** "Wrong email? Change it" quay về form đăng ký giữ nguyên các ô; mở từ Log in thì là "Back to Log in") và **Reset Step** ("Reset password": nhập email, rồi mã + mật khẩu mới + nhập lại). Bên dưới: **Sample Card** (đoạn transcript mẫu đã tô màu và 3 số WPM / pause / pitch) và **How It Works** (3 bước đánh số). |
 | **Top Bar**       | **Brand** (logo, bấm về Home), **Nav** (Home / Script / Practice), **Guest Buttons** (Log in, Sign up khi chưa đăng nhập), **User Button** (avatar + tên, mở **User Menu**: Profile, Settings, Log out) |
 | **Home**          | **Home Hero** (lời chào, **Home Summary**, **Home CTA** là nút Practice gợi ý, **Hero Mic** là micro 3D xoay, nút **See More** cuộn xuống). **Home Empty** (dòng báo khi chưa có buổi tập). **Progress** gồm **Latest Panel** (kết quả gần nhất) và 2 biểu đồ **Score Chart**, **Activity Chart**. **Details** gồm 3 biểu đồ **WPM Chart**, **Pitch Chart**, **Clarity Chart**. **History** (bảng các buổi tập, nút **Delete All**). |
-| **Script Studio** | **Chat Feed**, **Composer** (**Topic Select**, **Duration Select**, nút **Show my scripts** mở **Saved Scripts**, nút **Attach** đính PDF, **File Chip** hiện tên PDF đã đính, ô nhập, nút **Send**, nút **Composer Fold** thu gọn ô nhập dài), **Script Bubble** (thẻ file bấm vào để xem, các nút Practice (xanh) / Save / Copy / Download / Regenerate), **Refusal Bubble** (khi yêu cầu bị chặn), **Typing Skeleton** (khung chờ khi đang sinh script) |
+| **Script Studio** | **Chat Feed** (bubble trả lời mới nhất của Assistant có **Generate Button**: nút "Generate Script" sinh script, hiện khi đang trao đổi, đổi sang màu nhấn khi trợ lý báo đủ thông tin; chỉ bubble mới nhất có nút, đã có script thì không còn nút nào), **Composer** (**Topic Select**, **Duration Select**, nút **Show my scripts** mở **Saved Scripts**, nút **Attach** đính PDF, **File Chip** hiện tên PDF đã đính, ô nhập, nút **Send** (khi phiên đã có script thì đổi thành **Regenerate** ở cùng chỗ, icon mũi tên vòng kèm chữ trên desktop, chỉ icon ở màn hình hẹp: chữ trong ô nhập là feedback, ô trống thì viết bản mới; có **File Chip** thì gửi file vào chat trước rồi mới sinh lại; New chat thì về lại Send), nút **Composer Fold** thu gọn ô nhập dài), **Script Bubble** (thẻ file bấm vào để xem, các nút Practice (xanh) / Save / Copy / Download), **Script Title** (tên script do AI đặt, hiện trên thẻ file trong **Script Bubble**, ở đầu **Script Reader**, và là tên gợi ý trong **Script Name Dialog**), **Refusal Bubble** (khi yêu cầu bị chặn), **Typing Skeleton** (khung chờ khi đang sinh script) |
 | **Practice**      | **Practice Steps** (thanh 3 bước: 1 chọn script, 2 ghi âm, 3 chấm). **Text Picker**, 3 tab: _Mine_ (**Mine List** bên trái là Saved Scripts, nút **Mine Fold** thu gọn danh sách; **Mine View** bên phải là nội dung script đang chọn, có **Edit Tools**), _Sample_ (nút lấy script mẫu), _Own_ (tự viết, có bộ đếm từ và nút Save script). Nút **Make a script** (sang Script Studio) và **Use this script**. **Voice Input**, 2 tab: _Record_ (**Rec Timer**, **Level Meter**, nút Record / Pause / Discard) và _Upload_ (**Drop Zone**). **Speed Slider** (tốc độ tô chữ theo WPM). Nút **Evaluate**. **Script Sheet** (khung chữ để đọc, có tên và thông tin script ở trên). |
 | **Report**        | **Report Header** (tiêu đề, ngày giờ, nút Practice again / ...). **Report State** (thay toàn bộ Report khi audio không đủ để chấm). **Overview** (điểm overall, **Overview Cards** của 4 thành phần, **Coach Bubble** nhận xét ngắn). **Transcript View** (từng từ được tô màu). **Player** (phát lại ghi âm). **Volume Chart**. Cột phải: **Key Numbers** (các số chính) và **Score Card** (**Score Summary**: điểm overall và 4 thành phần, bấm mở Component Detail). |
 | **Profile**       | **Avatar Row** (avatar lớn, nút Change / Remove), **Profile Summary** (bảng thông tin cá nhân), **Baseline Row** (trạng thái baseline, nút **Record again** mở Baseline Recorder, nút **Listen** và trình phát giọng mẫu), nút **Edit info** mở Profile Modal |
 
 **Saved Scripts**: danh sách script người dùng đã lưu (tối đa `max_saved_scripts`), hiện "x / N", mỗi script là một thẻ file giống thẻ trong chat, có icon Edit và Delete. Có ở Practice (tab _Mine_) và Script Studio (Show my scripts, dạng menu thả xuống **Saved Menu**).
 
+**Saved-script duplicate errors**: `script_duplicate_body` khi văn bản đã trùng; `script_duplicate_title` khi tên trùng không phân biệt hoa thường.
+
 ## 2. Popup (modal) và lớp phủ
 
 | Tên gọi                | Chức năng |
 | ---------------------- | --------- |
 | **Profile Modal**      | Điền tên hiển thị, giới tính, tuổi, giọng, chủ đề |
-| **Consent Modal**      | Đồng ý ghi âm và lưu dữ liệu |
-| **Settings Modal**     | Mở từ User Menu. Màn đầu là **Settings List**, chọn một mục thì trượt sang màn con (có nút Back): **Permissions** (quyền micro), **Audio Settings** (chọn mic, âm lượng thu, âm lượng phát, thử mic), **Reading Speed** (khoảng min/max của Speed Slider, bật tự chỉnh tốc độ), **Change Password**, **Delete Account** (gõ lại email để xác nhận) |
+| **Consent Modal**      | Hiện khi bấm một tính năng cần ghi âm (Record, Evaluate, Baseline Gate, Record again, Word Coach) mà tài khoản đang tắt ghi âm. Nút _Allow recording_ (lưu consent xong mới chạy tiếp tính năng) và _Not now_ |
+| **Settings Modal**     | Mở từ User Menu. Màn đầu là **Settings List**, chọn một mục thì trượt sang màn con (có nút Back): **Permissions** (bật/tắt ghi âm; tắt thì hiện cảnh báo practice và ghi âm bị khoá), **Audio Settings** (chọn mic, thử mic), **Reading Speed** (khoảng min/max của Speed Slider, bật tự chỉnh tốc độ), **Change Password** (mật khẩu hiện tại + mật khẩu mới; link **Forgot Current Password** "Forgot your current password?" gửi mã tới email và mở form nhập mã ngay trong màn này), **Delete Account** (nhập mật khẩu hiện tại để xác nhận) |
 | **Safety Alert**       | Báo nội dung bị cấm |
 | **Confirm Dialog**     | Xác nhận xoá hoặc thoát |
-| **Script Name Dialog** | Nhập tên khi lưu script |
+| **Script Name Dialog** | Nhập tên khi lưu script ở Practice → tab Own (chat và reader lưu luôn theo tên đang hiện) |
 | **Script List Full**   | Báo danh sách script đã lưu đã đầy (chỉ có nút Close) |
 | **Script Reader**      | Xem nội dung script (bấm vào thẻ script trong chat hoặc trong Saved Scripts). Nút Edit sửa tên và nội dung ngay trong popup, nút Save, Close và nút **⋯** mở **Reader Menu** (Save script / Copy / Download / Practice) |
 | **Evaluating Overlay** | Màn hình chờ chấm điểm, có nút Cancel |
@@ -34,12 +36,24 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 | **Baseline Gate**      | Bắt ghi âm giọng mẫu trước khi dùng app (nút Log out hoặc bắt đầu ghi) |
 | **Baseline Recorder**  | Ghi lại giọng mẫu, mở từ Profile (nút Record again) |
 | **Component Detail**   | Giải thích chi tiết một thành phần điểm, 4 tab A / F / P / S |
-| **App Loader**         | Màn chờ toàn trang khi app đang tải |
-| **Busy Overlay**       | Lớp chờ khi đang làm một việc (ví dụ lưu, xoá), có dòng chữ trạng thái |
+| **App Loader**         | Màn chờ toàn trang "Loading your practice…": sau khi đăng nhập đúng (rõ dần từ Busy Overlay) hoặc khi tải lại trang đang đăng nhập, tới khi Home sẵn sàng |
+| **Busy Overlay**       | Lớp chờ khi đang làm một việc (ví dụ lưu, xoá, "Logging in…" lúc kiểm tra mật khẩu), có dòng chữ trạng thái |
 | **Toast**              | Thông báo ngắn tự ẩn ở góc màn hình |
 | **Tooltip**            | Chú thích nhỏ hiện giá trị khi rê chuột lên biểu đồ |
 
-## 3. Trang và phần sẽ thêm (dự kiến)
+## 3. Mã lỗi tài khoản
+
+| Mã lỗi                  | Khi nào |
+| ----------------------- | ------- |
+| `consent_required`      | 422: đăng ký (hoặc form gửi kèm mã) không đồng ý ghi âm. 403: route ghi âm khi tài khoản đang tắt ghi âm |
+| `otp_invalid`, `otp_expired` | Mã đăng ký hoặc mã đặt lại mật khẩu sai, hết hạn |
+| `weak_password`         | Mật khẩu mới dưới 8 ký tự |
+| `rate_limited`          | Quá số lần gửi mã, thử mã, nhập mật khẩu hiện tại |
+| `invalid_refresh_token` | Không còn phiên (cookie `psa_refresh` thiếu, hết hạn hoặc đã dùng) |
+| `origin_mismatch`       | Request refresh/logout đến từ site khác |
+| `wrong_password`        | Sai mật khẩu hiện tại (đổi mật khẩu, xoá tài khoản) |
+
+## 4. Trang và phần sẽ thêm (dự kiến)
 
 | Tên gọi             | Mô tả                                                    |
 | ------------------- | -------------------------------------------------------- |
@@ -48,7 +62,7 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 | **Feedback Page**   | Trang để người dùng báo lỗi và góp ý                     |
 | **Feedback Button** | Icon nhỏ trên mọi trang để báo lỗi tại chỗ               |
 
-## 4. Backend
+## 5. Backend
 
 | Tên gọi               | Mô tả                                                                                   |
 | --------------------- | --------------------------------------------------------------------------------------- |

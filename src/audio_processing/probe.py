@@ -40,7 +40,7 @@ def probe(
         raise AudioRejected(
             "too_large",
             f"The file is too large (maximum {max_bytes // (1024 * 1024)} MB). "
-            "Please choose a smaller file.",
+            "Please send the recording as MP3 or M4A.",
         )
 
     ffprobe_result = _run_ffprobe(path)

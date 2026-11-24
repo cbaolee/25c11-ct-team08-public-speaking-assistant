@@ -2,7 +2,6 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from pydantic import ValidationError
 
 from src.app.config import max_list_page_size
 from src.app.db.factory import build_memory_repos, get_repos
@@ -37,10 +36,8 @@ def _new_session(*, audio_path: str | None = None) -> NewSession:
 
 def _new_script(content_hash: str = "hash-1") -> NewScript:
     return NewScript(
-        title="Practice",
+        title=f"Practice {content_hash}",
         body="A short script.",
-        word_count=3,
-        source="written",
         content_hash=content_hash,
     )
 
@@ -216,6 +213,39 @@ def test_replace_current_baseline_keeps_exactly_one_current():
     assert repos.baselines.get_current_baseline(user_id) == second
 
 
+def test_replace_current_baseline_keeps_only_the_newest_row():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    rows = [
+        repos.baselines.replace_current_baseline(
+            user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+        )[0]
+        for _ in range(3)
+    ]
+
+    stored = repos.baselines._state.baselines[user_id]
+    assert [row.id for row in stored] == [rows[-1].id]
+    assert stored[0].is_current is True
+
+
+def test_replace_current_baseline_clears_baseline_id_of_old_sessions():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    first, _ = repos.baselines.replace_current_baseline(
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.7)
+    )
+    session = repos.sessions.create_session(
+        user_id, _new_session().model_copy(update={"baseline_id": first.id})
+    )
+    repos.baselines.replace_current_baseline(
+        user_id, NewBaseline(id=uuid4(), hesitation_threshold_s=0.8)
+    )
+
+    still_there = repos.sessions.get_session(user_id, session.id)
+    assert still_there is not None
+    assert still_there.baseline_id is None
+
+
 def test_replace_current_baseline_same_id_raises_conflict():
     repos = build_memory_repos()
     user_id = uuid4()
@@ -226,16 +256,17 @@ def test_replace_current_baseline_same_id_raises_conflict():
         repos.baselines.replace_current_baseline(user_id, data)
 
 
-def test_new_script_rejects_unsupported_duration():
-    with pytest.raises(ValidationError):
-        NewScript(
-            title="Practice",
-            body="A short script.",
-            word_count=3,
-            source="written",
-            content_hash="hash-1",
-            duration_min=7,
-        )
+def test_new_script_accepts_only_title_body_and_hash():
+    script = NewScript(
+        title="Practice",
+        body="A short script.",
+        content_hash="hash-1",
+    )
+    assert script.model_dump() == {
+        "title": "Practice",
+        "body": "A short script.",
+        "content_hash": "hash-1",
+    }
 
 
 def test_profile_patch_only_changes_fields_that_were_set():
@@ -503,3 +534,48 @@ def test_get_repos_rejects_non_dev_without_persistent_adapter(monkeypatch):
             get_repos()
     finally:
         get_repos.cache_clear()
+
+
+# ---------- accounts and shard cleanup (ADR-012) ----------
+
+
+def test_memory_account_keeps_the_first_shard():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    assert repos.accounts.get_shard(user_id) is None
+    assert repos.accounts.assign_shard(user_id, "aaaa") == "aaaa"
+    assert repos.accounts.assign_shard(user_id, "bbbb") == "aaaa"  # already stored: unchanged
+    assert repos.accounts.get_shard(user_id) == "aaaa"
+
+
+def test_memory_account_counts_users_per_shard():
+    repos = build_memory_repos()
+    for shard_ref in ("core", "aaaa", "aaaa"):
+        repos.accounts.assign_shard(uuid4(), shard_ref)
+    assert repos.accounts.count_by_shard() == {"core": 1, "aaaa": 2}
+
+
+def test_memory_account_rejects_an_empty_shard():
+    with pytest.raises(ValueError):
+        build_memory_repos().accounts.assign_shard(uuid4(), "")
+
+
+def test_memory_delete_user_sessions_keeps_other_users():
+    repos = build_memory_repos()
+    ana, ben = uuid4(), uuid4()
+    for _ in range(2):
+        repos.sessions.create_session(ana, _new_session())
+    repos.sessions.create_session(ben, _new_session())
+    assert repos.sessions.delete_user_sessions(ana) == 2
+    assert repos.sessions.list_sessions(ana, 10, None) == []
+    assert len(repos.sessions.list_sessions(ben, 10, None)) == 1
+    assert repos.sessions.delete_user_sessions(ana) == 0  # safe to run again
+
+
+def test_memory_delete_profile_drops_the_account_row():
+    repos = build_memory_repos()
+    user_id = uuid4()
+    repos.profiles.upsert_profile(user_id, ProfileUpsert(target_accent="American"))
+    repos.accounts.assign_shard(user_id, "aaaa")
+    repos.profiles.delete_profile(user_id)
+    assert repos.accounts.get_shard(user_id) is None

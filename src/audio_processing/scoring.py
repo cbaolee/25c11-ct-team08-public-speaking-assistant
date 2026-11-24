@@ -207,7 +207,7 @@ def accuracy_scores(result: AlignmentResult) -> AccuracyScores:
 
 
 def pitch_score_from_range(r_st: float | None) -> float | None:
-    """Turn the pitch range R_st (semitones) into the score P_pitch (scoring_framework.md §6.2).
+    """Turn the pitch range R_st (semitones) into the score P_pitch (docs/adr/ADR-003.md §6.2).
 
     R_st >= 6 -> 100; R_st <= 2 -> 0; in between 25 * (R_st - 2). None -> None
     (not measured means not scored, §8; never treated as 0).

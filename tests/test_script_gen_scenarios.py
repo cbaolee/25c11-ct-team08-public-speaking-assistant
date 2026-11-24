@@ -779,6 +779,111 @@ class TestScenario5FreeTopicAndRegenerateWithFeedback:
         assert "revised" in result.flags
         call_kwargs = mock_llm.generate_free_topic_script.call_args.kwargs
         assert call_kwargs["user_feedback"] == feedback_text
+        assert feedback_text in call_kwargs["chat_context"]
+        assert call_kwargs["chunks"] is not None
+        assert call_kwargs["chunks"][0].heading == "Chat note #1"
+        assert call_kwargs["chunks"][0].page == 0
+
+        # Subsequent blank regenerate keeps the earlier feedback in session context
+        # without persisting the auto-generated variation placeholder as a note.
+        req2 = ScriptGenerationRequest(
+            topic="Deep Sea Hydrothermal Vents",
+            category="free",
+            duration_min=5,
+            session_id=sid,
+            user_id=user_id,
+            user_feedback="Write a fresh variation of this speech.",
+        )
+        pipeline.run(req2)
+        updated_sess = chat_session_store.get(sid, user_id=user_id)
+        assert updated_sess is not None
+        assert updated_sess.user_notes == [feedback_text]
+        call_kwargs2 = mock_llm.generate_free_topic_script.call_args.kwargs
+        assert feedback_text in call_kwargs2["chat_context"]
+
+    def test_chat_only_session_passes_chat_context_without_fake_user_notes_chunk(
+        self, scenario_setup
+    ) -> None:
+        pipeline: ScriptGenerationPipeline = scenario_setup["pipeline"]
+        mock_llm: MagicMock = scenario_setup["mock_llm"]
+        user_id = str(scenario_setup["user"].id)
+
+        sid = "chat-only-no-pdf-session"
+        session = ChatSessionState(
+            session_id=sid,
+            user_id=user_id,
+            category="sports",
+            duration_min=5,
+            initial_prompt="Volleyball speech",
+            selected_template_id=None,
+            user_notes=[
+                "ok go ahead",
+                (
+                    "Overview\nInclude a detailed story about our varsity volleyball team "
+                    "comeback in the third set using aggressive jump serving strategy."
+                ),
+            ],
+        )
+        chat_session_store.put(session)
+
+        req = ScriptGenerationRequest(
+            topic="Volleyball Teamwork",
+            category="sports",
+            duration_min=5,
+            session_id=sid,
+            user_id=user_id,
+        )
+        pipeline.run(req)
+
+        call_kwargs = mock_llm.generate_free_topic_script.call_args.kwargs
+        assert "Volleyball speech" in call_kwargs["chat_context"]
+        assert "ok go ahead" in call_kwargs["chat_context"]
+        assert "comeback in the third set" in call_kwargs["chat_context"]
+        # Only the substantive note (>= 8 words) becomes an in-memory Chat note chunk (page=0)
+        assert call_kwargs["chunks"] is not None
+        assert len(call_kwargs["chunks"]) == 1
+        assert call_kwargs["chunks"][0].heading == "Chat note #1 · Overview"
+        assert call_kwargs["chunks"][0].page == 0
+
+    def test_session_multi_file_upload_assigns_unique_chunk_ids_and_clean_headings(
+        self, scenario_setup
+    ) -> None:
+        client: TestClient = scenario_setup["client"]
+        user_id = str(scenario_setup["user"].id)
+
+        resp1 = client.post(
+            "/api/script-chat/suggest",
+            data={"category": "wildlife", "duration_min": 5, "prompt": "Marine ecosystems"},
+            files={
+                "file": (
+                    "ocean_notes.txt",
+                    io.BytesIO(b"Coral reefs shelter diverse marine fish populations."),
+                    "text/plain",
+                )
+            },
+        )
+        assert resp1.status_code == 200
+        sid = resp1.json()["session_id"]
+
+        resp2 = client.post(
+            "/api/script-chat/message",
+            data={"session_id": sid, "message": "Adding a second reference file."},
+            files={
+                "file": (
+                    "kelp_forest.md",
+                    io.BytesIO(b"Sea otters protect kelp forests from urchin overgrazing."),
+                    "text/markdown",
+                )
+            },
+        )
+        assert resp2.status_code == 200
+        session = chat_session_store.get(sid, user_id=user_id)
+        assert session is not None
+        chunk_ids = [c.chunk_id for c in session.chunks]
+        assert len(chunk_ids) == len(set(chunk_ids)) == 2
+        assert chunk_ids == [1, 2]
+        assert session.chunks[0].heading == "ocean_notes"
+        assert session.chunks[1].heading == "kelp_forest"
 
     def test_api_generate_script_endpoint_with_session_and_feedback(self, scenario_setup) -> None:
         client: TestClient = scenario_setup["client"]

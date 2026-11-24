@@ -88,6 +88,7 @@
       <div class="pwwrap">
         <input type="password" id="authPassword" autocomplete="current-password">
       </div>
+      <button class="linkbtn forgot-link" type="button" id="forgotLink" data-t="reset.forgotLink"></button>
       <div id="pass2Wrap" hidden>
         <label for="authPassword2" data-t="auth.password2"></label>
         <input type="password" id="authPassword2" autocomplete="new-password">
@@ -104,16 +105,20 @@
         <div class="lbl" id="lblSuAccent" data-t="pm.accent"></div>
         <div class="opts" id="signupExtraAccents" role="radiogroup" aria-labelledby="lblSuAccent"></div>
         <div class="ferr" id="eSuAccent" role="alert" data-t="pm.errAccent"></div>
-        <div class="lbl" id="lblSuTopics"><span data-t="pm.topics"></span> <small data-t="pm.topicsHint"></small></div>
-        <div class="opts" id="signupExtraTopics" role="group" aria-labelledby="lblSuTopics"></div>
-        <div class="ferr" id="eSuTopics" role="alert" data-t="pm.errTopics"></div>
+        <div class="switch signup-consent">
+          <input type="checkbox" id="signupConsent" aria-describedby="signupConsentNote">
+          <label for="signupConsent" data-t="auth.consentLabel"></label>
+        </div>
       </div>
       <div class="ferr" id="authError" role="alert"></div>
       <button class="btn btn-primary btn-lg" type="submit" id="authSubmit" style="width:100%;margin-top:22px"></button>
+      <p class="note signup-consent-note" id="signupConsentNote" data-t="auth.consentNote" hidden></p>
     </form>
     <section class="otp-step" id="otpStep" aria-labelledby="otpTitle" hidden>
       <h3 class="otp-title" id="otpTitle" data-t="auth.otpTitle"></h3>
       <p class="note otp-sent" id="otpSentTo"></p>
+      <button class="linkbtn otp-change" type="button" id="otpBack"></button>
+      <p class="note otp-spam" data-t="auth.otpSpam"></p>
       <div class="pill ok otp-hint" id="otpHint" role="status" hidden></div>
       <form id="otpForm" novalidate>
         <label for="otpCode" data-t="auth.otpLabel"></label>
@@ -123,7 +128,36 @@
       </form>
       <div class="otp-actions">
         <button class="linkbtn otp-resend" type="button" id="otpResend"></button>
-        <button class="linkbtn otp-back" type="button" id="otpBack" data-t="auth.otpBack"></button>
+      </div>
+      <p class="note otp-expiry" id="otpExpiry"></p>
+    </section>
+    <section class="otp-step reset-step" id="resetStep" aria-labelledby="resetTitle" hidden>
+      <h3 class="otp-title" id="resetTitle" data-t="reset.title"></h3>
+      <form id="resetEmailForm" novalidate>
+        <p class="note otp-sent" data-t="reset.emailSub"></p>
+        <label for="resetEmail" data-t="auth.username"></label>
+        <input type="email" id="resetEmail" autocomplete="email" autocapitalize="none" spellcheck="false" aria-describedby="resetEmailError">
+        <div class="ferr" id="resetEmailError" role="alert"></div>
+        <button class="btn btn-primary btn-lg otp-verify" type="submit" id="resetSend" data-t="reset.send"></button>
+      </form>
+      <form id="resetCodeForm" novalidate hidden>
+        <p class="note otp-sent" id="resetSentTo"></p>
+        <p class="note otp-spam" data-t="auth.otpSpam"></p>
+        <div class="pill ok otp-hint" id="resetHint" role="status" hidden></div>
+        <label for="resetCode" data-t="auth.otpLabel"></label>
+        <input class="otp-code" id="resetCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" autocapitalize="none" spellcheck="false" aria-describedby="resetSentTo resetError">
+        <label for="resetNew" data-t="pass.newPass"></label>
+        <input type="password" id="resetNew" autocomplete="new-password">
+        <label for="resetNew2" data-t="pass.newPass2"></label>
+        <input type="password" id="resetNew2" autocomplete="new-password">
+        <div class="ferr" id="resetError" role="alert"></div>
+        <button class="btn btn-primary btn-lg otp-verify" type="submit" id="resetSave" data-t="reset.save"></button>
+        <div class="otp-actions">
+          <button class="linkbtn otp-resend" type="button" id="resetResend"></button>
+        </div>
+      </form>
+      <div class="otp-actions">
+        <button class="linkbtn otp-back" type="button" id="resetBack" data-t="reset.back"></button>
       </div>
     </section>
         </div>
@@ -231,10 +265,10 @@
         <button class="btn iconbtn" type="button" id="attachBtn" data-t-aria="script.attach" data-t-title="script.attach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.5 8.5a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.8 1.8 0 0 1-2.6-2.6l7.8-7.8"/></svg></button>
         <input type="file" id="composerFileInput" accept=".pdf,.md,.txt,application/pdf,text/markdown,text/plain" hidden>
         <textarea id="composerInput" rows="1" data-t-aria="script.inputLabel" data-t-ph="script.placeholder"></textarea>
-        <button class="btn btn-primary iconbtn composer-send" type="button" id="composerSend" data-t-aria="script.send" data-t-title="script.send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg></button>
+        <button class="btn btn-primary iconbtn composer-send" type="button" id="composerSend" data-t-aria="script.send" data-t-title="script.send"><svg class="ic-send" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/></svg><svg class="ic-regen" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.7 2.7L21 8M21 3v5h-5"/></svg><span class="lbl-regen" data-t="script.regenerate"></span></button>
       </div>
       <div class="ferr" id="composerError" role="alert"></div>
-      <p class="note" style="margin-top:8px" data-t="script.fileHint"></p>
+      <p class="note" id="composerFileHint" style="margin-top:8px" data-t="script.fileHint"></p>
       <p class="note" style="margin-top:8px" data-t="script.hint"></p>
     </div>
   </div>
@@ -261,7 +295,7 @@
       <div id="pStep1Go" class="row between use-row">
         <div class="use-left">
           <span class="pill num" id="mineCount"></span>
-          <div id="pickerSamplePane" class="row"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button><span class="note" data-t="practice.sampleNote"></span></div>
+          <div id="pickerSamplePane" class="row"><button class="btn" type="button" id="sampleBtn" data-t="practice.sampleBtn"></button></div>
         </div>
         <button class="btn btn-primary" type="button" id="useScript" data-t="practice.useScript" disabled></button>
       </div>
@@ -413,14 +447,12 @@
   <div class="lbl" id="lblAccent" data-t="pm.accent"></div>
   <div class="opts" id="mpAccents" role="radiogroup" aria-labelledby="lblAccent"></div>
   <div class="ferr" id="eAccent" role="alert" data-t="pm.errAccent"></div>
-  <div class="lbl" id="lblTopics"><span data-t="pm.topics"></span> <small data-t="pm.topicsHint"></small></div>
-  <div class="opts" id="mpTopics" role="group" aria-labelledby="lblTopics"></div>
-  <div class="ferr" id="eTopics" role="alert" data-t="pm.errTopics"></div>
   <div class="actions"><button class="btn" type="button" id="mpCancel" data-t="common.cancel"></button><button class="btn btn-primary" type="button" id="mpSave" data-t="common.save"></button></div>
 </div></div>
 
 <div class="mbg" id="consentModal" role="dialog" aria-modal="true" aria-labelledby="mcTitle"><div class="box">
   <h2 id="mcTitle" data-t="consent.title"></h2>
+  <p class="note" data-t="consent.locked"></p>
   <p data-t="consent.msg"></p>
   <ul style="margin:12px 0 0;padding-left:20px;color:var(--muted);font-size:15px">
     <li data-t="consent.p1"></li><li data-t="consent.p2"></li><li data-t="consent.p3"></li>
@@ -451,6 +483,7 @@
     <input type="checkbox" id="pmChk">
     <div><label for="pmChk" data-t="perm.allow"></label><div class="note" data-t="perm.note"></div></div>
     </div>
+    <p class="ferr" id="pmOffWarning" role="alert" data-t="perm.offWarning"></p>
     <div class="actions"><button class="btn btn-primary" type="button" id="permSave" data-t="common.save"></button></div>
   </section>
   <section id="settingsAudio" data-pane="audio" hidden>
@@ -459,10 +492,7 @@
     <p class="note" data-t="audio.sub"></p>
     <label for="audioMic" data-t="audio.mic"></label>
     <select id="audioMic"></select>
-    <label for="audioInput"><span data-t="audio.recVol"></span>: <span id="audioInputValue" class="num">70</span>%</label>
-    <input type="range" id="audioInput" min="0" max="100" value="70">
-    <label for="audioOutput"><span data-t="audio.playVol"></span>: <span id="audioOutputValue" class="num">80</span>%</label>
-    <input type="range" id="audioOutput" min="0" max="100" value="80">
+    <p class="note" id="audioMicHint" aria-live="polite"></p>
     <div class="row" style="margin-top:16px"><button class="btn" type="button" id="audioTest" data-t="audio.test"></button><span class="note" id="audioTestNote" aria-live="polite"></span></div>
     <div class="lvl" id="audioLevel" aria-hidden="true" style="margin-top:12px"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
     <div class="actions"><button class="btn btn-primary" type="button" id="audioSave" data-t="common.save"></button></div>
@@ -488,21 +518,43 @@
     <p class="note" data-t="pass.sub"></p>
     <label for="mpUser" data-t="pass.username"></label>
     <input type="email" id="mpUser" autocomplete="username" readonly>
-    <label for="mpNew" data-t="pass.newPass"></label>
-    <input type="password" id="mpNew" autocomplete="new-password">
-    <label for="mpNew2" data-t="pass.newPass2"></label>
-    <input type="password" id="mpNew2" autocomplete="new-password">
-    <div class="ferr" id="mpErr" role="alert"></div>
-    <div class="actions"><button class="btn btn-primary" type="button" id="passSave" data-t="common.save"></button></div>
+    <div id="mpWithCurrent">
+      <label for="mpCurrent" data-t="pass.current"></label>
+      <input type="password" id="mpCurrent" autocomplete="current-password">
+      <button class="linkbtn forgot-link" type="button" id="mpForgot" data-t="reset.forgotCurrent"></button>
+      <label for="mpNew" data-t="pass.newPass"></label>
+      <input type="password" id="mpNew" autocomplete="new-password">
+      <label for="mpNew2" data-t="pass.newPass2"></label>
+      <input type="password" id="mpNew2" autocomplete="new-password">
+      <div class="ferr" id="mpErr" role="alert"></div>
+      <div class="actions"><button class="btn btn-primary" type="button" id="passSave" data-t="common.save"></button></div>
+    </div>
+    <div id="mpWithCode" hidden>
+      <p class="note" id="mpCodeSentTo"></p>
+      <p class="note" data-t="reset.settingsNote"></p>
+      <label for="mpCode" data-t="auth.otpLabel"></label>
+      <input id="mpCode" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" autocapitalize="none" spellcheck="false">
+      <label for="mpCodeNew" data-t="pass.newPass"></label>
+      <input type="password" id="mpCodeNew" autocomplete="new-password">
+      <label for="mpCodeNew2" data-t="pass.newPass2"></label>
+      <input type="password" id="mpCodeNew2" autocomplete="new-password">
+      <div class="ferr" id="mpCodeErr" role="alert"></div>
+      <div class="actions">
+        <button class="linkbtn" type="button" id="mpCodeResend"></button>
+        <button class="btn" type="button" id="mpCodeCancel" data-t="common.cancel"></button>
+        <button class="btn btn-primary" type="button" id="mpCodeSave" data-t="reset.save"></button>
+      </div>
+    </div>
   </section>
   <section id="settingsDelete" data-pane="delete" hidden>
     <button class="btn btn-ghost btn-sm back" type="button" data-settings-back><span aria-hidden="true">&larr;</span> <span data-t="settings.back"></span></button>
     <h3 data-t="del.title"></h3>
     <p class="note" data-t="del.sub"></p>
-    <label for="delConfirmEmail" data-t="del.typeEmail"></label>
-    <input type="email" id="delConfirmEmail" autocomplete="off" spellcheck="false">
+    <input type="email" id="delUser" autocomplete="username" hidden>
+    <label for="delPassword" data-t="del.password"></label>
+    <input type="password" id="delPassword" autocomplete="current-password">
     <div class="ferr" id="delErr" role="alert"></div>
-    <div class="actions"><button class="btn btn-danger" type="button" id="delConfirm" data-t="del.confirm" disabled></button></div>
+    <div class="actions"><button class="btn" type="button" id="delCancel" data-t="common.cancel"></button><button class="btn btn-danger" type="button" id="delConfirm" data-t="del.agree" disabled></button></div>
   </section>
   </div>
 </div>
@@ -585,17 +637,16 @@
   <div class="actions"><button class="btn" type="button" id="baselineRecorderClose" data-close data-t="common.close"></button></div>
 </div></div>
 
-<div class="mbg" id="baselineGate" role="dialog" aria-modal="true" aria-labelledby="baselineGateTitle" aria-describedby="baselineGateMessage"><div class="box wide">
+<div class="mbg" id="baselineGate" role="dialog" aria-modal="true" aria-labelledby="baselineGateTitle" aria-describedby="baselineGateMessage"><div class="box wide gate-box" id="baselineGateBox" data-phase="idle">
   <h2 id="baselineGateTitle" data-t="gate.title"></h2>
   <p id="baselineGateMessage" data-t="gate.msg"></p>
-  <div class="lbl" id="baselineGateLabel" data-t="gate.passageLabel"></div>
   <p class="passage" id="baselineGatePassage" data-t="gate.passage"></p>
   <div class="timer" id="baselineGateTimer" role="timer" aria-live="off"></div>
   <div class="lvl" id="baselineGateLevel" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
   <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="baselineGateBarWrap" data-t-aria="profile.progress"><i id="baselineGateBar"></i></div>
   <div class="row" style="margin-top:12px"><span class="pill" id="baselineGateStatus" role="status"></span></div>
   <p class="note" style="margin-top:12px" data-t="gate.note"></p>
-  <div class="actions"><button class="btn btn-danger" type="button" id="baselineGateLogout" data-t="gate.logout"></button><button class="btn btn-primary" type="button" id="baselineGateAgree"></button></div>
+  <div class="actions"><button class="btn btn-danger" type="button" id="baselineGateLogout" data-t="gate.logout"></button><button class="btn" type="button" id="baselineGatePause" hidden></button><button class="btn btn-primary" type="button" id="baselineGateAgree"></button></div>
 </div></div>
 
 <div class="mbg" id="componentDetail" role="dialog" aria-modal="true" aria-labelledby="mpartTitle"><div class="box wide">
@@ -645,6 +696,10 @@
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="/static/js/evaluate_client.js"></script>
 <script src="/static/js/otp_utils.js"></script>
+<script src="/static/js/signup_form.js"></script>
+<script src="/static/js/reset_form.js"></script>
+<script src="/static/js/mic_device.js"></script>
+<script src="/static/js/script_duplicate.js"></script>
 <script type="module" src="/static/js/main.js"></script>
 <div id="wordCoach" role="dialog" aria-modal="false" aria-labelledby="wcTitle" hidden></div>
 </body>

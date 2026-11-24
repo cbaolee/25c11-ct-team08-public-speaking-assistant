@@ -44,7 +44,7 @@ export function pickSavedScript(id, byUser) {   // byUser: clicked in the list (
   return (byUser ? withBusy(req, T('busy.loading')) : req).then(r => (r.ok ? r.json() : null)).then(s => {
     if (!s) return;
     if (mineEditId && mineEditId !== s.id) cancelMineEdit();   // another script picked: the open edit is dropped
-    S.texts.mine = { id: s.id, title: s.title, short: s.title, text: s.body, topic: s.category || null, duration_min: s.duration_min || null };
+    S.texts.mine = { id: s.id, title: s.title, short: s.title, text: s.body, topic: null };
     renderSavedLists();
     if (S.screen === 'practice') { if (byUser) S.choosing = true; renderPractice(); }
   }).catch(() => {});
@@ -76,7 +76,7 @@ export function useScript() {
 /* Save script (Own tab): asks for a name, then saves; the text stays in the box. */
 export function saveOwn() {
   const v = ownTextOrError(); if (!v) return;
-  saveScriptAs({ title: T('practice.ownTitle'), text: v, source: 'written' }).then(j => {
+  saveScriptAs({ title: T('practice.ownTitle'), text: v }, true).then(j => {
     if (j) S.ownSaved = { id: j.id, title: j.title, text: v };
   });
 }
@@ -495,7 +495,7 @@ export function toggleRecording() {
     const counts = txt ? followCounts(txt.text) : null;
     S.follow = txt ? { counts, segs: buildFollow(counts), idx: -2, now: 0 } : null;
     S.rec = startRecorder({
-      lvl: $('#recLvl'), onTick: s => { $('#recTimer').textContent = fmtClock(s); followTick(s); },
+      lvl: $('#recLvl'), max: CONFIG.MAX_AUDIO_SECONDS, onTick: s => { $('#recTimer').textContent = fmtClock(s); followTick(s); },
       onEnd: (sec, auto, rec) => {
         S.rec = null; S.follow = null;
         if (rec && rec.blob) S.audio = { kind: 'rec', dur: sec, blob: rec.blob, mime: rec.mime };
@@ -521,7 +521,7 @@ export function onAudioFile(e) {
 export function runEval() {
   const txt = S.texts[S.pickerTab];
   if (!txt || !S.audio) return;
-  runEvalReal(txt);
+  requireConsent(() => runEvalReal(txt));   // an uploaded file is a recording too
 }
 export function cancelEval() {
   const ev = S.evaluation;
@@ -596,6 +596,7 @@ export function runEvalReal(txt) {
   const end = () => { stopEvalTimers(ev); if (active()) S.evaluation = null; closeModal('evaluatingOverlay', false); };
   const fail = j => {
     end(); hideEvalDock(true);
+    if (j && j.error_code === 'consent_required') return;   // api() already opened the Consent Modal
     if (j && j.error_code === 'baseline_required') { S.baseline = null; toast(T('eval.errBaselineRequired'), true); openBaselineGate(); return; }
     showEvalError(j && j.error_code && EVAL_ERR[j.error_code] ? T('eval.' + EVAL_ERR[j.error_code]) : ((j && j.message) || T('eval.errServer')));
   };

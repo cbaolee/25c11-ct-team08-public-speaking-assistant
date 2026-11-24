@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from src.app.config import max_audio_seconds
 from src.audio_processing import probe as probe_module
 from src.audio_processing.contracts import AudioRejected
 from src.audio_processing.probe import probe
@@ -14,7 +15,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 ALLOWED = frozenset({"wav", "matroska", "webm", "mov", "mp4"})
-LIMITS = dict(max_seconds=1320, max_bytes=100 * 1024 * 1024, allowed_formats=ALLOWED)
+LIMITS = dict(
+    max_seconds=max_audio_seconds,
+    max_bytes=100 * 1024 * 1024,
+    allowed_formats=ALLOWED,
+)
 
 
 def _ffmpeg(*args):

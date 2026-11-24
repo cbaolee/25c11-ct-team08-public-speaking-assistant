@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 import pytest
 import requests
 
+from src.app.db.session_helpers import AudioEncodingError
 from src.audio_processing.contracts import InsufficientAudio, MasterAudio, SttUnavailable
 from src.audio_processing.stt import STT_TIMEOUT, call_deepgram, call_gladia, transcribe
 
@@ -78,6 +79,30 @@ def test_deepgram_response_parsed_correctly(monkeypatch, mock_master):
     assert result.words[1].end_s == 1.0
 
 
+def test_deepgram_streams_audio_file(monkeypatch, mock_master):
+    expected_audio = mock_master.path.read_bytes()
+    request_data = []
+
+    def mock_post(url, *args, **kwargs):
+        body = kwargs["data"]
+        assert not isinstance(body, bytes)
+        request_data.append(body.read())
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "results": {
+                "channels": [
+                    {"alternatives": [{"transcript": "hello", "words": []}]}
+                ]
+            }
+        }
+        return mock_resp
+
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
+    call_deepgram(mock_master, api_key="test_key")
+
+    assert request_data == [expected_audio]
+
+
 def test_empty_transcript_raises_insufficient_audio(monkeypatch, mock_master):
     """Check an empty STT transcript raises InsufficientAudio[cite: 1]."""
 
@@ -115,6 +140,37 @@ def test_gladia_adds_filler_flag(monkeypatch, mock_master):
     assert "filler_from_vad_only" in result.flags
 
 
+def test_gladia_parses_segment_list_response(monkeypatch, mock_master):
+    def mock_post(*args, **kwargs):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {
+            "prediction": [
+                {
+                    "transcription": "hello",
+                    "words": [
+                        {
+                            "word": "hello",
+                            "time_begin": 0.0,
+                            "time_end": 0.5,
+                            "confidence": 0.9,
+                        }
+                    ],
+                },
+                {"transcription": "world", "words": []},
+            ]
+        }
+        return mock_resp
+
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", mock_post)
+    result = call_gladia(mock_master, api_key="test_key")
+
+    assert result.transcript == "hello world"
+    assert len(result.words) == 1
+    assert result.words[0].word == "hello"
+    assert result.words[0].start_s == 0.0
+    assert result.words[0].end_s == 0.5
+
+
 def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
     """Check the router: fall back to Gladia when Deepgram fails[cite: 1]."""
 
@@ -126,8 +182,7 @@ def test_fallback_to_gladia_when_deepgram_fails(monkeypatch, mock_master):
         else:
             # Return a good result for Gladia
             mock_resp.json.return_value = {
-                "prediction": "fallback success",
-                "prediction_raw": {"words": []},
+                "prediction": [{"transcription": "fallback success", "words": []}],
             }
         return mock_resp
 
@@ -206,3 +261,41 @@ def test_evaluate_returns_503_stt_unavailable(monkeypatch):
     r = client.get(f"/api/evaluate/{r.json()['job_id']}")
     assert r.json()["status"] == "failed"
     assert r.json()["error_code"] == "stt_unavailable"
+
+
+def _deepgram_ok(seen: list):
+    def mock_post(url, *args, **kwargs):
+        seen.append((kwargs["headers"]["Content-Type"], kwargs["data"].read()))
+        resp = MagicMock()
+        resp.json.return_value = {
+            "results": {"channels": [{"alternatives": [{"transcript": "hi", "words": []}]}]}
+        }
+        return resp
+
+    return mock_post
+
+
+def test_transcribe_sends_opus_copy(monkeypatch, mock_master):
+    """STT gets the small Opus file, not the master WAV."""
+    seen: list = []
+
+    def fake_encode(wav_path, out_path):
+        assert wav_path == mock_master.path
+        out_path.write_bytes(b"opus bytes")
+
+    monkeypatch.setattr("src.audio_processing.stt.encode_opus", fake_encode)
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", _deepgram_ok(seen))
+    transcribe(mock_master, settings=MockSettings())
+    assert seen == [("audio/webm", b"opus bytes")]
+
+
+def test_transcribe_sends_wav_when_opus_encoding_fails(monkeypatch, mock_master):
+    seen: list = []
+
+    def broken_encode(wav_path, out_path):
+        raise AudioEncodingError("ffmpeg failed")
+
+    monkeypatch.setattr("src.audio_processing.stt.encode_opus", broken_encode)
+    monkeypatch.setattr("src.audio_processing.stt.requests.post", _deepgram_ok(seen))
+    transcribe(mock_master, settings=MockSettings())
+    assert seen == [("audio/wav", mock_master.path.read_bytes())]

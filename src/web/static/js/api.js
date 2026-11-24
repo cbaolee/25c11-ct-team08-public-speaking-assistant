@@ -1,28 +1,36 @@
 import { T } from './i18n.js';
 import { logout } from './modals/baseline_gate.js';
 import { S } from './state.js';
-import { toast } from './ui.js';
+import { openModal, toast } from './ui.js';
 
 /* ---------- API calls + login session ----------
-   The tokens from POST /api/auth/login are kept in localStorage, so F5 keeps the person logged in.
-   api() adds `Authorization: Bearer`, and on a 401 swaps the refresh token for a new session once. */
-export const AUTH_KEY = 'psa.auth';
+   The access token lives only in memory (S.auth). The refresh token is an HttpOnly cookie that
+   JavaScript never sees, sent by the browser only to /api/auth/*. A page load (F5) and every 401
+   ask POST /api/auth/refresh for a new access token; api() adds `Authorization: Bearer`. */
 export const MIN_PASSWORD = 8;   // same rule as the backend (src/app/auth.py)
 export const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export const AUTH_ERR = { email_taken: 'auth.errTaken', invalid_email: 'auth.errEmail', weak_password: 'auth.errWeak', invalid_credentials: 'auth.errLogin' };
-export function loadAuth() {
-  try { const a = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null'); return a && a.access_token ? a : null; } catch (e) { return null; }
+const OLD_AUTH_KEY = 'psa.auth';   // where older versions kept both tokens; removed on load
+const REFRESH_RETRY_MS = 300;
+export function dropOldStoredTokens() {
+  try { localStorage.removeItem(OLD_AUTH_KEY); } catch (e) { /* storage blocked: nothing stored either */ }
 }
 export function storeAuth(a) {
-  S.auth = a;
-  try { if (a) localStorage.setItem(AUTH_KEY, JSON.stringify(a)); else localStorage.removeItem(AUTH_KEY); } catch (e) { /* private mode: login lasts until reload */ }
+  S.auth = a && a.access_token ? { access_token: a.access_token, expires_in: a.expires_in, user_id: a.user_id } : null;
+}
+function postRefresh() {
+  return fetch('/api/auth/refresh', { method: 'POST', credentials: 'same-origin' });
 }
 export let authRefresh = null;
-export function refreshAuth() {   // resolves true (new tokens), false (session over); rejects when the server cannot be reached
-  if (!S.auth || !S.auth.refresh_token) return Promise.resolve(false);
+/* Resolves true (new access token), false (session over); rejects when the server cannot be reached.
+   A refresh token works once, so two tabs refreshing together can make one of them get 401: that
+   tab tries once more after a short wait, when the other tab has already set the new cookie. */
+export function refreshAuth() {
   if (!authRefresh) {
-    authRefresh = fetch('/api/auth/refresh', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: S.auth.refresh_token }) })
-      .then(r => r.ok ? r.json().then(j => { storeAuth(j); return true; }) : (r.status === 401 ? false : Promise.reject(new Error('auth'))))
+    const asJson = r => r.json().then(j => { storeAuth(j); return true; });
+    authRefresh = postRefresh()
+      .then(r => r.status !== 401 ? r : new Promise(done => setTimeout(done, REFRESH_RETRY_MS)).then(postRefresh))
+      .then(r => r.ok ? asJson(r) : (r.status === 401 ? false : Promise.reject(new Error('auth'))))
       .finally(() => { authRefresh = null; });
   }
   return authRefresh;
@@ -38,18 +46,37 @@ export function api(url, opts) {
     return fetch(url, Object.assign({}, o, { headers: h }));
   };
   return send().then(res => {
+    if (res.status === 403) checkConsentLost(res);
     if (res.status !== 401 || !S.auth) return res;
     return refreshAuth().then(ok => { if (ok) return send(); sessionEnded(); return res; }, () => res);
   });
 }
 export const readJson = res => res.json().catch(() => null).then(j => ({ res, ok: res.ok, status: res.status, j }));
+/* 403 consent_required: recording was turned off (for example in another tab). The caller still
+   gets the response; the Consent Modal opens so the user can turn recording on again. */
+function checkConsentLost(res) {
+  res.clone().json().then(j => {
+    if (!j || j.error_code !== 'consent_required' || !S.user) return;
+    S.consent = false;
+    openModal('consentModal', { focus: '#mcAllow' });
+  }).catch(() => {});
+}
 export function sessionEnded() {
   storeAuth(null);
   if (S.user) { logout(true); toast(T('auth.expired'), true); }
 }
 
-/* Settings > Delete account. Stub: the backend route DELETE /api/auth/account is not built yet
-   (handed over to the Auth group), so today this request fails and the UI shows an error. */
-export function deleteAccount() {
-  return api('/api/auth/account', { method: 'DELETE' });
+/* Forgot password (Log in and Settings): POST without the access token, so a 401 never logs out.
+   Both resolve to readJson's { res, ok, status, j }. */
+function postJson(url, body) {
+  return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(readJson);
+}
+export const sendResetCode = email => postJson('/api/auth/forgot-password', { email });
+export const resetPassword = (email, token, newPassword) => postJson('/api/auth/reset-password', { email, token, new_password: newPassword });
+export const RESET_ERR = { otp_invalid: 'auth.errOtpInvalid', otp_expired: 'auth.errOtpExpired', rate_limited: 'auth.errRateLimited', invalid_email: 'auth.errEmail', weak_password: 'auth.errWeak' };
+
+/* Settings > Delete account: DELETE /api/auth/account with the current password (ADR-011).
+   A wrong password is 403 wrong_password, so api() does not treat it as a session that ended. */
+export function deleteAccount(password) {
+  return api('/api/auth/account', { method: 'DELETE', json: { password } });
 }

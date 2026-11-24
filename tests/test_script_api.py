@@ -69,6 +69,7 @@ def _build_test_pipeline() -> tuple[ScriptGenerationPipeline, MagicMock]:
             models_used=["openai/gpt-oss-120b"],
             citations=[ParagraphCitation(paragraph=1, heading=None, page=None, status="uncited")],
             flags=["uncited"],
+            title="Quantum Computing Ethics Today",
         )
 
     llm_mock.generate_free_topic_script.side_effect = _fake_free_topic
@@ -133,11 +134,13 @@ def test_generate_script_template_and_llm_cache_and_20m_warning(
     assert job_tpl["status"] == "completed"
     assert job_tpl["result"]["source"] == "template"
     assert "word_count_adjusted" in job_tpl["result"]["flags"]
+    assert job_tpl["result"]["title"] == "Keystone Species Conservation"
 
-    for _ in range(2):
+    for _ in range(2):  # the 2nd round is a cache hit and must keep the title
         job_llm = _submit_and_poll("Quantum Computing Ethics", duration_min=20, user_id="alice")
         assert job_llm["status"] == "completed"
         assert job_llm["result"]["source"] == "llm"
+        assert job_llm["result"]["title"] == "Quantum Computing Ethics Today"
         assert "audio_limit_warning" in job_llm["result"]["flags"]
 
     assert llm_mock.generate_free_topic_script.call_count == 1
@@ -185,50 +188,59 @@ def script_api(setup_pipeline, monkeypatch):
 
 
 def _save(client: TestClient, body: str, **extra: Any):
+    title = extra.pop("title", f"Script {body[:40]}")
     return client.post(
-        "/api/scripts", json={"title": "My Speech", "body": body, "source": "written", **extra}
+        "/api/scripts", json={"title": title, "body": body, **extra}
     )
 
 
 def test_save_script_stores_row_in_repo(script_api) -> None:
     client, repos, state = script_api
-    r = _save(client, "Good morning.", duration_min=5, topic="Greetings")
+    r = _save(client, "Good morning.")
     assert r.status_code == 201
     body = r.json()
     assert body["body"] == "Good morning."
     assert body["word_count"] == 2
-    assert body["source"] == "written"
     assert "user_id" not in body and "content_hash" not in body
-    assert repos.scripts.get_script(state["user"].id, UUID(body["id"])).topic == "Greetings"
+    saved = repos.scripts.get_script(state["user"].id, UUID(body["id"]))
+    assert saved is not None
+    assert saved.title == "Script Good morning."
 
 
-def test_save_same_text_twice_returns_existing_script(script_api) -> None:
+def test_save_same_text_twice_returns_duplicate_body(script_api) -> None:
     client, repos, state = script_api
     first = _save(client, "Hello world.")
     again = _save(client, "Hello world.", title="Another title")
-    assert (first.status_code, again.status_code) == (201, 200)
-    assert again.json()["id"] == first.json()["id"]
+    assert (first.status_code, again.status_code) == (201, 409)
+    assert again.json()["error_code"] == "script_duplicate_body"
+    assert again.json()["duplicate_id"] == first.json()["id"]
     assert repos.scripts.count_scripts(state["user"].id) == 1
 
 
-def test_save_script_generated_source_keeps_metadata(script_api) -> None:
+def test_save_script_accepts_only_title_and_body(script_api) -> None:
     client, _, _ = script_api
-    r = _save(
-        client,
-        "A generated speech.",
-        source="generated_llm",
-        models_used=["openai/gpt-oss-120b"],
-        template_id=None,
-        category="free",
-    )
+    r = _save(client, "A saved speech.", source="written", category="free")
     assert r.status_code == 201
-    assert r.json()["models_used"] == ["openai/gpt-oss-120b"]
+    assert r.json()["title"].startswith("Script ")
 
 
-def test_save_script_rejects_old_source_values(script_api) -> None:
+def test_save_script_rejects_duplicate_title_case_insensitively(script_api) -> None:
     client, _, _ = script_api
-    assert _save(client, "Hello.", source="user").status_code == 422
-    assert _save(client, "Hello.", source="template").status_code == 422
+    first = _save(client, "First text.", title="My Talk")
+    second = _save(client, "Second text.", title="my talk")
+    assert first.status_code == 201
+    assert second.status_code == 409
+    assert second.json()["error_code"] == "script_duplicate_title"
+    assert second.json()["duplicate_title"] == "My Talk"
+
+
+def test_save_script_duplicate_body_takes_priority_over_title(script_api) -> None:
+    client, _, _ = script_api
+    first = _save(client, "Same text.", title="My Talk")
+    second = _save(client, "Same text.", title="my talk")
+    assert first.status_code == 201
+    assert second.status_code == 409
+    assert second.json()["error_code"] == "script_duplicate_body"
 
 
 def test_save_script_empty_body_returns_422(script_api) -> None:
@@ -262,8 +274,9 @@ def test_saving_existing_script_at_cap_returns_existing_row(script_api) -> None:
     first = _save(client, "First text.")
     _save(client, "Second text.")
     again = _save(client, "First text.", title="Renamed")
-    assert again.status_code == 200
-    assert again.json()["id"] == first.json()["id"]
+    assert again.status_code == 409
+    assert again.json()["error_code"] == "script_duplicate_body"
+    assert again.json()["duplicate_id"] == first.json()["id"]
 
 
 def test_saved_scripts_other_user_cannot_list_read_or_delete(script_api) -> None:
@@ -311,8 +324,6 @@ def _store_scripts(repos, user_id, count: int) -> None:
             NewScript(
                 title=f"Script {index}",
                 body=body,
-                word_count=len(body.split()),
-                source="written",
                 content_hash=build_content_hash(body),
             ),
         )
@@ -384,6 +395,16 @@ def test_rename_script_changes_only_the_title(script_api) -> None:
     assert client.get(f"/api/scripts/{script['id']}").json()["title"] == "My new name"
 
 
+def test_rename_script_rejects_another_script_title(script_api) -> None:
+    client, _, _ = script_api
+    first = _save(client, "First text.", title="Shared name")
+    second = _save(client, "Second text.", title="Another name")
+    r = client.patch(f"/api/scripts/{second.json()['id']}", json={"title": "shared name"})
+    assert r.status_code == 409
+    assert r.json()["error_code"] == "script_duplicate_title"
+    assert r.json()["duplicate_id"] == first.json()["id"]
+
+
 def test_rename_script_rejects_empty_and_long_titles(script_api) -> None:
     client, _, _ = script_api
     script_id = _save(client, "Name rules.").json()["id"]
@@ -423,7 +444,7 @@ def test_edit_script_body_matching_another_script_returns_409(script_api) -> Non
     second = _save(client, "Second saved text.").json()
     r = client.patch(f"/api/scripts/{second['id']}", json={"body": "First saved text."})
     assert r.status_code == 409
-    assert r.json()["error_code"] == "script_duplicate"
+    assert r.json()["error_code"] == "script_duplicate_body"
     assert r.json()["duplicate_id"] == first["id"]
     assert r.json()["duplicate_title"] == first["title"]
     assert client.get(f"/api/scripts/{second['id']}").json()["body"] == "Second saved text."
