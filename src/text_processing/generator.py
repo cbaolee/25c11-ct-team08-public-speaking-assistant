@@ -1,6 +1,7 @@
 """Groq LLM script generator with multi-section free-topic flow and fallback chain."""
 
 import json
+import re
 import unicodedata
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -251,8 +252,9 @@ class ScriptGenerator:
                     f"Write section {section_index}/{total_sections} ('{section_title}') "
                     f"in approximately {target_words} words. "
                     "Only include a chunk ID in source_chunk_ids if a paragraph directly uses "
-                    "facts, figures, or claims from that specific source document chunk; if a "
-                    "paragraph uses general knowledge or the speaker's chat notes, use []. "
+                    "facts, figures, or claims from that specific source document chunk; "
+                    "otherwise set source_chunk_ids to []. "
+                    "Never include [], chunk IDs, or citation brackets inside the text field. "
                     'Return JSON: {"paragraphs": [{"text": "...", "source_chunk_ids": []}]}'
                     f"{_title_prompt_note(section_index)}"
                 ),
@@ -304,7 +306,7 @@ class ScriptGenerator:
             for item in raw_items:
                 if not isinstance(item, dict):
                     continue
-                text = str(item.get("text", "")).strip()
+                text = re.sub(r"\s*\[\s*\]", "", str(item.get("text", ""))).strip()
                 if not text:
                     continue
                 raw_ids = item.get("source_chunk_ids", [])
