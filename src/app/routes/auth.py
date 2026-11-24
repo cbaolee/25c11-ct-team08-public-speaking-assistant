@@ -148,6 +148,22 @@ def _consent_required() -> JSONResponse:
     return _error(422, "consent_required", "Recording consent is required to create an account.")
 
 
+def _display_name(sent: str | None, email: str) -> str:
+    """The name the app and the emails use: the one sent, or the part of the email before @."""
+    return (sent or "").strip() or email.split("@")[0][:50]
+
+
+def sync_display_name(auth: AuthProvider, user_id: UUID, display_name: str) -> None:
+    """Best effort: copy the name to the account so the emails greet the user with it.
+
+    The profile is the source of truth; a failure only means an older name (or "Hi,") in mail.
+    """
+    try:
+        auth.set_display_name(user_id, display_name)
+    except AuthProviderError:
+        logger.warning("Could not copy the display name to the account")
+
+
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
@@ -182,8 +198,9 @@ async def sign_up(
         return _weak_password()
     if payload.consent_recording is not True:
         return _consent_required()
+    display_name = _display_name(payload.display_name, email)
     try:
-        result = await run_in_threadpool(auth.sign_up, email, payload.password)
+        result = await run_in_threadpool(auth.sign_up, email, payload.password, display_name)
     except EmailTakenError:
         return _error(409, "email_taken", "An account with this email already exists.")
     except WeakPasswordError:
@@ -205,7 +222,7 @@ async def sign_up(
     if existing is None:
         profile = ProfileUpsert(
             target_accent=payload.target_accent.strip(),
-            display_name=(payload.display_name or "").strip() or email.split("@")[0][:50],
+            display_name=display_name,
             age=payload.age,
             gender=payload.gender,
         )
@@ -252,10 +269,12 @@ def _apply_password(auth: AuthProvider, user_id: UUID, password: str) -> bool:
     return True
 
 
-def _apply_profile(repos: Repos, user_id: UUID, details: SignupDetails, email: str) -> bool:
+def _apply_profile(
+    auth: AuthProvider, repos: Repos, user_id: UUID, details: SignupDetails, email: str
+) -> bool:
     profile = ProfileUpsert(
         target_accent=details.target_accent.strip(),
-        display_name=(details.display_name or "").strip() or email.split("@")[0][:50],
+        display_name=_display_name(details.display_name, email),
         age=details.age,
         gender=details.gender,
     )
@@ -265,6 +284,7 @@ def _apply_profile(repos: Repos, user_id: UUID, details: SignupDetails, email: s
     except StorageError:
         logger.warning("Verified account: the latest sign-up profile could not be saved")
         return False
+    sync_display_name(auth, user_id, profile.display_name)
     return True
 
 
@@ -310,7 +330,7 @@ async def verify_otp(
         )
     if payload.profile is not None:
         profile_updated = user_id is not None and await run_in_threadpool(
-            _apply_profile, repos, user_id, payload.profile, email
+            _apply_profile, auth, repos, user_id, payload.profile, email
         )
     return {
         "verified": True,

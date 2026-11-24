@@ -98,7 +98,10 @@ class TokenUser:
 
 
 class AuthProvider(Protocol):
-    def sign_up(self, email: str, password: str) -> SignUpResult: ...
+    # display_name goes to the account's metadata: the emails greet the user with it.
+    def sign_up(
+        self, email: str, password: str, display_name: str | None = None
+    ) -> SignUpResult: ...
 
     # Returns the id of the account the code confirmed (None when the provider does not say).
     def verify_signup_otp(self, email: str, token: str) -> UUID | None: ...
@@ -118,6 +121,9 @@ class AuthProvider(Protocol):
     def sign_out(self, access_token: str) -> None: ...
 
     def update_password(self, user_id: UUID, password: str) -> None: ...
+
+    # Keep the name the emails use in step with profiles.display_name.
+    def set_display_name(self, user_id: UUID, display_name: str) -> None: ...
 
     # Re-auth for sensitive actions (ADR-011): True only when the password is the account's.
     def verify_password(self, email: str, password: str) -> bool: ...
@@ -146,6 +152,7 @@ class _MemoryAccount:
     reset_hash: str | None = None  # forgot-password code, kept apart from the sign-up code
     reset_expires_at: float = 0
     reset_attempts: int = 0
+    display_name: str | None = None  # Supabase keeps it in user_metadata
 
 
 def _mask_email(email: str) -> str:
@@ -250,7 +257,9 @@ class MemoryAuthProvider:
         if self._log_codes:
             logger.info("dev OTP for %s : %s", _mask_email(account.email), code)
 
-    def sign_up(self, email: str, password: str) -> SignUpResult:
+    def sign_up(
+        self, email: str, password: str, display_name: str | None = None
+    ) -> SignUpResult:
         email = email.strip().lower()
         if len(password) < MIN_PASSWORD_LENGTH:
             raise WeakPasswordError()
@@ -266,6 +275,7 @@ class MemoryAuthProvider:
             account = _MemoryAccount(
                 uuid4(), email, salt, self._hash(password, salt), not self._require_email_otp
             )
+            account.display_name = display_name
             self._accounts[email] = account
             if not account.confirmed:
                 self._issue_otp(account)
@@ -350,6 +360,12 @@ class MemoryAuthProvider:
                 raise InvalidCredentialsError()
             account.salt = secrets.token_bytes(16)
             account.password_hash = self._hash(password, account.salt)
+
+    def set_display_name(self, user_id: UUID, display_name: str) -> None:
+        with self._lock:
+            account = self._account_by_id(user_id)
+            if account is not None:
+                account.display_name = display_name
 
     def verify_password(self, email: str, password: str) -> bool:
         """Check a password without creating a session (re-auth before a sensitive action)."""
@@ -489,11 +505,20 @@ class SupabaseAuthProvider:
             except Exception:
                 pass  # Best effort; never expose the session.
 
-    def sign_up(self, email: str, password: str) -> SignUpResult:
+    def sign_up(
+        self, email: str, password: str, display_name: str | None = None
+    ) -> SignUpResult:
         if not self._require_email_otp:
-            return SignUpResult(str(self.create_user(email, password)), False, True)
+            user_id = self.create_user(email, password)
+            if display_name:
+                self.set_display_name(user_id, display_name)
+            return SignUpResult(str(user_id), False, True)
+        # The metadata must go with sign up: the confirm email is sent by this call.
+        credentials = {"email": email, "password": password}
+        if display_name:
+            credentials["options"] = {"data": {"display_name": display_name}}
         try:
-            resp = self._new_client().sign_up({"email": email, "password": password})
+            resp = self._new_client().sign_up(credentials)
         except AuthWeakPasswordError as err:
             raise WeakPasswordError() from err
         except Exception as err:
@@ -602,6 +627,15 @@ class SupabaseAuthProvider:
             raise AuthUnavailableError("Could not change the password") from err
         except Exception as err:
             raise AuthUnavailableError("Could not change the password") from err
+
+    def set_display_name(self, user_id: UUID, display_name: str) -> None:
+        """user_metadata.display_name, read by the email templates as {{ .Data.display_name }}."""
+        try:
+            self._admin_client.admin.update_user_by_id(
+                str(user_id), {"user_metadata": {"display_name": display_name}}
+            )
+        except Exception as err:
+            raise AuthUnavailableError("Could not save the display name") from err
 
     def verify_password(self, email: str, password: str) -> bool:
         """Re-auth: sign in on a throwaway client, then revoke the session it created at once.

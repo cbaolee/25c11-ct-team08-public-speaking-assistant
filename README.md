@@ -125,6 +125,20 @@ Only needed when `SUPABASE_URL` is set.
 
 > Never edit a merged migration, except its `Applied:` line. Add a new file (`0011_...sql`, or the next number in `migration_shard/`) with the `Run` / `Applied` / `Effect` header. Run it on every project it is for (core or each shard).
 
+### Email
+
+Sign up and _Forgot password?_ send a 6-digit code by email through Supabase Auth. Only needed when `SUPABASE_URL` is set; without it no email is sent: the in-memory accounts (dev only) log the code at INFO level.
+
+Supabase's built-in email server is for trying things out only: about 2 emails per hour, sent only to members of the Supabase organization, and new Free projects cannot change the email templates. Real users need your own SMTP server:
+
+1. Create an account at an email provider with SMTP, for example [Resend](https://resend.com) or [Brevo](https://www.brevo.com), and verify the sender address or domain there.
+2. In Supabase: _Project Settings → Authentication → SMTP Settings_ → turn on _Enable custom SMTP_, then enter the sender email and name, host, port, username and password from the provider.
+3. _Authentication → Rate Limits_: raise _Rate limit for sending emails_ (30 per hour by default once custom SMTP is on) to what the provider allows.
+4. Paste the two templates from [docs/email_templates](docs/email_templates/README.md) (_Confirm signup_ and _Reset password_) and set their subjects.
+5. Check _Authentication → Providers → Email_: _Email OTP Length_ 6 and _Email OTP Expiration_ 3600 seconds, as the templates say.
+
+Never commit the SMTP password: it stays in the Supabase dashboard only.
+
 ### Testing
 
 ```bash
@@ -176,6 +190,7 @@ A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase p
 │   ├── adr/                       # Architecture decision records
 │   ├── ai_use_log/                # AI usage logs, one file per member
 │   ├── conventions/               # Team conventions
+│   ├── email_templates/           # Supabase Auth emails (sign-up code, reset code)
 │   ├── challenge_analysis.md
 │   ├── use_case.drawio
 │   ├── input_flow.drawio
