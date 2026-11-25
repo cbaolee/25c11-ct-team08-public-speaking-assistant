@@ -98,7 +98,6 @@
 .sch-wheel-current { font-weight: 700; }
 .sch-picker-go { align-self: flex-end; }
 .sch-picker-arrow:focus-visible, .sch-wheel:focus-visible, #screenSchedule #schMonth:focus-visible, #screenSchedule .sch-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (prefers-reduced-motion: reduce) { .sch-monthpicker { animation: none; } }
 
 .sch-datepicker, .sch-timepicker { position: relative; }
 .sch-picker-trigger { width: 100%; min-height: 44px; padding: 10px 12px; text-align: left; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); background: var(--surface); color: var(--ink); font: 400 16px var(--sans); cursor: pointer; font-variant-numeric: tabular-nums; }
@@ -133,7 +132,7 @@
 .sch-carousel-controls { display: flex; gap: 6px; }
 .sch-carousel-arrow { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); cursor: pointer; }
 .sch-carousel-arrow:disabled { opacity: .35; cursor: default; }
-.sch-carousel-viewport { position: relative; flex-basis: 100%; min-width: 0; overflow: hidden; padding: 4px 0; }
+.sch-carousel-viewport { position: relative; flex-basis: 100%; min-width: 0; overflow: clip; padding: 4px 0; }
 .sch-carousel-viewport.sch-fade-right { mask-image: linear-gradient(to right, black 94%, transparent); }
 .sch-carousel-viewport.sch-fade-left { mask-image: linear-gradient(to right, transparent, black 6%); }
 .sch-carousel-viewport.sch-fade-left.sch-fade-right { mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent); }
@@ -146,7 +145,7 @@
 .sch-card-top { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .sch-card-top .sch-chip { margin-left: auto; }
 .sch-card-length, .sch-card-helper { color: var(--muted); font-size: 13px; }
-.sch-card-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-style: italic; }
+.sch-card-note { position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-style: italic; }
 .sch-card-status { font-size: 14px; }
 .sch-card-clock { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sch-tone-ok { color: var(--ok); }

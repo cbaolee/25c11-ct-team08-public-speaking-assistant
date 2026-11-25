@@ -44,6 +44,8 @@ function pickerShell(container, paint) {
   const escape = e => { if (e.key === 'Escape' && !popup.hidden) { e.preventDefault(); e.stopPropagation(); close(); } };
   trigger.addEventListener('keydown', escape);
   popup.addEventListener('keydown', escape);
+  window.addEventListener('resize', () => { if (!picker.hidden) closePicker(); });
+  document.addEventListener('scroll', e => { if (!picker.hidden && !picker.contains(e.target)) closePicker(); }, true);
   document.addEventListener('pointerdown', e => { if (!popup.hidden && !container.contains(e.target)) close(false); });
   return { trigger, popup, close };
 }
@@ -160,7 +162,7 @@ function openDay(key, highlightKey = null) {
       const id = resultLink(getSchedule().done[occ.key], S.sessions);
       if (id) {
         const result = button(T('schedule.viewResult'), () => closeModal('schDayDrawer'));
-        result.dataset.open = id; actions.append(result);
+        result.dataset.open = id; result.dataset.todayRole = 'result'; actions.append(result);
       } else row.append(node('p', T('schedule.resultUnavailable'), 'note'));
     }
     if (canEdit(occ, Date.now())) actions.append(button(T('schedule.edit'), () => openEvent(key, occ, event)));
@@ -291,7 +293,8 @@ function init() {
         }
       };
       wheel.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); change(e.key === 'ArrowUp' ? -1 : 1); } };
-      section.addEventListener('wheel', e => { if (e.deltaY) { e.preventDefault(); change(e.deltaY < 0 ? -1 : 1); } }, { passive: false });
+      let lastWheelStep = -Infinity;
+      section.addEventListener('wheel', e => { if (e.deltaY) { e.preventDefault(); const now = performance.now(); if (now - lastWheelStep >= 120) { lastWheelStep = now; change(e.deltaY < 0 ? -1 : 1); } } }, { passive: false });
       paint(); section.append(up, wheel, down); columns.append(section);
     });
     picker.append(columns, button(T('schedule.pickerGo'), apply, 'btn btn-sm btn-primary sch-picker-go'));
@@ -305,9 +308,11 @@ function init() {
     picker.style.left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.left + rect.width / 2 - width / 2)) + 'px';
     picker.style.top = rect.bottom + 6 + 'px'; picker.querySelector('.sch-wheel').focus();
   };
-  const escapePicker = e => { if (e.key === 'Escape' && !picker.hidden) { e.preventDefault(); e.stopPropagation(); closePicker(); } else if (e.key === 'Enter' && !picker.hidden) { e.preventDefault(); apply(); } };
+  const escapePicker = e => { if (e.key === 'Escape' && !picker.hidden) { e.preventDefault(); e.stopPropagation(); closePicker(); } else if (e.key === 'Enter' && !picker.hidden && (e.target.classList.contains('sch-wheel') || e.target.classList.contains('sch-picker-go'))) { e.preventDefault(); apply(); } };
   label.onkeydown = escapePicker;
   picker.onkeydown = escapePicker;
+  window.addEventListener('resize', () => { if (!picker.hidden) closePicker(); });
+  document.addEventListener('scroll', e => { if (!picker.hidden && !picker.contains(e.target)) closePicker(); }, true);
   document.addEventListener('pointerdown', e => { if (!picker.hidden && !picker.parentElement.contains(e.target)) closePicker(); });
   $('schPrev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
   $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
@@ -345,6 +350,10 @@ export function renderTodayPanel() {
   const summary = todaySummary(occurrences, now);
   const items = occurrences.filter(o => o.day === dayKey(now));
   const panel = document.getElementById('schTodayPanel');
+  const active = document.activeElement;
+  const focusRole = panel.contains(active) ? active.dataset.todayRole : null;
+  const focusKey = focusRole ? active.closest('.sch-card')?.dataset.todayKey : null;
+  let restoringFocus = false;
   todayResize.abort(); todayResize = new AbortController();
   panel.replaceChildren();
   const head = node('div', null, 'sch-today-head');
@@ -365,6 +374,7 @@ export function renderTodayPanel() {
     const controls = node('div', null, 'sch-carousel-controls');
     const arrow = (label, direction) => {
       const b = todayButton('', 'sch-carousel-arrow sch-chevron', () => move(direction));
+      b.dataset.todayRole = direction < 0 ? 'prev' : 'next';
       b.setAttribute('aria-label', T('schedule.todayPanel.' + label)); b.setAttribute('aria-controls', track.id);
       const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('aria-hidden', 'true');
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'path'); line.setAttribute('d', direction < 0 ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'); icon.append(line); b.append(icon); return b;
@@ -374,9 +384,11 @@ export function renderTodayPanel() {
     const words = Object.fromEntries(['hour', 'hours', 'minute', 'minutes', 'lessThanMinute'].map(k => [k, T('schedule.todayPanel.' + k)]));
     items.forEach((item, index) => {
       const status = occurrenceStatus(item, now), card = node('article', null, 'sch-card');
+      card.dataset.todayKey = item.key;
       const open = todayButton('', 'sch-card-open', () => { go('schedule'); openDay(item.day, item.key); });
+      open.dataset.todayRole = 'open';
       open.setAttribute('aria-label', T('schedule.todayPanel.details', { time: time(item.start), length: T('schedule.minutes', { n: item.duration_min }) }));
-      card.addEventListener('focusin', () => { const visible = visibleCount(); if (index < todayCarouselIndex) todayCarouselIndex = index; else if (index >= todayCarouselIndex + visible) todayCarouselIndex = index - visible + 1; update(); });
+      card.addEventListener('focusin', () => { const before = todayCarouselIndex, visible = visibleCount(); if (index < todayCarouselIndex) todayCarouselIndex = index; else if (index >= todayCarouselIndex + visible) todayCarouselIndex = index - visible + 1; if (before !== todayCarouselIndex) update(!restoringFocus); });
       const top = node('div', null, 'sch-card-top');
       top.append(node('strong', time(item.start)), node('span', T('schedule.minutes', { n: item.duration_min }), 'sch-card-length'));
       if (status === 'done' || status === 'missed') top.append(chip(status));
@@ -390,28 +402,31 @@ export function renderTodayPanel() {
       else statusLine.textContent = T('schedule.todayPanel.windowClosed');
       const actions = node('div', null, 'sch-card-actions');
       if (status === 'active' || status === 'upcoming') {
-        const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary', () => startCheckIn(item)); check.dataset.schCheckin = item.key; check.disabled = status === 'upcoming'; actions.append(check);
+        const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary', () => startCheckIn(item)); check.dataset.schCheckin = item.key; check.dataset.todayRole = 'check-in'; check.disabled = status === 'upcoming'; actions.append(check);
         if (status === 'upcoming') actions.append(node('span', T('schedule.todayPanel.opensAt', { time: time(item.start) }), 'sch-card-helper'));
       } else if (status === 'done') {
         const id = resultLink(getSchedule().done[item.key], S.sessions);
-        if (id) { const result = todayButton(T('schedule.viewResult'), 'btn', null); result.dataset.open = id; actions.append(result); }
+        if (id) { const result = todayButton(T('schedule.viewResult'), 'btn', null); result.dataset.open = id; result.dataset.todayRole = 'result'; actions.append(result); }
         else actions.append(node('span', T('schedule.resultUnavailable'), 'sch-card-helper'));
       }
       card.append(open, top, note, statusLine, actions); track.append(card);
     });
     viewport.append(track); body.append(viewport, live);
     function visibleCount() { return window.matchMedia('(max-width: 720px)').matches ? 1 : 3; }
-    function update() {
+    function update(userMove = false) {
       const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, 0);
       const fades = edgeFades(todayCarouselIndex, items.length, visible);
       viewport.classList.toggle('sch-fade-left', fades.left); viewport.classList.toggle('sch-fade-right', fades.right);
       controls.hidden = items.length <= visible; prev.disabled = !fades.left; next.disabled = !fades.right;
-      const card = track.firstElementChild; const offset = card ? todayCarouselIndex * (card.getBoundingClientRect().width + 16) : 0;
+      const card = track.firstElementChild; const offset = !fades.right ? Math.max(0, track.scrollWidth - viewport.clientWidth) : card ? todayCarouselIndex * (card.getBoundingClientRect().width + 16) : 0;
+      viewport.scrollLeft = 0;
+      if (!userMove) track.style.transition = 'none';
       track.style.transform = `translateX(-${offset}px)`;
-      live.textContent = T('schedule.todayPanel.showing', { start: todayCarouselIndex + 1, end: Math.min(items.length, todayCarouselIndex + visible), total: items.length });
+      if (!userMove) { void track.offsetWidth; track.style.removeProperty('transition'); }
+      if (userMove) { const message = T('schedule.todayPanel.showing', { start: todayCarouselIndex + 1, end: Math.min(items.length, todayCarouselIndex + visible), total: items.length }); if (live.textContent !== message) live.textContent = message; }
     }
-    function move(direction) { const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, direction * visible); update(); }
-    requestAnimationFrame(update);
+    function move(direction) { const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, direction * visible); update(true); }
+    requestAnimationFrame(() => update());
     window.addEventListener('resize', () => { if (panel.contains(viewport)) update(); }, { signal: todayResize.signal });
   } else {
     todayCarouselIndex = 0;
@@ -430,6 +445,10 @@ export function renderTodayPanel() {
   panel.append(dots);
   const motivation = motivationKey(summary);
   if (motivation) panel.append(node('p', T('schedule.motivation.' + motivation, { n: summary.streak, len: occ?.duration_min }), 'sch-motivation'));
+  if (focusRole) {
+    const target = [...panel.querySelectorAll('[data-today-role]')].find(el => el.dataset.todayRole === focusRole && (focusKey == null || el.closest('.sch-card')?.dataset.todayKey === focusKey));
+    if (target && !target.disabled) { restoringFocus = true; target.focus({ preventScroll: true }); restoringFocus = false; }
+  }
 }
 
 configureCheckIn({ getSchedule, saveScheduleState, rerender: () => { if (S.screen === 'home') renderTodayPanel(); if (S.screen === 'schedule') { render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); } } });
