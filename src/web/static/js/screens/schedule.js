@@ -41,7 +41,9 @@ function pickerShell(container, paint) {
     if (popup.getBoundingClientRect().bottom > box.bottom) popup.classList.add('sch-flip');
     popup.querySelector('[tabindex="0"], button:not(:disabled)')?.focus();
   };
-  popup.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } });
+  const escape = e => { if (e.key === 'Escape' && !popup.hidden) { e.preventDefault(); e.stopPropagation(); close(); } };
+  trigger.addEventListener('keydown', escape);
+  popup.addEventListener('keydown', escape);
   document.addEventListener('pointerdown', e => { if (!popup.hidden && !container.contains(e.target)) close(false); });
   return { trigger, popup, close };
 }
@@ -114,6 +116,7 @@ function chip(status, label, compact = false) {
 function render() {
   const state = getSchedule(), keys = monthGrid(month.getFullYear(), month.getMonth()), now = Date.now();
   $('schMonth').textContent = fmt(month, { month: 'long', year: 'numeric' });
+  $('schMonthLive').textContent = $('schMonth').textContent;
   const current = new Date(now);
   $('schToday').hidden = month.getFullYear() === current.getFullYear() && month.getMonth() === current.getMonth();
   const grid = $('schGrid'), focusedDay = document.activeElement?.dataset.schDay; grid.replaceChildren();
@@ -202,7 +205,7 @@ function openEvent(key, occ = null, event = null) {
   ['schDate', 'schTime', 'schLength', 'schNote', 'schRepeat', 'schUntil'].forEach(id => $(id).removeAttribute('aria-invalid'));
   $('schEventTitle').textContent = T(editing ? 'schedule.editEvent' : 'schedule.newEvent');
   $('schDelete').hidden = !editing;
-  $('schRepeatFields').hidden = !!editing && event.recurrence.kind !== 'none';
+  $('schRepeatFields').hidden = !!editing;
   $('schRepeat').querySelectorAll('button').forEach(b => { b.disabled = !!editing; });
   $('schDate').disabled = !!editing && event.recurrence.kind !== 'none';
   $('schEditRepeat').hidden = !editing || event.recurrence.kind === 'none';
@@ -214,7 +217,7 @@ function openEvent(key, occ = null, event = null) {
   }
   updateRecurrence();
   $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS });
-  openModal('schEventModal', { focus: '#schDate' });
+  openModal('schEventModal', { focus: !$('schDate').disabled ? '#schDate' : !$('schTime').disabled ? '#schTime' : '#schNote' });
 }
 function openEmail(occ, event) {
   const body = $('schEmailBody'); body.replaceChildren();
@@ -254,7 +257,7 @@ function init() {
       const change = delta => { pickedMonth = new Date(pickedMonth.getFullYear() + (column ? delta : 0), pickedMonth.getMonth() + (column ? 0 : delta), 1); paintPicker(); picker.querySelectorAll('.sch-month-value')[column].focus(); };
       const up = button('\u2303', () => change(1), 'sch-picker-arrow'); up.setAttribute('aria-label', T('schedule.' + next));
       const value = button(column ? String(pickedMonth.getFullYear()) : fmt(pickedMonth, { month: 'long' }), () => {}, 'sch-month-value');
-      value.setAttribute('aria-label', T('schedule.' + title));
+      value.setAttribute('aria-label', T('schedule.' + title + 'Value', { value: value.textContent }));
       value.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); change(e.key === 'ArrowUp' ? 1 : -1); } else if (e.key === 'Enter') { e.preventDefault(); apply(); } };
       const down = button('\u2304', () => change(-1), 'sch-picker-arrow'); down.setAttribute('aria-label', T('schedule.' + prev));
       section.append(up, value, down); picker.append(section);
@@ -263,7 +266,9 @@ function init() {
   };
   const apply = () => { month = pickedMonth; render(); closePicker(); };
   label.onclick = () => { if (!picker.hidden) { closePicker(); return; } pickedMonth = new Date(month.getFullYear(), month.getMonth(), 1); paintPicker(); picker.hidden = false; label.setAttribute('aria-expanded', 'true'); picker.querySelector('.sch-month-value').focus(); };
-  picker.onkeydown = e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closePicker(); } };
+  const escapePicker = e => { if (e.key === 'Escape' && !picker.hidden) { e.preventDefault(); e.stopPropagation(); closePicker(); } };
+  label.onkeydown = escapePicker;
+  picker.onkeydown = escapePicker;
   document.addEventListener('pointerdown', e => { if (!picker.hidden && !picker.parentElement.contains(e.target)) closePicker(); });
   $('schPrev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
   $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
