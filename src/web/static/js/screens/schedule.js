@@ -5,10 +5,10 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
-import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
-import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
+import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
 let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker, untilPicker;
@@ -139,13 +139,14 @@ function render() {
   $('schEmpty').hidden = state.events.length !== 0;
   if (focusedDay) grid.querySelector(`[data-sch-day="${focusedDay}"]`)?.focus();
 }
-function openDay(key) {
+function openDay(key, highlightKey = null) {
   selectedDay = key; $('schDayTitle').textContent = fullDate(parseDay(key));
   const list = $('schDayList'); list.replaceChildren();
   const occs = occurrencesBetween(parseDay(key), addDays(parseDay(key), 1));
   if (!occs.length) list.append(node('p', T('schedule.nothing'), 'sch-day-empty'));
   occs.forEach(occ => {
     const event = getSchedule().events.find(e => e.id === occ.event_id), row = node('div', null, 'sch-entry');
+    if (occ.key === highlightKey) { row.classList.add('sch-entry-highlight'); }
     row.append(node('strong', `${time(occ.start)} \u2013 ${time(occ.start + occ.duration_min * 60000)} \u00B7 ${T('schedule.minutes', { n: occ.duration_min })}`));
     row.append(chip(occurrenceStatus(occ, Date.now())));
     if (occ.note) row.append(node('p', occ.note, 'sch-note'));
@@ -168,6 +169,7 @@ function openDay(key) {
   $('schDayNew').hidden = key < dayKey(Date.now());
   $('schDayNew').onclick = () => openEvent(key);
   if (!$('schDayDrawer').classList.contains('show')) openModal('schDayDrawer');
+  if (highlightKey) { const highlighted = list.querySelector('.sch-entry-highlight'); highlighted?.scrollIntoView({ block: 'nearest' }); if (highlighted) setTimeout(() => highlighted.classList.remove('sch-entry-highlight'), 2000); }
 }
 function setSegment(id, value) {
   const group = $(id); group.value = String(value);
@@ -330,6 +332,7 @@ setInterval(() => { if (S.screen === 'schedule' && !S.modal.length) render(); el
 export function openTodayEvent() { month = new Date(); render(); openEvent(dayKey(Date.now())); }
 export function openTodayDrawer() { month = new Date(); render(); openDay(dayKey(Date.now())); }
 
+let todayCarouselIndex = 0, todayResize = new AbortController();
 const todayButton = (text, cls, action) => {
   const el = node('button', text, cls);
   el.type = 'button';
@@ -338,8 +341,11 @@ const todayButton = (text, cls, action) => {
 };
 export function renderTodayPanel() {
   const now = Date.now(), today = parseDay(dayKey(now));
-  const summary = todaySummary(occurrencesBetween(addDays(startOfWeek(now), -56), addDays(today, 2)), now);
+  const occurrences = occurrencesBetween(addDays(startOfWeek(now), -56), addDays(today, 2));
+  const summary = todaySummary(occurrences, now);
+  const items = occurrences.filter(o => o.day === dayKey(now));
   const panel = document.getElementById('schTodayPanel');
+  todayResize.abort(); todayResize = new AbortController();
   panel.replaceChildren();
   const head = node('div', null, 'sch-today-head');
   const heading = node('h2', T('schedule.todayPanel.heading')); heading.id = 'schTodayH';
@@ -352,21 +358,66 @@ export function renderTodayPanel() {
   head.append(heading, node('span', T('schedule.demo'), 'badge-demo'), streak, node('span', T('schedule.todayPanel.weekCount', summary.week), 'sch-week-count'));
   panel.append(head);
   const body = node('div', null, 'sch-today-body'), occ = summary.primary;
-  if (occ) {
-    const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(occ.start));
-    body.append(node('strong', T('schedule.todayPanel.' + summary.status + 'Time', { time, len: occ.duration_min })));
-    if (summary.status === 'done' || summary.status === 'missed') body.append(node('span', (summary.status === 'done' ? '\u2713 ' : '\u25CC ') + T('schedule.' + summary.status), 'sch-chip sch-' + summary.status));
-    if ((summary.status === 'active' || summary.status === 'upcoming') && occ.note) body.append(node('p', occ.note, 'sch-note'));
-    if (summary.status === 'active') {
-      body.append(node('p', T('schedule.todayPanel.closes', { time: formatCountdown(summary.closes_in_ms) })));
-      const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary', () => startCheckIn(occ));
-      check.dataset.schCheckin = occ.key; body.append(check);
+  if (items.length) {
+    const viewport = node('div', null, 'sch-carousel-viewport');
+    const track = node('div', null, 'sch-carousel-track'); track.id = 'schTodayTrack';
+    const live = node('span', null, 'sr-only'); live.setAttribute('aria-live', 'polite');
+    const controls = node('div', null, 'sch-carousel-controls');
+    const arrow = (label, direction) => {
+      const b = todayButton('', 'sch-carousel-arrow sch-chevron', () => move(direction));
+      b.setAttribute('aria-label', T('schedule.todayPanel.' + label)); b.setAttribute('aria-controls', track.id);
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('aria-hidden', 'true');
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path'); line.setAttribute('d', direction < 0 ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'); icon.append(line); b.append(icon); return b;
+    };
+    const prev = arrow('previousPractices', -1), next = arrow('nextPractices', 1);
+    controls.append(prev, next); head.append(controls);
+    const words = Object.fromEntries(['hour', 'hours', 'minute', 'minutes', 'lessThanMinute'].map(k => [k, T('schedule.todayPanel.' + k)]));
+    items.forEach((item, index) => {
+      const status = occurrenceStatus(item, now), card = node('article', null, 'sch-card');
+      const open = todayButton('', 'sch-card-open', () => { go('schedule'); openDay(item.day, item.key); });
+      open.setAttribute('aria-label', T('schedule.todayPanel.details', { time: time(item.start), length: T('schedule.minutes', { n: item.duration_min }) }));
+      card.addEventListener('focusin', () => { const visible = visibleCount(); if (index < todayCarouselIndex) todayCarouselIndex = index; else if (index >= todayCarouselIndex + visible) todayCarouselIndex = index - visible + 1; update(); });
+      const top = node('div', null, 'sch-card-top');
+      top.append(node('strong', time(item.start)), node('span', T('schedule.minutes', { n: item.duration_min }), 'sch-card-length'));
+      if (status === 'done' || status === 'missed') top.append(chip(status));
+      const note = node('p', item.note || T('schedule.todayPanel.noNote'), 'sch-card-note'); if (item.note) note.title = item.note;
+      const statusLine = node('p', null, 'sch-card-status');
+      if (status === 'active') {
+        const remaining = windowClosesAt(item) - now; statusLine.classList.add('sch-tone-' + closesTone(remaining));
+        const clock = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); clock.setAttribute('viewBox', '0 0 24 24'); clock.setAttribute('aria-hidden', 'true'); clock.setAttribute('class', 'sch-card-clock'); clock.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'; statusLine.append(clock, document.createTextNode(T('schedule.todayPanel.closesIn', { time: formatDurationWords(remaining, words) })));
+      } else if (status === 'upcoming') statusLine.textContent = T('schedule.todayPanel.startsIn', { time: formatDurationWords(item.start - now, words) });
+      else if (status === 'done') statusLine.textContent = T('schedule.todayPanel.completedAt', { time: time(item.done_at) });
+      else statusLine.textContent = T('schedule.todayPanel.windowClosed');
+      const actions = node('div', null, 'sch-card-actions');
+      if (status === 'active' || status === 'upcoming') {
+        const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary', () => startCheckIn(item)); check.dataset.schCheckin = item.key; check.disabled = status === 'upcoming'; actions.append(check);
+        if (status === 'upcoming') actions.append(node('span', T('schedule.todayPanel.opensAt', { time: time(item.start) }), 'sch-card-helper'));
+      } else if (status === 'done') {
+        const id = resultLink(getSchedule().done[item.key], S.sessions);
+        if (id) { const result = todayButton(T('schedule.viewResult'), 'btn', null); result.dataset.open = id; actions.append(result); }
+        else actions.append(node('span', T('schedule.resultUnavailable'), 'sch-card-helper'));
+      }
+      card.append(open, top, note, statusLine, actions); track.append(card);
+    });
+    viewport.append(track); body.append(viewport, live);
+    function visibleCount() { return window.matchMedia('(max-width: 720px)').matches ? 1 : 3; }
+    function update() {
+      const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, 0);
+      const fades = edgeFades(todayCarouselIndex, items.length, visible);
+      viewport.classList.toggle('sch-fade-left', fades.left); viewport.classList.toggle('sch-fade-right', fades.right);
+      controls.hidden = items.length <= visible; prev.disabled = !fades.left; next.disabled = !fades.right;
+      const card = track.firstElementChild; const offset = card ? todayCarouselIndex * (card.getBoundingClientRect().width + 16) : 0;
+      track.style.transform = `translateX(-${offset}px)`;
+      live.textContent = T('schedule.todayPanel.showing', { start: todayCarouselIndex + 1, end: Math.min(items.length, todayCarouselIndex + visible), total: items.length });
     }
+    function move(direction) { const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, direction * visible); update(); }
+    requestAnimationFrame(update);
+    window.addEventListener('resize', () => { if (panel.contains(viewport)) update(); }, { signal: todayResize.signal });
   } else {
+    todayCarouselIndex = 0;
     body.append(node('p', T('schedule.todayPanel.nothing')));
     body.append(todayButton(T('schedule.todayPanel.plan'), 'btn btn-primary', () => { go('schedule'); openTodayDrawer(); }));
   }
-  if (summary.more) body.append(todayButton(T('schedule.todayPanel.more', { n: summary.more }), 'sch-today-link', () => { go('schedule'); openTodayDrawer(); }));
   panel.append(body);
   const dots = node('div', null, 'sch-week-dots');
   const days = T('schedule.todayPanel.days'), letters = T('schedule.todayPanel.letters'), states = T('schedule.todayPanel.states');

@@ -78,3 +78,24 @@ test('picker wheels wrap months and clamp years independently', async () => {
   assert.deepEqual(wheelWindow(2021, 2021, 2031), [null, 2021, 2022]);
   assert.deepEqual(wheelWindow(2031, 2021, 2031), [2030, 2031, null]);
 });
+
+test('carousel duration words and urgency cover boundaries', async () => {
+  const { formatDurationWords, closesTone } = await view;
+  assert.equal(formatDurationWords(80 * 60000), '1 hour 20 minutes');
+  assert.equal(formatDurationWords(120 * 60000), '2 hours');
+  assert.equal(formatDurationWords(45 * 60000), '45 minutes');
+  assert.equal(formatDurationWords(60000), '1 minute');
+  assert.equal(formatDurationWords(59999), 'less than a minute');
+  assert.equal(closesTone(60 * 60000), 'ok');
+  assert.equal(closesTone(60 * 60000 - 1), 'danger');
+});
+test('carousel steps clamp and fades reflect hidden cards', async () => {
+  const { carouselStep, edgeFades } = await view;
+  assert.equal(carouselStep(0, 8, 3, 3), 3);
+  assert.equal(carouselStep(3, 8, 3, 3), 5);
+  assert.equal(carouselStep(1, 8, 3, -3), 0);
+  assert.equal(carouselStep(0, 2, 3, 3), 0);
+  assert.deepEqual(edgeFades(0, 8, 3), { left: false, right: true });
+  assert.deepEqual(edgeFades(3, 8, 3), { left: true, right: true });
+  assert.deepEqual(edgeFades(5, 8, 3), { left: true, right: false });
+});
