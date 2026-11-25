@@ -77,14 +77,27 @@
 
 .sch-chevron svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+#screenSchedule .sch-toolbar .sch-chevron, #screenSchedule #schMonth { border: 0; background: transparent; box-shadow: none; border-radius: var(--r-ctl); }
+#screenSchedule .sch-toolbar .sch-chevron:hover, #screenSchedule #schMonth:hover { background: var(--accent-soft); }
+#screenSchedule #schMonth { font: 600 26px/1.2 var(--serif); }
 .sch-month-wrap { position: relative; }
 .sch-month-wrap > button { min-width: 150px; }
-.sch-monthpicker { position: absolute; z-index: 10; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px; background: #FAF7F0; border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); animation: sch-picker-in .18s ease; font-variant-numeric: tabular-nums; }
-.sch-month-column { display: grid; justify-items: center; gap: 4px; }
-.sch-picker-arrow, .sch-month-value { min-width: 44px; min-height: 30px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
-.sch-picker-arrow:hover, .sch-month-value:hover { background: var(--accent-soft); }
-@keyframes sch-picker-in { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
-@media (max-width: 720px) { .sch-picker-arrow, .sch-month-value { min-height: 44px; } }
+.sch-monthpicker { position: fixed; z-index: 10; width: min(340px, calc(100vw - 24px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 20px; background: #FAF7F0; border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); font-variant-numeric: tabular-nums; }
+.sch-monthpicker[hidden] { display: none; }
+.sch-wheel-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.sch-month-column { display: grid; justify-items: stretch; text-align: center; gap: 4px; min-width: 0; }
+.sch-wheel-title { color: var(--muted); font-size: 12px; font-weight: 600; }
+.sch-picker-arrow { display: grid; place-items: center; justify-self: center; width: 36px; height: 36px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--ink); cursor: pointer; }
+.sch-picker-arrow svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sch-picker-arrow:hover:not(:disabled) { background: var(--accent-soft); }
+.sch-picker-arrow:disabled { opacity: .3; cursor: default; }
+.sch-wheel { position: relative; display: block; height: 108px; overflow: hidden; border-radius: var(--r-ctl); }
+.sch-wheel::before { content: ''; position: absolute; top: 36px; left: 0; right: 0; height: 36px; background: var(--accent-soft); border-radius: var(--r-ctl); }
+.sch-wheel-list { position: relative; display: grid; grid-template-rows: repeat(3, 36px); align-items: center; }
+.sch-wheel-adjacent { opacity: .35; font-size: 13px; }
+.sch-wheel-current { font-weight: 700; }
+.sch-picker-go { align-self: flex-end; }
+.sch-picker-arrow:focus-visible, .sch-wheel:focus-visible, #screenSchedule #schMonth:focus-visible, #screenSchedule .sch-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .sch-monthpicker { animation: none; } }
 
 .sch-datepicker, .sch-timepicker { position: relative; }

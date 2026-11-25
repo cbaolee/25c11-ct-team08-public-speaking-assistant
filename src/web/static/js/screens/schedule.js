@@ -5,7 +5,7 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
-import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink } from '../schedule/schedule_view.js';
+import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
@@ -247,26 +247,63 @@ function init() {
   };
   $('schReset').onclick = () => openConfirmDialog(T('schedule.resetQuestion'), T('schedule.resetDetail'), T('schedule.reset'), () => { cachedState = resetSchedule(S.user.id, options()); cachedUser = S.user.id; render(); toast(T('schedule.resetDone')); });
   const picker = $('schMonthPicker'), label = $('schMonth');
-  let pickedMonth;
+  let pickedMonth, pickedYear, minYear, maxYear;
   const closePicker = () => { picker.hidden = true; label.setAttribute('aria-expanded', 'false'); label.focus(); };
+  const apply = () => { month = new Date(pickedYear, pickedMonth, 1); render(); closePicker(); };
   const paintPicker = () => {
     picker.replaceChildren();
-    [['pickerMonth', 'previous', 'nextMonth', 0], ['pickerYear', 'previousYear', 'nextYear', 1]].forEach(([title, prev, next, column]) => {
+    const columns = node('span', null, 'sch-wheel-columns');
+    [['pickerMonth', 'previous', 'nextMonth', false], ['pickerYear', 'previousYear', 'nextYear', true]].forEach(([title, prev, next, year]) => {
       const section = node('span', null, 'sch-month-column');
-      section.append(node('span', T('schedule.' + title)));
-      const change = delta => { pickedMonth = new Date(pickedMonth.getFullYear() + (column ? delta : 0), pickedMonth.getMonth() + (column ? 0 : delta), 1); paintPicker(); picker.querySelectorAll('.sch-month-value')[column].focus(); };
-      const up = button('\u2303', () => change(1), 'sch-picker-arrow'); up.setAttribute('aria-label', T('schedule.' + next));
-      const value = button(column ? String(pickedMonth.getFullYear()) : fmt(pickedMonth, { month: 'long' }), () => {}, 'sch-month-value');
-      value.setAttribute('aria-label', T('schedule.' + title + 'Value', { value: value.textContent }));
-      value.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); change(e.key === 'ArrowUp' ? 1 : -1); } else if (e.key === 'Enter') { e.preventDefault(); apply(); } };
-      const down = button('\u2304', () => change(-1), 'sch-picker-arrow'); down.setAttribute('aria-label', T('schedule.' + prev));
-      section.append(up, value, down); picker.append(section);
+      section.append(node('span', T('schedule.' + title), 'sch-wheel-title'));
+      const up = button(null, () => change(-1), 'sch-picker-arrow');
+      const down = button(null, () => change(1), 'sch-picker-arrow');
+      const icon = direction => {
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('d', direction < 0 ? 'M6 15l6-6 6 6' : 'M6 9l6 6 6-6'); svg.append(path); return svg;
+      };
+      up.append(icon(-1)); down.append(icon(1));
+      up.setAttribute('aria-label', T('schedule.' + prev)); down.setAttribute('aria-label', T('schedule.' + next));
+      const wheel = node('span', null, 'sch-wheel'); wheel.tabIndex = 0; wheel.setAttribute('role', 'spinbutton');
+      wheel.setAttribute('aria-label', T('schedule.' + title));
+      wheel.setAttribute('aria-valuemin', String(year ? minYear : 1)); wheel.setAttribute('aria-valuemax', String(year ? maxYear : 12));
+      const list = node('span', null, 'sch-wheel-list'); wheel.append(list);
+      const paint = () => {
+        const value = year ? pickedYear : pickedMonth;
+        const values = wheelWindow(value, year ? minYear : 0, year ? maxYear : 11, !year);
+        list.replaceChildren(...values.map((item, i) => node('span', item === null ? '' : year ? String(item) : fmt(new Date(2020, item, 1), { month: 'long' }), i === 1 ? 'sch-wheel-current' : 'sch-wheel-adjacent')));
+        wheel.setAttribute('aria-valuenow', String(year ? value : value + 1));
+        wheel.setAttribute('aria-valuetext', list.children[1].textContent);
+        up.disabled = year && value === minYear; down.disabled = year && value === maxYear;
+      };
+      const change = delta => {
+        const before = year ? pickedYear : pickedMonth;
+        if (year) pickedYear = clampWheel(pickedYear + delta, minYear, maxYear);
+        else pickedMonth = wrapWheel(pickedMonth + delta, 0, 11);
+        if (before === (year ? pickedYear : pickedMonth)) return;
+        list.getAnimations().forEach(animation => animation.cancel()); paint();
+        if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          list.animate([{ transform: `translateY(${delta * 36}px)`, opacity: 0.55 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 200, easing: 'ease-out' });
+        }
+      };
+      wheel.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); change(e.key === 'ArrowUp' ? -1 : 1); } };
+      section.addEventListener('wheel', e => { if (e.deltaY) { e.preventDefault(); change(e.deltaY < 0 ? -1 : 1); } }, { passive: false });
+      paint(); section.append(up, wheel, down); columns.append(section);
     });
-    picker.append(button(T('schedule.pickerGo'), apply, 'btn btn-sm btn-primary'));
+    picker.append(columns, button(T('schedule.pickerGo'), apply, 'btn btn-sm btn-primary sch-picker-go'));
   };
-  const apply = () => { month = pickedMonth; render(); closePicker(); };
-  label.onclick = () => { if (!picker.hidden) { closePicker(); return; } pickedMonth = new Date(month.getFullYear(), month.getMonth(), 1); paintPicker(); picker.hidden = false; label.setAttribute('aria-expanded', 'true'); picker.querySelector('.sch-month-value').focus(); };
-  const escapePicker = e => { if (e.key === 'Escape' && !picker.hidden) { e.preventDefault(); e.stopPropagation(); closePicker(); } };
+  label.onclick = () => {
+    if (!picker.hidden) { closePicker(); return; }
+    const currentYear = new Date().getFullYear(); minYear = currentYear - 5; maxYear = currentYear + 5;
+    pickedMonth = month.getMonth(); pickedYear = clampWheel(month.getFullYear(), minYear, maxYear);
+    paintPicker(); picker.hidden = false; label.setAttribute('aria-expanded', 'true');
+    const rect = label.getBoundingClientRect(), width = picker.offsetWidth;
+    picker.style.left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.left + rect.width / 2 - width / 2)) + 'px';
+    picker.style.top = rect.bottom + 6 + 'px'; picker.querySelector('.sch-wheel').focus();
+  };
+  const escapePicker = e => { if (e.key === 'Escape' && !picker.hidden) { e.preventDefault(); e.stopPropagation(); closePicker(); } else if (e.key === 'Enter' && !picker.hidden) { e.preventDefault(); apply(); } };
   label.onkeydown = escapePicker;
   picker.onkeydown = escapePicker;
   document.addEventListener('pointerdown', e => { if (!picker.hidden && !picker.parentElement.contains(e.target)) closePicker(); });
