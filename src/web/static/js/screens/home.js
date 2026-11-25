@@ -1,6 +1,7 @@
 import { chart } from '../charts.js';
 import { ADR, adviceList, fx, progressDelta, sh } from '../data.js';
 import { T } from '../i18n.js';
+import { renderTodayPanel } from './schedule.js';
 import { renderHistory } from '../screens/history.js';
 import { RENDER, S } from '../state.js';
 import { $, IC, esc, fmtDay, fmtDayLong, minus, scored } from '../utils.js';
@@ -86,6 +87,7 @@ export function scrollHomeDown() {
 RENDER.home = function () {
   const ss = scored();
   renderHero(ss);
+  renderTodayPanel();
   syncHeroLight();
   const empty = !ss.length;
   $('#homeEmpty').hidden = !empty; $('#homeData').hidden = empty;

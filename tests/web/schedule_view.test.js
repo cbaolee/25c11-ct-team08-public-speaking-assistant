@@ -18,3 +18,16 @@ test('month grid handles a leap February starting on Monday', async () => {
   assert.equal(days[28], '2016-02-29');
   assert.equal(days[41], '2016-03-13');
 });
+
+test('countdown floors minutes and handles hour boundaries', async () => {
+  const { formatCountdown } = await view;
+  assert.equal(formatCountdown(80 * 60000 + 59999), '1 h 20 min');
+  assert.equal(formatCountdown(45 * 60000), '45 min');
+  assert.equal(formatCountdown(-1), '0 min');
+});
+test('streak labels interpolate the supplied text', async () => {
+  const { streakLabel } = await view;
+  assert.equal(streakLabel(0, 'No streak yet', '{n}-week streak'), 'No streak yet');
+  assert.equal(streakLabel(1, 'No streak yet', '{n}-week streak'), '1-week streak');
+  assert.equal(streakLabel(8, 'No streak yet', '{n}-week streak'), '8-week streak');
+});

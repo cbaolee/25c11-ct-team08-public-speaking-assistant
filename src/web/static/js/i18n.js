@@ -422,6 +422,32 @@ TEXT.schedule = {
   past: 'Pick a time in the future.', invalid: 'Enter a valid date and time.', invalidLength: 'Choose a valid length.', invalidNote: 'The note is too long.', invalidRepeat: 'Choose a valid repeat.', invalidDays: 'Choose at least one day.', invalidUntil: 'Until must be on or after the event date.', minutes: '{n} min', count: '{n}/{max}',
   repeats: 'Repeats {kind}', repeatsUntil: 'Repeats {kind} until {date}', dailyLower: 'daily', weeklyLower: 'weekly', customLower: 'on custom days', email: 'Email preview', delete: 'Delete series', deleteQuestion: 'Delete this event and all its repeats?', deleteDetail: 'This removes the entire series.', deleted: 'Event deleted', created: 'Event created', emailTitle: 'Reminder email preview', to: 'To: {value}', from: 'From: Public Speaking Coach (demo)', subject: 'Subject: Practice in {lead} minutes: {length} min at {time}', greeting: 'Hello {name},', greetingNameless: 'Hello,', when: 'Your practice is on {when}.', emailLength: 'Length: {length} min.', emailNote: 'Note: {note}', openPractice: 'Open practice', skipped: 'Too close to start: no reminder would be sent.', wouldSend: 'Would be sent at {when} · Demo only, nothing is sent.', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 };
+TEXT.schedule.todayPanel = {
+  heading: "Today's practice",
+  weekCount: '{done}/{total} done this week',
+  noStreak: 'No streak yet',
+  streak: '{n}-week streak',
+  activeTime: '{time} \u00B7 {len} min',
+  upcomingTime: 'Next at {time} \u00B7 {len} min',
+  doneTime: 'Done \u00B7 {time} \u00B7 {len} min',
+  missedTime: 'Missed \u00B7 {time}',
+  closes: 'Window open, closes in {time}',
+  checkIn: 'Check in',
+  nothing: 'Nothing planned today.',
+  plan: 'Plan practice',
+  more: '+{n} more today',
+  dot: '{day}: {state}',
+  days: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+  letters: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
+  states: { done: 'done', active: 'active', upcoming: 'upcoming', missed: 'missed', none: 'none' }
+};
+TEXT.schedule.motivation = {
+  doneToday: "Nice work. Today's practice is done.",
+  keepStreak: 'One session keeps your {n}-week streak alive.',
+  windowOpen: 'Your practice window is open. {len} minutes is enough.',
+  pickUp: 'Missed one? Pick up today. Consistency beats perfection.',
+  plan: 'Plan your next practice to start a streak.'
+};
 TEXT.wc = { title: 'Practice', heardAs: 'Heard as: {x}', hearIt: 'Hear it', hearYourself: 'Hear yourself', tryAgain: 'Try again', stop: 'Stop', checking: 'Checking...', recognised: 'Recognised as {x}', close: 'Close, listen again', heard: 'Heard {y}', notHeard: "We couldn't hear that, try again", sampleVoice: 'Sample voice from your browser', practiceOnly: 'Practice only: your score does not change', noVoice: 'No English voice is available', practiceSentence: 'Practice this sentence', stillWrong: 'Still to practise: {x}', errMic: 'Microphone unavailable. Check your permissions and device.', errRate: 'Too many attempts. Please try again later.', errStt: 'Speech recognition is unavailable. Try again later.', errNet: 'Could not check the recording. Try again.', closeLabel: 'Close practice', timer: '{elapsed} / {max}' };
 TEXT.script.page = 'p. {n}';
 TEXT.report.playFrom = 'Play from {t}';
