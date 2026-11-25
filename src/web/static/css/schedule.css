@@ -128,3 +128,32 @@
 .sch-segment, .sch-day-toggle { min-height: 44px; padding: 8px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); background: #FAF7F0; color: var(--ink); font: 600 14px var(--sans); cursor: pointer; font-variant-numeric: tabular-nums; }
 .sch-day-toggle { border-radius: var(--r-pill); }
 .sch-segment[aria-checked="true"], .sch-day-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: white; }
+
+/* Today's practice carousel. */
+.sch-carousel-controls { display: flex; gap: 6px; }
+.sch-carousel-arrow { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); cursor: pointer; }
+.sch-carousel-arrow:disabled { opacity: .35; cursor: default; }
+.sch-carousel-viewport { position: relative; flex-basis: 100%; min-width: 0; overflow: hidden; padding: 4px 0; }
+.sch-carousel-viewport.sch-fade-right { mask-image: linear-gradient(to right, black 94%, transparent); }
+.sch-carousel-viewport.sch-fade-left { mask-image: linear-gradient(to right, transparent, black 6%); }
+.sch-carousel-viewport.sch-fade-left.sch-fade-right { mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent); }
+.sch-carousel-track { display: flex; gap: 16px; transition: transform 300ms ease-out; }
+.sch-card { position: relative; flex: 0 0 calc((100% - 32px) / 3.15); min-width: 0; height: 210px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: var(--r-panel); background: var(--surface); }
+.sch-card-open { position: static; padding: 0; border: 0; background: none; }
+.sch-card-open::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-panel); cursor: pointer; }
+.sch-card-open:focus-visible { outline: none; }
+.sch-card-open:focus-visible::after { outline: 3px solid var(--accent); outline-offset: -3px; }
+.sch-card-top { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.sch-card-top .sch-chip { margin-left: auto; }
+.sch-card-length, .sch-card-helper { color: var(--muted); font-size: 13px; }
+.sch-card-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-style: italic; }
+.sch-card-status { font-size: 14px; }
+.sch-card-clock { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sch-tone-ok { color: var(--ok); }
+.sch-tone-danger { color: var(--record); }
+.sch-card-actions { position: relative; z-index: 1; margin-top: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; pointer-events: none; }
+.sch-card-actions button { pointer-events: auto; }
+.sch-entry-highlight { animation: sch-highlight 2s ease-out; }
+@keyframes sch-highlight { from { background: var(--accent-soft); } to { background: transparent; } }
+@media (max-width: 720px) { .sch-card { flex-basis: calc((100% - 16px) / 1.15); } }
+@media (prefers-reduced-motion: reduce) { .sch-carousel-track { transition: none; } .sch-entry-highlight { animation: none; outline: 2px solid var(--accent); } }

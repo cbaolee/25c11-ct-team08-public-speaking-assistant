@@ -44,3 +44,12 @@ export function clampWheel(value, min, max) { return Math.max(min, Math.min(max,
 export function wheelWindow(value, min, max, wrap = false) {
   return [-1, 0, 1].map(offset => { const next = value + offset; return wrap ? wrapWheel(next, min, max) : next < min || next > max ? null : next; });
 }
+
+export function formatDurationWords(ms, words = { hour: 'hour', hours: 'hours', minute: 'minute', minutes: 'minutes', lessThanMinute: 'less than a minute' }) {
+  const total = Math.max(0, Math.floor(ms / 60000)), hours = Math.floor(total / 60), minutes = total % 60;
+  if (total === 0) return words.lessThanMinute;   // "0 minutes" reads like the window has already closed
+  return [hours ? `${hours} ${words[hours === 1 ? 'hour' : 'hours']}` : '', minutes || !hours ? `${minutes} ${words[minutes === 1 ? 'minute' : 'minutes']}` : ''].filter(Boolean).join(' ');
+}
+export function closesTone(ms) { return ms >= 60 * 60000 ? 'ok' : 'danger'; }
+export function carouselStep(index, total, visible, step) { return Math.max(0, Math.min(Math.max(0, total - visible), index + step)); }
+export function edgeFades(index, total, visible) { return { left: index > 0, right: index + visible < total }; }
