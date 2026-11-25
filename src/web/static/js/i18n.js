@@ -445,7 +445,14 @@ TEXT.schedule = {
   pickerGo: 'Go',
   previous: 'Previous month', prev: 'Prev', nextMonth: 'Next month', next: 'Next', today: 'Today', empty: 'Pick a day to plan your first practice.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
   upcoming: 'Upcoming', active: 'Now', activeLegend: 'Active', done: 'Done', missed: 'Missed', date: 'Date', time: 'Time', length: 'Length', note: 'Note', repeat: 'Repeat', none: 'None', daily: 'Daily', weekly: 'Weekly', custom: 'Custom days', customDays: 'Custom days', until: 'Until (optional)', reminder: 'Reminder: {n} minutes before (fixed in this demo)', save: 'Save',
-  past: 'Pick a time in the future.', invalid: 'Enter a valid date and time.', invalidLength: 'Choose a valid length.', invalidNote: 'The note is too long.', invalidRepeat: 'Choose a valid repeat.', invalidDays: 'Choose at least one day.', invalidUntil: 'Until must be on or after the event date.', minutes: '{n} min', count: '{n}/{max}',
+  past: 'Pick a time in the future.', invalid: 'Enter a valid date and time.', invalidLength: 'Choose a valid length.', invalidNote: 'The note is too long.', invalidRepeat: 'Choose a valid repeat.', invalidDays: 'Pick at least one day.', invalidUntil: 'Until must be on or after the event date.', minutes: '{n} min', count: '{n}/{max}',
+  repeatOn: 'Repeat on',
+  customOption: 'Custom',
+  noSessionsSummary: '0 sessions.',
+  noEndDate: 'No end date',
+  noEndSummary: 'Repeats with no end date.',
+  sessionsSummary: '{n} sessions, last on {date}.',
+  sessionMarker: 'session',
   repeats: 'Repeats {kind}', repeatsUntil: 'Repeats {kind} until {date}', dailyLower: 'daily', weeklyLower: 'weekly', customLower: 'on custom days', email: 'Email preview', delete: 'Delete', deleteQuestion: 'Delete this practice event and all its repeats?', deleteDetail: 'This removes the entire series.', deleted: 'Practice event deleted', created: 'Practice event created', emailTitle: 'Reminder email preview', to: 'To: {value}', from: 'From: Public Speaking Coach (demo)', subject: 'Subject: Practice in {lead} minutes: {length} min at {time}', greeting: 'Hello {name},', greetingNameless: 'Hello,', when: 'Your practice is on {when}.', emailLength: 'Length: {length} min.', emailNote: 'Note: {note}', openPractice: 'Open practice', skipped: 'Too close to start: no reminder would be sent.', wouldSend: 'Would be sent at {when} · Demo only, nothing is sent.', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 };
 TEXT.schedule.todayPanel = {

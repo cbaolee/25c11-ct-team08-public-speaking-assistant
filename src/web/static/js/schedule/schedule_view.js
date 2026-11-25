@@ -34,3 +34,5 @@ export function defaultTime(nowMs, dateKey) {
   const next = new Date(nowMs); next.setMinutes((Math.floor(now.getMinutes() / 30) + 1) * 30, 0, 0);
   return next.getDate() === now.getDate() ? `${String(next.getHours()).padStart(2, '0')}:${String(next.getMinutes()).padStart(2, '0')}` : '';
 }
+
+export function sessionsSummary(days) { return { n: days.length, last: days.length ? days[days.length - 1] : null }; }
