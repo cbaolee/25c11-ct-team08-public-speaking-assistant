@@ -149,7 +149,8 @@ export const TEXT = {
     saveScript: 'Save script', saveTitle: 'Save script', nameLabel: 'Script name', errNameEmpty: 'Enter a name for the script.',
     saved: 'Saved as "{title}".',
     nameCount: '{n} / {max} characters', foldList: 'Hide the script list', unfoldList: 'Show the script list',
-    edit: 'Edit', editTitle: 'Edit script', editAria: 'Edit {title}', bodyLabel: 'Script text', errBodyEmpty: 'The script text cannot be empty.', edited: 'Script updated.',
+    backToday: 'Back to today',
+  edit: 'Edit', editTitle: 'Edit script', editAria: 'Edit {title}', bodyLabel: 'Script text', errBodyEmpty: 'The script text cannot be empty.', edited: 'Script updated.',
     deleteAria: 'Delete {title}', deleteTitle: 'Delete this script?', deleteMsg: '"{title}" will be removed from your list. Reports of sessions you practised with it stay.',
     deleted: 'Script deleted.',
     dupBodyT: 'This script is already saved', dupBodyMsg: 'Your saved script "{title}" has exactly the same text, so this one was not saved.',
@@ -419,11 +420,19 @@ TEXT.schedule = {
   checkInClosed: 'This practice window has closed.',
   checkInComplete: 'Check-in complete',
   scheduledPractice: 'Scheduled practice',
-  title: 'Schedule', demo: 'Demo only', intro: 'Plan practice sessions and check in when they start. Reminders are previews only.', newEvent: 'New event', reset: 'Reset demo', resetQuestion: 'Reset the demo schedule?', resetDetail: 'This replaces your schedule with the demo events.', resetDone: 'Demo schedule reset',
-  previous: 'Previous month', prev: 'Prev', nextMonth: 'Next month', next: 'Next', today: 'Today', empty: 'No practice planned yet.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
+  backToday: 'Back to today',
+  edit: 'Edit',
+  editEvent: 'Edit practice event',
+  editRepeat: 'Changes apply to this session and the ones after it.',
+  editTooLate: 'This session starts in less than 20 minutes and can no longer be changed.',
+  deleteSingleQuestion: 'Delete this practice event?',
+  deleteFollowingQuestion: 'Delete this session and the ones after it?',
+  updated: 'Practice event updated',
+  title: 'Schedule', demo: 'Demo only', intro: 'Plan practice sessions and check in when they start. Reminders are previews only.', newEvent: 'New practice event', reset: 'Reset demo', resetQuestion: 'Reset the demo schedule?', resetDetail: 'This replaces your schedule with the demo practice events.', resetDone: 'Demo schedule reset',
+  previous: 'Previous month', prev: 'Prev', nextMonth: 'Next month', next: 'Next', today: 'Today', empty: 'Pick a day to plan your first practice.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
   upcoming: 'Upcoming', active: 'Now', activeLegend: 'Active', done: 'Done', missed: 'Missed', date: 'Date', time: 'Time', length: 'Length', note: 'Note', repeat: 'Repeat', none: 'None', daily: 'Daily', weekly: 'Weekly', custom: 'Custom days', customDays: 'Custom days', until: 'Until (optional)', reminder: 'Reminder: {n} minutes before (fixed in this demo)', save: 'Save',
   past: 'Pick a time in the future.', invalid: 'Enter a valid date and time.', invalidLength: 'Choose a valid length.', invalidNote: 'The note is too long.', invalidRepeat: 'Choose a valid repeat.', invalidDays: 'Choose at least one day.', invalidUntil: 'Until must be on or after the event date.', minutes: '{n} min', count: '{n}/{max}',
-  repeats: 'Repeats {kind}', repeatsUntil: 'Repeats {kind} until {date}', dailyLower: 'daily', weeklyLower: 'weekly', customLower: 'on custom days', email: 'Email preview', delete: 'Delete series', deleteQuestion: 'Delete this event and all its repeats?', deleteDetail: 'This removes the entire series.', deleted: 'Event deleted', created: 'Event created', emailTitle: 'Reminder email preview', to: 'To: {value}', from: 'From: Public Speaking Coach (demo)', subject: 'Subject: Practice in {lead} minutes: {length} min at {time}', greeting: 'Hello {name},', greetingNameless: 'Hello,', when: 'Your practice is on {when}.', emailLength: 'Length: {length} min.', emailNote: 'Note: {note}', openPractice: 'Open practice', skipped: 'Too close to start: no reminder would be sent.', wouldSend: 'Would be sent at {when} · Demo only, nothing is sent.', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  repeats: 'Repeats {kind}', repeatsUntil: 'Repeats {kind} until {date}', dailyLower: 'daily', weeklyLower: 'weekly', customLower: 'on custom days', email: 'Email preview', delete: 'Delete', deleteQuestion: 'Delete this practice event and all its repeats?', deleteDetail: 'This removes the entire series.', deleted: 'Practice event deleted', created: 'Practice event created', emailTitle: 'Reminder email preview', to: 'To: {value}', from: 'From: Public Speaking Coach (demo)', subject: 'Subject: Practice in {lead} minutes: {length} min at {time}', greeting: 'Hello {name},', greetingNameless: 'Hello,', when: 'Your practice is on {when}.', emailLength: 'Length: {length} min.', emailNote: 'Note: {note}', openPractice: 'Open practice', skipped: 'Too close to start: no reminder would be sent.', wouldSend: 'Would be sent at {when} · Demo only, nothing is sent.', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 };
 TEXT.schedule.todayPanel = {
   heading: "Today's practice",

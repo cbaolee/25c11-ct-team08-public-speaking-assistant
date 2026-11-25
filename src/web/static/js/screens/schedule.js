@@ -4,14 +4,14 @@ import { S, RENDER } from '../state.js';
 import { openModal, closeModal, enhanceSelect, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN } from '../schedule/schedule_model.js';
-import { loadSchedule, saveSchedule, resetSchedule, addEvent, deleteEvent, newEventId } from '../schedule/schedule_store.js';
+import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
 import { monthGrid, formatCountdown, streakLabel } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
-import { canCheckIn } from '../schedule/schedule_model.js';
+import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
-let cachedUser, cachedState, month = new Date(), selectedDay;
+let cachedUser, cachedState, month = new Date(), selectedDay, editing = null;
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
 export function getSchedule() {
@@ -38,6 +38,8 @@ function chip(status, label, compact = false) {
 function render() {
   const state = getSchedule(), keys = monthGrid(month.getFullYear(), month.getMonth()), now = Date.now();
   $('schMonth').textContent = fmt(month, { month: 'long', year: 'numeric' });
+  const current = new Date(now);
+  $('schToday').hidden = month.getFullYear() === current.getFullYear() && month.getMonth() === current.getMonth();
   const grid = $('schGrid'), focusedDay = document.activeElement?.dataset.schDay; grid.replaceChildren();
   const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[41]), 1));
   keys.forEach(key => {
@@ -62,7 +64,7 @@ function openDay(key) {
   selectedDay = key; $('schDayTitle').textContent = fullDate(parseDay(key));
   const list = $('schDayList'); list.replaceChildren();
   const occs = occurrencesBetween(parseDay(key), addDays(parseDay(key), 1));
-  if (!occs.length) { list.append(node('p', T('schedule.nothing')), button(T('schedule.newEvent'), () => openEvent(key), 'btn btn-primary')); }
+  if (!occs.length) list.append(node('p', T('schedule.nothing'), 'sch-day-empty'));
   occs.forEach(occ => {
     const event = getSchedule().events.find(e => e.id === occ.event_id), row = node('div', null, 'sch-entry');
     row.append(node('strong', `${time(occ.start)} – ${time(occ.start + occ.duration_min * 60000)} · ${T('schedule.minutes', { n: occ.duration_min })}`));
@@ -73,18 +75,33 @@ function openDay(key) {
       row.append(node('p', event.recurrence.until ? T('schedule.repeatsUntil', { kind, date: shortDate(parseDay(event.recurrence.until)) }) : T('schedule.repeats', { kind }), 'note'));
     }
     const actions = node('div', null, 'sch-actions');
-    actions.append(button(T('schedule.email'), () => openEmail(occ, event)), button(T('schedule.delete'), () => openConfirmDialog(T('schedule.deleteQuestion'), T('schedule.deleteDetail'), T('schedule.delete'), () => { saveScheduleState(deleteEvent(getSchedule(), event.id)); render(); openDay(key); toast(T('schedule.deleted')); })));
+    actions.append(button(T('schedule.email'), () => openEmail(occ, event)));
+    if (canEdit(occ, Date.now())) actions.append(button(T('schedule.edit'), () => openEvent(key, occ, event)));
     const slot = node('div'); slot.dataset.schCheckin = ''; if (canCheckIn(occ, Date.now()) && occurrenceStatus(occ, Date.now()) === 'active') slot.append(button(T('schedule.todayPanel.checkIn'), () => { closeModal('schDayDrawer'); startCheckIn(occ); }, 'btn btn-primary')); actions.append(slot); row.append(actions); list.append(row);
   });
+  $('schDayNew').hidden = key < dayKey(Date.now());
+  $('schDayNew').onclick = () => openEvent(key);
   if (!$('schDayDrawer').classList.contains('show')) openModal('schDayDrawer');
 }
-function openEvent(key) {
+function openEvent(key, occ = null, event = null) {
+  editing = occ ? { occ, event } : null;
   const form = $('schForm'); form.reset(); $('schLength').value = '10'; $('schRepeat').value = 'none';
   $('schDate').min = dayKey(Date.now()); $('schDate').value = key && key >= $('schDate').min ? key : $('schDate').min;
   $('schUntil').min = $('schDate').value; $('schDays').hidden = true;
   ['Start', 'Length', 'Note', 'Repeat', 'Days', 'Until'].forEach(k => { $('sch' + k + 'Error').textContent = ''; $('sch' + k + 'Error').classList.remove('show'); });
   ['schDate', 'schTime', 'schLength', 'schNote', 'schRepeat', 'schUntil'].forEach(id => $(id).removeAttribute('aria-invalid'));
-  $('schCount').textContent = T('schedule.count', { n: 0, max: NOTE_MAX_CHARS });
+  $('schEventTitle').textContent = T(editing ? 'schedule.editEvent' : 'schedule.newEvent');
+  $('schDelete').hidden = !editing;
+  $('schRepeat').disabled = !!editing;
+  $('schDate').disabled = !!editing && event.recurrence.kind !== 'none';
+  $('schEditRepeat').hidden = !editing || event.recurrence.kind === 'none';
+  if (editing) {
+    $('schDate').value = occ.day; $('schTime').value = event.time; $('schLength').value = String(event.duration_min);
+    $('schNote').value = event.note; $('schRepeat').value = event.recurrence.kind;
+    $('schUntil').value = event.recurrence.until || '';
+    $('schDayChecks').querySelectorAll('input').forEach(input => { input.checked = event.recurrence.days.includes(Number(input.value)); });
+  }
+  $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS });
   openModal('schEventModal', { focus: '#schDate' });
 }
 function openEmail(occ, event) {
@@ -104,24 +121,34 @@ function init() {
   $('schRepeat').onchange = () => { $('schDays').hidden = $('schRepeat').value !== 'custom'; };
   $('schDate').onchange = () => { $('schUntil').min = $('schDate').value; };
   $('schReminder').textContent = T('schedule.reminder', { n: REMINDER_LEAD_MIN });
-  $('schNew').onclick = $('schEmptyNew').onclick = () => openEvent();
+  $('schDelete').onclick = () => {
+    if (!editing) return;
+    const { occ, event } = editing;
+    openConfirmDialog(T(event.recurrence.kind === 'none' ? 'schedule.deleteSingleQuestion' : 'schedule.deleteFollowingQuestion'), '', T('schedule.delete'), () => {
+      if (!canEdit(occ, Date.now())) { $('schStartError').textContent = T('schedule.editTooLate'); $('schStartError').classList.add('show'); return; }
+      saveScheduleState(deleteFromOccurrence(getSchedule(), event.id, occ.day)); closeModal('schEventModal'); render(); openDay(selectedDay); toast(T('schedule.deleted'));
+    });
+  };
   $('schReset').onclick = () => openConfirmDialog(T('schedule.resetQuestion'), T('schedule.resetDetail'), T('schedule.reset'), () => { cachedState = resetSchedule(S.user.id, options()); cachedUser = S.user.id; render(); toast(T('schedule.resetDone')); });
   $('schPrev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
   $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
-  document.querySelector('#screenSchedule #schToday').onclick = () => { month = new Date(); render(); };
+  document.querySelector('#screenSchedule #schToday').onclick = () => { month = new Date(); render(); $('schGrid').querySelector(`[data-sch-day="${dayKey(Date.now())}"]`)?.focus(); };
   $('schForm').onsubmit = e => {
     e.preventDefault(); const input = { date: $('schDate').value, time: $('schTime').value, duration_min: Number($('schLength').value), note: $('schNote').value, recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('input:checked')].map(x => Number(x.value)), until: $('schUntil').value || null } };
+    if (editing) input.recurrence = editing.event.recurrence;
     const result = validateEvent(input, Date.now()), errors = result.errors;
-    const fields = [['start', 'Start', errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', null], ['until', 'Until', 'invalidUntil', 'schUntil']];
+    if (editing && !canEdit(editing.occ, Date.now())) errors.start = 'too_late';
+    const fields = [['start', 'Start', errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', null], ['until', 'Until', 'invalidUntil', 'schUntil']];
     fields.forEach(([key, target, message, id]) => { $('sch' + target + 'Error').textContent = errors[key] ? T('schedule.' + message) : ''; $('sch' + target + 'Error').classList.toggle('show', !!errors[key]); if (id) $(id).setAttribute('aria-invalid', String(!!errors[key])); });
     $('schDate').setAttribute('aria-invalid', String(!!errors.start));
-    if (!result.ok) { const first = fields.find(([key]) => errors[key]); if (first[3]) $(first[3]).focus(); else $('schDayChecks').querySelector('input').focus(); return; }
-    saveScheduleState(addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), sample: false })); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T('schedule.created'));
+    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[3]) $(first[3]).focus(); else $('schDayChecks').querySelector('input').focus(); return; }
+    const wasEditing = !!editing;
+    saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), sample: false })); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));
   };
 }
 let initialized = false;
 RENDER.schedule = () => { if (!initialized) { init(); initialized = true; } render(); };
-setInterval(() => { if (S.screen === 'schedule') render(); else if (S.screen === 'home' && S.user) renderTodayPanel(); }, 60000);   // keeps the countdown and status changes fresh
+setInterval(() => { if (S.screen === 'schedule' && !S.modal.length) render(); else if (S.screen === 'home' && S.user) renderTodayPanel(); }, 60000);   // keeps the countdown and status changes fresh
 
 export function openTodayEvent() { month = new Date(); render(); openEvent(dayKey(Date.now())); }
 export function openTodayDrawer() { month = new Date(); render(); openDay(dayKey(Date.now())); }
@@ -160,7 +187,7 @@ export function renderTodayPanel() {
     }
   } else {
     body.append(node('p', T('schedule.todayPanel.nothing')));
-    body.append(todayButton(T('schedule.todayPanel.plan'), 'btn btn-primary', () => { go('schedule'); openTodayEvent(); }));
+    body.append(todayButton(T('schedule.todayPanel.plan'), 'btn btn-primary', () => { go('schedule'); openTodayDrawer(); }));
   }
   if (summary.more) body.append(todayButton(T('schedule.todayPanel.more', { n: summary.more }), 'sch-today-link', () => { go('schedule'); openTodayDrawer(); }));
   panel.append(body);
