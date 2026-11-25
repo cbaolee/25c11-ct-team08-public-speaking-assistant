@@ -6,6 +6,8 @@ import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, deleteEvent, newEventId } from '../schedule/schedule_store.js';
 import { monthGrid, formatCountdown, streakLabel } from '../schedule/schedule_view.js';
+import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
+import { canCheckIn } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
@@ -72,7 +74,7 @@ function openDay(key) {
     }
     const actions = node('div', null, 'sch-actions');
     actions.append(button(T('schedule.email'), () => openEmail(occ, event)), button(T('schedule.delete'), () => openConfirmDialog(T('schedule.deleteQuestion'), T('schedule.deleteDetail'), T('schedule.delete'), () => { saveScheduleState(deleteEvent(getSchedule(), event.id)); render(); openDay(key); toast(T('schedule.deleted')); })));
-    const slot = node('div'); slot.dataset.schCheckin = ''; actions.append(slot); row.append(actions); list.append(row);
+    const slot = node('div'); slot.dataset.schCheckin = ''; if (canCheckIn(occ, Date.now()) && occurrenceStatus(occ, Date.now()) === 'active') slot.append(button(T('schedule.todayPanel.checkIn'), () => { closeModal('schDayDrawer'); startCheckIn(occ); }, 'btn btn-primary')); actions.append(slot); row.append(actions); list.append(row);
   });
   if (!$('schDayDrawer').classList.contains('show')) openModal('schDayDrawer');
 }
@@ -153,8 +155,8 @@ export function renderTodayPanel() {
     if ((summary.status === 'active' || summary.status === 'upcoming') && occ.note) body.append(node('p', occ.note, 'sch-note'));
     if (summary.status === 'active') {
       body.append(node('p', T('schedule.todayPanel.closes', { time: formatCountdown(summary.closes_in_ms) })));
-      const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary');
-      check.dataset.schCheckin = occ.key; check.dataset.go = 'schedule'; body.append(check);
+      const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary', () => startCheckIn(occ));
+      check.dataset.schCheckin = occ.key; body.append(check);
     }
   } else {
     body.append(node('p', T('schedule.todayPanel.nothing')));
@@ -174,3 +176,5 @@ export function renderTodayPanel() {
   const motivation = motivationKey(summary);
   if (motivation) panel.append(node('p', T('schedule.motivation.' + motivation, { n: summary.streak, len: occ?.duration_min }), 'sch-motivation'));
 }
+
+configureCheckIn({ getSchedule, saveScheduleState, rerender: () => { if (S.screen === 'home') renderTodayPanel(); if (S.screen === 'schedule') { render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); } } });
