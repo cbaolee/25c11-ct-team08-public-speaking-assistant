@@ -70,6 +70,17 @@ topic_suggest_min_score = 0.35
 # Minimum cosine similarity for retrieving document chunks and verifying paragraph citations
 retrieval_min_score = 0.25
 citation_min_support_score = 0.52
+# Per-turn chat text limit in characters (NFC code points), paired with [web] composer_max_words
+max_turn_text_chars = 18_000
+# Bounded pre-generation chat context window & compaction policy
+context_window_max_chars = 4_500
+context_window_max_entries = 8
+context_compaction_keep_recent = 2
+context_compaction_max_summary_chars = 1_500
+# Smaller Groq model used to compact older chat context entries (.env: GROQ_COMPACTION_MODEL)
+groq_compaction_model = "openai/gpt-oss-20b"
+# Telemetry ETA buffer added to base stage estimates, in seconds
+eta_buffer_s = 10
 
 [api_keys]
 # How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.

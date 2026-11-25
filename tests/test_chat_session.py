@@ -21,19 +21,39 @@ from src.text_processing.chat_session import (
     READY_MESSAGE,
     ChatSessionState,
     ChatSessionStore,
+    ContextEntry,
+    TurnStepTracker,
     analyze_slot_coverage,
+    append_to_context_window,
     build_followup_reply,
+    build_turn1_question,
     check_ready_to_generate,
     classify_argument_slot,
+    compact_context_entries,
+    deterministic_compact_summary,
+    evaluate_and_build_followup,
     group_uncovered_slots,
     ingest_upload_file,
+    normalize_turn_entry,
 )
 from src.text_processing.contracts import (
+    ETA_BUFFER_S,
     DocumentChunk,
+    ScriptGenerationRequest,
+    ScriptJobState,
     TemplateDocument,
     TopicMetadata,
 )
-from src.text_processing.parser import DocumentParserError
+from src.text_processing.limiter import TokenBucketLimiter
+from src.text_processing.moderation import ContentModerator
+from src.text_processing.parser import (
+    FILE_SIZE_LIMITS_BYTES,
+    MAX_PDF_SIZE_BYTES,
+    MAX_TEXT_FILE_BYTES,
+    DocumentParserError,
+    max_bytes_for_extension,
+    validate_turn_text_length,
+)
 from src.text_processing.pipeline import ScriptGenerationPipeline
 from src.text_processing.retrieval import SemanticRetriever
 from src.text_processing.template_engine import assemble_template
@@ -378,15 +398,15 @@ class Test3LayerStopRule:
         )
         assert is_ready is False
 
-    def test_layer_2_hard_interaction_cap(self) -> None:
-        # Even with 0 coverage and missing entities, 2 turns triggers ready
+    def test_no_forced_2_turn_cap(self) -> None:
+        # Removing the 2-turn hard cap: missing entities & low coverage stay False at turn 2+
         is_ready = check_ready_to_generate(
             selected_template_id="sports/sample",
             missing_entities=["entity_target", "entity_name"],
             coverage_ratio=0.1,
             gather_turns=2,
         )
-        assert is_ready is True
+        assert is_ready is False
 
     def test_layer_3_free_topic_with_uploaded_file(self) -> None:
         is_ready = check_ready_to_generate(
@@ -447,7 +467,7 @@ class TestBuildFollowupReply:
         )
         assert reply == READY_MESSAGE
 
-    def test_gather_turns_cap_returns_ready_message(self) -> None:
+    def test_gather_turns_2_continues_asking_when_not_ready(self) -> None:
         reply = build_followup_reply(
             topic="Marathon Pacing",
             ready_to_generate=False,
@@ -455,7 +475,9 @@ class TestBuildFollowupReply:
             missing_groups=[GROUP_MAIN],
             gather_turns=2,
         )
-        assert reply == READY_MESSAGE
+        assert reply != READY_MESSAGE
+        assert "**name**" in reply
+        assert f"**{GROUP_MAIN}**" in reply
 
     def test_client_none_falls_back_to_checklist(self) -> None:
         reply = build_followup_reply(
@@ -595,3 +617,327 @@ class TestPipelineJobCapacityEviction:
         assert job2.job_id in pipeline._jobs
         assert job3.job_id in pipeline._jobs
         assert job4.job_id in pipeline._jobs
+
+
+class TestPerTurnLimitsAndExtensionCaps:
+    def test_file_size_limits_mapping_matches_constants(self) -> None:
+        assert FILE_SIZE_LIMITS_BYTES[".pdf"] == MAX_PDF_SIZE_BYTES
+        assert FILE_SIZE_LIMITS_BYTES[".md"] == MAX_TEXT_FILE_BYTES
+        assert FILE_SIZE_LIMITS_BYTES[".txt"] == MAX_TEXT_FILE_BYTES
+        assert max_bytes_for_extension("notes.PDF") == MAX_PDF_SIZE_BYTES
+        assert max_bytes_for_extension("outline.md") == MAX_TEXT_FILE_BYTES
+        with pytest.raises(DocumentParserError) as exc_info:
+            max_bytes_for_extension("slides.pptx")
+        assert exc_info.value.error_code == "unsupported_file_type"
+
+    def test_validate_turn_text_length_checks_chars_and_words(self) -> None:
+        validate_turn_text_length("Short valid message.", max_chars=100, max_words=20)
+        with pytest.raises(DocumentParserError) as char_exc:
+            validate_turn_text_length("a" * 51, max_chars=50, max_words=100)
+        assert char_exc.value.error_code == "text_too_long"
+
+        with pytest.raises(DocumentParserError) as word_exc:
+            validate_turn_text_length(" ".join(["word"] * 11), max_chars=500, max_words=10)
+        assert word_exc.value.error_code == "text_too_long"
+
+
+class TestBoundedContextAndCompaction:
+    def test_normalize_turn_entry_strips_filler_and_tags(self) -> None:
+        entry = normalize_turn_entry(
+            "Sure, here is my point:   Our audience is first-year medical students.\n\n\n"
+            "Focus on ethics.",
+            turn=2,
+            source="chat",
+        )
+        assert entry is not None
+        assert entry.turn == 2
+        assert entry.source == "chat"
+        assert "Our audience is first-year medical students." in entry.text
+        assert not entry.text.lower().startswith("sure")
+        assert entry.formatted().startswith("[Turn 2 | chat]")
+
+    def test_append_to_context_window_compacts_via_smaller_groq_model(self) -> None:
+        session = ChatSessionState(
+            session_id="s-compact",
+            user_id="u1",
+            category="science",
+            duration_min=10,
+            topic="CRISPR Ethics",
+        )
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        summary_json = (
+            '{"summary": "- Audience: grad students\\n'
+            '- Key focus: gene therapy safety"}'
+        )
+        mock_resp.choices = [MagicMock(message=MagicMock(content=summary_json))]
+        mock_resp.usage = MagicMock(total_tokens=180)
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        compacted_flags = []
+        for turn in range(1, 5):
+            _, compacted = append_to_context_window(
+                session,
+                f"Turn {turn} detailed fact about gene therapy trial #{turn} with 95% accuracy.",
+                turn=turn,
+                source="chat",
+                client=mock_client,
+                compaction_model="openai/gpt-oss-20b",
+                limiter=TokenBucketLimiter(),
+                max_entries=3,
+                keep_recent=2,
+            )
+            compacted_flags.append(compacted)
+
+        assert compacted_flags == [False, False, False, True]
+        assert session.compaction_count == 1
+        assert len(session.context_window) == 2
+        assert session.context_window[-1].turn == 4
+        assert "grad students" in session.compacted_summary
+        assert mock_client.chat.completions.create.call_args.kwargs["model"] == "openai/gpt-oss-20b"
+
+    def test_compaction_deterministic_fallback_when_groq_fails_or_rate_limited(self) -> None:
+        failing_client = MagicMock()
+        failing_client.chat.completions.create.side_effect = RuntimeError("429 quota exhausted")
+
+        entries = [
+            ContextEntry(
+                turn=1, source="chat", text="Target audience is 200 high school teachers."
+            ),
+            ContextEntry(
+                turn=2, source="chat", text="Include 2024 UNESCO AI literacy benchmark."
+            ),
+        ]
+        summary, used_llm = compact_context_entries(
+            "",
+            entries,
+            topic="AI in Education",
+            client=failing_client,
+            limiter=TokenBucketLimiter(),
+            max_summary_chars=400,
+        )
+        assert used_llm is False
+        assert "200 high school teachers" in summary
+        assert "2024 UNESCO" in summary
+
+        # Rate-limiter exhaustion skips Groq cleanly and uses deterministic summary
+        tight_limiter = TokenBucketLimiter(rpm_limit=0, tpm_limit=10)
+        summary2, used_llm2 = compact_context_entries(
+            summary,
+            [ContextEntry(turn=3, source="chat", text="Keep tone practical and optimistic.")],
+            client=MagicMock(),
+            limiter=tight_limiter,
+            max_summary_chars=300,
+        )
+        assert used_llm2 is False
+        assert "practical and optimistic" in summary2
+
+    def test_deterministic_compact_summary_enforces_max_chars(self) -> None:
+        entries = [
+            ContextEntry(
+                turn=i,
+                source="chat",
+                text=f"Point {i}: unique fact number {i * 17} for speech.",
+            )
+            for i in range(1, 15)
+        ]
+        summary = deterministic_compact_summary("", entries, max_chars=220)
+        assert len(summary) <= 220
+        assert "Point 14" in summary
+
+    def test_pipeline_run_consumes_compacted_summary_and_active_window(self) -> None:
+        from src.text_processing.contracts import GeneratedScript
+
+        store = TemplateStore(Path("nonexistent"))
+        mock_llm = MagicMock()
+        mock_llm.generate_free_topic_script.return_value = GeneratedScript(
+            script=" ".join(["speech"] * 650),
+            word_count=650,
+            duration_min=5,
+            source="llm",
+            template_id=None,
+            models_used=["openai/gpt-oss-120b"],
+        )
+        pipeline = ScriptGenerationPipeline(
+            template_store=store,
+            llm_generator=mock_llm,
+            moderator=ContentModerator(enable_llama_guard=False),
+        )
+        sess = ChatSessionState(
+            session_id="s-pipe",
+            user_id="u1",
+            category="free",
+            duration_min=5,
+            initial_prompt="AI Ethics",
+            compacted_summary=(
+                "- Audience: software engineers\n- Focus on algorithmic accountability"
+            ),
+            context_window=[
+                ContextEntry(
+                    turn=3,
+                    source="chat",
+                    text="Cite the EU AI Act tiered risk framework with concrete startup examples.",
+                )
+            ],
+        )
+        pipeline.session_store.put(sess)
+        try:
+            pipeline.run(
+                ScriptGenerationRequest(
+                    topic="AI Ethics",
+                    category="free",
+                    duration_min=5,
+                    session_id="s-pipe",
+                    user_id="u1",
+                    user_feedback="Emphasize practical audit checklists in the closing.",
+                )
+            )
+            kwargs = mock_llm.generate_free_topic_script.call_args.kwargs
+            assert "[Session Summary]" in kwargs["chat_context"]
+            assert "algorithmic accountability" in kwargs["chat_context"]
+            assert "EU AI Act" in kwargs["chat_context"]
+            assert "practical audit checklists" in kwargs["chat_context"]
+
+            updated = pipeline.session_store.get("s-pipe", user_id="u1")
+            assert updated is not None
+            assert any("practical audit checklists" in e.text for e in updated.context_window)
+        finally:
+            pipeline.session_store.delete("s-pipe", user_id="u1")
+
+
+class TestContinuousGroqQA:
+    def test_turn1_question_uses_groq_and_fallback_with_bold_keys(self) -> None:
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content=(
+                        '{"reply_message": "Who is your **target audience** and what '
+                        '**real-world examples** should we include?", '
+                        '"missing_items": ["target audience", "real-world examples"]}'
+                    )
+                )
+            )
+        ]
+        mock_resp.usage = MagicMock(total_tokens=110)
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        reply, missing = build_turn1_question(
+            topic="Solar Microgrids",
+            category="IT",
+            duration_min=5,
+            is_free_topic=True,
+            client=mock_client,
+            limiter=TokenBucketLimiter(),
+        )
+        assert "**target audience**" in reply
+        assert "target audience" in missing
+
+        # Fallback when client is None
+        fb_reply, fb_missing = build_turn1_question(
+            topic="Solar Microgrids",
+            is_free_topic=True,
+            client=None,
+        )
+        assert "**" in fb_reply
+        assert len(fb_missing) >= 1
+
+    def test_evaluate_and_build_followup_json_and_fallback(self) -> None:
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content=(
+                        '{"sufficient": false, '
+                        '"missing_items": ["concrete case study"], '
+                        '"reply_message": "Thanks! Could you share one **concrete case study**?"}'
+                    )
+                )
+            )
+        ]
+        mock_resp.usage = MagicMock(total_tokens=140)
+        mock_client.chat.completions.create.return_value = mock_resp
+
+        decision = evaluate_and_build_followup(
+            topic="Urban Forests",
+            is_free_topic=True,
+            compacted_summary="- Audience: city planners",
+            context_entries=[
+                ContextEntry(turn=1, source="chat", text="Focus on heat island reduction.")
+            ],
+            latest_user_answer="Focus on heat island reduction.",
+            client=mock_client,
+            limiter=TokenBucketLimiter(),
+        )
+        assert decision.used_llm is True
+        assert decision.sufficient is False
+        assert decision.missing_items == ["concrete case study"]
+        assert "**concrete case study**" in decision.reply_message
+
+        # Verify bounded context was passed to Groq
+        sent_user = mock_client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+        assert "city planners" in sent_user
+        assert "[Turn 1 | chat]" in sent_user
+
+        # Malformed JSON falls back deterministically without raising
+        bad_client = MagicMock()
+        bad_resp = MagicMock()
+        bad_resp.choices = [MagicMock(message=MagicMock(content="not-json"))]
+        bad_resp.usage = MagicMock(total_tokens=50)
+        bad_client.chat.completions.create.return_value = bad_resp
+
+        fb_decision = evaluate_and_build_followup(
+            topic="Urban Forests",
+            is_free_topic=True,
+            latest_user_answer="Short note",
+            client=bad_client,
+            limiter=TokenBucketLimiter(),
+        )
+        assert fb_decision.used_llm is False
+        assert fb_decision.sufficient is False
+        assert "**" in fb_decision.reply_message
+
+
+class TestStepAndEtaTelemetry:
+    def test_turn_step_tracker_adds_10s_buffer_and_zeros_remaining_on_finish(self) -> None:
+        tracker = TurnStepTracker(
+            [
+                "validating_input",
+                "moderating",
+                "updating_context",
+                "compacting_context",
+                "analyzing_with_llm",
+            ]
+        )
+        tracker.start("validating_input")
+        active = tracker.to_telemetry()
+        assert active["eta_buffer_s"] == ETA_BUFFER_S == 10
+        assert active["estimated_total_s"] > 10.0
+        assert active["estimated_remaining_s"] > 10.0
+
+        tracker.skip("compacting_context")
+        tracker.finish()
+        done = tracker.to_telemetry()
+        assert done["stage"] == "completed"
+        assert done["progress"] == 100
+        assert done["estimated_remaining_s"] == 0.0
+        assert any(
+            s["key"] == "compacting_context" and s["state"] == "skipped"
+            for s in done["steps"]
+        )
+
+    def test_script_job_state_exposes_steps_and_10s_buffered_eta(self) -> None:
+        job = ScriptJobState(job_id="j1", user_id="u1")
+        payload = job.to_dict()
+        assert payload["eta_buffer_s"] == 10
+        assert payload["estimated_total_s"] > 10.0
+        assert payload["estimated_remaining_s"] == payload["estimated_total_s"]
+        assert [s["key"] for s in payload["steps"]] == [
+            "validating_input",
+            "extracting",
+            "moderating",
+            "generating",
+            "validating_output",
+        ]

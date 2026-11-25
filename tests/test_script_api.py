@@ -13,10 +13,19 @@ from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
-from src.app.config import max_saved_scripts, script_title_max_chars, settings
+from src.app.config import (
+    composer_max_words,
+    max_pdf_size_bytes,
+    max_saved_scripts,
+    max_text_file_bytes,
+    max_turn_text_chars,
+    script_title_max_chars,
+    settings,
+)
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
+from src.text_processing.chat_session import chat_session_store
 from src.text_processing.contracts import (
     GeneratedScript,
     ParagraphCitation,
@@ -499,3 +508,328 @@ def test_get_script_invalid_id_returns_422(script_api) -> None:
 def test_scripts_need_login() -> None:
     app_main.app.dependency_overrides.clear()
     assert TestClient(app_main.app).get("/api/scripts").status_code == 401
+
+
+# ---------- Issue #120 PR 1: Limits, Bounded Context, Continuous Q&A, Telemetry ----------
+
+
+def test_api_config_exposes_script_chat_limits_and_telemetry(script_api) -> None:
+    client, _, _ = script_api
+    resp = client.get("/api/config")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["max_turn_text_chars"] == max_turn_text_chars
+    assert body["composer_max_words"] == composer_max_words
+    assert body["max_pdf_size_bytes"] == max_pdf_size_bytes
+    assert body["max_text_file_bytes"] == max_text_file_bytes
+    assert body["file_size_limits_bytes"][".pdf"] == max_pdf_size_bytes
+    assert body["file_size_limits_bytes"][".md"] == max_text_file_bytes
+    assert body["file_size_limits_bytes"][".txt"] == max_text_file_bytes
+    assert body["eta_buffer_s"] == 10
+    assert body["script_telemetry"]["eta_buffer_s"] == 10
+
+
+def test_chat_suggest_and_message_reject_oversized_text_before_moderation_or_llm(
+    script_api, monkeypatch
+) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    mod_calls: list[str] = []
+    monkeypatch.setattr(
+        pipeline.moderator, "assert_safe", lambda text, **kw: mod_calls.append(text)
+    )
+    mock_groq = MagicMock()
+    pipeline.template_engine.client = mock_groq
+
+    # Create valid session first
+    ok_resp = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Keystone species"},
+    )
+    assert ok_resp.status_code == 200
+    sid = ok_resp.json()["session_id"]
+    mod_calls.clear()
+
+    too_many_chars = "x" * (max_turn_text_chars + 1)
+    too_many_words = " ".join(["w"] * (composer_max_words + 1))
+
+    # 1. /suggest rejects char limit & word limit before moderation/LLM
+    r1 = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": too_many_chars},
+    )
+    assert r1.status_code == 422
+    assert r1.json()["error_code"] == "text_too_long"
+
+    r2 = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": too_many_words},
+    )
+    assert r2.status_code == 422
+    assert r2.json()["error_code"] == "text_too_long"
+
+    # 2. /message rejects char limit & word limit before moderation/LLM
+    r3 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": too_many_chars},
+    )
+    assert r3.status_code == 422
+    assert r3.json()["error_code"] == "text_too_long"
+
+    r4 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": too_many_words},
+    )
+    assert r4.status_code == 422
+    assert r4.json()["error_code"] == "text_too_long"
+
+    assert mod_calls == []
+    assert mock_groq.chat.completions.create.call_count == 0
+    chat_session_store.clear()
+
+
+def test_chat_uploads_enforce_per_type_limits_before_reading_full_body_or_moderating(
+    script_api, monkeypatch
+) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    mod_calls: list[str] = []
+    monkeypatch.setattr(
+        pipeline.moderator, "assert_safe", lambda text, **kw: mod_calls.append(text)
+    )
+
+    ok_resp = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Keystone species"},
+    )
+    sid = ok_resp.json()["session_id"]
+    mod_calls.clear()
+
+    # Lower text-file byte ceiling for fast test & verify chunked reader aborts early
+    monkeypatch.setitem(
+        app_main.max_bytes_for_extension.__globals__["FILE_SIZE_LIMITS_BYTES"], ".txt", 1024
+    )
+    monkeypatch.setitem(
+        app_main.max_bytes_for_extension.__globals__["FILE_SIZE_LIMITS_BYTES"], ".md", 1024
+    )
+
+    r_txt = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5},
+        files={"file": ("huge.txt", io.BytesIO(b"a" * 2048), "text/plain")},
+    )
+    assert r_txt.status_code == 422
+    assert r_txt.json()["error_code"] == "file_too_large"
+
+    r_md = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "notes"},
+        files={"file": ("huge.md", io.BytesIO(b"a" * 2048), "text/markdown")},
+    )
+    assert r_md.status_code == 422
+    assert r_md.json()["error_code"] == "file_too_large"
+
+    r_bad_ext = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "notes"},
+        files={"file": ("deck.pptx", io.BytesIO(b"binary"), "application/octet-stream")},
+    )
+    assert r_bad_ext.status_code == 422
+    assert r_bad_ext.json()["error_code"] == "unsupported_file_type"
+
+    assert mod_calls == []
+    chat_session_store.clear()
+
+
+def test_resolve_groq_client_uses_key_pool_when_template_engine_client_is_none(
+    monkeypatch,
+) -> None:
+    pipeline, _ = _build_test_pipeline()
+    assert pipeline.template_engine.client is None
+    sentinel = object()
+    monkeypatch.setattr(app_main, "make_groq_client", lambda: sentinel)
+    assert app_main._resolve_groq_client(pipeline) is sentinel
+
+
+def test_turn1_gating_and_continuous_multi_turn_groq_qa_with_compaction_and_telemetry(
+    script_api, monkeypatch
+) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    # Mock Groq client handling both Q&A (120b) and compaction (20b)
+    mock_groq = MagicMock()
+
+    def _fake_create(*, model: str, messages: list[dict[str, str]], **_: Any):
+        resp = MagicMock()
+        resp.usage = MagicMock(total_tokens=150)
+        if model == "openai/gpt-oss-20b":
+            payload = {"summary": "- Audience: policy makers\n- Focus: coral reef resilience"}
+        else:
+            user_text = messages[1]["content"]
+            if "Mode: Free-topic" in user_text or "Mode: Template-guided" in user_text:
+                payload = {
+                    "reply_message": (
+                        "To start, who is your **target audience** and what "
+                        "**real-world examples** will you cite?"
+                    ),
+                    "missing_items": ["target audience", "real-world examples"],
+                }
+            elif "Final tone check: inspiring" in user_text:
+                payload = {
+                    "sufficient": True,
+                    "missing_items": [],
+                    "reply_message": (
+                        "Awesome — we have everything needed for **Coral Reefs**. "
+                        "Generate when ready, or add more **details**."
+                    ),
+                }
+            else:
+                payload = {
+                    "sufficient": False,
+                    "missing_items": ["key statistics", "call to action"],
+                    "reply_message": (
+                        "Thanks! Could you add **key statistics** and a clear **call to action**?"
+                    ),
+                }
+        resp.choices = [MagicMock(message=MagicMock(content=json.dumps(payload)))]
+        return resp
+
+    mock_groq.chat.completions.create.side_effect = _fake_create
+    pipeline.template_engine.client = mock_groq
+
+    # 1. Suggest
+    s_resp = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Coral reefs"},
+    )
+    assert s_resp.status_code == 200
+    s_body = s_resp.json()
+    sid = s_body["session_id"]
+    assert s_body["eta_buffer_s"] == 10
+    assert s_body["estimated_total_s"] > 10.0
+    assert s_body["estimated_remaining_s"] == 0.0
+    assert [st["key"] for st in s_body["steps"]] == [
+        "validating_input",
+        "moderating",
+        "matching_templates",
+    ]
+
+    # 2. Turn 1 (Free-topic select-topic): ALWAYS assistant_turn=1, can_generate=False
+    t1_resp = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": sid, "template_id": None},
+    )
+    assert t1_resp.status_code == 200
+    t1_body = t1_resp.json()
+    assert t1_body["assistant_turn"] == 1
+    assert t1_body["can_generate"] is False
+    assert t1_body["ready_to_generate"] is False
+    assert "**target audience**" in t1_body["reply_message"]
+    assert t1_body["eta_buffer_s"] == 10
+    assert t1_body["estimated_total_s"] > 10.0
+
+    # Tighten window ceiling to force compaction on the 3rd user message (Turn 4)
+    chat_mod = app_main.append_to_context_window.__globals__
+    monkeypatch.setitem(chat_mod, "CONTEXT_WINDOW_MAX_ENTRIES", 2)
+    monkeypatch.setitem(chat_mod, "CONTEXT_COMPACTION_KEEP_RECENT", 2)
+
+    # 3. Turn 2, 3, 4 (no 2-turn hard stop; Turn 4 compacts older turns via gpt-oss-20b)
+    t2 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "Audience is city policy makers."},
+    ).json()
+    assert t2["assistant_turn"] == 2
+    assert t2["can_generate"] is True
+    assert t2["ready_to_generate"] is False
+    assert t2["context_compacted"] is False
+    assert "**key statistics**" in t2["reply_message"]
+
+    t3 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "Focus on coral reef thermal resilience."},
+    ).json()
+    assert t3["assistant_turn"] == 3
+    assert t3["can_generate"] is True
+    assert t3["ready_to_generate"] is False
+    assert t3["context_compacted"] is False
+
+    t4 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "30% reef recovery shown in 2024 trials."},
+    ).json()
+    assert t4["assistant_turn"] == 4
+    assert t4["can_generate"] is True
+    assert t4["context_compacted"] is True
+    assert t4["compaction_count"] == 1
+    assert any(
+        st["key"] == "compacting_context" and st["state"] == "done" for st in t4["steps"]
+    )
+
+    t5 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "Final tone check: inspiring and urgent."},
+    ).json()
+    assert t5["assistant_turn"] == 5
+    assert t5["can_generate"] is True
+    assert t5["ready_to_generate"] is True
+    assert t5["missing_items"] == []
+
+    chat_session_store.clear()
+
+
+def test_generate_script_job_and_async_chat_job_telemetry(script_api) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    # 1. Script generation telemetry (+10s buffer & ordered steps)
+    queued = client.post(
+        "/api/generate-script",
+        data={"topic": "Quantum Computing Ethics", "category": "free", "duration_min": 5},
+    )
+    assert queued.status_code == 202
+    q_body = queued.json()
+    assert q_body["eta_buffer_s"] == 10
+    assert q_body["estimated_total_s"] > 10.0
+
+    polled = client.get(f"/api/generate-script/{q_body['job_id']}")
+    assert polled.status_code == 200
+    p_body = polled.json()
+    assert p_body["status"] == "completed"
+    assert p_body["stage"] == "completed"
+    assert p_body["eta_buffer_s"] == 10
+    assert p_body["estimated_total_s"] > 10.0
+    assert p_body["estimated_remaining_s"] == 0.0
+    assert all(st["state"] == "done" for st in p_body["steps"])
+
+    # 2. Async chat turn job endpoint polling
+    sid = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Reefs"},
+    ).json()["session_id"]
+    job_resp = client.post(
+        "/api/script-chat/message/jobs",
+        data={"session_id": sid, "message": "Audience is biology teachers."},
+    )
+    assert job_resp.status_code == 202
+    j_body = job_resp.json()
+    assert j_body["eta_buffer_s"] == 10
+
+    done_resp = client.get(f"/api/script-chat/jobs/{j_body['job_id']}")
+    assert done_resp.status_code == 200
+    d_body = done_resp.json()
+    assert d_body["status"] == "completed"
+    assert d_body["estimated_remaining_s"] == 0.0
+    assert d_body["result"]["assistant_turn"] == 2
+    assert d_body["result"]["can_generate"] is True
+    chat_session_store.clear()

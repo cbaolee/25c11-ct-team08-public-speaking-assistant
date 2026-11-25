@@ -20,12 +20,24 @@ _SUPABASE_API_SUFFIXES = ("/rest/v1", "/auth/v1", "/storage/v1")
 _storage = CONSTANTS["storage"]
 _audio = CONSTANTS["audio"]
 _script = CONSTANTS["script"]
+_web = CONSTANTS["web"]
 
 max_audio_seconds = _audio["max_audio_seconds"]
 baseline_min_seconds = _audio["baseline_min_seconds"]
 baseline_max_seconds = _audio["baseline_max_seconds"]
 max_script_words = _script["max_script_words"]
 max_script_chars = _script["max_script_chars"]
+max_turn_text_chars = _script["max_turn_text_chars"]
+composer_max_words = _web["composer_max_words"]
+max_pdf_size_bytes = _script["max_pdf_size_bytes"]
+max_pdf_pages = _script["max_pdf_pages"]
+max_text_file_bytes = _script["max_text_file_bytes"]
+max_text_file_words = _script["max_text_file_words"]
+context_window_max_chars = _script["context_window_max_chars"]
+context_window_max_entries = _script["context_window_max_entries"]
+context_compaction_keep_recent = _script["context_compaction_keep_recent"]
+context_compaction_max_summary_chars = _script["context_compaction_max_summary_chars"]
+eta_buffer_s = _script["eta_buffer_s"]
 max_upload_bytes = _storage["max_upload_bytes"]
 max_saved_scripts = _storage["max_saved_scripts"]
 script_title_max_chars = _storage["script_title_max_chars"]
@@ -58,6 +70,11 @@ def validate_list_limits(page_size: int, saved_scripts: int) -> None:
 def _from_toml(section: str, key: str):
     """Default factory: read the value when Settings is built, so .env still wins."""
     return lambda: CONSTANTS[section][key]
+
+
+def _from_toml_optional(section: str, key: str, fallback: str):
+    """Default factory with fallback when a test replaces CONSTANTS with a partial TOML."""
+    return lambda: CONSTANTS.get(section, {}).get(key, fallback)
 
 
 # A comma-separated list in .env ("key1,key2"), not JSON.
@@ -143,6 +160,9 @@ class Settings(BaseSettings):
     groq_llm_model: str = ""
     groq_llm_fallback_model_1: str = ""
     groq_llm_fallback_model_2: str = ""
+    groq_compaction_model: str = Field(
+        default_factory=_from_toml_optional("script", "groq_compaction_model", "openai/gpt-oss-20b")
+    )
     app_env: str = "dev"
 
     # Moderation Layer 2 (Ollama / OpenAI-compatible Llama-Guard endpoint)
@@ -191,6 +211,15 @@ class Settings(BaseSettings):
     @classmethod
     def _check_supabase_url(cls, value: str) -> str:
         return _clean_supabase_url(value)
+
+    @field_validator("groq_compaction_model", mode="before")
+    @classmethod
+    def _default_compaction_model(cls, value: object) -> str:
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return str(
+            CONSTANTS.get("script", {}).get("groq_compaction_model", "openai/gpt-oss-20b")
+        )
 
     @field_validator("supabase_shards", mode="before")
     @classmethod

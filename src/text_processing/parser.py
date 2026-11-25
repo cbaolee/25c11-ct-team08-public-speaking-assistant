@@ -2,6 +2,7 @@
 
 import os
 import re
+import unicodedata
 import warnings
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -35,7 +36,14 @@ MAX_PDF_SIZE_BYTES = CONSTANTS["script"]["max_pdf_size_bytes"]
 MAX_POC_PAGES = CONSTANTS["script"]["max_pdf_pages"]
 MAX_TEXT_FILE_BYTES = CONSTANTS["script"]["max_text_file_bytes"]
 MAX_TEXT_FILE_WORDS = CONSTANTS["script"]["max_text_file_words"]
+MAX_TURN_TEXT_CHARS = CONSTANTS["script"]["max_turn_text_chars"]
+MAX_TURN_TEXT_WORDS = CONSTANTS["web"]["composer_max_words"]
 ALLOWED_DOC_EXTENSIONS = frozenset({".pdf", ".md", ".txt"})
+FILE_SIZE_LIMITS_BYTES: dict[str, int] = {
+    ".pdf": MAX_PDF_SIZE_BYTES,
+    ".md": MAX_TEXT_FILE_BYTES,
+    ".txt": MAX_TEXT_FILE_BYTES,
+}
 HEADING_PATTERN = re.compile(r"^(#{1,4})\s+(.+)$")
 
 
@@ -212,3 +220,38 @@ def validate_and_parse_document(
             if chunk.heading == f"Page {chunk.page} Overview":
                 chunk.heading = fallback_heading
     return chunks
+
+
+def max_bytes_for_extension(filename: str) -> int:
+    """Return the per-type byte ceiling for `.pdf`, `.md`, or `.txt` uploads."""
+    ext = Path(filename or "").suffix.lower()
+    if ext not in FILE_SIZE_LIMITS_BYTES:
+        raise DocumentParserError(
+            "unsupported_file_type",
+            f"Unsupported file format '{ext}'. Only .pdf, .md, and .txt files are supported.",
+        )
+    return FILE_SIZE_LIMITS_BYTES[ext]
+
+
+def validate_turn_text_length(
+    text: str,
+    *,
+    max_chars: int = MAX_TURN_TEXT_CHARS,
+    max_words: int = MAX_TURN_TEXT_WORDS,
+) -> None:
+    """Enforce per-turn NFC character and word limits before moderation or LLM calls."""
+    if not text:
+        return
+    normalized = unicodedata.normalize("NFC", text)
+    char_count = len(normalized)
+    if char_count > max_chars:
+        raise DocumentParserError(
+            "text_too_long",
+            f"Message is too long ({char_count} characters; maximum {max_chars}).",
+        )
+    word_count = len(normalized.split())
+    if word_count > max_words:
+        raise DocumentParserError(
+            "text_too_long",
+            f"Message has too many words ({word_count} words; maximum {max_words}).",
+        )
