@@ -17,7 +17,7 @@ from typing import Any, Literal
 
 import numpy as np
 
-from src.app.constants import CONSTANTS
+from src.app.config import topic_suggest_min_score, topic_suggest_top_k
 
 from .contracts import CATEGORY_SLUG_MAP, VALID_DURATIONS, TemplateDocument, TopicMetadata
 from .retrieval import SemanticRetriever
@@ -25,8 +25,8 @@ from .retrieval import SemanticRetriever
 logger = logging.getLogger(__name__)
 
 DEFAULT_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "data" / "templates"
-DEFAULT_SUGGEST_TOP_K: int = CONSTANTS["script"]["topic_suggest_top_k"]
-DEFAULT_SUGGEST_MIN_SCORE: float = CONSTANTS["script"]["topic_suggest_min_score"]
+DEFAULT_SUGGEST_TOP_K: int = topic_suggest_top_k
+DEFAULT_SUGGEST_MIN_SCORE: float = float(topic_suggest_min_score)
 _FALLBACK_WEAK_MATCH_LIMIT = 3
 _REV_CATEGORY_MAP = {v.lower(): k for k, v in CATEGORY_SLUG_MAP.items()}
 SLOT_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")

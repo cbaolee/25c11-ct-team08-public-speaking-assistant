@@ -833,3 +833,92 @@ def test_generate_script_job_and_async_chat_job_telemetry(script_api) -> None:
     assert d_body["result"]["assistant_turn"] == 2
     assert d_body["result"]["can_generate"] is True
     chat_session_store.clear()
+
+
+def test_select_topic_switch_from_template_to_free_topic_resets_topic(script_api) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    s_resp = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Coral reefs in warm seas"},
+    )
+    assert s_resp.status_code == 200
+    sid = s_resp.json()["session_id"]
+
+    # First select a template
+    r_tpl = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": sid, "template_id": "wildlife/keystone_5m"},
+    )
+    assert r_tpl.status_code == 200
+    stored = chat_session_store._sessions[sid]
+    assert stored.selected_template_id == "wildlife/keystone_5m"
+    assert stored.topic != "Coral reefs in warm seas"
+
+    # Now switch back to free-topic (template_id=None)
+    r_free = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": sid, "template_id": None},
+    )
+    assert r_free.status_code == 200
+    body = r_free.json()
+    assert body["selected_template_id"] is None
+    assert body["assistant_turn"] == 1
+    assert body["can_generate"] is False
+    assert stored.selected_template_id is None
+    assert stored.topic == "Coral reefs in warm seas"
+    chat_session_store.clear()
+
+
+def test_select_topic_unknown_template_404_preserves_session_state(script_api) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    s_resp = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Coral reefs"},
+    )
+    assert s_resp.status_code == 200
+    sid = s_resp.json()["session_id"]
+
+    # Advance session to Turn 2 in free-topic mode first
+    r_free = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": sid, "template_id": None},
+    )
+    assert r_free.status_code == 200
+    r_msg = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "Target audience is marine biology students."},
+    )
+    assert r_msg.status_code == 200
+
+    stored = chat_session_store._sessions[sid]
+    prev_snapshot = (
+        stored.selected_template_id,
+        stored.gather_turns,
+        stored.assistant_turn,
+        stored.ready_to_generate,
+        stored.topic,
+    )
+
+    # Attempt to select a nonexistent template -> 404 without mutating session
+    r_missing = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": sid, "template_id": "nonexistent/missing_5m"},
+    )
+    assert r_missing.status_code == 404
+    assert r_missing.json()["error_code"] == "template_not_found"
+    assert (
+        stored.selected_template_id,
+        stored.gather_turns,
+        stored.assistant_turn,
+        stored.ready_to_generate,
+        stored.topic,
+    ) == prev_snapshot
+    chat_session_store.clear()

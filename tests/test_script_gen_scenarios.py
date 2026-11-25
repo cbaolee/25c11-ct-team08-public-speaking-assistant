@@ -3,7 +3,7 @@
 Scenarios covered:
 - Scenario 1: Topic suggestions from category + duration + prompt (strong & free-topic).
 - Scenario 2: Interactive gathering: template selection -> entity follow-ups -> ready.
-- Scenario 3: Hard 2-turn gathering cap (gather_turns == 2) -> stops asking follow-up questions.
+- Scenario 3: Continuous gathering (no 2-turn hard cap) -> Turn 2+ unlocks can_generate.
 - Scenario 4: Template generation (6T) with polish_script_paragraphs.
 - Scenario 5: Free-topic generation (6L) and regenerate with user_feedback reusing session chunks.
 - Scenario 6: Content moderation (Layer 1 + mocked Layer 2) rejecting unsafe content.

@@ -69,3 +69,30 @@ def test_script_generator_fallback_and_citation_check(monkeypatch) -> None:
     assert res.model_used == gen.model_chain[1] and res.citations == [
         {"heading": "Intro", "page": 1}
     ]
+
+
+def test_verify_citations_rejects_whitespace_headings_and_bool_pages(monkeypatch) -> None:
+    """Whitespace headings must be dropped and bool pages must never leak as page numbers."""
+    from src.text_processing.contracts import DocumentChunk
+
+    monkeypatch.setattr(settings, "groq_api_keys", ["dummy_key"])
+    gen = ScriptGenerator()
+    chunks = [
+        DocumentChunk(chunk_id=1, heading="Intro", page=1, content="Opening."),
+        DocumentChunk(chunk_id=2, heading="Methods", page=2, content="Details."),
+    ]
+    verified = gen.verify_citations(
+        [
+            {"heading": "   ", "page": 1},
+            {"heading": None, "page": 2},
+            {"heading": "Intro", "page": True},
+            {"heading": "Unknown", "page": True},
+            {"heading": "Methods", "page": 2},
+        ],
+        chunks,
+    )
+    assert verified == [
+        {"heading": "Intro", "page": 1},
+        {"heading": "Methods", "page": 2},
+    ]
+    assert all(type(item["page"]) is int for item in verified)

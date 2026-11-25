@@ -26,8 +26,35 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import numpy as np
 
-from src.app.config import settings
-from src.app.constants import CONSTANTS
+from src.app.config import (
+    chat_session_store_capacity,
+    chat_session_ttl_s,
+    chat_turn_step_durations,
+    compaction_low_signal_max_words,
+    compaction_max_tokens,
+    compaction_temperature,
+    context_compaction_keep_recent,
+    context_compaction_max_summary_chars,
+    context_compaction_min_summary_chars,
+    context_entry_min_cap_chars,
+    context_entry_reserve_chars,
+    context_window_max_chars,
+    context_window_max_entries,
+    default_compaction_model,
+    eta_buffer_s,
+    followup_legacy_temperature,
+    followup_max_tokens,
+    followup_temperature,
+    free_topic_min_words,
+    free_topic_thesis_min_words,
+    qa_limiter_max_wait_s,
+    qa_max_missing_items_display,
+    settings,
+    slot_coverage_min_score,
+    slot_coverage_ready_threshold,
+    turn1_max_tokens,
+    turn1_temperature,
+)
 
 from .contracts import (
     DocumentChunk,
@@ -50,14 +77,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Constants
-DEFAULT_STORE_CAPACITY = 100
-DEFAULT_STORE_TTL_SECONDS = 1800.0  # 30 minutes
-COSINE_SIMILARITY_THRESHOLD = 0.35
-FREE_TOPIC_MIN_WORDS = 150
-TURN1_MAX_TOKENS = 160
-FOLLOWUP_MAX_TOKENS = 220
-COMPACTION_MAX_TOKENS = 300
+# Constants (sourced from app_constants.toml via src.app.config)
+DEFAULT_STORE_CAPACITY = int(chat_session_store_capacity)
+DEFAULT_STORE_TTL_SECONDS = float(chat_session_ttl_s)  # 30 minutes
+COSINE_SIMILARITY_THRESHOLD = float(slot_coverage_min_score)
+SLOT_COVERAGE_READY_THRESHOLD = float(slot_coverage_ready_threshold)
+FREE_TOPIC_MIN_WORDS = int(free_topic_min_words)
+FREE_TOPIC_THESIS_MIN_WORDS = int(free_topic_thesis_min_words)
+TURN1_MAX_TOKENS = int(turn1_max_tokens)
+FOLLOWUP_MAX_TOKENS = int(followup_max_tokens)
+COMPACTION_MAX_TOKENS = int(compaction_max_tokens)
+COMPACTION_TEMPERATURE = float(compaction_temperature)
+TURN1_TEMPERATURE = float(turn1_temperature)
+FOLLOWUP_TEMPERATURE = float(followup_temperature)
+FOLLOWUP_LEGACY_TEMPERATURE = float(followup_legacy_temperature)
+QA_LIMITER_MAX_WAIT_S = float(qa_limiter_max_wait_s)
+QA_MAX_MISSING_ITEMS_DISPLAY = int(qa_max_missing_items_display)
 FOLLOWUP_DEFAULT_MODEL = "openai/gpt-oss-20b"
 _DEFAULT_QA_MODEL_CHAIN: tuple[str, ...] = (
     "openai/gpt-oss-120b",
@@ -65,22 +100,19 @@ _DEFAULT_QA_MODEL_CHAIN: tuple[str, ...] = (
     "openai/gpt-oss-20b",
 )
 
-_SCRIPT_CFG = CONSTANTS["script"]
-CONTEXT_WINDOW_MAX_CHARS = int(_SCRIPT_CFG["context_window_max_chars"])
-CONTEXT_WINDOW_MAX_ENTRIES = int(_SCRIPT_CFG["context_window_max_entries"])
-CONTEXT_COMPACTION_KEEP_RECENT = int(_SCRIPT_CFG["context_compaction_keep_recent"])
-CONTEXT_COMPACTION_MAX_SUMMARY_CHARS = int(_SCRIPT_CFG["context_compaction_max_summary_chars"])
-DEFAULT_COMPACTION_MODEL = str(_SCRIPT_CFG["groq_compaction_model"])
-ETA_BUFFER_S = int(_SCRIPT_CFG["eta_buffer_s"])
+CONTEXT_WINDOW_MAX_CHARS = int(context_window_max_chars)
+CONTEXT_WINDOW_MAX_ENTRIES = int(context_window_max_entries)
+CONTEXT_COMPACTION_KEEP_RECENT = int(context_compaction_keep_recent)
+CONTEXT_COMPACTION_MAX_SUMMARY_CHARS = int(context_compaction_max_summary_chars)
+CONTEXT_COMPACTION_MIN_SUMMARY_CHARS = int(context_compaction_min_summary_chars)
+CONTEXT_ENTRY_RESERVE_CHARS = int(context_entry_reserve_chars)
+CONTEXT_ENTRY_MIN_CAP_CHARS = int(context_entry_min_cap_chars)
+COMPACTION_LOW_SIGNAL_MAX_WORDS = int(compaction_low_signal_max_words)
+DEFAULT_COMPACTION_MODEL = str(default_compaction_model)
+ETA_BUFFER_S = int(eta_buffer_s)
 
 CHAT_TURN_STEP_DURATIONS: dict[str, float] = {
-    "validating_input": 0.5,
-    "moderating": 1.0,
-    "matching_templates": 1.5,
-    "analyzing_slots": 1.0,
-    "updating_context": 0.5,
-    "compacting_context": 2.5,
-    "analyzing_with_llm": 3.5,
+    k: float(v) for k, v in chat_turn_step_durations.items()
 }
 
 READY_MESSAGE = (
@@ -468,7 +500,10 @@ def normalize_turn_entry(
     ceiling = (
         max_entry_chars
         if max_entry_chars is not None
-        else max(500, CONTEXT_WINDOW_MAX_CHARS - 500)
+        else max(
+            CONTEXT_ENTRY_MIN_CAP_CHARS,
+            CONTEXT_WINDOW_MAX_CHARS - CONTEXT_ENTRY_RESERVE_CHARS,
+        )
     )
     compact = _truncate_cleanly(compact, ceiling)
     if not compact:
@@ -522,7 +557,9 @@ def deterministic_compact_summary(
         drop_idx = 0
         for idx in range(len(kept) - 1):
             item = kept[idx]
-            if len(item.split()) < 8 and not any(ch.isdigit() for ch in item):
+            if len(item.split()) < COMPACTION_LOW_SIGNAL_MAX_WORDS and not any(
+                ch.isdigit() for ch in item
+            ):
                 drop_idx = idx
                 break
         kept.pop(drop_idx)
@@ -576,7 +613,7 @@ def compact_context_entries(
     est_tokens = max(90, int(len(user_prompt) / 3.5) + COMPACTION_MAX_TOKENS)
 
     wait = active_limiter.wait_time_s(target_model, est_tokens)
-    if wait > 5.0 or not active_limiter.can_consume(target_model, est_tokens):
+    if wait > QA_LIMITER_MAX_WAIT_S or not active_limiter.can_consume(target_model, est_tokens):
         logger.info(
             "Compaction rate budget tight for %s; using deterministic fallback.", target_model
         )
@@ -597,7 +634,7 @@ def compact_context_entries(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.2,
+            temperature=COMPACTION_TEMPERATURE,
             max_tokens=COMPACTION_MAX_TOKENS,
             response_format={"type": "json_object"},
         )
@@ -613,8 +650,12 @@ def compact_context_entries(
                 parsed = json.loads(raw)
                 if isinstance(parsed, dict):
                     summary_text = str(parsed.get("summary", "")).strip()
-            except json.JSONDecodeError:
-                summary_text = raw
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    "Groq compaction returned invalid JSON on %s (%s); using fallback.",
+                    target_model,
+                    exc,
+                )
 
         if summary_text:
             return _truncate_cleanly(summary_text, max_summary_chars), True
@@ -668,7 +709,9 @@ def append_to_context_window(
         cleaned,
         turn=turn,
         source=source,
-        max_entry_chars=max(400, eff_max_chars - 500),
+        max_entry_chars=max(
+            CONTEXT_ENTRY_MIN_CAP_CHARS, eff_max_chars - CONTEXT_ENTRY_RESERVE_CHARS
+        ),
     )
     if entry is None:
         return None, False
@@ -692,9 +735,15 @@ def append_to_context_window(
         to_compact = []
         kept = list(session.context_window)
 
+    min_summary_floor = CONTEXT_COMPACTION_MIN_SUMMARY_CHARS
+    while len(kept) > 1 and sum(e.char_count for e in kept) > max(
+        min_summary_floor, eff_max_chars - min_summary_floor
+    ):
+        to_compact.append(kept.pop(0))
+
     summary_budget = min(
         eff_summary_chars,
-        max(200, eff_max_chars - sum(e.char_count for e in kept)),
+        max(min_summary_floor, eff_max_chars - sum(e.char_count for e in kept)),
     )
 
     if to_compact:
@@ -850,7 +899,7 @@ def check_ready_to_generate(
     """Deterministic readiness evaluation (no 2-turn forced hard stop)."""
     _ = gather_turns  # kept in signature for caller compatibility; no forced turn cap
     if selected_template_id is not None:
-        return len(missing_entities) == 0 and coverage_ratio >= 0.7
+        return len(missing_entities) == 0 and coverage_ratio >= SLOT_COVERAGE_READY_THRESHOLD
 
     has_files = bool(files_loaded and len(files_loaded) > 0)
     all_text = f"{prompt} {' '.join(user_notes or [])}".strip()
@@ -866,7 +915,7 @@ def _ensure_bold_keys(reply: str, keys: list[str]) -> str:
     """Ensure key requested items appear wrapped in **bold** markers for UI scannability."""
     if "**" in reply or not keys:
         return reply
-    formatted_keys = ", ".join(f"**{k}**" for k in keys[:3] if k)
+    formatted_keys = ", ".join(f"**{k}**" for k in keys[:QA_MAX_MISSING_ITEMS_DISPLAY] if k)
     if not formatted_keys:
         return reply
     return f"{reply.rstrip()} (Key focus: {formatted_keys})"
@@ -926,7 +975,7 @@ def _derive_missing_items(
 
     lower = context_text.lower()
     missing: list[str] = []
-    if len(context_text.split()) < 15:
+    if len(context_text.split()) < FREE_TOPIC_THESIS_MIN_WORDS:
         missing.append("central thesis")
     if not any(
         w in lower for w in ("audience", "student", "listener", "team", "executive", "public")
@@ -993,7 +1042,7 @@ def build_turn1_question(
 
     for model_id in chain:
         wait = active_limiter.wait_time_s(model_id, est_tokens)
-        if wait > 5.0 or not active_limiter.can_consume(model_id, est_tokens):
+        if wait > QA_LIMITER_MAX_WAIT_S or not active_limiter.can_consume(model_id, est_tokens):
             continue
         try:
             resp = client.chat.completions.create(
@@ -1002,7 +1051,7 @@ def build_turn1_question(
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
-                temperature=0.4,
+                temperature=TURN1_TEMPERATURE,
                 max_tokens=TURN1_MAX_TOKENS,
                 response_format={"type": "json_object"},
             )
@@ -1022,8 +1071,10 @@ def build_turn1_question(
                         raw_items = data.get("missing_items")
                         if isinstance(raw_items, list) and raw_items:
                             parsed_items = [str(x).strip() for x in raw_items if str(x).strip()]
-                except json.JSONDecodeError:
-                    reply = raw
+                except json.JSONDecodeError as exc:
+                    logger.warning(
+                        "Groq Turn 1 returned invalid JSON on %s (%s)", model_id, exc
+                    )
             if reply:
                 return _ensure_bold_keys(reply, parsed_items), parsed_items
         except Exception as exc:
@@ -1036,7 +1087,7 @@ def build_turn1_question(
 
 
 def _turn1_fallback_question(topic: str, missing_items: list[str], *, is_free_topic: bool) -> str:
-    bold_items = [f"**{item}**" for item in missing_items[:3]]
+    bold_items = [f"**{item}**" for item in missing_items[:QA_MAX_MISSING_ITEMS_DISPLAY]]
     joined = ", ".join(bold_items) if bold_items else "**target audience** and **key examples**"
     if is_free_topic:
         return (
@@ -1047,6 +1098,24 @@ def _turn1_fallback_question(topic: str, missing_items: list[str], *, is_free_to
         f"Great choice on '{topic}'. "
         f"Before drafting, could you share more about your {joined}?"
     )
+
+
+def _parse_bool_flag(value: Any, *, default: bool) -> bool:
+    """Parse LLM boolean-like JSON values safely (avoiding bool('false') == True)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no", ""}:
+            return False
+        return default
+    if value is None:
+        return default
+    return bool(value)
 
 
 def evaluate_and_build_followup(
@@ -1138,7 +1207,7 @@ def evaluate_and_build_followup(
 
         for model_id in chain:
             wait = active_limiter.wait_time_s(model_id, est_tokens)
-            if wait > 5.0 or not active_limiter.can_consume(model_id, est_tokens):
+            if wait > QA_LIMITER_MAX_WAIT_S or not active_limiter.can_consume(model_id, est_tokens):
                 continue
             try:
                 resp = client.chat.completions.create(
@@ -1147,7 +1216,7 @@ def evaluate_and_build_followup(
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": user_prompt},
                     ],
-                    temperature=0.4,
+                    temperature=FOLLOWUP_TEMPERATURE,
                     max_tokens=FOLLOWUP_MAX_TOKENS,
                     response_format={"type": "json_object"},
                 )
@@ -1161,7 +1230,9 @@ def evaluate_and_build_followup(
                 if isinstance(parsed, dict):
                     reply = str(parsed.get("reply_message", "")).strip()
                     if reply:
-                        sufficient = bool(parsed.get("sufficient", fallback_sufficient))
+                        sufficient = _parse_bool_flag(
+                            parsed.get("sufficient"), default=fallback_sufficient
+                        )
                         raw_items = parsed.get("missing_items")
                         if isinstance(raw_items, list):
                             missing_items = [str(x).strip() for x in raw_items if str(x).strip()]
@@ -1197,7 +1268,9 @@ def evaluate_and_build_followup(
         is_free_topic=is_free_topic,
     )
     if is_free_topic and fallback_missing:
-        bold_items = ", ".join(f"**{item}**" for item in fallback_missing[:3])
+        bold_items = ", ".join(
+            f"**{item}**" for item in fallback_missing[:QA_MAX_MISSING_ITEMS_DISPLAY]
+        )
         reply = (
             f"Thanks! To strengthen your speech on '{topic}', "
             f"could you provide more on {bold_items}?"
@@ -1252,7 +1325,7 @@ def build_followup_reply(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.5,
+            temperature=FOLLOWUP_LEGACY_TEMPERATURE,
             max_tokens=FOLLOWUP_MAX_TOKENS,
         )
         reply = resp.choices[0].message.content.strip()
@@ -1312,9 +1385,14 @@ def ingest_upload_file(
 
 __all__ = [
     "CHAT_TURN_STEP_DURATIONS",
+    "COMPACTION_LOW_SIGNAL_MAX_WORDS",
     "COMPACTION_MAX_TOKENS",
+    "COMPACTION_TEMPERATURE",
     "CONTEXT_COMPACTION_KEEP_RECENT",
     "CONTEXT_COMPACTION_MAX_SUMMARY_CHARS",
+    "CONTEXT_COMPACTION_MIN_SUMMARY_CHARS",
+    "CONTEXT_ENTRY_MIN_CAP_CHARS",
+    "CONTEXT_ENTRY_RESERVE_CHARS",
     "CONTEXT_WINDOW_MAX_CHARS",
     "CONTEXT_WINDOW_MAX_ENTRIES",
     "COSINE_SIMILARITY_THRESHOLD",
@@ -1323,13 +1401,20 @@ __all__ = [
     "DEFAULT_STORE_TTL_SECONDS",
     "ETA_BUFFER_S",
     "FOLLOWUP_DEFAULT_MODEL",
+    "FOLLOWUP_LEGACY_TEMPERATURE",
     "FOLLOWUP_MAX_TOKENS",
+    "FOLLOWUP_TEMPERATURE",
     "FREE_TOPIC_MIN_WORDS",
+    "FREE_TOPIC_THESIS_MIN_WORDS",
     "GROUP_COUNTER",
     "GROUP_EVIDENCE",
     "GROUP_MAIN",
+    "QA_LIMITER_MAX_WAIT_S",
+    "QA_MAX_MISSING_ITEMS_DISPLAY",
     "READY_MESSAGE",
+    "SLOT_COVERAGE_READY_THRESHOLD",
     "TURN1_MAX_TOKENS",
+    "TURN1_TEMPERATURE",
     "ChatSessionState",
     "ChatSessionStore",
     "ContextEntry",

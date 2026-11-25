@@ -9,18 +9,25 @@ This module acts as the stable interface between:
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
-from src.app.constants import CONSTANTS
+from src.app.config import (
+    eta_buffer_s,
+    generate_stage_base_s,
+    generate_stage_durations,
+    generate_stage_per_min_s,
+)
 
 from .parser import DocumentChunk
 
-ETA_BUFFER_S: int = int(CONSTANTS["script"].get("eta_buffer_s", 10))
+ETA_BUFFER_S: int = int(eta_buffer_s)
+GENERATE_STAGE_BASE_S: float = float(generate_stage_base_s)
+GENERATE_STAGE_PER_MIN_S: float = float(generate_stage_per_min_s)
 
 SCRIPT_JOB_STAGES: tuple[tuple[str, int, float], ...] = (
-    ("validating_input", 10, 1.0),
-    ("extracting", 15, 2.0),
-    ("moderating", 15, 1.5),
-    ("generating", 50, 8.0),
-    ("validating_output", 10, 1.0),
+    ("validating_input", 10, generate_stage_durations["validating_input"]),
+    ("extracting", 15, generate_stage_durations["extracting"]),
+    ("moderating", 15, generate_stage_durations["moderating"]),
+    ("generating", 50, generate_stage_durations["generating"]),
+    ("validating_output", 10, generate_stage_durations["validating_output"]),
 )
 
 
@@ -28,7 +35,11 @@ def script_stage_durations(duration_min: int = 5) -> dict[str, float]:
     """Return base stage durations (seconds) scaled modestly by target duration."""
     dur = max(5, int(duration_min or 5))
     return {
-        key: (round(4.0 + 0.8 * dur, 1) if key == "generating" else base_s)
+        key: (
+            round(GENERATE_STAGE_BASE_S + GENERATE_STAGE_PER_MIN_S * dur, 1)
+            if key == "generating"
+            else base_s
+        )
         for key, _, base_s in SCRIPT_JOB_STAGES
     }
 
@@ -256,6 +267,8 @@ __all__ = [
     "DocumentChunk",
     "DurationMinutes",
     "ETA_BUFFER_S",
+    "GENERATE_STAGE_BASE_S",
+    "GENERATE_STAGE_PER_MIN_S",
     "GeneratedScript",
     "JobStatus",
     "ModerationDecision",

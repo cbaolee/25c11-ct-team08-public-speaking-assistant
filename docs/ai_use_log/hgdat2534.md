@@ -9,4 +9,4 @@
 | 2026-11-13 | #9 (WP-B3) | Antigravity | Implemented TemplateEngine orchestrator, RAG chunk retrieval, and unit tests        |
 | 2026-11-20 | #57 | Antigravity | Implemented ephemeral chat session management, 0-token slot coverage, and unit tests |
 | 2026-11-20 | #57 (Phase 2) | Antigravity | Implemented automated test suite for script generation chat scenarios 1-6 and Phase 2 workflow |
-| 2026-11-25 | #120 (PR 1/3) | Antigravity | Implemented per-turn input limits, bounded context window, Groq compaction, continuous Q&A loop (Turn 1 can_generate=false / Turn 2+ can_generate=true), processing step telemetry, ADR-014, architecture.md update, and expanded pytest suites |
+| 2026-11-25 | #120 (PR 1/3) | Antigravity | Implemented per-turn input limits, bounded context window, Groq compaction, continuous Q&A loop (Turn 1 can_generate=false / Turn 2+ can_generate=true), processing step telemetry, centralized `[script]` constants in `app_constants.toml`, ADR-014, architecture.md update, and expanded pytest suites |
