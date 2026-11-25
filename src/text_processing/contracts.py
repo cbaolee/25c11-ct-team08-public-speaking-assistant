@@ -9,7 +9,59 @@ This module acts as the stable interface between:
 from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
+from src.app.constants import CONSTANTS
+
 from .parser import DocumentChunk
+
+ETA_BUFFER_S: int = int(CONSTANTS["script"].get("eta_buffer_s", 10))
+
+SCRIPT_JOB_STAGES: tuple[tuple[str, int, float], ...] = (
+    ("validating_input", 10, 1.0),
+    ("extracting", 15, 2.0),
+    ("moderating", 15, 1.5),
+    ("generating", 50, 8.0),
+    ("validating_output", 10, 1.0),
+)
+
+
+def script_stage_durations(duration_min: int = 5) -> dict[str, float]:
+    """Return base stage durations (seconds) scaled modestly by target duration."""
+    dur = max(5, int(duration_min or 5))
+    return {
+        key: (round(4.0 + 0.8 * dur, 1) if key == "generating" else base_s)
+        for key, _, base_s in SCRIPT_JOB_STAGES
+    }
+
+
+def default_script_job_steps() -> list[dict[str, str]]:
+    """Initial ordered step list for `ScriptJobState`."""
+    return [{"key": key, "state": "pending"} for key, _, _ in SCRIPT_JOB_STAGES]
+
+
+def compute_script_job_total_s(
+    duration_min: int = 5,
+    eta_buffer_s: int = ETA_BUFFER_S,
+) -> float:
+    """Base sum of stage durations plus the ~10-second telemetry buffer."""
+    durations = script_stage_durations(duration_min)
+    return round(sum(durations.values()) + eta_buffer_s, 1)
+
+
+def compute_script_job_remaining_s(
+    steps: list[dict[str, str]],
+    duration_min: int = 5,
+    eta_buffer_s: int = ETA_BUFFER_S,
+) -> float:
+    """Remaining estimated seconds (including buffer) while active; 0.0 when finished."""
+    if not steps or all(s.get("state") in ("done", "skipped") for s in steps):
+        return 0.0
+    durations = script_stage_durations(duration_min)
+    rem = sum(
+        durations.get(s.get("key", ""), 0.0)
+        for s in steps
+        if s.get("state") in ("pending", "running")
+    )
+    return round(rem + eta_buffer_s, 1)
 
 DurationMinutes = Literal[5, 10, 15, 20]
 ScriptSource = Literal["template", "llm"]
@@ -175,12 +227,23 @@ class ScriptJobState:
     result: GeneratedScript | None = None
     error_code: str | None = None
     error_message: str | None = None
+    stage: str = "queued"
+    steps: list[dict[str, str]] = field(default_factory=default_script_job_steps)
+    eta_buffer_s: int = ETA_BUFFER_S
+    duration_min: int = 5
+    estimated_total_s: float = field(default_factory=lambda: compute_script_job_total_s(5))
+    estimated_remaining_s: float = field(default_factory=lambda: compute_script_job_total_s(5))
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "job_id": self.job_id,
             "status": self.status,
+            "stage": self.stage,
             "progress": self.progress,
+            "steps": [dict(s) for s in self.steps],
+            "eta_buffer_s": self.eta_buffer_s,
+            "estimated_total_s": self.estimated_total_s,
+            "estimated_remaining_s": self.estimated_remaining_s,
             "result": self.result.to_dict() if self.result else None,
             "error_code": self.error_code,
             "message": self.error_message,
@@ -192,10 +255,12 @@ __all__ = [
     "CitationStatus",
     "DocumentChunk",
     "DurationMinutes",
+    "ETA_BUFFER_S",
     "GeneratedScript",
     "JobStatus",
     "ModerationDecision",
     "ParagraphCitation",
+    "SCRIPT_JOB_STAGES",
     "ScriptGenerationError",
     "ScriptGenerationRequest",
     "ScriptJobState",
@@ -205,4 +270,8 @@ __all__ = [
     "TemplateSlot",
     "TopicMetadata",
     "VALID_DURATIONS",
+    "compute_script_job_remaining_s",
+    "compute_script_job_total_s",
+    "default_script_job_steps",
+    "script_stage_durations",
 ]

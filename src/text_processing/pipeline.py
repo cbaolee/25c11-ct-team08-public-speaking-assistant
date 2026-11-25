@@ -13,14 +13,18 @@ from pathlib import Path
 
 from src.app.constants import CONSTANTS
 
-from .chat_session import ChatSessionStore, chat_session_store
+from .chat_session import ChatSessionStore, append_to_context_window, chat_session_store
 from .contracts import (
+    ETA_BUFFER_S,
     DocumentChunk,
     GeneratedScript,
     JobStatus,
     ScriptGenerationError,
     ScriptGenerationRequest,
     ScriptJobState,
+    compute_script_job_remaining_s,
+    compute_script_job_total_s,
+    default_script_job_steps,
 )
 from .generator import ScriptGenerator
 from .moderation import ContentModerator
@@ -107,10 +111,22 @@ class ScriptGenerationPipeline:
             else:
                 self._jobs.popitem(last=False)
 
-    def create_job(self, user_id: str = "anonymous") -> ScriptJobState:
+    def create_job(self, user_id: str = "anonymous", duration_min: int = 5) -> ScriptJobState:
         """Create and register a new background job state in memory (Brief §5.5)."""
         job_id = str(uuid.uuid4())
-        job = ScriptJobState(job_id=job_id, user_id=user_id, status="queued", progress=0)
+        total_s = compute_script_job_total_s(duration_min, ETA_BUFFER_S)
+        job = ScriptJobState(
+            job_id=job_id,
+            user_id=user_id,
+            status="queued",
+            progress=0,
+            stage="queued",
+            steps=default_script_job_steps(),
+            eta_buffer_s=ETA_BUFFER_S,
+            duration_min=duration_min,
+            estimated_total_s=total_s,
+            estimated_remaining_s=total_s,
+        )
         self._jobs[job_id] = job
         self._evict_jobs_if_needed()
         return job
@@ -119,11 +135,43 @@ class ScriptGenerationPipeline:
         """Look up an in-memory job by `job_id`."""
         return self._jobs.get(job_id)
 
-    def _update_job(self, job_id: str | None, status: JobStatus, progress: int) -> None:
+    def _update_job(
+        self,
+        job_id: str | None,
+        status: JobStatus,
+        progress: int,
+        *,
+        stage: str | None = None,
+    ) -> None:
         if job_id and job_id in self._jobs:
             job = self._jobs[job_id]
             job.status = status
             job.progress = progress
+            active_stage = stage or status
+            job.stage = active_stage
+            found_target = False
+            for step in job.steps:
+                if step["key"] == active_stage:
+                    step["state"] = "running"
+                    found_target = True
+                elif not found_target:
+                    step["state"] = "done"
+                elif step["state"] == "running":
+                    step["state"] = "done"
+            job.estimated_remaining_s = compute_script_job_remaining_s(
+                job.steps, job.duration_min, job.eta_buffer_s
+            )
+
+    def _resolve_compaction_client(self):
+        client = getattr(self.template_engine, "client", None)
+        if client is not None:
+            return client
+        if (
+            isinstance(self.llm_generator, ScriptGenerator)
+            and self.llm_generator.client is not None
+        ):
+            return self.llm_generator.client
+        return None
 
     @staticmethod
     def _build_cache_key(
@@ -151,13 +199,14 @@ class ScriptGenerationPipeline:
 
     def run(self, request: ScriptGenerationRequest, job_id: str | None = None) -> GeneratedScript:
         """Execute stages 1 through 8 synchronously with LRU cache and post-validation."""
+        self._update_job(job_id, "extracting", 10, stage="validating_input")
         if not request.topic or not request.topic.strip():
             raise ScriptGenerationError(
                 "output_invalid", "Topic must not be empty.", status_code=422
             )
 
         # Stage 1, 2, 3: Validate, Parse, and Sanitize input document (if provided)
-        self._update_job(job_id, "extracting", 15)
+        self._update_job(job_id, "extracting", 25, stage="extracting")
         chunks: list[DocumentChunk] = []
         chat_parts: list[str] = []
         citable_notes: list[str] = []
@@ -176,7 +225,19 @@ class ScriptGenerationPipeline:
                         chat_parts.append(cleaned_prompt)
                         if len(cleaned_prompt.split()) >= 15:
                             citable_notes.append(cleaned_prompt)
-                if sess.user_notes:
+                if getattr(sess, "compacted_summary", "") and sess.compacted_summary.strip():
+                    cleaned_summary = sanitize_text(sess.compacted_summary).strip()
+                    if cleaned_summary:
+                        chat_parts.append(f"[Session Summary]\n{cleaned_summary}")
+                        if len(cleaned_summary.split()) >= 8:
+                            citable_notes.append(cleaned_summary)
+                if getattr(sess, "context_window", None):
+                    for entry in sess.context_window:
+                        cleaned_entry = sanitize_text(entry.text).strip()
+                        if cleaned_entry:
+                            chat_parts.append(cleaned_entry)
+                            citable_notes.append(cleaned_entry)
+                elif sess.user_notes:
                     for note in sess.user_notes:
                         cleaned_note = sanitize_text(note).strip()
                         if cleaned_note:
@@ -234,7 +295,7 @@ class ScriptGenerationPipeline:
             chunks.extend(note_chunks)
 
         # Stage 4: Content Moderation on topic, greeting, user_feedback, chat_context, and chunks
-        self._update_job(job_id, "moderating", 35)
+        self._update_job(job_id, "moderating", 40, stage="moderating")
         parts = [sanitize_text(request.topic)]
         if request.greeting:
             parts.append(sanitize_text(request.greeting))
@@ -245,19 +306,27 @@ class ScriptGenerationPipeline:
         parts.extend(c.content for c in chunks[:20])
         self.moderator.assert_safe("\n".join(parts), user_id=request.user_id)
 
-        # Persist safe Regenerate prompt into session notes so context accumulates across turns
+        # Persist safe Regenerate prompt into bounded context window so context accumulates safely
         if sess is not None and pending_feedback_note:
-            sess.user_notes.append(pending_feedback_note)
+            append_to_context_window(
+                sess,
+                pending_feedback_note,
+                turn=sess.gather_turns + 1,
+                source="feedback",
+                client=self._resolve_compaction_client(),
+                limiter=getattr(self.template_engine, "limiter", None),
+            )
             self.session_store.put(sess)
 
         # Check LRU cache (D-10)
         cache_key = self._build_cache_key(request, chunks, chat_context=effective_chat_context)
         if cache_key in self._cache:
+            self._update_job(job_id, "generating", 90, stage="validating_output")
             self._cache.move_to_end(cache_key)
             return deepcopy(self._cache[cache_key])
 
         # Stage 5 & 6: Route between Template Branch (6T) and Free-Topic LLM Branch (6L)
-        self._update_job(job_id, "generating", 65)
+        self._update_job(job_id, "generating", 60, stage="generating")
         template_doc = None
         if (
             not force_free_topic
@@ -356,6 +425,7 @@ class ScriptGenerationPipeline:
                 )
 
         # Stage 7: Post-validation and 20-minute script audio-limit warning
+        self._update_job(job_id, "generating", 90, stage="validating_output")
         eff_duration = result.duration_min or request.duration_min
         issues = validate_assembled_script(result.script, eff_duration)
         if "unresolved_slots" in issues:
@@ -389,20 +459,36 @@ class ScriptGenerationPipeline:
         """Execute `run()` for an in-memory job and record completion or error state."""
         job = self._jobs.get(job_id)
         if job is None:
-            job = ScriptJobState(job_id=job_id, user_id=request.user_id)
+            total_s = compute_script_job_total_s(request.duration_min, ETA_BUFFER_S)
+            job = ScriptJobState(
+                job_id=job_id,
+                user_id=request.user_id,
+                duration_min=request.duration_min,
+                estimated_total_s=total_s,
+                estimated_remaining_s=total_s,
+            )
             self._jobs[job_id] = job
             self._evict_jobs_if_needed()
         try:
             result = self.run(request, job_id=job_id)
+            for step in job.steps:
+                if step["state"] in ("pending", "running"):
+                    step["state"] = "done"
             job.status = "completed"
+            job.stage = "completed"
             job.progress = 100
+            job.estimated_remaining_s = 0.0
             job.result = result
         except ScriptGenerationError as exc:
             job.status = "failed"
+            job.stage = "failed"
+            job.estimated_remaining_s = 0.0
             job.error_code = exc.error_code
             job.error_message = exc.message
         except Exception as exc:
             job.status = "failed"
+            job.stage = "failed"
+            job.estimated_remaining_s = 0.0
             job.error_code = "generation_unavailable"
             job.error_message = str(exc)
         finally:

@@ -55,7 +55,19 @@ def test_module_constants_match_repo_toml():
     assert config.max_audio_seconds == data["audio"]["max_audio_seconds"]
     assert config.MIN_PAUSE_S == data["audio"]["min_pause_s"]
     assert config.max_script_words == data["script"]["max_script_words"]
+    assert config.max_turn_text_chars == data["script"]["max_turn_text_chars"]
+    assert config.max_text_file_bytes == data["script"]["max_text_file_bytes"]
+    assert config.max_text_file_words == data["script"]["max_text_file_words"]
+    assert config.eta_buffer_s == data["script"]["eta_buffer_s"]
     assert config.max_saved_scripts == data["storage"]["max_saved_scripts"]
+
+
+def test_groq_compaction_model_follows_toml_and_env(monkeypatch):
+    monkeypatch.delenv("GROQ_COMPACTION_MODEL", raising=False)
+    s = Settings(_env_file=None)
+    assert s.groq_compaction_model == constants.load_constants()["script"]["groq_compaction_model"]
+    monkeypatch.setenv("GROQ_COMPACTION_MODEL", "llama-3.1-8b-instant")
+    assert Settings(_env_file=None).groq_compaction_model == "llama-3.1-8b-instant"
 
 
 def test_api_config_returns_web_section():
@@ -67,8 +79,17 @@ def test_api_config_returns_web_section():
     assert body["max_saved_scripts"] == config.max_saved_scripts
     assert body["max_audio_seconds"] == config.max_audio_seconds
     assert body["script_title_max_chars"] == config.script_title_max_chars
+    assert body["max_turn_text_chars"] == data["script"]["max_turn_text_chars"]
     assert body["max_pdf_size_bytes"] == data["script"]["max_pdf_size_bytes"]
     assert body["max_pdf_pages"] == data["script"]["max_pdf_pages"]
+    assert body["max_text_file_bytes"] == data["script"]["max_text_file_bytes"]
+    assert body["max_text_file_words"] == data["script"]["max_text_file_words"]
+    assert body["file_size_limits_bytes"] == {
+        ".pdf": data["script"]["max_pdf_size_bytes"],
+        ".md": data["script"]["max_text_file_bytes"],
+        ".txt": data["script"]["max_text_file_bytes"],
+    }
+    assert body["eta_buffer_s"] == data["script"]["eta_buffer_s"] == 10
     assert body["auth"] == {
         key: data["auth"][key] for key in ("otp_length", "resend_cooldown_s", "unconfirmed_ttl_min")
     }

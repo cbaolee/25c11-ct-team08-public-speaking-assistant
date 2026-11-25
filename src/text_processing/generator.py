@@ -152,13 +152,30 @@ class ScriptGenerator:
     def verify_citations(
         self, raw_citations: list[dict[str, Any]], chunks: list[DocumentChunk]
     ) -> list[dict[str, Any]]:
-        """Keep only citations pointing to real page numbers in chunks."""
-        valid = {c.page for c in chunks}
-        return [
-            {"heading": str(i.get("heading", "")).strip(), "page": i["page"]}
-            for i in raw_citations
-            if isinstance(i, dict) and i.get("page") in valid and i.get("heading")
-        ]
+        """Keep citations pointing to real page numbers; remap by heading when page is wrong."""
+        valid_pages = {c.page for c in chunks}
+        # Build heading → page lookup (case-insensitive, first match wins)
+        heading_to_page: dict[str, int] = {}
+        for c in chunks:
+            key = c.heading.strip().lower()
+            if key and key not in heading_to_page:
+                heading_to_page[key] = c.page
+
+        result: list[dict[str, Any]] = []
+        for i in raw_citations:
+            if not isinstance(i, dict) or not i.get("heading"):
+                continue
+            heading = str(i["heading"]).strip()
+            page = i.get("page")
+            if page in valid_pages:
+                result.append({"heading": heading, "page": page})
+            else:
+                # Page hallucinated — try to remap via heading lookup
+                remapped = heading_to_page.get(heading.lower())
+                if remapped is not None:
+                    result.append({"heading": heading, "page": remapped})
+                # Otherwise drop the citation entirely (page unverifiable)
+        return result
 
     def generate_script(self, chunks: list[DocumentChunk], topic: str) -> ScriptResult:
         """Call Groq LLM in JSON mode to produce a 120-150 word English script."""

@@ -28,12 +28,19 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import (
+    composer_max_words,
+    eta_buffer_s,
     max_audio_seconds,
     max_list_page_size,
+    max_pdf_pages,
+    max_pdf_size_bytes,
     max_request_bytes,
     max_saved_scripts,
     max_script_chars,
     max_script_words,
+    max_text_file_bytes,
+    max_text_file_words,
+    max_turn_text_chars,
     max_upload_bytes,
     missing_required_settings,
     script_title_max_chars,
@@ -76,12 +83,14 @@ from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadPar
 from src.audio_processing.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
 from src.audio_processing.pipeline import evaluate_session
 from src.text_processing.chat_session import (
-    READY_MESSAGE,
+    CHAT_TURN_STEP_DURATIONS,
     ChatSessionState,
+    TurnStepTracker,
     analyze_slot_coverage,
-    build_followup_reply,
+    append_to_context_window,
+    build_turn1_question,
     chat_session_store,
-    check_ready_to_generate,
+    evaluate_and_build_followup,
     ingest_upload_file,
 )
 from src.text_processing.contracts import (
@@ -89,9 +98,16 @@ from src.text_processing.contracts import (
     DocumentChunk,
     ScriptGenerationError,
     ScriptGenerationRequest,
+    script_stage_durations,
 )
+from src.text_processing.generator import ScriptGenerator
+from src.text_processing.groq_pool import make_groq_client
 from src.text_processing.moderation import DEFAULT_LLAMA_GUARD_MODEL, ContentModerator
-from src.text_processing.parser import DocumentParserError
+from src.text_processing.parser import (
+    DocumentParserError,
+    max_bytes_for_extension,
+    validate_turn_text_length,
+)
 from src.text_processing.pipeline import ScriptGenerationPipeline
 from src.text_processing.sanitizer import sanitize_chunks, sanitize_text
 
@@ -210,8 +226,22 @@ async def web_config() -> dict[str, Any]:
         "max_saved_scripts": max_saved_scripts,
         "max_audio_seconds": max_audio_seconds,
         "script_title_max_chars": script_title_max_chars,
-        "max_pdf_size_bytes": CONSTANTS["script"]["max_pdf_size_bytes"],
-        "max_pdf_pages": CONSTANTS["script"]["max_pdf_pages"],
+        "max_turn_text_chars": max_turn_text_chars,
+        "max_pdf_size_bytes": max_pdf_size_bytes,
+        "max_pdf_pages": max_pdf_pages,
+        "max_text_file_bytes": max_text_file_bytes,
+        "max_text_file_words": max_text_file_words,
+        "file_size_limits_bytes": {
+            ".pdf": max_pdf_size_bytes,
+            ".md": max_text_file_bytes,
+            ".txt": max_text_file_bytes,
+        },
+        "eta_buffer_s": eta_buffer_s,
+        "script_telemetry": {
+            "eta_buffer_s": eta_buffer_s,
+            "chat_turn_step_durations_s": dict(CHAT_TURN_STEP_DURATIONS),
+            "generate_stage_durations_s": script_stage_durations(5),
+        },
         "auth": {key: CONSTANTS["auth"][key] for key in (
             "otp_length", "resend_cooldown_s", "unconfirmed_ttl_min"
         )},
@@ -797,14 +827,140 @@ async def generate_script_endpoint(
         session_id=clean_session_id,
         user_feedback=clean_feedback,
     )
-    job = pipeline.create_job(user_id=user_id)
+    job = pipeline.create_job(user_id=user_id, duration_min=duration_min)
     background_tasks.add_task(pipeline.run_job, job.job_id, req, True)
-    return {"job_id": job.job_id, "status": job.status}
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "stage": job.stage,
+        "steps": [dict(s) for s in job.steps],
+        "eta_buffer_s": job.eta_buffer_s,
+        "estimated_total_s": job.estimated_total_s,
+        "estimated_remaining_s": job.estimated_remaining_s,
+    }
 
 
 class SelectTopicPayload(BaseModel):
     session_id: str
     template_id: str | None = None
+
+
+def _resolve_groq_client(pipeline: ScriptGenerationPipeline) -> Any | None:
+    """Resolve Groq client without silently passing None when GROQ_API_KEYS is configured."""
+    client = getattr(pipeline.template_engine, "client", None)
+    if client is not None:
+        return client
+    llm_gen = getattr(pipeline, "llm_generator", None)
+    if isinstance(llm_gen, ScriptGenerator) and llm_gen.client is not None:
+        return llm_gen.client
+    return make_groq_client()
+
+
+def _validate_turn_text(text: str) -> None:
+    """Enforce per-turn text limits before moderation, embeddings, or LLM calls."""
+    if not text:
+        return
+    try:
+        validate_turn_text_length(
+            text, max_chars=max_turn_text_chars, max_words=composer_max_words
+        )
+    except DocumentParserError as exc:
+        raise ScriptGenerationError(
+            error_code=exc.error_code,
+            message=exc.message,
+            status_code=422,
+        ) from exc
+
+
+async def _read_document_upload_limited(
+    upload: UploadFile, *, chunk_size: int = 65_536
+) -> bytes:
+    """Stream-read an uploaded .pdf/.md/.txt file up to its per-type byte ceiling."""
+    filename = upload.filename or ""
+    try:
+        max_bytes = max_bytes_for_extension(filename)
+    except DocumentParserError as exc:
+        raise ScriptGenerationError(
+            error_code=exc.error_code,
+            message=exc.message,
+            status_code=422,
+        ) from exc
+
+    declared_size = getattr(upload, "size", None)
+    suffix = Path(filename).suffix.lower()
+    if isinstance(declared_size, int) and declared_size > max_bytes:
+        raise ScriptGenerationError(
+            error_code="file_too_large",
+            message=f"Uploaded '{suffix}' file exceeds {max_bytes} bytes limit.",
+            status_code=422,
+        )
+
+    buf = bytearray()
+    while True:
+        chunk = await upload.read(chunk_size)
+        if not chunk:
+            break
+        buf.extend(chunk)
+        if len(buf) > max_bytes:
+            raise ScriptGenerationError(
+                error_code="file_too_large",
+                message=f"Uploaded '{suffix}' file exceeds {max_bytes} bytes limit.",
+                status_code=422,
+            )
+
+    if not buf:
+        raise ScriptGenerationError(
+            error_code="empty_file",
+            message="The uploaded file is empty.",
+            status_code=422,
+        )
+    return bytes(buf)
+
+
+_chat_turn_jobs: dict[str, dict[str, Any]] = {}
+_chat_turn_jobs_lock = threading.Lock()
+_CHAT_TURN_JOBS_CAP = 128
+
+
+def _create_chat_turn_job(user_id: str, tracker: TurnStepTracker) -> str:
+    job_id = str(uuid4())
+    snap = {
+        "job_id": job_id,
+        "user_id": user_id,
+        "status": "queued",
+        **tracker.to_telemetry(),
+        "result": None,
+        "error_code": None,
+        "message": None,
+    }
+    with _chat_turn_jobs_lock:
+        if len(_chat_turn_jobs) >= _CHAT_TURN_JOBS_CAP:
+            oldest = next(iter(_chat_turn_jobs))
+            del _chat_turn_jobs[oldest]
+        _chat_turn_jobs[job_id] = snap
+    return job_id
+
+
+def _sync_chat_turn_job(
+    job_id: str | None,
+    tracker: TurnStepTracker,
+    *,
+    status: str = "running",
+    result: dict[str, Any] | None = None,
+    error_code: str | None = None,
+    message: str | None = None,
+) -> None:
+    if not job_id:
+        return
+    with _chat_turn_jobs_lock:
+        job = _chat_turn_jobs.get(job_id)
+        if job is None:
+            return
+        job["status"] = status
+        job.update(tracker.to_telemetry())
+        job["result"] = result
+        job["error_code"] = error_code
+        job["message"] = message
 
 
 @app.post("/api/script-chat/suggest")
@@ -820,16 +976,17 @@ async def script_chat_suggest_endpoint(
     pipeline = get_script_pipeline()
     user_id = str(user.id)
     store = getattr(pipeline, "session_store", chat_session_store)
+    tracker = TurnStepTracker(["validating_input", "moderating", "matching_templates"])
+    tracker.start("validating_input")
 
-    clean_prompt = sanitize_text(prompt).strip() if prompt else ""
-    if clean_prompt:
-        pipeline.moderator.assert_safe(clean_prompt, user_id=user_id)
+    # 1. Enforce per-turn text and upload byte limits BEFORE moderation, embeddings, or LLM
+    _validate_turn_text(prompt)
 
     file_chunks: list[DocumentChunk] = []
     filename: str = ""
     if file is not None and file.filename:
         filename = file.filename
-        file_bytes = await file.read()
+        file_bytes = await _read_document_upload_limited(file)
         try:
             raw_chunks = ingest_upload_file(file_bytes, filename)
             file_chunks = sanitize_chunks(raw_chunks)
@@ -839,9 +996,6 @@ async def script_chat_suggest_endpoint(
                 message=exc.message,
                 status_code=422,
             ) from exc
-        file_text = "\n".join(c.content for c in file_chunks[:20])
-        if file_text:
-            pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
     clean_session_id = session_id.strip()
     session = None
@@ -854,6 +1008,17 @@ async def script_chat_suggest_endpoint(
                 status_code=404,
             )
 
+    clean_prompt = sanitize_text(prompt).strip() if prompt else ""
+
+    tracker.start("moderating")
+    if clean_prompt:
+        pipeline.moderator.assert_safe(clean_prompt, user_id=user_id)
+    if file_chunks:
+        file_text = "\n".join(c.content for c in file_chunks[:20])
+        if file_text:
+            pipeline.moderator.assert_safe(file_text, user_id=user_id)
+
+    tracker.start("matching_templates")
     if session is None:
         session = ChatSessionState(
             session_id=str(uuid4()),
@@ -892,10 +1057,12 @@ async def script_chat_suggest_endpoint(
         query=query,
         retriever=getattr(pipeline.template_engine, "retriever", None),
     )
+    tracker.finish()
     res = suggestion_res.to_dict()
     res["session_id"] = session.session_id
     res["topics"] = list(res["suggestions"])
     res["files_loaded"] = list(session.files_loaded)
+    res.update(tracker.to_telemetry())
     return res
 
 
@@ -904,10 +1071,13 @@ async def script_chat_select_topic_endpoint(
     payload: SelectTopicPayload,
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> dict[str, Any]:
-    """Store selected template ID and analyze slot coverage or enter free-topic mode."""
+    """Turn 1: Lock topic/mode and always return an opening context question (no Generate)."""
     pipeline = get_script_pipeline()
     user_id = str(user.id)
     store = getattr(pipeline, "session_store", chat_session_store)
+    tracker = TurnStepTracker(["validating_input", "analyzing_slots", "analyzing_with_llm"])
+    tracker.start("validating_input")
+
     session = store.get(payload.session_id, user_id=user_id)
     if session is None:
         raise ScriptGenerationError(
@@ -916,9 +1086,14 @@ async def script_chat_select_topic_endpoint(
             status_code=404,
         )
 
+    tracker.start("analyzing_slots")
     session.selected_template_id = payload.template_id
+    session.gather_turns = 0
+    session.assistant_turn = 1
+    session.ready_to_generate = False
     retriever = getattr(pipeline.template_engine, "retriever", None)
 
+    is_free_topic = not bool(payload.template_id)
     if payload.template_id:
         template_doc = pipeline.template_store.get(payload.template_id)
         if template_doc is None:
@@ -934,29 +1109,11 @@ async def script_chat_select_topic_endpoint(
             chunk_embeddings=session.chunk_embeddings,
             retriever=retriever,
             prompt=session.initial_prompt,
-            user_notes=session.user_notes,
+            user_notes=session.get_context_texts(include_summary=True),
         )
         session.coverage_ratio = cov_ratio
         session.missing_entities = missing_entities
         session.missing_groups = missing_groups
-        session.ready_to_generate = check_ready_to_generate(
-            selected_template_id=session.selected_template_id,
-            missing_entities=session.missing_entities,
-            coverage_ratio=session.coverage_ratio,
-            gather_turns=session.gather_turns,
-            files_loaded=session.files_loaded,
-            prompt=session.initial_prompt,
-            user_notes=session.user_notes,
-        )
-        client = getattr(pipeline.template_engine, "client", None)
-        reply = build_followup_reply(
-            topic=session.topic,
-            ready_to_generate=session.ready_to_generate,
-            missing_entities=session.missing_entities,
-            missing_groups=session.missing_groups,
-            gather_turns=session.gather_turns,
-            client=client,
-        )
     else:
         session.selected_template_id = None
         if not session.topic:
@@ -964,44 +1121,185 @@ async def script_chat_select_topic_endpoint(
         session.missing_entities = []
         session.missing_groups = []
         session.coverage_ratio = 0.0
-        session.ready_to_generate = check_ready_to_generate(
-            selected_template_id=None,
-            missing_entities=[],
-            coverage_ratio=0.0,
-            gather_turns=session.gather_turns,
-            files_loaded=session.files_loaded,
-            prompt=session.initial_prompt,
-            user_notes=session.user_notes,
-        )
-        if session.ready_to_generate:
-            reply = READY_MESSAGE
-        else:
-            reply = (
-                "To help craft your free-topic speech, please share your main ideas or "
-                "upload reference material (notes or document)."
-            )
 
+    tracker.start("analyzing_with_llm")
+    client = _resolve_groq_client(pipeline)
+    limiter = getattr(pipeline.template_engine, "limiter", None)
+    model_chain = getattr(pipeline.template_engine, "model_chain", None)
+    reply, missing_items = build_turn1_question(
+        topic=session.topic or session.category or "your speech",
+        category=session.category,
+        duration_min=session.duration_min,
+        is_free_topic=is_free_topic,
+        initial_prompt=session.initial_prompt,
+        files_loaded=session.files_loaded,
+        missing_entities=session.missing_entities,
+        missing_groups=session.missing_groups,
+        client=client,
+        model_chain=model_chain,
+        limiter=limiter,
+    )
+    session.last_question = reply
+    session.missing_items = list(missing_items)
+    session.ready_to_generate = False
+
+    tracker.finish()
     store.put(session)
     return {
         "session_id": session.session_id,
         "template_id": session.selected_template_id,
         "selected_template_id": session.selected_template_id,
-        "ready_to_generate": session.ready_to_generate, "coverage_ratio": session.coverage_ratio,
-        "missing_entities": session.missing_entities, "missing_groups": session.missing_groups,
+        "ready_to_generate": False,
+        "can_generate": False,
+        "assistant_turn": 1,
+        "coverage_ratio": session.coverage_ratio,
+        "missing_entities": session.missing_entities,
+        "missing_groups": session.missing_groups,
+        "missing_items": list(missing_items),
+        "context_compacted": False,
         "reply_message": reply,
+        **tracker.to_telemetry(),
     }
 
 
-@app.post("/api/script-chat/message")
-async def script_chat_message_endpoint(
-    user: Annotated[CurrentUser, Depends(get_current_user)],
-    session_id: Annotated[str, Form(...)],
-    message: Annotated[str, Form()] = "",
-    file: Annotated[UploadFile | None, File()] = None,
+def _execute_chat_message(
+    *,
+    pipeline: ScriptGenerationPipeline,
+    session: ChatSessionState,
+    user_id: str,
+    clean_msg: str,
+    file_chunks: list[DocumentChunk],
+    filename: str,
+    tracker: TurnStepTracker,
+    job_id: str | None = None,
 ) -> dict[str, Any]:
-    """Add user notes/documents, re-evaluate slot coverage and 3-layer stop condition."""
-    pipeline = get_script_pipeline()
-    user_id = str(user.id)
+    store = getattr(pipeline, "session_store", chat_session_store)
+    tracker.start("moderating")
+    _sync_chat_turn_job(job_id, tracker)
+    if clean_msg:
+        pipeline.moderator.assert_safe(clean_msg, user_id=user_id)
+    if file_chunks:
+        file_text = "\n".join(c.content for c in file_chunks[:20])
+        if file_text:
+            pipeline.moderator.assert_safe(file_text, user_id=user_id)
+
+    tracker.start("updating_context")
+    _sync_chat_turn_job(job_id, tracker)
+    session.gather_turns += 1
+    session.assistant_turn = max(2, session.gather_turns + 1)
+
+    retriever = getattr(pipeline.template_engine, "retriever", None)
+    client = _resolve_groq_client(pipeline)
+    limiter = getattr(pipeline.template_engine, "limiter", None)
+    model_chain = getattr(pipeline.template_engine, "model_chain", None)
+
+    context_compacted = False
+    if clean_msg:
+        _, context_compacted = append_to_context_window(
+            session,
+            clean_msg,
+            turn=session.gather_turns,
+            source="chat",
+            client=client,
+            limiter=limiter,
+        )
+    elif file_chunks and filename:
+        _, context_compacted = append_to_context_window(
+            session,
+            f"Uploaded reference file: {filename}",
+            turn=session.gather_turns,
+            source="file_summary",
+            client=client,
+            limiter=limiter,
+        )
+
+    if file_chunks:
+        session.files_loaded.append(filename)
+        id_offset = len(session.chunks)
+        for idx, chunk in enumerate(file_chunks, start=1):
+            chunk.chunk_id = id_offset + idx
+        session.chunks.extend(file_chunks)
+        if retriever is not None:
+            session.chunk_embeddings = retriever.encode_chunks(session.chunks)
+
+    if context_compacted:
+        tracker.start("compacting_context")
+        _sync_chat_turn_job(job_id, tracker)
+        tracker.done("compacting_context")
+    else:
+        tracker.skip("compacting_context")
+
+    tracker.start("analyzing_with_llm")
+    _sync_chat_turn_job(job_id, tracker)
+
+    if session.selected_template_id:
+        template_doc = pipeline.template_store.get(session.selected_template_id)
+        if template_doc:
+            session.topic = template_doc.metadata.topic
+            cov_ratio, missing_entities, missing_groups = analyze_slot_coverage(
+                template_document=template_doc,
+                chunks=session.chunks,
+                chunk_embeddings=session.chunk_embeddings,
+                retriever=retriever,
+                prompt=session.initial_prompt,
+                user_notes=session.get_context_texts(include_summary=True),
+            )
+            session.coverage_ratio = cov_ratio
+            session.missing_entities = missing_entities
+            session.missing_groups = missing_groups
+
+    topic = getattr(session, "topic", None) or session.initial_prompt or "your speech"
+    decision = evaluate_and_build_followup(
+        topic=topic,
+        category=session.category,
+        duration_min=session.duration_min,
+        is_free_topic=(session.selected_template_id is None),
+        compacted_summary=session.compacted_summary,
+        context_entries=session.context_window,
+        latest_user_answer=clean_msg,
+        missing_entities=session.missing_entities,
+        missing_groups=session.missing_groups,
+        coverage_ratio=session.coverage_ratio,
+        files_loaded=session.files_loaded,
+        initial_prompt=session.initial_prompt,
+        client=client,
+        model_chain=model_chain,
+        limiter=limiter,
+    )
+    session.ready_to_generate = decision.sufficient
+    session.missing_items = list(decision.missing_items)
+    session.last_question = decision.reply_message
+
+    tracker.finish()
+    store.put(session)
+    result = {
+        "session_id": session.session_id,
+        "reply_message": decision.reply_message,
+        "ready_to_generate": session.ready_to_generate,
+        "can_generate": True,
+        "assistant_turn": session.assistant_turn,
+        "coverage_ratio": session.coverage_ratio,
+        "missing_entities": session.missing_entities,
+        "missing_groups": session.missing_groups,
+        "missing_items": list(decision.missing_items),
+        "context_compacted": context_compacted,
+        "compaction_count": session.compaction_count,
+        "gather_turns": session.gather_turns,
+        "files_loaded": list(session.files_loaded),
+        **tracker.to_telemetry(),
+    }
+    _sync_chat_turn_job(job_id, tracker, status="completed", result=result)
+    return result
+
+
+async def _prepare_chat_message_inputs(
+    *,
+    pipeline: ScriptGenerationPipeline,
+    user_id: str,
+    session_id: str,
+    message: str,
+    file: UploadFile | None,
+) -> tuple[ChatSessionState, str, list[DocumentChunk], str]:
     store = getattr(pipeline, "session_store", chat_session_store)
     session = store.get(session_id, user_id=user_id)
     if session is None:
@@ -1011,15 +1309,16 @@ async def script_chat_message_endpoint(
             status_code=404,
         )
 
-    clean_msg = sanitize_text(message).strip() if message else ""
-    if clean_msg:
-        pipeline.moderator.assert_safe(clean_msg, user_id=user_id)
+    # Enforce per-turn text and upload byte limits BEFORE moderation, embeddings, or LLM
+    _validate_turn_text(message)
 
     file_chunks: list[DocumentChunk] = []
+    filename = ""
     if file is not None and file.filename:
-        file_bytes = await file.read()
+        filename = file.filename
+        file_bytes = await _read_document_upload_limited(file)
         try:
-            raw_chunks = ingest_upload_file(file_bytes, file.filename)
+            raw_chunks = ingest_upload_file(file_bytes, filename)
             file_chunks = sanitize_chunks(raw_chunks)
         except DocumentParserError as exc:
             raise ScriptGenerationError(
@@ -1027,79 +1326,158 @@ async def script_chat_message_endpoint(
                 message=exc.message,
                 status_code=422,
             ) from exc
-        file_text = "\n".join(c.content for c in file_chunks[:20])
-        if file_text:
-            pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
+    clean_msg = sanitize_text(message).strip() if message else ""
     if not clean_msg and not file_chunks:
         raise ScriptGenerationError(
             error_code="empty_input",
             message="Please provide a message or a document.",
             status_code=422,
         )
+    return session, clean_msg, file_chunks, filename
 
-    if clean_msg:
-        session.user_notes.append(clean_msg)
-    if file_chunks:
-        session.files_loaded.append(file.filename)
-        id_offset = len(session.chunks)
-        for idx, chunk in enumerate(file_chunks, start=1):
-            chunk.chunk_id = id_offset + idx
-        session.chunks.extend(file_chunks)
-        retriever = getattr(pipeline.template_engine, "retriever", None)
-        if retriever is not None:
-            session.chunk_embeddings = retriever.encode_chunks(session.chunks)
 
-    session.gather_turns += 1
-
-    retriever = getattr(pipeline.template_engine, "retriever", None)
-    client = getattr(pipeline.template_engine, "client", None)
-
-    if session.selected_template_id:
-        template_doc = pipeline.template_store.get(session.selected_template_id)
-        if template_doc:
-            session.topic = template_doc.metadata.topic
-            cov_ratio, missing_entities, missing_groups = analyze_slot_coverage(
-                template_document=template_doc, chunks=session.chunks,
-                chunk_embeddings=session.chunk_embeddings, retriever=retriever,
-                prompt=session.initial_prompt, user_notes=session.user_notes,
-            )
-            session.coverage_ratio = cov_ratio
-            session.missing_entities = missing_entities
-            session.missing_groups = missing_groups
-
-    session.ready_to_generate = check_ready_to_generate(
-        selected_template_id=session.selected_template_id,
-        missing_entities=session.missing_entities,
-        coverage_ratio=session.coverage_ratio,
-        gather_turns=session.gather_turns,
-        files_loaded=session.files_loaded,
-        prompt=session.initial_prompt,
-        user_notes=session.user_notes,
+@app.post("/api/script-chat/message")
+async def script_chat_message_endpoint(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    session_id: Annotated[str, Form(...)],
+    message: Annotated[str, Form()] = "",
+    file: Annotated[UploadFile | None, File()] = None,
+) -> dict[str, Any]:
+    """Turn 2+: Bound context, optionally compact, evaluate with Groq, and keep loop open."""
+    pipeline = get_script_pipeline()
+    user_id = str(user.id)
+    tracker = TurnStepTracker(
+        [
+            "validating_input",
+            "moderating",
+            "updating_context",
+            "compacting_context",
+            "analyzing_with_llm",
+        ]
+    )
+    tracker.start("validating_input")
+    session, clean_msg, file_chunks, filename = await _prepare_chat_message_inputs(
+        pipeline=pipeline,
+        user_id=user_id,
+        session_id=session_id,
+        message=message,
+        file=file,
+    )
+    return _execute_chat_message(
+        pipeline=pipeline,
+        session=session,
+        user_id=user_id,
+        clean_msg=clean_msg,
+        file_chunks=file_chunks,
+        filename=filename,
+        tracker=tracker,
     )
 
-    topic = getattr(session, "topic", None) or session.initial_prompt or "your speech"
-    if session.selected_template_id:
-        reply = build_followup_reply(
-            topic=topic, ready_to_generate=session.ready_to_generate,
-            missing_entities=session.missing_entities, missing_groups=session.missing_groups,
-            gather_turns=session.gather_turns, client=client,
-        )
-    else:
-        if session.ready_to_generate:
-            reply = READY_MESSAGE
-        else:
-            reply = (
-                "Thanks! Please provide more details or upload notes to help prepare your speech."
-            )
 
-    store.put(session)
-    return {
-        "session_id": session.session_id, "reply_message": reply,
-        "ready_to_generate": session.ready_to_generate, "coverage_ratio": session.coverage_ratio,
-        "missing_entities": session.missing_entities, "missing_groups": session.missing_groups,
-        "gather_turns": session.gather_turns, "files_loaded": list(session.files_loaded),
-    }
+def _run_chat_message_job(
+    job_id: str,
+    pipeline: ScriptGenerationPipeline,
+    session: ChatSessionState,
+    user_id: str,
+    clean_msg: str,
+    file_chunks: list[DocumentChunk],
+    filename: str,
+    tracker: TurnStepTracker,
+) -> None:
+    try:
+        _execute_chat_message(
+            pipeline=pipeline,
+            session=session,
+            user_id=user_id,
+            clean_msg=clean_msg,
+            file_chunks=file_chunks,
+            filename=filename,
+            tracker=tracker,
+            job_id=job_id,
+        )
+    except ScriptGenerationError as exc:
+        tracker.fail()
+        _sync_chat_turn_job(
+            job_id,
+            tracker,
+            status="failed",
+            error_code=exc.error_code,
+            message=exc.message,
+        )
+    except Exception as exc:
+        tracker.fail()
+        _sync_chat_turn_job(
+            job_id,
+            tracker,
+            status="failed",
+            error_code="generation_unavailable",
+            message=str(exc),
+        )
+
+
+@app.post("/api/script-chat/message/jobs", status_code=202)
+async def create_script_chat_message_job_endpoint(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    background_tasks: BackgroundTasks,
+    session_id: Annotated[str, Form(...)],
+    message: Annotated[str, Form()] = "",
+    file: Annotated[UploadFile | None, File()] = None,
+) -> dict[str, Any]:
+    """Queue a Turn 2+ message turn and return 202 with live step/ETA polling job_id."""
+    pipeline = get_script_pipeline()
+    user_id = str(user.id)
+    tracker = TurnStepTracker(
+        [
+            "validating_input",
+            "moderating",
+            "updating_context",
+            "compacting_context",
+            "analyzing_with_llm",
+        ]
+    )
+    tracker.start("validating_input")
+    session, clean_msg, file_chunks, filename = await _prepare_chat_message_inputs(
+        pipeline=pipeline,
+        user_id=user_id,
+        session_id=session_id,
+        message=message,
+        file=file,
+    )
+    tracker.done("validating_input")
+    job_id = _create_chat_turn_job(user_id, tracker)
+    background_tasks.add_task(
+        _run_chat_message_job,
+        job_id,
+        pipeline,
+        session,
+        user_id,
+        clean_msg,
+        file_chunks,
+        filename,
+        tracker,
+    )
+    with _chat_turn_jobs_lock:
+        snap = dict(_chat_turn_jobs[job_id])
+    snap.pop("user_id", None)
+    return snap
+
+
+@app.get("/api/script-chat/jobs/{job_id}")
+async def get_script_chat_job_endpoint(
+    job_id: str, user: Annotated[CurrentUser, Depends(get_current_user)]
+) -> JSONResponse:
+    """Poll step progress, +10s buffered ETA, and result of an async chat turn job."""
+    with _chat_turn_jobs_lock:
+        job = _chat_turn_jobs.get(job_id)
+        snap = dict(job) if job and job.get("user_id") == str(user.id) else None
+    if snap is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error_code": "job_not_found", "message": f"Job '{job_id}' not found."},
+        )
+    snap.pop("user_id", None)
+    return JSONResponse(status_code=200, content=snap)
 
 
 @app.get("/api/generate-script/{job_id}")

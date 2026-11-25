@@ -274,6 +274,7 @@ def scenario_setup(monkeypatch: pytest.MonkeyPatch):
     from src.app.config import settings
     monkeypatch.setattr(settings, "supabase_url", "")
     monkeypatch.setattr(settings, "ollama_host", "")
+    monkeypatch.setattr(settings, "groq_api_keys", [])
     chat_session_store.clear()
     store, main_template = _build_test_store()
 
@@ -480,8 +481,11 @@ class TestScenario2InteractiveGathering:
         select_body = select_res.json()
         assert select_body["selected_template_id"] == "wildlife/keystone_5m"
         assert select_body["ready_to_generate"] is False
+        assert select_body["can_generate"] is False
+        assert select_body["assistant_turn"] == 1
         assert "entity_audience_type" in select_body["missing_entities"]
         assert select_body["reply_message"] != READY_MESSAGE
+        assert "**" in select_body["reply_message"]
 
         # 3. User provides message covering missing entities and file covering argument slots
         reference_doc = (
@@ -513,7 +517,9 @@ class TestScenario2InteractiveGathering:
         assert msg_body["missing_entities"] == []
         assert msg_body["coverage_ratio"] >= 0.7
         assert msg_body["ready_to_generate"] is True
-        assert msg_body["reply_message"] == READY_MESSAGE
+        assert msg_body["can_generate"] is True
+        assert msg_body["assistant_turn"] == 2
+        assert "Keystone Species Conservation" in msg_body["reply_message"]
 
         # Check session state in store
         session = chat_session_store.get(session_id, user_id=user_id)
@@ -538,28 +544,30 @@ class TestScenario2InteractiveGathering:
 
 
 # ---------------------------------------------------------------------------
-# Scenario 3: Hard 2-Turn Gathering Cap (gather_turns == 2)
+# Scenario 3: Continuous Gathering (No 2-Turn Hard Cap; Turn 2+ can_generate)
 # ---------------------------------------------------------------------------
 
 
-class TestScenario3GatherTurnsCap:
-    """Scenario 3: Hard 2-turn gathering cap (gather_turns == 2) -> stops asking."""
+class TestScenario3ContinuousGathering:
+    """Scenario 3: Continuous Q&A does not hard-stop at gather_turns == 2."""
 
-    def test_hard_2_turn_cap_stops_asking(self, scenario_setup) -> None:
+    def test_continuous_gathering_keeps_asking_past_turn_2(self, scenario_setup) -> None:
         client: TestClient = scenario_setup["client"]
 
-        # 1. Start session & select template
+        # 1. Start session & select template (Turn 1 -> can_generate=False)
         suggest_res = client.post(
             "/api/script-chat/suggest",
             data={"category": "wildlife", "duration_min": 5},
         )
         session_id = suggest_res.json()["session_id"]
-        client.post(
+        select_res = client.post(
             "/api/script-chat/select-topic",
             json={"session_id": session_id, "template_id": "wildlife/keystone_5m"},
         )
+        assert select_res.json()["assistant_turn"] == 1
+        assert select_res.json()["can_generate"] is False
 
-        # 2. Turn 1: user provides vague answer, bot continues asking
+        # 2. First user message (assistant_turn=2): can_generate unlocks, still insufficient
         turn1_res = client.post(
             "/api/script-chat/message",
             data={"session_id": session_id, "message": "I am not quite sure yet."},
@@ -567,10 +575,12 @@ class TestScenario3GatherTurnsCap:
         assert turn1_res.status_code == 200
         turn1_body = turn1_res.json()
         assert turn1_body["gather_turns"] == 1
+        assert turn1_body["assistant_turn"] == 2
+        assert turn1_body["can_generate"] is True
         assert turn1_body["ready_to_generate"] is False
         assert turn1_body["reply_message"] != READY_MESSAGE
 
-        # 3. Turn 2: second vague answer reaches gather_turns == 2
+        # 3. Second user message (assistant_turn=3): no forced 2-turn hard stop
         turn2_res = client.post(
             "/api/script-chat/message",
             data={"session_id": session_id, "message": "Still thinking about it."},
@@ -578,20 +588,20 @@ class TestScenario3GatherTurnsCap:
         assert turn2_res.status_code == 200
         turn2_body = turn2_res.json()
         assert turn2_body["gather_turns"] == 2
+        assert turn2_body["assistant_turn"] == 3
+        assert turn2_body["can_generate"] is True
+        assert turn2_body["ready_to_generate"] is False
+        assert turn2_body["reply_message"] != READY_MESSAGE
+        assert "**" in turn2_body["reply_message"]
 
-        # Hard cap triggered: ready_to_generate becomes True and bot returns READY_MESSAGE
-        assert turn2_body["ready_to_generate"] is True
-        assert turn2_body["reply_message"] == READY_MESSAGE
-
-    def test_unit_check_ready_to_generate_layer2_cap(self) -> None:
-        # Layer 2 cap fires even if coverage is 0.0 and missing_entities remain
+    def test_unit_check_ready_to_generate_has_no_2_turn_cap(self) -> None:
         ready = check_ready_to_generate(
             selected_template_id="wildlife/keystone_5m",
             missing_entities=["entity_audience_type", "entity_location"],
             coverage_ratio=0.0,
             gather_turns=2,
         )
-        assert ready is True
+        assert ready is False
 
 
 # ---------------------------------------------------------------------------
@@ -797,7 +807,8 @@ class TestScenario5FreeTopicAndRegenerateWithFeedback:
         pipeline.run(req2)
         updated_sess = chat_session_store.get(sid, user_id=user_id)
         assert updated_sess is not None
-        assert updated_sess.user_notes == [feedback_text]
+        assert updated_sess.get_context_texts() == [feedback_text]
+        assert updated_sess.context_window[0].source == "feedback"
         call_kwargs2 = mock_llm.generate_free_topic_script.call_args.kwargs
         assert feedback_text in call_kwargs2["chat_context"]
 

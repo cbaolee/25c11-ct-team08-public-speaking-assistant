@@ -67,7 +67,7 @@ src/app/
     ├── factory.py          Repos container; get_repos() picks the implementation and wires the shards
     └── session_helpers.py  Opus encoding, series split/merge, compaction
 src/audio_processing/       Evaluate and Baseline Pipeline
-src/text_processing/        Script Pipeline
+src/text_processing/        Script Pipeline (parsing, moderation, bounded chat context & compaction, templates, LLM generation)
 src/web/
 ├── templates/index.html    Markup only; loads CSS and static/js/main.js
 ├── static/css/             base, layout, components, screens (in this order)
@@ -116,7 +116,7 @@ tests/                      pytest (tests/db: repositories and helpers); tests/w
 | `PUT /api/profile/avatar`          | Multipart `file`; checked by content, resized to a square WebP, stored       |
 | `DELETE /api/profile/avatar`       | Delete the avatar file, set `avatar_path` to `null`                          |
 
-`GET /api/config` returns the `[web]` section plus limits shared with the backend (`max_saved_scripts`, `script_title_max_chars`, `max_pdf_size_bytes`, `max_pdf_pages`), so each number is declared once.
+`GET /api/config` returns the `[web]` section plus limits shared with the backend (`max_saved_scripts`, `script_title_max_chars`, `max_turn_text_chars`, `max_pdf_size_bytes`, `max_pdf_pages`, `max_text_file_bytes`, `max_text_file_words`, `file_size_limits_bytes`, `eta_buffer_s`, and `script_telemetry`), so each number is declared once.
 
 ### 3.2 Profile preferences
 
@@ -151,6 +151,8 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 | 413    | `{"error_code": "avatar_too_large", ...}`                                | Avatar above `storage.avatar_max_bytes`            |
 | 422    | `{"error_code": "avatar_invalid", ...}`                                  | Not PNG/JPEG/WebP, or a side above `avatar_max_side_px` |
 | 422    | Validation error                                                         | Bad `preferences` value                            |
+| 422    | `{"error_code": "text_too_long" \| "file_too_large" \| "unsupported_file_type" \| "empty_input" \| "content_rejected", ...}` | `/api/script-chat/*` per-turn text limit, bounded upload cap, empty input, or moderation rejection |
+| 404    | `{"error_code": "session_not_found" \| "template_not_found" \| "job_not_found", ...}` | Unknown or cross-user `/api/script-chat/*` session/job, unknown template, or unknown `/api/generate-script/{job_id}` |
 | 503    | `{"error_code": "baseline_not_saved" \| "baseline_unavailable", ...}`   | Baseline could not be saved / loaded               |
 | 503    | `{"error": "session_storage_unavailable"}`                               | Database or storage error in session endpoints     |
 | 503    | `{"error_code": "script_storage_unavailable", ...}`                      | Database error in saved-script endpoints           |
@@ -383,6 +385,44 @@ Two steps. The Busy Overlay ("Logging in…") covers the password check; a wrong
 
 A page load (F5) calls `POST /api/auth/refresh` under the App Loader: the `psa_refresh` cookie gives a new access token and the same first data loads; without a valid cookie the Landing page shows.
 
+### 5.6 Script generation and pre-generation Q&A
+
+```mermaid
+sequenceDiagram
+    participant UI as Browser
+    participant API as /api/script-chat/* & /api/generate-script
+    participant CS as ChatSession & Context Window
+    participant LLM as Groq (PooledGroqClient)
+    participant P as ScriptGenerationPipeline
+    UI->>API: POST /api/script-chat/suggest (prompt, optional .pdf/.md/.txt)
+    API->>API: Check max_turn_text_chars, composer_max_words, per-type byte ceiling
+    API->>P: moderator.assert_safe -> suggest_topics
+    API-->>UI: 200 session_id, suggestions, steps, +10s buffered ETA
+    UI->>API: POST /api/script-chat/select-topic (Turn 1)
+    API->>LLM: build_turn1_question (template or free-topic, fallback on failure)
+    API-->>UI: 200 assistant_turn=1, can_generate=false, **bold** key question
+    loop Turn 2+ continuous gathering until user triggers Generate
+        UI->>API: POST /api/script-chat/message (or /message/jobs)
+        API->>CS: sanitize -> moderate -> normalize ContextEntry -> bounded window
+        opt Context ceiling crossed
+            CS->>LLM: compact older entries (groq_compaction_model / rule fallback)
+        end
+        API->>LLM: evaluate_and_build_followup -> JSON {sufficient, missing_items, reply_message}
+        API-->>UI: 200 assistant_turn>=2, can_generate=true, ready_to_generate, context_compacted, steps, ETA
+    end
+    UI->>API: POST /api/generate-script (session_id)
+    API-->>UI: 202 job_id, steps, +10s buffered ETA
+    P->>CS: Read compacted_summary + active context_window (+ chunks)
+    UI->>API: GET /api/generate-script/{job_id}
+    API-->>UI: status, stage, steps, estimated_remaining_s, result
+```
+
+- Full design, ceilings, and fallback rules live in [ADR-014](docs/adr/ADR-014.md).
+- **Per-turn limits & upload guards:** `POST /api/script-chat/suggest` and `POST /api/script-chat/message` check `max_turn_text_chars` (`18,000`), `composer_max_words` (`3,000`), and per-extension upload byte limits (`.pdf` 25 MB / 10 pages, `.md`/`.txt` 2 MB / 15,000 words) via chunked reads (`422 text_too_long` / `file_too_large` / `unsupported_file_type`) before moderation, embeddings, or Groq calls.
+- **Bounded context window & compaction:** Raw user answers are sanitized (`sanitize_text`), moderated (`ContentModerator.assert_safe`), normalized (`normalize_turn_entry`), and appended as `ContextEntry` items to `ChatSessionState.context_window`. Crossing `context_window_max_chars` (`4,500`) or `context_window_max_entries` (`8`) compacts older entries (keeping newest `context_compaction_keep_recent` = `2` intact) into `compacted_summary` (`<= 1,500` chars) via `GROQ_COMPACTION_MODEL` (`openai/gpt-oss-20b` through `PooledGroqClient` + `TokenBucketLimiter`), falling back to `deterministic_compact_summary` if Groq fails or rate limits are tight. `ScriptGenerationPipeline.run()` consumes `compacted_summary` plus active `context_window` entries and routes `Regenerate` feedback through the same bounded window.
+- **Continuous Turn 1 -> Turn 2+ Q&A:** Turn 1 (`/select-topic`) always asks a context question with `assistant_turn: 1` and `can_generate: false`. Turn 2+ (`/message`) runs a single structured JSON Groq call returning `{sufficient, missing_items, reply_message}` with `**bold**` key requests and `can_generate: true` (no forced 2-turn stop).
+- **Step & +10s buffered ETA telemetry:** Chat turns (`/suggest`, `/select-topic`, `/message`, plus async `/message/jobs` and `GET /api/script-chat/jobs/{job_id}`) and `GET /api/generate-script/{job_id}` expose ordered `steps`, `stage`, `eta_buffer_s` (`10`), `estimated_total_s`, and `estimated_remaining_s`.
+
 ## 6. Browser state
 
 | Store            | Key                       | Content                                             | Cleared                                  |
@@ -428,11 +468,15 @@ API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS`, `GROQ_API_KEYS`, each one or m
 | `SIGNED_URL_TTL_S`                                                   | `600`                                     | Signed URL lifetime, seconds             |
 | `BASELINE_REQUIRED`                                                  | `true`                                    | Reject evaluation without a baseline     |
 | `AUTH_COOKIE_SECURE`                                                 | `true`                                    | `Secure` flag of the `psa_refresh` cookie; browsers accept it on `http://localhost` |
+| `GROQ_LLM_MODEL`, `GROQ_LLM_FALLBACK_MODEL_1`, `GROQ_LLM_FALLBACK_MODEL_2` | `openai/gpt-oss-120b`, `qwen/qwen3.8-27b`, `openai/gpt-oss-20b` | Primary and fallback Groq models for script generation and Q&A |
+| `GROQ_COMPACTION_MODEL`                                              | `openai/gpt-oss-20b`                      | Smaller Groq model for compacting older chat context entries |
 | `DEV_USER_ID`, `DEV2_USER_ID`                                        | empty                                     | Test users, read only by integration tests |
 
 Account limits in `app_constants.toml` `[auth]`: `otp_length` (6), `resend_cooldown_s` (60), `verify_attempts_per_window` (5) per `verify_window_s` (600), `unconfirmed_ttl_min` (60), `refresh_cookie_days` (30).
 
 Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `script_title_max_chars` (70), `max_list_page_size` (50), `avatar_max_bytes` (2 MB), `avatar_size_px` (256), `avatar_max_side_px` (4096), `max_upload_bytes` (100 MB).
+
+Script & pre-generation chat limits in `app_constants.toml` `[script]`: `max_turn_text_chars` (18,000, paired with `[web]` `composer_max_words` = 3,000), `max_pdf_size_bytes` (25 MB), `max_pdf_pages` (10), `max_text_file_bytes` (2 MB), `max_text_file_words` (15,000), `context_window_max_chars` (4,500), `context_window_max_entries` (8), `context_compaction_keep_recent` (2), `context_compaction_max_summary_chars` (1,500), `groq_compaction_model` (`openai/gpt-oss-20b`), and `eta_buffer_s` (10).
 
 ## 9. Testing
 
@@ -460,6 +504,7 @@ Storage limits in `app_constants.toml` `[storage]`: `max_saved_scripts` (10), `s
 | [ADR-011](docs/adr/ADR-011.md) | Re-auth for password change and account deletion, purge of unconfirmed accounts, microphone choice |
 | [ADR-012](docs/adr/ADR-012.md) | Database split into one core and shard projects by user           |
 | [ADR-013](docs/adr/ADR-013.md) | Required recording consent, password reset by email code, refresh token in an HttpOnly cookie, rate limits in Postgres |
+| [ADR-014](docs/adr/ADR-014.md) | Pre-generation continuous Groq Q&A, bounded chat context window, compaction, input guards, and step/ETA telemetry |
 
 ## 11. Accounts
 
