@@ -57,3 +57,22 @@
 @media (prefers-reduced-motion: reduce) { .sch-today, .sch-today * { transition: none !important; animation: none !important; } }
 
 .sch-banner:not([hidden]) { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; padding: .75rem 1rem; border-radius: .75rem; background: #eef4ff; }
+
+/* Schedule calendar and drawer refinements. */
+.sch-day { position: relative; background: var(--surface); }
+.sch-day-number { display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px; font-variant-numeric: tabular-nums; }
+.sch-day.sch-today { margin: 0; box-shadow: inset 0 3px var(--accent); }
+.sch-today .sch-day-number { outline: 0; background: var(--accent); color: white; font-weight: 700; }
+.sch-day .sch-compact { display: grid; grid-template-columns: auto 1fr; gap: 0 4px; border-radius: var(--r-ctl); }
+.sch-day .sch-chip-time { grid-column: 1 / -1; grid-row: 1; font-variant-numeric: tabular-nums; }
+.sch-day-empty { margin: 20px 0; color: var(--muted); font-style: italic; }
+.sch-drawer { align-items: flex-start; padding: 80px 18px 24px; }
+.sch-drawer .box { height: auto; max-height: min(640px, calc(100vh - 104px)); border-radius: var(--r-panel); overflow-y: auto; }
+.sch-delete { margin-right: auto; }
+@media (max-width: 720px) {
+  .sch-day .sch-compact { display: inline-flex; }
+  .sch-drawer { align-items: flex-end; padding: 0; }
+  .sch-drawer .box { max-height: 85vh; border-radius: var(--r-panel) var(--r-panel) 0 0; }
+}
+
+.sch-chevron svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
