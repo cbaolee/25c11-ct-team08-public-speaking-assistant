@@ -1,0 +1,36 @@
+.badge-demo { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--sans); padding: 3px 10px; border-radius: var(--r-pill); background: var(--warn-soft); color: var(--warn); }
+.sch-title, .sch-actions, .sch-toolbar, .sch-legend { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sch-title h1, .sch-title h2 { margin: 0; }
+.sch-panel { margin-top: 20px; }
+.sch-toolbar { justify-content: center; margin: 20px 0; }
+.sch-toolbar strong { min-width: 150px; text-align: center; }
+.sch-weekdays, .sch-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.sch-weekdays { text-align: center; font-weight: 600; padding: 8px 0; }
+.sch-grid { border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.sch-day { min-width: 0; min-height: 105px; padding: 8px; border: 0; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); color: var(--ink); text-align: left; cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font: inherit; }
+.sch-day:focus-visible, .sch-checks input:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; position: relative; z-index: 1; }
+.sch-outside .sch-day-number { color: var(--muted); }
+.sch-today .sch-day-number { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-pill); }
+.sch-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid transparent; border-radius: var(--r-pill); font: 600 12px var(--sans); max-width: 100%; }
+.sch-done { background: var(--ok-soft); color: var(--ok); }
+.sch-active { background: var(--accent-soft); color: var(--accent); }
+.sch-upcoming { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+.sch-missed { background: var(--surface); border: 1px dashed var(--muted); color: var(--muted); }
+.sch-chip-time, .sch-chip-word { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sch-more { font-size: 12px; }
+.sch-legend { margin-top: 16px; }
+.sch-empty { margin-top: 20px; }
+.sch-drawer { justify-content: flex-end; padding: 0; }
+.sch-drawer .box { height: 100%; max-height: 100%; max-width: 440px; border-radius: var(--r-panel) 0 0 var(--r-panel); }
+.sch-entry { display: grid; justify-items: start; gap: 10px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.sch-entry p { margin: 0; }
+.sch-note { white-space: pre-wrap; overflow-wrap: anywhere; }
+.sch-form label { display: block; margin-top: 12px; }
+.sch-form input[type=date], .sch-form input[type=time] { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); font: 400 16px var(--sans); background: var(--surface); color: var(--ink); }
+.sch-checks { display: flex; flex-wrap: wrap; gap: 10px; }
+.sch-checks label { display: flex; align-items: center; gap: 4px; margin: 0; }
+.sch-form fieldset { margin-top: 12px; border: 1px solid var(--line); border-radius: var(--r-ctl); }
+.sch-email { margin: 16px 0; padding: 16px; border: 1px solid var(--line-strong); border-radius: var(--r-panel); overflow-wrap: anywhere; }
+.sch-email p { margin: 0 0 10px; white-space: pre-wrap; }
+@media (max-width: 720px) { .sch-day { min-height: 60px; padding: 5px; } .sch-compact { padding: 0; border: 0; background: transparent; } .sch-compact.sch-missed { border: 1px dashed var(--muted); } .sch-compact .sch-chip-time, .sch-more { display: none; } .sch-compact .sch-chip-word { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; } .sch-drawer { align-items: flex-end; } .sch-drawer .box { width: 100%; max-width: none; height: auto; max-height: 85vh; border-radius: var(--r-panel) var(--r-panel) 0 0; } }
+@media (prefers-reduced-motion: reduce) { .sch-drawer, .sch-drawer *, #schEventModal, #schEventModal *, #schEmailModal, #schEmailModal *, #screenSchedule * { transition: none !important; animation: none !important; } }

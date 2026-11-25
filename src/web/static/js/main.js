@@ -17,6 +17,7 @@ import './screens/history.js';
 import './screens/script_studio.js';
 import './recorder.js';
 import './screens/practice.js';
+import './screens/schedule.js';
 import './screens/report.js';
 import './screens/profile.js';
 import './modals/profile_modal.js';
