@@ -1,0 +1,6 @@
+| 2026-11-25 | #122 | gpt-6.1-terra (Codex CLI) qua Claude Code | schedule_model.js (canEdit, previewOccurrenceDays), schedule_store.js (editOccurrence, deleteFromOccurrence, session_id trong done record) và test |
+| 2026-11-25 | #122 | gpt-6.1-terra (Codex CLI) qua Claude Code | screens/schedule.js: Month Picker, Back to today, Date/Time Picker, segmented Length/Repeat, Until preview, Edit/Delete, View result, Day Drawer nổi; schedule_view.js helpers + test; schedule.css; TEXT.schedule |
+| 2026-11-25 | #122 | gpt-6.1-terra (Codex CLI) qua Claude Code | practice.js: dời dòng dispatch psc:evaluation-complete, thêm session_id |
+| 2026-11-25 | #122 | gpt-6.1-terra (Codex CLI) qua Claude Code | screens/schedule.js + schedule.css: Month Picker dạng cột cuộn, header không viền, carousel thẻ Today's practice (renderTodayPanel), sửa lỗi sau review; schedule_view.js (formatDurationWords, closesTone, carouselStep, edgeFades, wrapWheel) + test |
+| 2026-11-25 | #122 | Claude Code (skill ui-ux-pro-max) | Điều phối, review, sửa nhỏ (less than a minute, icon đồng hồ SVG)|
+| 2026-11-25 | #122 | gpt-6.1-terra (Codex CLI) qua Claude Code | screens/schedule.js + schedule.css: mũi tên < > hai bên carousel Today, bỏ "No note", chuyển Back to today vào Month Picker |
