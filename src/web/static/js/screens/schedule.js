@@ -1,17 +1,17 @@
 import { T } from '../i18n.js';
 import { go } from '../nav.js';
 import { S, RENDER } from '../state.js';
-import { openModal, closeModal, enhanceSelect, toast } from '../ui.js';
+import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
-import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN } from '../schedule/schedule_model.js';
+import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
-import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime } from '../schedule/schedule_view.js';
+import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
-let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker;
+let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker, untilPicker;
 let openPopover = null;
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
@@ -45,10 +45,10 @@ function pickerShell(container, paint) {
   document.addEventListener('pointerdown', e => { if (!popup.hidden && !container.contains(e.target)) close(false); });
   return { trigger, popup, close };
 }
-function makeDatePicker(container, { min, value, onChange, markDays = () => [] }) {
-  let minimum = min, current = value, cursor = value;
+function makeDatePicker(container, { min, value, onChange, markDays = () => [], allowEmpty = false }) {
+  let minimum = min, current = value, cursor = value || min;
   const shell = pickerShell(container, paint);
-  function update() { shell.trigger.value = current; shell.trigger.textContent = fmt(parseDay(current), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
+  function update() { shell.trigger.value = current; shell.trigger.textContent = current ? fmt(parseDay(current), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : T('schedule.noEndDate'); }
   function paint() {
     const popup = shell.popup; popup.replaceChildren();
     const date = new Date(parseDay(cursor)), header = node('div', null, 'sch-picker-header');
@@ -66,14 +66,15 @@ function makeDatePicker(container, { min, value, onChange, markDays = () => [] }
       if (key === dayKey(Date.now())) b.classList.add('sch-picker-today');
       if (key === current) b.classList.add('sch-picker-selected');
       if (new Date(parseDay(key)).getMonth() !== date.getMonth()) b.classList.add('sch-picker-outside');
-      if (marked.includes(key)) b.classList.add('sch-picker-marked');
+      if (marked.includes(key)) { b.classList.add('sch-picker-marked'); b.append(node('span', ' ' + T('schedule.sessionMarker'), 'sr-only')); b.setAttribute('aria-label', b.getAttribute('aria-label') + ', ' + T('schedule.sessionMarker')); }
       b.onkeydown = e => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) { e.preventDefault(); cursor = moveDay(key, e.key); if (cursor < minimum) cursor = minimum; paint(); popup.querySelector('[tabindex="0"]')?.focus(); } };
       grid.append(b);
     }); popup.append(grid);
+    if (allowEmpty) popup.append(button(T('schedule.noEndDate'), () => { current = ''; update(); onChange(''); shell.close(); }, 'btn btn-sm'));
   }
-  update(); return { set(value, minValue) { minimum = minValue; current = cursor = value; update(); }, close: shell.close };
+  update(); return { set(value, minValue) { minimum = minValue; current = value; cursor = value || minValue; update(); }, close: shell.close };
 }
-function makeTimePicker(container, getDate) {
+function makeTimePicker(container, getDate, onChange = () => {}) {
   let current = '', parts;
   const shell = pickerShell(container, paint);
   const valid = value => { const [h, m] = value.split(':').map(Number), d = new Date(parseDay(getDate())); d.setHours(h, m, 0, 0); return d.getTime() > Date.now(); };
@@ -98,7 +99,7 @@ function makeTimePicker(container, getDate) {
         const selected = list.querySelector('[aria-selected="true"]'); if (selected?.disabled) { selected.tabIndex = -1; const first = list.querySelector('button:not(:disabled)'); if (first) first.tabIndex = 0; }
       });
     }
-    function apply() { const value = to24h(parts.h, parts.m, parts.pm); if (valid(value)) { current = value; update(); shell.close(); } }
+    function apply() { const value = to24h(parts.h, parts.m, parts.pm); if (valid(value)) { current = value; update(); onChange(value); shell.close(); } }
     draw(); popup.append(button(T('schedule.pickerApply'), apply, 'btn btn-sm btn-primary'));
   }
   update(); return { set(value) { current = value; update(); }, close: shell.close };
@@ -142,7 +143,7 @@ function openDay(key) {
   if (!occs.length) list.append(node('p', T('schedule.nothing'), 'sch-day-empty'));
   occs.forEach(occ => {
     const event = getSchedule().events.find(e => e.id === occ.event_id), row = node('div', null, 'sch-entry');
-    row.append(node('strong', `${time(occ.start)} – ${time(occ.start + occ.duration_min * 60000)} · ${T('schedule.minutes', { n: occ.duration_min })}`));
+    row.append(node('strong', `${time(occ.start)} \u2013 ${time(occ.start + occ.duration_min * 60000)} \u00B7 ${T('schedule.minutes', { n: occ.duration_min })}`));
     row.append(chip(occurrenceStatus(occ, Date.now())));
     if (occ.note) row.append(node('p', occ.note, 'sch-note'));
     if (event.recurrence.kind !== 'none') {
@@ -158,26 +159,53 @@ function openDay(key) {
   $('schDayNew').onclick = () => openEvent(key);
   if (!$('schDayDrawer').classList.contains('show')) openModal('schDayDrawer');
 }
+function setSegment(id, value) {
+  const group = $(id); group.value = String(value);
+  group.querySelectorAll('[role="radio"]').forEach(b => { const selected = b.value === group.value; b.setAttribute('aria-checked', String(selected)); b.tabIndex = selected ? 0 : -1; });
+}
+function makeSegments(id, values, label, changed) {
+  const group = $(id);
+  values.forEach(value => {
+    const b = button(label(value), () => { setSegment(id, value); changed(); }, 'sch-segment');
+    b.value = String(value); b.setAttribute('role', 'radio');
+    b.onkeydown = e => { const delta = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key]; if (delta) { e.preventDefault(); const items = [...group.querySelectorAll('[role="radio"]')]; const next = items[(items.indexOf(b) + delta + items.length) % items.length]; next.click(); next.focus(); } };
+    group.append(b);
+  });
+}
+function currentInput() {
+  return { date: $('schDate').value, time: $('schTime').value, duration_min: Number($('schLength').value), note: $('schNote').value, recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('[aria-pressed="true"]')].map(x => Number(x.value)), until: $('schUntil').value || null } };
+}
+function updateRecurrence() {
+  const input = currentInput(), repeating = input.recurrence.kind !== 'none';
+  $('schDays').hidden = input.recurrence.kind !== 'custom';
+  $('schUntilField').hidden = !repeating;
+  if (!repeating) { untilPicker.set('', input.date); return; }
+  const until = input.recurrence.until;
+  if (!until) $('schUntilSummary').textContent = T('schedule.noEndSummary');
+  else { const result = sessionsSummary(previewOccurrenceDays(input, input.date, until)); $('schUntilSummary').textContent = result.last ? T('schedule.sessionsSummary', { n: result.n, date: shortDate(parseDay(result.last)) }) : T('schedule.noSessionsSummary'); }
+}
 function openEvent(key, occ = null, event = null) {
   if (openPopover) openPopover(false);
   editing = occ ? { occ, event } : null;
-  const form = $('schForm'); form.reset(); $('schLength').value = '10'; $('schRepeat').value = 'none';
+  const form = $('schForm'); form.reset(); setSegment('schLength', '10'); setSegment('schRepeat', 'none'); $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   const minimum = dayKey(Date.now()), chosen = key && key >= minimum ? key : minimum;
   datePicker.set(chosen, minimum); timePicker.set(defaultTime(Date.now(), chosen));
-  $('schUntil').min = $('schDate').value; $('schDays').hidden = true;
+  untilPicker.set('', chosen); $('schDays').hidden = true;
   ['Start', 'Length', 'Note', 'Repeat', 'Days', 'Until'].forEach(k => { $('sch' + k + 'Error').textContent = ''; $('sch' + k + 'Error').classList.remove('show'); });
   ['schDate', 'schTime', 'schLength', 'schNote', 'schRepeat', 'schUntil'].forEach(id => $(id).removeAttribute('aria-invalid'));
   $('schEventTitle').textContent = T(editing ? 'schedule.editEvent' : 'schedule.newEvent');
   $('schDelete').hidden = !editing;
-  $('schRepeat').disabled = !!editing;
+  $('schRepeatFields').hidden = !!editing && event.recurrence.kind !== 'none';
+  $('schRepeat').querySelectorAll('button').forEach(b => { b.disabled = !!editing; });
   $('schDate').disabled = !!editing && event.recurrence.kind !== 'none';
   $('schEditRepeat').hidden = !editing || event.recurrence.kind === 'none';
   if (editing) {
-    datePicker.set(occ.day, minimum); timePicker.set(event.time); $('schLength').value = String(event.duration_min);
-    $('schNote').value = event.note; $('schRepeat').value = event.recurrence.kind;
-    $('schUntil').value = event.recurrence.until || '';
-    $('schDayChecks').querySelectorAll('input').forEach(input => { input.checked = event.recurrence.days.includes(Number(input.value)); });
+    datePicker.set(occ.day, minimum); timePicker.set(event.time); setSegment('schLength', event.duration_min);
+    $('schNote').value = event.note; setSegment('schRepeat', event.recurrence.kind);
+    untilPicker.set(event.recurrence.until || '', occ.day);
+    $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(event.recurrence.days.includes(Number(b.value)))));
   }
+  updateRecurrence();
   $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS });
   openModal('schEventModal', { focus: '#schDate' });
 }
@@ -189,15 +217,15 @@ function openEmail(occ, event) {
   openModal('schEmailModal');
 }
 function init() {
-  T('schedule.weekdays').forEach((name, i) => { $('schWeekdays').append(node('span', name)); const label = node('label'); const input = node('input'); input.type = 'checkbox'; input.value = i + 1; label.append(input, document.createTextNode(name)); $('schDayChecks').append(label); });
+  T('schedule.weekdays').forEach((name, i) => { $('schWeekdays').append(node('span', name)); const b = button(name, () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); updateRecurrence(); }, 'sch-day-toggle'); b.value = i + 1; b.setAttribute('aria-pressed', 'false'); $('schDayChecks').append(b); });
   ['upcoming', 'active', 'done', 'missed'].forEach(status => { const c = chip(status); if (status === 'active') c.lastChild.textContent = T('schedule.activeLegend'); $('schLegend').append(c); });
-  DURATIONS_MIN.forEach(n => $('schLength').add(new Option(T('schedule.minutes', { n }), n))); $('schLength').value = '10';
-  ['none', 'daily', 'weekly', 'custom'].forEach(k => $('schRepeat').add(new Option(T('schedule.' + k), k)));
-  enhanceSelect($('schLength')); enhanceSelect($('schRepeat'));
+  makeSegments('schLength', DURATIONS_MIN, n => T('schedule.minutes', { n }), updateRecurrence);
+  makeSegments('schRepeat', ['none', 'daily', 'weekly', 'custom'], k => T('schedule.' + (k === 'custom' ? 'customOption' : k)), updateRecurrence);
+  setSegment('schLength', '10'); setSegment('schRepeat', 'none');
   $('schNote').maxLength = NOTE_MAX_CHARS; $('schNote').oninput = () => { $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS }); };
-  $('schRepeat').onchange = () => { $('schDays').hidden = $('schRepeat').value !== 'custom'; };
-  datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { $('schUntil').min = value; timePicker.set(defaultTime(Date.now(), value)); } });
-  timePicker = makeTimePicker($('schTimePicker'), () => $('schDate').value);
+  datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { const until = $('schUntil').value; untilPicker.set(until && until >= value ? until : '', value); timePicker.set(defaultTime(Date.now(), value)); updateRecurrence(); } });
+  timePicker = makeTimePicker($('schTimePicker'), () => $('schDate').value, updateRecurrence);
+  untilPicker = makeDatePicker($('schUntilPicker'), { min: dayKey(Date.now()), value: '', allowEmpty: true, onChange: updateRecurrence, markDays: (year, month) => { const input = currentInput(), end = dayKey(new Date(year, month + 1, 0).getTime()), limit = input.recurrence.until && input.recurrence.until < end ? input.recurrence.until : end; return previewOccurrenceDays(input, input.date, limit); } });
   $('schReminder').textContent = T('schedule.reminder', { n: REMINDER_LEAD_MIN });
   $('schDelete').onclick = () => {
     if (!editing) return;
@@ -234,14 +262,14 @@ function init() {
   $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
   document.querySelector('#screenSchedule #schToday').onclick = () => { month = new Date(); render(); $('schGrid').querySelector(`[data-sch-day="${dayKey(Date.now())}"]`)?.focus(); };
   $('schForm').onsubmit = e => {
-    e.preventDefault(); const input = { date: $('schDate').value, time: $('schTime').value, duration_min: Number($('schLength').value), note: $('schNote').value, recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('input:checked')].map(x => Number(x.value)), until: $('schUntil').value || null } };
+    e.preventDefault(); const input = currentInput();
     if (editing) input.recurrence = editing.event.recurrence;
     const result = validateEvent(input, Date.now()), errors = result.errors;
     if (editing && !canEdit(editing.occ, Date.now())) errors.start = 'too_late';
-    const fields = [['start', 'Start', errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', null], ['until', 'Until', 'invalidUntil', 'schUntil']];
+    const fields = [['start', 'Start', errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', 'schDayChecks'], ['until', 'Until', 'invalidUntil', 'schUntil']];
     fields.forEach(([key, target, message, id]) => { $('sch' + target + 'Error').textContent = errors[key] ? T('schedule.' + message) : ''; $('sch' + target + 'Error').classList.toggle('show', !!errors[key]); if (id) $(id).setAttribute('aria-invalid', String(!!errors[key])); });
     $('schDate').setAttribute('aria-invalid', String(!!errors.start));
-    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[0] === 'start' && !$('schDate').disabled) $('schDate').focus(); else if (first[3]) $(first[3]).focus(); else $('schDayChecks').querySelector('input').focus(); return; }
+    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[0] === 'start' && !$('schDate').disabled) $('schDate').focus(); else if (['schLength', 'schRepeat'].includes(first[3])) $(first[3]).querySelector('[aria-checked="true"]').focus(); else if (first[3] === 'schDayChecks') $('schDayChecks').querySelector('button').focus(); else if (first[3]) $(first[3]).focus(); return; }
     const wasEditing = !!editing;
     saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), sample: false })); if (openPopover) openPopover(false); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));
   };

@@ -54,3 +54,9 @@ test('new event defaults to the next half hour or future evening', async () => {
   assert.equal(defaultTime(new Date(2026, 10, 25, 23, 40).getTime(), '2026-11-25'), '');
   assert.equal(defaultTime(new Date(2026, 10, 25, 23, 40).getTime(), '2026-11-26'), '19:00');
 });
+
+test('session summary counts days and identifies the last occurrence', async () => {
+  const { sessionsSummary } = await view;
+  assert.deepEqual(sessionsSummary([]), { n: 0, last: null });
+  assert.deepEqual(sessionsSummary(['2026-11-25', '2026-12-02']), { n: 2, last: '2026-12-02' });
+});
