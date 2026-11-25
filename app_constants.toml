@@ -79,8 +79,58 @@ context_compaction_keep_recent = 2
 context_compaction_max_summary_chars = 1_500
 # Smaller Groq model used to compact older chat context entries (.env: GROQ_COMPACTION_MODEL)
 groq_compaction_model = "openai/gpt-oss-20b"
-# Telemetry ETA buffer added to base stage estimates, in seconds
+# Pre-generation chat session store capacity and sliding TTL (30 minutes)
+chat_session_store_capacity = 100
+chat_session_ttl_s = 1800.0
+# Slot coverage thresholds (0-token cosine threshold and template readiness ratio)
+slot_coverage_min_score = 0.35
+slot_coverage_ready_threshold = 0.7
+# Free-topic readiness word-count floor and initial thesis word threshold
+free_topic_min_words = 150
+free_topic_thesis_min_words = 15
+# Groq token budgets, temperatures, rate-limit wait cap, and UI hint cap for compaction & Q&A
+compaction_max_tokens = 300
+turn1_max_tokens = 160
+followup_max_tokens = 220
+compaction_temperature = 0.2
+turn1_temperature = 0.4
+followup_temperature = 0.4
+followup_legacy_temperature = 0.5
+qa_limiter_max_wait_s = 5.0
+qa_max_missing_items_display = 3
+# Context entry char reserve/floor, compaction summary floor, and deterministic low-signal threshold
+context_entry_reserve_chars = 500
+context_entry_min_cap_chars = 400
+context_compaction_min_summary_chars = 200
+compaction_low_signal_max_words = 8
+# Pipeline & endpoint caps: citable note min words, LRU cache size, job store caps, chunk & read sizes
+citable_note_min_words = 8
+pipeline_cache_max_size = 64
+script_jobs_max_capacity = 128
+chat_turn_jobs_max_capacity = 128
+upload_read_chunk_bytes = 65_536
+moderation_max_chunks = 20
+suggest_query_max_chunks = 3
+# Telemetry ETA buffer added to base stage estimates, in seconds, and generating stage scaling
 eta_buffer_s = 10
+generate_stage_base_s = 4.0
+generate_stage_per_min_s = 0.8
+
+[script.chat_turn_step_durations]
+validating_input = 0.5
+moderating = 1.0
+matching_templates = 1.5
+analyzing_slots = 1.0
+updating_context = 0.5
+compacting_context = 2.5
+analyzing_with_llm = 3.5
+
+[script.generate_stage_durations]
+validating_input = 1.0
+extracting = 2.0
+moderating = 1.5
+generating = 8.0
+validating_output = 1.0
 
 [api_keys]
 # How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.

@@ -745,6 +745,41 @@ class TestBoundedContextAndCompaction:
         assert len(summary) <= 220
         assert "Point 14" in summary
 
+    def test_append_to_context_window_trims_kept_on_consecutive_near_ceiling_entries(self) -> None:
+        from src.text_processing.chat_session import CONTEXT_WINDOW_MAX_CHARS
+
+        session = ChatSessionState(
+            session_id="s-ceiling",
+            user_id="u1",
+            category="science",
+            duration_min=5,
+            topic="Energy Storage",
+        )
+        append_to_context_window(
+            session,
+            "Short initial audience note for students " + ("x" * 350),
+            turn=1,
+            source="chat",
+        )
+        _, compacted_2 = append_to_context_window(
+            session,
+            "Turn 2 detailed evidence " + ("a" * 3800),
+            turn=2,
+            source="chat",
+        )
+        assert compacted_2 is False
+
+        _, compacted_3 = append_to_context_window(
+            session,
+            "Turn 3 detailed counterpoint " + ("b" * 3800),
+            turn=3,
+            source="chat",
+        )
+        assert compacted_3 is True
+        assert len(session.context_window) == 1
+        assert session.context_window[0].turn == 3
+        assert session.context_char_count() <= CONTEXT_WINDOW_MAX_CHARS
+
     def test_pipeline_run_consumes_compacted_summary_and_active_window(self) -> None:
         from src.text_processing.contracts import GeneratedScript
 
@@ -898,6 +933,93 @@ class TestContinuousGroqQA:
         assert fb_decision.used_llm is False
         assert fb_decision.sufficient is False
         assert "**" in fb_decision.reply_message
+
+    def test_compaction_and_turn1_reject_truncated_or_malformed_json(self) -> None:
+        bad_compact_client = MagicMock()
+        bad_compact_resp = MagicMock()
+        bad_compact_resp.choices = [
+            MagicMock(message=MagicMock(content='{"summary": "unterminated'))
+        ]
+        bad_compact_resp.usage = MagicMock(total_tokens=40)
+        bad_compact_client.chat.completions.create.return_value = bad_compact_resp
+
+        summary, used_llm = compact_context_entries(
+            "",
+            [ContextEntry(turn=1, source="chat", text="42% efficiency gain in Berlin.")],
+            topic="Transit",
+            client=bad_compact_client,
+            limiter=TokenBucketLimiter(),
+        )
+        assert used_llm is False
+        assert "42% efficiency gain in Berlin" in summary
+        assert '{"summary"' not in summary
+
+        bad_turn1_client = MagicMock()
+        bad_turn1_resp = MagicMock()
+        bad_turn1_resp.choices = [
+            MagicMock(message=MagicMock(content="{malformed json truncated"))
+        ]
+        bad_turn1_resp.usage = MagicMock(total_tokens=40)
+        bad_turn1_client.chat.completions.create.return_value = bad_turn1_resp
+
+        reply, missing = build_turn1_question(
+            topic="Transit",
+            is_free_topic=True,
+            client=bad_turn1_client,
+            limiter=TokenBucketLimiter(),
+        )
+        assert "{malformed" not in reply
+        assert "**" in reply
+        assert len(missing) >= 1
+
+    def test_evaluate_and_build_followup_parses_string_sufficient_flags(self) -> None:
+        for raw_flag, expected in [
+            ("false", False),
+            ("False", False),
+            ("0", False),
+            ("no", False),
+            ("", False),
+            ("true", True),
+            ("1", True),
+            ("yes", True),
+            ("unrecognized", False),
+        ]:
+            mock_client = MagicMock()
+            mock_resp = MagicMock()
+            mock_resp.choices = [
+                MagicMock(
+                    message=MagicMock(
+                        content=(
+                            f'{{"sufficient": "{raw_flag}", '
+                            '"missing_items": ["audience"], '
+                            '"reply_message": "Tell me about your **audience**."}'
+                        )
+                    )
+                )
+            ]
+            mock_resp.usage = MagicMock(total_tokens=80)
+            mock_client.chat.completions.create.return_value = mock_resp
+
+            decision = evaluate_and_build_followup(
+                topic="Transit",
+                is_free_topic=True,
+                latest_user_answer="Short note",
+                client=mock_client,
+                limiter=TokenBucketLimiter(),
+            )
+            assert decision.sufficient is expected, f"Failed for {raw_flag!r}"
+
+    def test_pipeline_preserves_passed_empty_chat_session_store(self) -> None:
+        from src.text_processing.chat_session import chat_session_store
+
+        isolated_store = ChatSessionStore()
+        assert len(isolated_store) == 0
+        pipeline = ScriptGenerationPipeline(
+            template_store=TemplateStore(Path("nonexistent")),
+            session_store=isolated_store,
+        )
+        assert pipeline.session_store is isolated_store
+        assert pipeline.session_store is not chat_session_store
 
 
 class TestStepAndEtaTelemetry:

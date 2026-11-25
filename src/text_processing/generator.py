@@ -6,8 +6,12 @@ import unicodedata
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from src.app.config import script_title_max_chars, settings
-from src.app.constants import CONSTANTS
+from src.app.config import (
+    citation_min_support_score,
+    retrieval_min_score,
+    script_title_max_chars,
+    settings,
+)
 
 from .contracts import (
     TARGET_WORD_COUNT_RANGES,
@@ -22,8 +26,8 @@ from .moderation import wrap_untrusted_document_context
 from .retrieval import SemanticRetriever, verify_paragraph_citation
 from .template_engine import TokenBucketLimiter
 
-_RETRIEVAL_MIN_SCORE = float(CONSTANTS["script"].get("retrieval_min_score", 0.25))
-_CITATION_MIN_SUPPORT_SCORE = float(CONSTANTS["script"].get("citation_min_support_score", 0.52))
+_RETRIEVAL_MIN_SCORE = float(retrieval_min_score)
+_CITATION_MIN_SUPPORT_SCORE = float(citation_min_support_score)
 
 SECTION_PLANS: dict[int, list[tuple[str, int]]] = {
     5: [("Opening & Core Argument", 350), ("Practical Evidence & Conclusion", 350)],
@@ -163,11 +167,14 @@ class ScriptGenerator:
 
         result: list[dict[str, Any]] = []
         for i in raw_citations:
-            if not isinstance(i, dict) or not i.get("heading"):
+            if not isinstance(i, dict):
                 continue
-            heading = str(i["heading"]).strip()
+            raw_heading = i.get("heading")
+            heading = str(raw_heading).strip() if raw_heading is not None else ""
+            if not heading:
+                continue
             page = i.get("page")
-            if page in valid_pages:
+            if not isinstance(page, bool) and page in valid_pages:
                 result.append({"heading": heading, "page": page})
             else:
                 # Page hallucinated — try to remap via heading lookup

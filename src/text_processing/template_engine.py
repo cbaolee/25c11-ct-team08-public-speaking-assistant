@@ -16,8 +16,13 @@ import re
 import time
 from typing import Any
 
-from src.app.config import settings
-from src.app.constants import CONSTANTS
+from src.app.config import (
+    citation_min_support_score,
+    retrieval_min_score,
+    settings,
+    slot_fill_max_words,
+    slot_fill_min_words,
+)
 
 from .contracts import (
     TARGET_WORD_COUNT_RANGES,
@@ -41,10 +46,10 @@ _DEFAULT_MODEL_CHAIN: tuple[str, ...] = (
     "qwen/qwen3.8-27b",
     "openai/gpt-oss-20b",
 )
-_SLOT_FILL_MIN_WORDS = CONSTANTS["script"]["slot_fill_min_words"]
-_SLOT_FILL_MAX_WORDS = CONSTANTS["script"]["slot_fill_max_words"]
-_RETRIEVAL_MIN_SCORE = float(CONSTANTS["script"].get("retrieval_min_score", 0.25))
-_CITATION_MIN_SUPPORT_SCORE = float(CONSTANTS["script"].get("citation_min_support_score", 0.52))
+_SLOT_FILL_MIN_WORDS = slot_fill_min_words
+_SLOT_FILL_MAX_WORDS = slot_fill_max_words
+_RETRIEVAL_MIN_SCORE = float(retrieval_min_score)
+_CITATION_MIN_SUPPORT_SCORE = float(citation_min_support_score)
 
 
 def parse_slots(

@@ -11,7 +11,14 @@ from collections import OrderedDict
 from copy import deepcopy
 from pathlib import Path
 
-from src.app.constants import CONSTANTS
+from src.app.config import (
+    citable_note_min_words,
+    citation_min_support_score,
+    free_topic_thesis_min_words,
+    moderation_max_chunks,
+    pipeline_cache_max_size,
+    script_jobs_max_capacity,
+)
 
 from .chat_session import ChatSessionStore, append_to_context_window, chat_session_store
 from .contracts import (
@@ -39,14 +46,19 @@ from .template_engine import (
 from .template_store import TemplateStore
 
 logger = logging.getLogger(__name__)
-_CITATION_MIN_SUPPORT_SCORE = float(CONSTANTS["script"].get("citation_min_support_score", 0.52))
+_CITATION_MIN_SUPPORT_SCORE = float(citation_min_support_score)
+_CITABLE_NOTE_MIN_WORDS = int(citable_note_min_words)
+_FREE_TOPIC_THESIS_MIN_WORDS = int(free_topic_thesis_min_words)
+DEFAULT_PIPELINE_CACHE_MAX_SIZE = int(pipeline_cache_max_size)
+DEFAULT_SCRIPT_JOBS_CAPACITY = int(script_jobs_max_capacity)
+_MODERATION_MAX_CHUNKS = int(moderation_max_chunks)
 _AUTO_REGEN_FEEDBACK_PREFIX = "write a fresh variation of this speech"
 
 
 def _build_chat_note_chunks(
     notes: list[str],
     start_chunk_id: int = 1,
-    min_words: int = 8,
+    min_words: int = _CITABLE_NOTE_MIN_WORDS,
 ) -> list[DocumentChunk]:
     """Turn substantive user chat notes into in-memory citable chunks (`page=0`)."""
     note_chunks: list[DocumentChunk] = []
@@ -83,7 +95,7 @@ class ScriptGenerationPipeline:
         template_engine: TemplateEngine | None = None,
         llm_generator: ScriptGenerator | None = None,
         session_store: ChatSessionStore | None = None,
-        max_cache_size: int = 64,
+        max_cache_size: int = DEFAULT_PIPELINE_CACHE_MAX_SIZE,
     ) -> None:
         if template_store is None:
             store = TemplateStore()
@@ -91,12 +103,18 @@ class ScriptGenerationPipeline:
             self.template_store = store
         else:
             self.template_store = template_store
-        self.moderator = moderator or ContentModerator()
-        self.template_engine = template_engine or TemplateEngine()
-        self.llm_generator = llm_generator or ScriptGenerator()
-        self.session_store = session_store or chat_session_store
+        self.moderator = moderator if moderator is not None else ContentModerator()
+        self.template_engine = (
+            template_engine if template_engine is not None else TemplateEngine()
+        )
+        self.llm_generator = (
+            llm_generator if llm_generator is not None else ScriptGenerator()
+        )
+        self.session_store = (
+            session_store if session_store is not None else chat_session_store
+        )
         self.max_cache_size = max_cache_size
-        self.max_jobs_capacity = 128
+        self.max_jobs_capacity = DEFAULT_SCRIPT_JOBS_CAPACITY
         self._jobs: OrderedDict[str, ScriptJobState] = OrderedDict()
         self._cache: OrderedDict[str, GeneratedScript] = OrderedDict()
 
@@ -223,13 +241,13 @@ class ScriptGenerationPipeline:
                     cleaned_prompt = sanitize_text(sess.initial_prompt).strip()
                     if cleaned_prompt:
                         chat_parts.append(cleaned_prompt)
-                        if len(cleaned_prompt.split()) >= 15:
+                        if len(cleaned_prompt.split()) >= _FREE_TOPIC_THESIS_MIN_WORDS:
                             citable_notes.append(cleaned_prompt)
                 if getattr(sess, "compacted_summary", "") and sess.compacted_summary.strip():
                     cleaned_summary = sanitize_text(sess.compacted_summary).strip()
                     if cleaned_summary:
                         chat_parts.append(f"[Session Summary]\n{cleaned_summary}")
-                        if len(cleaned_summary.split()) >= 8:
+                        if len(cleaned_summary.split()) >= _CITABLE_NOTE_MIN_WORDS:
                             citable_notes.append(cleaned_summary)
                 if getattr(sess, "context_window", None):
                     for entry in sess.context_window:
@@ -303,7 +321,7 @@ class ScriptGenerationPipeline:
             parts.append(sanitize_text(request.user_feedback))
         if effective_chat_context:
             parts.append(effective_chat_context)
-        parts.extend(c.content for c in chunks[:20])
+        parts.extend(c.content for c in chunks[:_MODERATION_MAX_CHUNKS])
         self.moderator.assert_safe("\n".join(parts), user_id=request.user_id)
 
         # Persist safe Regenerate prompt into bounded context window so context accumulates safely

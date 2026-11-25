@@ -9,7 +9,15 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from src.app.constants import CONSTANTS
+from src.app.config import (
+    composer_max_words,
+    max_pdf_pages,
+    max_pdf_size_bytes,
+    max_text_file_bytes,
+    max_text_file_words,
+    max_turn_text_chars,
+    min_pdf_size_bytes,
+)
 
 try:
     with warnings.catch_warnings():
@@ -31,13 +39,13 @@ except ImportError:
     maybe_recover_page_text = None
 
 PDF_MAGIC_BYTES = b"%PDF-"
-MIN_PDF_SIZE_BYTES = CONSTANTS["script"]["min_pdf_size_bytes"]
-MAX_PDF_SIZE_BYTES = CONSTANTS["script"]["max_pdf_size_bytes"]
-MAX_POC_PAGES = CONSTANTS["script"]["max_pdf_pages"]
-MAX_TEXT_FILE_BYTES = CONSTANTS["script"]["max_text_file_bytes"]
-MAX_TEXT_FILE_WORDS = CONSTANTS["script"]["max_text_file_words"]
-MAX_TURN_TEXT_CHARS = CONSTANTS["script"]["max_turn_text_chars"]
-MAX_TURN_TEXT_WORDS = CONSTANTS["web"]["composer_max_words"]
+MIN_PDF_SIZE_BYTES = min_pdf_size_bytes
+MAX_PDF_SIZE_BYTES = max_pdf_size_bytes
+MAX_POC_PAGES = max_pdf_pages
+MAX_TEXT_FILE_BYTES = max_text_file_bytes
+MAX_TEXT_FILE_WORDS = max_text_file_words
+MAX_TURN_TEXT_CHARS = max_turn_text_chars
+MAX_TURN_TEXT_WORDS = composer_max_words
 ALLOWED_DOC_EXTENSIONS = frozenset({".pdf", ".md", ".txt"})
 FILE_SIZE_LIMITS_BYTES: dict[str, int] = {
     ".pdf": MAX_PDF_SIZE_BYTES,

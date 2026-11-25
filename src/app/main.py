@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from src.app.config import (
+    chat_turn_jobs_max_capacity,
     composer_max_words,
     eta_buffer_s,
     max_audio_seconds,
@@ -43,8 +44,11 @@ from src.app.config import (
     max_turn_text_chars,
     max_upload_bytes,
     missing_required_settings,
+    moderation_max_chunks,
     script_title_max_chars,
     settings,
+    suggest_query_max_chunks,
+    upload_read_chunk_bytes,
     validate_list_limits,
 )
 from src.app.constants import CONSTANTS
@@ -873,7 +877,7 @@ def _validate_turn_text(text: str) -> None:
 
 
 async def _read_document_upload_limited(
-    upload: UploadFile, *, chunk_size: int = 65_536
+    upload: UploadFile, *, chunk_size: int = upload_read_chunk_bytes
 ) -> bytes:
     """Stream-read an uploaded .pdf/.md/.txt file up to its per-type byte ceiling."""
     filename = upload.filename or ""
@@ -919,7 +923,7 @@ async def _read_document_upload_limited(
 
 _chat_turn_jobs: dict[str, dict[str, Any]] = {}
 _chat_turn_jobs_lock = threading.Lock()
-_CHAT_TURN_JOBS_CAP = 128
+_CHAT_TURN_JOBS_CAP = chat_turn_jobs_max_capacity
 
 
 def _create_chat_turn_job(user_id: str, tracker: TurnStepTracker) -> str:
@@ -1014,7 +1018,7 @@ async def script_chat_suggest_endpoint(
     if clean_prompt:
         pipeline.moderator.assert_safe(clean_prompt, user_id=user_id)
     if file_chunks:
-        file_text = "\n".join(c.content for c in file_chunks[:20])
+        file_text = "\n".join(c.content for c in file_chunks[:moderation_max_chunks])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
@@ -1049,7 +1053,7 @@ async def script_chat_suggest_endpoint(
 
     query = clean_prompt
     if not query and session.chunks:
-        query = " ".join(c.content for c in session.chunks[:3])
+        query = " ".join(c.content for c in session.chunks[:suggest_query_max_chunks])
 
     suggestion_res = pipeline.template_store.suggest_topics(
         category_slug=session.category,
@@ -1087,12 +1091,7 @@ async def script_chat_select_topic_endpoint(
         )
 
     tracker.start("analyzing_slots")
-    session.selected_template_id = payload.template_id
-    session.gather_turns = 0
-    session.assistant_turn = 1
-    session.ready_to_generate = False
-    retriever = getattr(pipeline.template_engine, "retriever", None)
-
+    template_doc = None
     is_free_topic = not bool(payload.template_id)
     if payload.template_id:
         template_doc = pipeline.template_store.get(payload.template_id)
@@ -1102,6 +1101,15 @@ async def script_chat_select_topic_endpoint(
                 message=f"Template '{payload.template_id}' not found.",
                 status_code=404,
             )
+
+    was_template = session.selected_template_id is not None
+    session.selected_template_id = payload.template_id
+    session.gather_turns = 0
+    session.assistant_turn = 1
+    session.ready_to_generate = False
+    retriever = getattr(pipeline.template_engine, "retriever", None)
+
+    if template_doc is not None:
         session.topic = template_doc.metadata.topic
         cov_ratio, missing_entities, missing_groups = analyze_slot_coverage(
             template_document=template_doc,
@@ -1116,7 +1124,7 @@ async def script_chat_select_topic_endpoint(
         session.missing_groups = missing_groups
     else:
         session.selected_template_id = None
-        if not session.topic:
+        if was_template or not session.topic:
             session.topic = session.initial_prompt or session.category or "Custom Speech"
         session.missing_entities = []
         session.missing_groups = []
@@ -1179,7 +1187,7 @@ def _execute_chat_message(
     if clean_msg:
         pipeline.moderator.assert_safe(clean_msg, user_id=user_id)
     if file_chunks:
-        file_text = "\n".join(c.content for c in file_chunks[:20])
+        file_text = "\n".join(c.content for c in file_chunks[:moderation_max_chunks])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
