@@ -593,6 +593,7 @@ class TemplateEngine:
                                             int(x)
                                             for x in source_ids
                                             if isinstance(x, (int, float))
+                                            or (isinstance(x, str) and x.strip().isdigit())
                                         ],
                                         retrieved_chunks=slot_candidates,
                                         paragraph_text=text,

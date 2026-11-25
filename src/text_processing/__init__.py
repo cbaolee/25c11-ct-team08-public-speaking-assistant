@@ -39,8 +39,19 @@ from .generator import ScriptGenerator, ScriptResult
 from .moderation import ContentModerator, wrap_untrusted_document_context
 from .parser import DocumentChunk, DocumentParserError, parse_input_to_chunks, validate_pdf_file
 from .pipeline import ScriptGenerationPipeline
-from .retrieval import SemanticRetriever, verify_paragraph_citation
+from .retrieval import (
+    NLIVerifier,
+    SemanticRetriever,
+    align_script_citations,
+    verify_paragraph_citation,
+)
 from .sanitizer import sanitize_chunks, sanitize_text
+from .source_classifier import (
+    SourceCategory,
+    SourceClassification,
+    classify_user_message,
+    extract_citable_source_text,
+)
 from .template_engine import (
     TemplateEngine,
     TokenBucketLimiter,
@@ -68,6 +79,7 @@ __all__ = [
     "GROUP_MAIN",
     "GeneratedScript",
     "ModerationDecision",
+    "NLIVerifier",
     "ParagraphCitation",
     "READY_MESSAGE",
     "ScriptGenerationError",
@@ -77,6 +89,8 @@ __all__ = [
     "ScriptJobState",
     "ScriptResult",
     "SemanticRetriever",
+    "SourceCategory",
+    "SourceClassification",
     "TemplateDocument",
     "TemplateEngine",
     "TemplateSlot",
@@ -84,12 +98,15 @@ __all__ = [
     "TokenBucketLimiter",
     "TopicMetadata",
     "VALID_DURATIONS",
+    "align_script_citations",
     "analyze_slot_coverage",
     "assemble_template",
     "build_followup_reply",
     "chat_session_store",
     "check_ready_to_generate",
     "classify_argument_slot",
+    "classify_user_message",
+    "extract_citable_source_text",
     "format_checklist_fallback",
     "group_uncovered_slots",
     "ingest_upload_file",

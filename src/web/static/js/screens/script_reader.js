@@ -18,11 +18,21 @@ let draft = null;   // { title, text } while editing; null when not editing
 function paintBody(sc) {
   const body = $('#mrBody'), paras = sc.text.split(/\n\n+/).filter(Boolean), cites = sc.citations || [], warns = sc.warnings || [];
   let h = '';
+  const fmtSource = s => {
+    const cleanHeading = s && s.heading && !/^Page \d+ Overview$/i.test(s.heading) ? s.heading : '';
+    return (cleanHeading ? cleanHeading + (s.page ? ' · ' : '') : '') + (s.page ? T('script.page', { n: s.page }) : (cleanHeading ? '' : 'cited'));
+  };
   paras.forEach((p, i) => {
     const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
-    const cleanHeading = c && c.heading && !/^Page \d+ Overview$/i.test(c.heading) ? c.heading : '';
-    const citeLabel = c ? ((cleanHeading ? cleanHeading + (c.page ? ' · ' : '') : '') + (c.page ? T('script.page', { n: c.page }) : (cleanHeading ? '' : 'cited'))) : '';
-    const badge = c ? (c.status === 'cited' ? '<span class="cite">' + esc(citeLabel) + '</span>' : '<span class="cite un">' + esc(T('script.uncited')) + '</span>') : '';
+    let badge = '';
+    if (c) {
+      if (c.status === 'cited') {
+        const srcList = Array.isArray(c.sources) && c.sources.length ? c.sources : [c];
+        badge = srcList.map(s => '<span class="cite">' + esc(fmtSource(s)) + '</span>').join(' ');
+      } else {
+        badge = '<span class="cite un">' + esc(T('script.uncited')) + '</span>';
+      }
+    }
     h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
   });
   if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';

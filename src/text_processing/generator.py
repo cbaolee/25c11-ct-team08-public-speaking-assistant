@@ -19,7 +19,7 @@ from .contracts import (
 )
 from .groq_pool import make_groq_client
 from .moderation import wrap_untrusted_document_context
-from .retrieval import SemanticRetriever, verify_paragraph_citation
+from .retrieval import SemanticRetriever, align_script_citations, verify_paragraph_citation
 from .template_engine import TokenBucketLimiter
 
 _RETRIEVAL_MIN_SCORE = float(CONSTANTS["script"].get("retrieval_min_score", 0.25))
@@ -408,6 +408,14 @@ class ScriptGenerator:
                     )
 
         full_script = "\n\n".join(all_paragraphs)
+        if source_chunks and full_script.strip():
+            citations = align_script_citations(
+                full_script,
+                source_chunks,
+                citations,
+                retriever=self.retriever,
+                min_support_score=_CITATION_MIN_SUPPORT_SCORE,
+            )
         word_count = len(full_script.split())
         flags: list[str] = []
         warnings: list[str] = []

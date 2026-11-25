@@ -24,9 +24,15 @@ from .contracts import (
 )
 from .generator import ScriptGenerator
 from .moderation import ContentModerator
-from .parser import DocumentParserError, parse_input_to_chunks, validate_pdf_file
-from .retrieval import align_script_citations
+from .parser import (
+    DocumentParserError,
+    _split_long_chunk_text,
+    parse_input_to_chunks,
+    validate_pdf_file,
+)
+from .retrieval import SemanticRetriever, align_script_citations
 from .sanitizer import sanitize_chunks, sanitize_text
+from .source_classifier import extract_citable_source_text
 from .template_engine import (
     TemplateEngine,
     polish_script_paragraphs,
@@ -42,30 +48,41 @@ _AUTO_REGEN_FEEDBACK_PREFIX = "write a fresh variation of this speech"
 def _build_chat_note_chunks(
     notes: list[str],
     start_chunk_id: int = 1,
-    min_words: int = 8,
+    min_words: int = 4,
+    *,
+    retriever: SemanticRetriever | None = None,
 ) -> list[DocumentChunk]:
-    """Turn substantive user chat notes into in-memory citable chunks (`page=0`)."""
+    """Turn citable ``source_material`` user notes into in-memory chunks (``page=0``).
+
+    Casual chat ("I'm happy", "thanks") and editing instructions ("make it shorter")
+    are filtered out by ``extract_citable_source_text`` so they can never be cited,
+    while mixed messages have non-source sentences stripped before chunking.
+    """
     note_chunks: list[DocumentChunk] = []
     note_num = 0
     for raw_note in notes:
         cleaned = sanitize_text(raw_note).strip()
-        if len(cleaned.split()) < min_words:
+        if not cleaned:
+            continue
+        source_only = extract_citable_source_text(cleaned, retriever=retriever)
+        if not source_only or len(source_only.split()) < min_words:
             continue
         note_num += 1
-        lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
+        lines = [ln.strip() for ln in source_only.splitlines() if ln.strip()]
         label = f"Chat note #{note_num}"
         if len(lines) > 1:
             first_line = re.sub(r"^[#*\-\s]+|[:.\s]+$", "", lines[0]).strip()
             if 1 <= len(first_line.split()) <= 5 and len(first_line) <= 36:
                 label = f"Chat note #{note_num} · {first_line}"
-        note_chunks.append(
-            DocumentChunk(
-                chunk_id=start_chunk_id + len(note_chunks),
-                heading=label,
-                page=0,
-                content=cleaned,
+        for part in _split_long_chunk_text(source_only):
+            note_chunks.append(
+                DocumentChunk(
+                    chunk_id=start_chunk_id + len(note_chunks),
+                    heading=label,
+                    page=0,
+                    content=part,
+                )
             )
-        )
     return note_chunks
 
 
@@ -174,8 +191,7 @@ class ScriptGenerationPipeline:
                     cleaned_prompt = sanitize_text(sess.initial_prompt).strip()
                     if cleaned_prompt:
                         chat_parts.append(cleaned_prompt)
-                        if len(cleaned_prompt.split()) >= 15:
-                            citable_notes.append(cleaned_prompt)
+                        citable_notes.append(cleaned_prompt)
                 if sess.user_notes:
                     for note in sess.user_notes:
                         cleaned_note = sanitize_text(note).strip()
@@ -227,9 +243,13 @@ class ScriptGenerationPipeline:
                 ) from exc
 
         if citable_notes:
+            active_retriever = getattr(self.template_engine, "retriever", None) or getattr(
+                self.llm_generator, "retriever", None
+            )
             note_chunks = _build_chat_note_chunks(
                 citable_notes,
                 start_chunk_id=len(chunks) + 1,
+                retriever=active_retriever,
             )
             chunks.extend(note_chunks)
 

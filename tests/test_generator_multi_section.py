@@ -40,7 +40,8 @@ def test_generate_free_topic_script_all_durations(
     duration_min: int, expected_sections: int
 ) -> None:
     target_per_sec = SECTION_PLANS[duration_min][0][1]
-    filler = " ".join(["speech"] * target_per_sec)
+    lead = "AI in Healthcare provides speech evidence."
+    filler = lead + " " + " ".join(["speech"] * (target_per_sec - len(lead.split())))
 
     def _handler(**_: Any) -> Any:
         return _make_response({"paragraphs": [{"text": filler, "source_chunk_ids": [0]}]})
