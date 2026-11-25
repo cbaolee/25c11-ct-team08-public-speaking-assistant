@@ -109,3 +109,25 @@ test('completion records require finite ordered timestamps', async () => {
     assert.equal(s.isValidState({ ...base, done: { a: record } }), false);
   }
 });
+
+
+test('editing and deleting occurrences preserve history and inputs', async () => {
+  const s = await store, m = await model;
+  const event = { id: 'a', date: '2026-11-23', time: '15:00', duration_min: 10, note: '', recurrence: { kind: 'daily', days: [], until: '2026-11-30' }, created_at: 1, sample: true };
+  const state = { version: 1, events: [event], done: { 'a@2026-11-24': { checkin_at: 2, done_at: 3 } } }, snapshot = structuredClone(state);
+  const range = { from: m.parseDay('2026-11-23'), to: m.parseDay('2026-11-26') };
+  const split = s.editOccurrence(state, 'a', '2026-11-26', { time: '16:00', note: 'new' }, { now, newId: 'b' });
+  assert.deepEqual(m.expandOccurrences(split.events, range, split.done), m.expandOccurrences(state.events, range, state.done));
+  assert.equal(split.events[0].recurrence.until, '2026-11-25');
+  assert.equal(split.events[1].date, '2026-11-26'); assert.equal(split.events[1].time, '16:00');
+  assert.deepEqual(split.done, state.done);
+  assert.deepEqual(s.editOccurrence(state, 'a', '2026-11-23', {}, { now, newId: 'b' }).events.map(e => e.id), ['b']);
+  const single = { ...state, events: [{ ...event, recurrence: { kind: 'none', days: [], until: null } }] };
+  const updated = s.editOccurrence(single, 'a', '2026-11-23', { date: '2026-11-27', time: '17:00' }, { now, newId: 'b' });
+  assert.equal(updated.events[0].id, 'a'); assert.equal(updated.events[0].date, '2026-11-27'); assert.equal(updated.events[0].created_at, now);
+  assert.equal(s.deleteFromOccurrence(single, 'a', '2026-11-23').events.length, 0);
+  assert.deepEqual(s.deleteFromOccurrence(single, 'a', '2026-11-23').done, {});
+  assert.equal(s.deleteFromOccurrence(state, 'a', '2026-11-26').events[0].recurrence.until, '2026-11-25');
+  assert.deepEqual(s.deleteFromOccurrence(state, 'a', '2026-11-23').done, {});
+  assert.deepEqual(state, snapshot);
+});

@@ -1,3 +1,4 @@
+export const EDIT_MIN_LEAD_MIN = 20;
 export const CHECKIN_WINDOW_H = 6;
 export const REMINDER_LEAD_MIN = 30;
 export const NOTE_MAX_CHARS = 200;
@@ -57,6 +58,13 @@ export function expandOccurrences(events, range, done = {}) {
   }
   return result.sort(byStart);
 }
+// Preview matching local calendar days, including the final day.
+export function previewOccurrenceDays(input, fromDay, toDay) {
+  if (toDay < fromDay || toDay < input.date) return [];
+  const event = { ...input, id: 'preview', recurrence: { ...input.recurrence, until: null } };
+  return expandOccurrences([event], { from: parseDay(fromDay), to: addDays(parseDay(toDay), 1) }).map(o => o.day);
+}
+export function canEdit(occ, now) { return occ.start - now >= EDIT_MIN_LEAD_MIN * 60000; }
 // Find the exclusive end of the check-in window.
 export function windowClosesAt(occ) {
   // A session belongs to its own day, so its window never crosses midnight.
