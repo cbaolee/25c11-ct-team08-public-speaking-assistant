@@ -41,7 +41,7 @@ new MutationObserver(() => {
 document.addEventListener('psc:evaluation-complete', event => {
   if (!context) return;
   if (shouldCompleteCheckIn(context, event.detail)) {
-    callbacks.saveScheduleState(markDone(callbacks.getSchedule(), context.occKey, { checkin_at: context.checkin_at, done_at: Date.now() }));
+    callbacks.saveScheduleState(markDone(callbacks.getSchedule(), context.occKey, { checkin_at: context.checkin_at, done_at: Date.now(), session_id: event.detail.session_id }));
     clearCheckIn(); callbacks.rerender();
     setTimeout(() => toast(T('schedule.checkInComplete')), 4000);
   } else if (S.screen !== 'practice') clearCheckIn();

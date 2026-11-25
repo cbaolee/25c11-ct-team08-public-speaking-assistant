@@ -5,7 +5,7 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
-import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary } from '../schedule/schedule_view.js';
+import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
@@ -152,6 +152,13 @@ function openDay(key) {
     }
     const actions = node('div', null, 'sch-actions');
     actions.append(button(T('schedule.email'), () => openEmail(occ, event)));
+    if (occurrenceStatus(occ, Date.now()) === 'done') {
+      const id = resultLink(getSchedule().done[occ.key], S.sessions);
+      if (id) {
+        const result = button(T('schedule.viewResult'), () => closeModal('schDayDrawer'));
+        result.dataset.open = id; actions.append(result);
+      } else row.append(node('p', T('schedule.resultUnavailable'), 'note'));
+    }
     if (canEdit(occ, Date.now())) actions.append(button(T('schedule.edit'), () => openEvent(key, occ, event)));
     const slot = node('div'); slot.dataset.schCheckin = ''; if (canCheckIn(occ, Date.now()) && occurrenceStatus(occ, Date.now()) === 'active') slot.append(button(T('schedule.todayPanel.checkIn'), () => { closeModal('schDayDrawer'); startCheckIn(occ); }, 'btn btn-primary')); actions.append(slot); row.append(actions); list.append(row);
   });

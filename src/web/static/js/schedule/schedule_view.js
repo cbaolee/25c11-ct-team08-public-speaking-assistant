@@ -36,3 +36,5 @@ export function defaultTime(nowMs, dateKey) {
 }
 
 export function sessionsSummary(days) { return { n: days.length, last: days.length ? days[days.length - 1] : null }; }
+
+export function resultLink(record, sessions) { return typeof record?.session_id === 'string' && record.session_id && sessions.some(session => session.id === record.session_id) ? record.session_id : null; }
