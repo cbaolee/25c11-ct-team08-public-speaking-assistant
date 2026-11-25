@@ -199,6 +199,27 @@ class TestClassifyUserMessage:
         assert "50%" in extracted_2
         assert "1950" in extracted_2
 
+        # Comma-less short mixed sentence keeps the factual clause and strips imperative prefix
+        mixed_no_comma = "Make it shorter and mention that Saola was found in 1992."
+        extracted_3 = extract_citable_source_text(mixed_no_comma)
+        assert extracted_3 is not None
+        assert "Make it shorter" not in extracted_3
+        assert "Saola was found in 1992" in extracted_3
+
+    def test_multiline_casual_and_numeric_edit_instructions_rejected(self) -> None:
+        multiline_casual = "My thoughts\nI like dogs\nVery cute"
+        assert extract_citable_source_text(multiline_casual) is None
+
+        numeric_edit = classify_user_message("Make it 5 minutes long")
+        assert numeric_edit.citable is False
+        assert numeric_edit.category == "editing_instruction"
+
+    def test_duplicate_chat_notes_are_deduplicated(self) -> None:
+        note = "According to the 2023 WHO report, depression affects 5% of adults worldwide."
+        chunks = _build_chat_note_chunks([note, "  " + note + "  ", "thanks!"])
+        assert len(chunks) == 1
+        assert chunks[0].heading == "Chat note #1"
+
 
 class TestPipelineChatCitationFiltering:
     """End-to-end check that pipeline passes instructions to LLM but only cites source facts."""

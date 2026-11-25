@@ -583,3 +583,45 @@ class TestNLICitationAndMultiHop:
         assert _is_verbatim_inline_fact("2019", chunk_str) is True
         assert _is_verbatim_inline_fact("severe regions", chunk_str) is False
         assert _is_verbatim_inline_fact(" ".join(["tropical"] * 30), chunk_str) is False
+
+    def test_binary_nli_clause_split_blocks_half_fabricated_numeric_clause(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Cinema Acoustics",
+                page=2,
+                content=(
+                    "Dolby Atmos debuted in 2012 with Pixar's Brave and supports "
+                    "up to 128 discrete audio objects."
+                ),
+            )
+        ]
+
+        def _scorer(_premise: str, hypothesis: str) -> float:
+            # Whole sentence fails because of fabricated 10,000; first clause alone entails
+            if "10,000" in hypothesis:
+                return 0.01
+            if "debuted in 2012" in hypothesis:
+                return 0.94
+            return 0.02
+
+        fake_nli = NLIVerifier("mock-half-contra")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1],
+            retrieved_chunks=chunks,
+            paragraph_text=(
+                "Dolby Atmos debuted in 2012 with Pixar's Brave "
+                "and supports 10,000 discrete audio objects."
+            ),
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "uncited"

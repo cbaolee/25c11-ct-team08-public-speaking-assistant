@@ -59,6 +59,7 @@ def _build_chat_note_chunks(
     while mixed messages have non-source sentences stripped before chunking.
     """
     note_chunks: list[DocumentChunk] = []
+    seen_notes: set[str] = set()
     note_num = 0
     for raw_note in notes:
         cleaned = sanitize_text(raw_note).strip()
@@ -67,6 +68,10 @@ def _build_chat_note_chunks(
         source_only = extract_citable_source_text(cleaned, retriever=retriever)
         if not source_only or len(source_only.split()) < min_words:
             continue
+        dedup_key = re.sub(r"\s+", " ", source_only).strip().lower()
+        if dedup_key in seen_notes:
+            continue
+        seen_notes.add(dedup_key)
         note_num += 1
         lines = [ln.strip() for ln in source_only.splitlines() if ln.strip()]
         label = f"Chat note #{note_num}"

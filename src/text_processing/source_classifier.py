@@ -150,7 +150,7 @@ _EDITING_IMPERATIVE_PATTERN = re.compile(
 # e.g. "Also mention that the Saola was discovered in 1992..."
 _FACT_INTRO_WRAPPER = re.compile(
     r"^(?:(?:also|and|please|can\s+you|could\s+you)\s+)*"
-    r"(?:mention|include|note|state|cite|add|highlight|point\s+out)\s+"
+    r"(?:mention|include|note|state|cite|say|add|highlight|point\s+out)\s+"
     r"(?:that|the\s+fact\s+that)\s+",
     re.IGNORECASE,
 )
@@ -419,7 +419,11 @@ def classify_user_message(
 
     # Layer 1B: Strip "Also mention that ..." wrapper when checking if core is factual
     unwrapped = _FACT_INTRO_WRAPPER.sub("", cleaned).strip()
-    was_fact_wrapper = unwrapped != cleaned and len(_word_tokens(unwrapped)) >= min_words
+    unwrapped_words = _word_tokens(unwrapped)
+    unwrapped_facts = _count_factual_signals(unwrapped)
+    was_fact_wrapper = unwrapped != cleaned and (
+        len(unwrapped_words) >= min_words or unwrapped_facts >= 1
+    )
 
     if not was_fact_wrapper and _EDITING_IMPERATIVE_PATTERN.match(cleaned):
         if factual_signals == 0 or word_count <= 12:
@@ -518,8 +522,11 @@ def classify_user_message(
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'])")
 _MIXED_CONJUNCTION_SPLIT_RE = re.compile(
-    r",\s+(?=(?:and\s+)?(?:also\s+)?(?:mention|include|note|state|cite|add|highlight)\s+(?:that|the\s+fact\s+that)\b)",
+    r"(?:,\s+|\s+)(?=(?:and\s+)?(?:also\s+)?(?:mention|include|note|state|cite|say|add|highlight)\s+(?:that|the\s+fact\s+that)\b)",
     re.IGNORECASE,
+)
+_CONVERSATIONAL_PRONOUNS = frozenset(
+    {"i", "i'm", "im", "ive", "i've", "my", "me", "we", "you", "your", "please", "thanks"}
 )
 
 
@@ -529,6 +536,11 @@ def _is_short_heading_line(line: str) -> bool:
     if not stripped or stripped.endswith((".", "!", "?")):
         return False
     words = _word_tokens(stripped)
+    if any(w.lower() in _CONVERSATIONAL_PRONOUNS for w in words):
+        return False
+    is_explicit_header = line.lstrip().startswith("#") or stripped.endswith(":")
+    if not is_explicit_header and len(words) > 3:
+        return False
     return (
         1 <= len(words) <= 6
         and len(stripped) <= 48
@@ -573,13 +585,14 @@ def extract_citable_source_text(
 
     kept_lines: list[str] = []
     pending_heading: str | None = None
+    had_citable_sentence = False
 
     for line in lines:
         if _is_short_heading_line(line) and len(lines) > 1:
             pending_heading = line
             continue
 
-        # Split multi-sentence lines (and mixed "Make it shorter, and mention that ..." clauses)
+        # Split multi-sentence lines (and mixed "Make it shorter and mention that ..." clauses)
         raw_sentences: list[str] = []
         for s in _SENTENCE_SPLIT_RE.split(line):
             s = s.strip()
@@ -592,25 +605,28 @@ def extract_citable_source_text(
         for sent in raw_sentences:
             decision = classify_user_message(sent, retriever=retriever)
             if decision.citable:
+                had_citable_sentence = True
                 # Clean leading "Also mention that " so the chunk stores clean factual prose
                 cleaned_sent = _FACT_INTRO_WRAPPER.sub("", sent).strip()
                 if cleaned_sent and cleaned_sent[0].islower():
                     cleaned_sent = cleaned_sent[0].upper() + cleaned_sent[1:]
                 kept_in_line.append(cleaned_sent or sent)
 
+        line_words = _word_tokens(line)
+        has_conv_pronoun = any(w.lower() in _CONVERSATIONAL_PRONOUNS for w in line_words)
         if kept_in_line:
             if pending_heading is not None:
                 kept_lines.append(pending_heading)
                 pending_heading = None
             kept_lines.append(" ".join(kept_in_line))
-        elif pending_heading is not None and len(_word_tokens(line)) <= 5:
+        elif pending_heading is not None and len(line_words) <= 5 and not has_conv_pronoun:
             # Short bullet item under a heading (e.g. "Tasmania", "Papua New Guinea")
             norm_item = _normalize_for_match(line)
             if norm_item not in _CASUAL_EXACT and not _CASUAL_PATTERN.match(line):
                 kept_lines.append(pending_heading)
                 pending_heading = None
                 kept_lines.append(line)
-        elif kept_lines and len(_word_tokens(line)) <= 5:
+        elif kept_lines and len(line_words) <= 5 and not has_conv_pronoun:
             norm_item = _normalize_for_match(line)
             if (
                 norm_item not in _CASUAL_EXACT
@@ -623,7 +639,11 @@ def extract_citable_source_text(
         return None
 
     assembled = "\n".join(kept_lines).strip()
-    # Final sanity check: resulting chunk must still look like source material
+    if (
+        not had_citable_sentence
+        and not classify_user_message(assembled, retriever=retriever).citable
+    ):
+        return None
     if len(_word_tokens(assembled)) < 4 and _count_factual_signals(assembled) == 0:
         return None
     return assembled

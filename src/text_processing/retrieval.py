@@ -456,10 +456,17 @@ class NLIVerifier:
                         cls._shared_model = CrossEncoder(
                             target,
                             model_kwargs={"local_files_only": True},
-                            tokenizer_kwargs={"local_files_only": True},
+                            processor_kwargs={"local_files_only": True},
                         )
                     except TypeError:
-                        cls._shared_model = CrossEncoder(target)
+                        try:
+                            cls._shared_model = CrossEncoder(
+                                target,
+                                model_kwargs={"local_files_only": True},
+                                tokenizer_kwargs={"local_files_only": True},
+                            )
+                        except TypeError:
+                            cls._shared_model = CrossEncoder(target)
                 else:
                     cls._shared_model = CrossEncoder(target)
                 logger.info("Cross-Encoder NLI model loaded.")
@@ -575,22 +582,26 @@ def _verify_with_nli(
 
     chunk_texts = {c.chunk_id: f"{c.heading}: {c.content}" for c in candidates}
 
-    # Pre-filter out completely off-topic chunks (e.g. OOD/repetitive text with cosine < 0.18)
-    # when real embeddings are available so Cross-Encoder never sees nonsensical OOD pairs.
+    # Pre-filter out completely off-topic chunks (cosine < 0.20) when real embeddings are
+    # available, and cache sentence/chunk vectors for reuse in Round 2B multi-hop ranking.
     emb_model = retriever.get_model()
+    s_vecs: NDArray[np.float32] | None = None
+    local_c_vecs: dict[int, NDArray[np.float32]] = dict(chunk_embeddings_by_id or {})
     eligible_cids: set[int] = {c.chunk_id for c in candidates}
     if emb_model is not None and not type(emb_model).__name__.startswith("Mock"):
         try:
             s_vecs = retriever._encode(emb_model, sentences)
             eligible_cids = set()
             for ch in candidates:
-                c_vec = (chunk_embeddings_by_id or {}).get(ch.chunk_id)
+                c_vec = local_c_vecs.get(ch.chunk_id)
                 if c_vec is None:
                     c_vec = retriever._encode(emb_model, [chunk_texts[ch.chunk_id]])[0]
+                    local_c_vecs[ch.chunk_id] = c_vec
                 max_sim = float(np.max(s_vecs @ c_vec))
                 if max_sim >= 0.20:
                     eligible_cids.add(ch.chunk_id)
         except Exception:
+            s_vecs = None
             eligible_cids = {c.chunk_id for c in candidates}
 
     active_candidates = [c for c in candidates if c.chunk_id in eligible_cids]
@@ -641,48 +652,88 @@ def _verify_with_nli(
     # Round 2A: Clause splitting for compound sentences that missed Round 1
     unsupported_indices = [i for i, ok in enumerate(sent_supported) if not ok]
     if unsupported_indices:
+        clauses_by_sent: dict[int, list[str]] = {}
         clause_pairs: list[tuple[str, str]] = []
-        clause_meta: list[tuple[int, int]] = []  # (cand_idx, sent_idx)
+        clause_meta: list[tuple[int, int, int]] = []  # (cand_idx, sent_idx, clause_idx)
         for s_idx in unsupported_indices:
             clauses = _split_clauses(sentences[s_idx])
-            for clause in clauses:
+            if not clauses:
+                continue
+            clauses_by_sent[s_idx] = clauses
+            for cl_idx, clause in enumerate(clauses):
                 for c_idx, chunk in enumerate(candidates):
                     clause_pairs.append((chunk_texts[chunk.chunk_id], clause))
-                    clause_meta.append((c_idx, s_idx))
+                    clause_meta.append((c_idx, s_idx, cl_idx))
 
         if clause_pairs:
             clause_scores = nli.score_pairs(clause_pairs)
             if clause_scores is not None:
-                for (c_idx, s_idx), (p_ent, p_con) in zip(
+                supported_clauses: set[tuple[int, int]] = set()
+                score_lookup: dict[tuple[int, int, int], tuple[float, float]] = {}
+                for (c_idx, s_idx, cl_idx), (p_ent, p_con) in zip(
                     clause_meta, clause_scores, strict=True
                 ):
+                    score_lookup[(c_idx, s_idx, cl_idx)] = (p_ent, p_con)
                     cid = candidates[c_idx].chunk_id
                     if (
                         p_ent >= entailment_min
                         and p_con < contradiction_max
                         and max_contra_by_cid[cid] < contradiction_max
                     ):
+                        supported_clauses.add((s_idx, cl_idx))
+
+                for (c_idx, s_idx, cl_idx), (p_ent, p_con) in zip(
+                    clause_meta, clause_scores, strict=True
+                ):
+                    cid = candidates[c_idx].chunk_id
+                    if not (
+                        p_ent >= entailment_min
+                        and p_con < contradiction_max
+                        and max_contra_by_cid[cid] < contradiction_max
+                    ):
+                        continue
+                    # Guard for 2-class NLI: reject if an unsupported sibling clause in the same
+                    # sentence introduces ungrounded numbers on the same chunk topic.
+                    c_norm_nums = set(re.findall(r"\d+", chunk_texts[cid].replace(",", "")))
+                    c_toks = _extract_content_tokens(chunk_texts[cid])
+                    has_conflicting_sibling = False
+                    for sib_idx, sib_text in enumerate(clauses_by_sent.get(s_idx, [])):
+                        if sib_idx == cl_idx or (s_idx, sib_idx) in supported_clauses:
+                            continue
+                        sib_nums = set(re.findall(r"\d+", sib_text.replace(",", "")))
+                        sib_ent, sib_con = score_lookup.get((c_idx, s_idx, sib_idx), (0.0, 0.0))
+                        if sib_con >= contradiction_max or (
+                            bool(sib_nums - c_norm_nums)
+                            and bool(_extract_content_tokens(sib_text) & c_toks)
+                            and sib_ent < 0.15
+                        ):
+                            has_conflicting_sibling = True
+                            break
+                    if not has_conflicting_sibling:
                         accepted_scores[cid] = max(accepted_scores.get(cid, 0.0), p_ent)
                         sent_supported[s_idx] = True
 
     # Round 2B: Combined Top-2 Premise NLI for multi-hop synthesis across two chunks
     still_unsupported = [i for i, ok in enumerate(sent_supported) if not ok]
     if still_unsupported and len(candidates) >= 2:
-        emb_model = retriever.get_model()
         multihop_pairs: list[tuple[str, str]] = []
         multihop_cands: list[tuple[DocumentChunk, DocumentChunk]] = []
 
         for s_idx in still_unsupported:
             sent = sentences[s_idx]
-            # Rank candidates for this sentence by cosine similarity (or lexical fallback)
             ranked: list[tuple[float, DocumentChunk]] = []
             if emb_model is not None:
                 try:
-                    s_vec = retriever._encode(emb_model, [sent])[0]
+                    s_vec = (
+                        s_vecs[s_idx]
+                        if (s_vecs is not None and s_idx < len(s_vecs))
+                        else retriever._encode(emb_model, [sent])[0]
+                    )
                     for ch in candidates:
-                        c_vec = (chunk_embeddings_by_id or {}).get(ch.chunk_id)
+                        c_vec = local_c_vecs.get(ch.chunk_id)
                         if c_vec is None:
                             c_vec = retriever._encode(emb_model, [chunk_texts[ch.chunk_id]])[0]
+                            local_c_vecs[ch.chunk_id] = c_vec
                         sim = float(np.dot(c_vec, s_vec))
                         ranked.append((sim, ch))
                 except Exception:
