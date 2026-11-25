@@ -417,6 +417,15 @@ export const TEXT = {
   chart: { table: 'View as table', time: 'Time', value: 'Value', type: 'Type', minutes: 'Minutes' }
 };
 TEXT.schedule = {
+  chooseDate: 'Choose date',
+  chooseTime: 'Choose time',
+  pickerHour: 'Hour',
+  pickerMinute: 'Minute',
+  pickerPeriod: 'AM/PM',
+  pickerAM: 'AM',
+  pickerPM: 'PM',
+  pickerApply: 'Apply',
+  pickerNoTime: 'Choose a time',
   checkInClosed: 'This practice window has closed.',
   checkInComplete: 'Check-in complete',
   scheduledPractice: 'Scheduled practice',

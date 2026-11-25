@@ -5,13 +5,14 @@ import { openModal, closeModal, enhanceSelect, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
-import { monthGrid, formatCountdown, streakLabel } from '../schedule/schedule_view.js';
+import { monthGrid, formatCountdown, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
-let cachedUser, cachedState, month = new Date(), selectedDay, editing = null;
+let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker;
+let openPopover = null;
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
 export function getSchedule() {
@@ -28,6 +29,80 @@ const fullDate = value => fmt(value, { weekday: 'long', month: 'long', day: 'num
 const dateTime = value => fmt(value, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const node = (tag, text, cls) => { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; };
 const button = (text, fn, cls = 'btn btn-sm') => { const b = node('button', text, cls); b.type = 'button'; b.onclick = fn; return b; };
+function pickerShell(container, paint) {
+  const trigger = container.querySelector('button'), popup = container.querySelector('.sch-popover');
+  const close = (restore = true) => { popup.hidden = true; trigger.setAttribute('aria-expanded', 'false'); if (openPopover === close) openPopover = null; if (restore) trigger.focus(); };
+  trigger.onclick = () => {
+    if (!popup.hidden) { close(); return; }
+    if (openPopover) openPopover(false);
+    paint(); popup.hidden = false; trigger.setAttribute('aria-expanded', 'true'); openPopover = close;
+    popup.classList.remove('sch-flip');
+    const box = container.closest('.box').getBoundingClientRect();
+    if (popup.getBoundingClientRect().bottom > box.bottom) popup.classList.add('sch-flip');
+    popup.querySelector('[tabindex="0"], button:not(:disabled)')?.focus();
+  };
+  popup.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } });
+  document.addEventListener('pointerdown', e => { if (!popup.hidden && !container.contains(e.target)) close(false); });
+  return { trigger, popup, close };
+}
+function makeDatePicker(container, { min, value, onChange, markDays = () => [] }) {
+  let minimum = min, current = value, cursor = value;
+  const shell = pickerShell(container, paint);
+  function update() { shell.trigger.value = current; shell.trigger.textContent = fmt(parseDay(current), { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); }
+  function paint() {
+    const popup = shell.popup; popup.replaceChildren();
+    const date = new Date(parseDay(cursor)), header = node('div', null, 'sch-picker-header');
+    const changeMonth = action => { cursor = moveDay(cursor, action); if (cursor < minimum) cursor = minimum; paint(); popup.querySelector('[tabindex="0"]')?.focus(); };
+    const prev = button('\u2039', () => changeMonth('PageUp'), 'sch-picker-control'); prev.setAttribute('aria-label', T('schedule.previous'));
+    const next = button('\u203A', () => changeMonth('PageDown'), 'sch-picker-control'); next.setAttribute('aria-label', T('schedule.nextMonth'));
+    header.append(prev, node('strong', fmt(date, { month: 'long', year: 'numeric' })), next); popup.append(header);
+    const grid = node('div', null, 'sch-mini-grid');
+    T('schedule.weekdays').forEach(day => grid.append(node('span', day)));
+    const marked = markDays(date.getFullYear(), date.getMonth());
+    monthGrid(date.getFullYear(), date.getMonth()).forEach(key => {
+      const b = button(String(new Date(parseDay(key)).getDate()), () => { current = key; update(); onChange(key); shell.close(); }, 'sch-picker-control');
+      b.disabled = key < minimum; b.tabIndex = key === cursor ? 0 : -1;
+      b.setAttribute('aria-label', fmt(parseDay(key), { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }));
+      if (key === dayKey(Date.now())) b.classList.add('sch-picker-today');
+      if (key === current) b.classList.add('sch-picker-selected');
+      if (new Date(parseDay(key)).getMonth() !== date.getMonth()) b.classList.add('sch-picker-outside');
+      if (marked.includes(key)) b.classList.add('sch-picker-marked');
+      b.onkeydown = e => { if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) { e.preventDefault(); cursor = moveDay(key, e.key); if (cursor < minimum) cursor = minimum; paint(); popup.querySelector('[tabindex="0"]')?.focus(); } };
+      grid.append(b);
+    }); popup.append(grid);
+  }
+  update(); return { set(value, minValue) { minimum = minValue; current = cursor = value; update(); }, close: shell.close };
+}
+function makeTimePicker(container, getDate) {
+  let current = '', parts;
+  const shell = pickerShell(container, paint);
+  const valid = value => { const [h, m] = value.split(':').map(Number), d = new Date(parseDay(getDate())); d.setHours(h, m, 0, 0); return d.getTime() > Date.now(); };
+  function update() { shell.trigger.value = current; shell.trigger.textContent = current ? fmt(new Date(2000, 0, 1, ...current.split(':').map(Number)), { hour: 'numeric', minute: '2-digit' }) : T('schedule.pickerNoTime'); }
+  function paint() {
+    parts = to12h(current || '19:00'); const popup = shell.popup; popup.replaceChildren();
+    const columns = node('div', null, 'sch-time-columns'); popup.append(columns);
+    function draw() {
+      columns.replaceChildren();
+      const candidates = (column, value) => to24h(column === 0 ? value : parts.h, column === 1 ? value : parts.m, column === 2 ? value : parts.pm);
+      [[T('schedule.pickerHour'), Array.from({ length: 12 }, (_, i) => i + 1)], [T('schedule.pickerMinute'), MINUTE_STEPS], [T('schedule.pickerPeriod'), [false, true]]].forEach(([label, values], column) => {
+        const wrap = node('div', null, 'sch-time-column'), title = node('span', label); wrap.append(title);
+        const list = node('div', null, 'sch-time-list'); list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', label);
+        values.forEach(value => {
+          const text = column === 1 ? String(value).padStart(2, '0') : column === 2 ? T(value ? 'schedule.pickerPM' : 'schedule.pickerAM') : String(value);
+          const selected = value === [parts.h, parts.m, parts.pm][column];
+          const b = button(text, () => { if (column === 0) parts.h = value; else if (column === 1) parts.m = value; else parts.pm = value; draw(); columns.children[column].querySelector('[aria-selected="true"]')?.focus(); }, 'sch-picker-control');
+          b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(selected)); b.tabIndex = selected ? 0 : -1;
+          b.disabled = column === 1 ? !valid(candidates(column, value)) : column === 0 ? !MINUTE_STEPS.some(m => valid(to24h(value, m, parts.pm))) : !Array.from({ length: 12 }, (_, i) => i + 1).some(h => MINUTE_STEPS.some(m => valid(to24h(h, m, value))));
+          b.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); const enabled = [...list.querySelectorAll('button:not(:disabled)')], index = enabled.indexOf(b), next = enabled[(index + (e.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length]; next?.click(); } else if (e.key === 'Enter') { e.preventDefault(); apply(); } }; list.append(b);
+        }); wrap.append(list); columns.append(wrap);
+        const selected = list.querySelector('[aria-selected="true"]'); if (selected?.disabled) { selected.tabIndex = -1; const first = list.querySelector('button:not(:disabled)'); if (first) first.tabIndex = 0; }
+      });
+    }
+    function apply() { const value = to24h(parts.h, parts.m, parts.pm); if (valid(value)) { current = value; update(); shell.close(); } }
+    draw(); popup.append(button(T('schedule.pickerApply'), apply, 'btn btn-sm btn-primary'));
+  }
+  update(); return { set(value) { current = value; update(); }, close: shell.close };
+}
 function chip(status, label, compact = false) {
   const el = node('span', null, 'sch-chip sch-' + status + (compact ? ' sch-compact' : ''));
   const icon = node('span', { active: '\u25CF', done: '\u2713', upcoming: '\u25CB', missed: '\u25CC' }[status], 'sch-icon'); icon.setAttribute('aria-hidden', 'true'); el.append(icon);
@@ -84,9 +159,11 @@ function openDay(key) {
   if (!$('schDayDrawer').classList.contains('show')) openModal('schDayDrawer');
 }
 function openEvent(key, occ = null, event = null) {
+  if (openPopover) openPopover(false);
   editing = occ ? { occ, event } : null;
   const form = $('schForm'); form.reset(); $('schLength').value = '10'; $('schRepeat').value = 'none';
-  $('schDate').min = dayKey(Date.now()); $('schDate').value = key && key >= $('schDate').min ? key : $('schDate').min;
+  const minimum = dayKey(Date.now()), chosen = key && key >= minimum ? key : minimum;
+  datePicker.set(chosen, minimum); timePicker.set(defaultTime(Date.now(), chosen));
   $('schUntil').min = $('schDate').value; $('schDays').hidden = true;
   ['Start', 'Length', 'Note', 'Repeat', 'Days', 'Until'].forEach(k => { $('sch' + k + 'Error').textContent = ''; $('sch' + k + 'Error').classList.remove('show'); });
   ['schDate', 'schTime', 'schLength', 'schNote', 'schRepeat', 'schUntil'].forEach(id => $(id).removeAttribute('aria-invalid'));
@@ -96,7 +173,7 @@ function openEvent(key, occ = null, event = null) {
   $('schDate').disabled = !!editing && event.recurrence.kind !== 'none';
   $('schEditRepeat').hidden = !editing || event.recurrence.kind === 'none';
   if (editing) {
-    $('schDate').value = occ.day; $('schTime').value = event.time; $('schLength').value = String(event.duration_min);
+    datePicker.set(occ.day, minimum); timePicker.set(event.time); $('schLength').value = String(event.duration_min);
     $('schNote').value = event.note; $('schRepeat').value = event.recurrence.kind;
     $('schUntil').value = event.recurrence.until || '';
     $('schDayChecks').querySelectorAll('input').forEach(input => { input.checked = event.recurrence.days.includes(Number(input.value)); });
@@ -119,7 +196,8 @@ function init() {
   enhanceSelect($('schLength')); enhanceSelect($('schRepeat'));
   $('schNote').maxLength = NOTE_MAX_CHARS; $('schNote').oninput = () => { $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS }); };
   $('schRepeat').onchange = () => { $('schDays').hidden = $('schRepeat').value !== 'custom'; };
-  $('schDate').onchange = () => { $('schUntil').min = $('schDate').value; };
+  datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { $('schUntil').min = value; timePicker.set(defaultTime(Date.now(), value)); } });
+  timePicker = makeTimePicker($('schTimePicker'), () => $('schDate').value);
   $('schReminder').textContent = T('schedule.reminder', { n: REMINDER_LEAD_MIN });
   $('schDelete').onclick = () => {
     if (!editing) return;
@@ -163,9 +241,9 @@ function init() {
     const fields = [['start', 'Start', errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', null], ['until', 'Until', 'invalidUntil', 'schUntil']];
     fields.forEach(([key, target, message, id]) => { $('sch' + target + 'Error').textContent = errors[key] ? T('schedule.' + message) : ''; $('sch' + target + 'Error').classList.toggle('show', !!errors[key]); if (id) $(id).setAttribute('aria-invalid', String(!!errors[key])); });
     $('schDate').setAttribute('aria-invalid', String(!!errors.start));
-    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[3]) $(first[3]).focus(); else $('schDayChecks').querySelector('input').focus(); return; }
+    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[0] === 'start' && !$('schDate').disabled) $('schDate').focus(); else if (first[3]) $(first[3]).focus(); else $('schDayChecks').querySelector('input').focus(); return; }
     const wasEditing = !!editing;
-    saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), sample: false })); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));
+    saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), sample: false })); if (openPopover) openPopover(false); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));
   };
 }
 let initialized = false;

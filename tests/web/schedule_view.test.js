@@ -31,3 +31,26 @@ test('streak labels interpolate the supplied text', async () => {
   assert.equal(streakLabel(1, 'No streak yet', '{n}-week streak'), '1-week streak');
   assert.equal(streakLabel(8, 'No streak yet', '{n}-week streak'), '8-week streak');
 });
+
+test('time conversions and five minute choices cover noon and midnight', async () => {
+  const { to12h, to24h, MINUTE_STEPS } = await view;
+  assert.deepEqual(to12h('19:05'), { h: 7, m: 5, pm: true });
+  assert.equal(to24h(12, 0, false), '00:00');
+  assert.equal(to24h(12, 5, true), '12:05');
+  assert.equal(to24h(7, 5, true), '19:05');
+  assert.deepEqual(MINUTE_STEPS, [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55]);
+});
+test('calendar navigation clamps months and starts weeks on Monday', async () => {
+  const { moveDay, monthMatrix } = await view;
+  assert.equal(moveDay('2024-03-31', 'PageUp'), '2024-02-29');
+  assert.equal(moveDay('2026-01-01', 'ArrowLeft'), '2025-12-31');
+  assert.equal(moveDay('2026-11-25', 'Home'), '2026-11-23');
+  assert.equal(moveDay('2026-11-25', 'End'), '2026-11-29');
+  assert.equal(monthMatrix(2026, 10).length, 42);
+});
+test('new event defaults to the next half hour or future evening', async () => {
+  const { defaultTime } = await view;
+  assert.equal(defaultTime(new Date(2026, 10, 25, 18, 30).getTime(), '2026-11-25'), '19:00');
+  assert.equal(defaultTime(new Date(2026, 10, 25, 23, 40).getTime(), '2026-11-25'), '');
+  assert.equal(defaultTime(new Date(2026, 10, 25, 23, 40).getTime(), '2026-11-26'), '19:00');
+});
