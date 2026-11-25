@@ -121,7 +121,7 @@ function init() {
 }
 let initialized = false;
 RENDER.schedule = () => { if (!initialized) { init(); initialized = true; } render(); };
-setInterval(() => { if (S.screen === 'schedule') render(); }, 60000);
+setInterval(() => { if (S.screen === 'schedule') render(); else if (S.screen === 'home' && S.user) renderTodayPanel(); }, 60000);   // keeps the countdown and status changes fresh
 
 export function openTodayEvent() { month = new Date(); render(); openEvent(dayKey(Date.now())); }
 export function openTodayDrawer() { month = new Date(); render(); openDay(dayKey(Date.now())); }
