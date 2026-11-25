@@ -86,3 +86,24 @@
 @keyframes sch-picker-in { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (max-width: 720px) { .sch-picker-arrow, .sch-month-value { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .sch-monthpicker { animation: none; } }
+
+.sch-datepicker, .sch-timepicker { position: relative; }
+.sch-picker-trigger { width: 100%; min-height: 44px; padding: 10px 12px; text-align: left; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); background: var(--surface); color: var(--ink); font: 400 16px var(--sans); cursor: pointer; font-variant-numeric: tabular-nums; }
+.sch-picker-trigger:disabled { opacity: .6; cursor: default; }
+.sch-popover:not([hidden]) { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; width: min(100%, 350px); padding: 12px; background: #FAF7F0; border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); font-variant-numeric: tabular-nums; animation: sch-pop-in .18s ease; }
+.sch-popover.sch-flip { top: auto; bottom: calc(100% + 4px); }
+.sch-picker-header { display: flex; align-items: center; justify-content: space-between; }
+.sch-mini-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; align-items: center; font-size: 12px; }
+.sch-picker-control { min-width: 32px; min-height: 32px; padding: 0; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.sch-picker-control:hover:not(:disabled) { background: var(--accent-soft); }
+.sch-picker-control:disabled { opacity: .35; cursor: default; }
+.sch-picker-control.sch-picker-today { box-shadow: inset 0 0 0 2px var(--accent); }
+.sch-picker-control.sch-picker-selected, .sch-time-list [aria-selected="true"] { background: var(--accent); color: white; }
+.sch-picker-outside { color: var(--muted); }
+.sch-picker-marked { text-decoration: underline; }
+.sch-time-columns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
+.sch-time-column { display: grid; gap: 4px; text-align: center; }
+.sch-time-list { display: flex; flex-direction: column; max-height: 180px; overflow: auto; }
+@keyframes sch-pop-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 720px) { .sch-picker-control { min-width: 44px; min-height: 44px; } .sch-popover:not([hidden]) { width: min(100%, 370px); } }
+@media (prefers-reduced-motion: reduce) { .sch-popover:not([hidden]) { animation: none; } }
