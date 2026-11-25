@@ -1,10 +1,12 @@
 import { T } from '../i18n.js';
+import { go } from '../nav.js';
 import { S, RENDER } from '../state.js';
 import { openModal, closeModal, enhanceSelect, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, deleteEvent, newEventId } from '../schedule/schedule_store.js';
-import { monthGrid } from '../schedule/schedule_view.js';
+import { monthGrid, formatCountdown, streakLabel } from '../schedule/schedule_view.js';
+import { startOfWeek, todaySummary, motivationKey } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
 let cachedUser, cachedState, month = new Date(), selectedDay;
@@ -104,7 +106,7 @@ function init() {
   $('schReset').onclick = () => openConfirmDialog(T('schedule.resetQuestion'), T('schedule.resetDetail'), T('schedule.reset'), () => { cachedState = resetSchedule(S.user.id, options()); cachedUser = S.user.id; render(); toast(T('schedule.resetDone')); });
   $('schPrev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
   $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
-  $('schToday').onclick = () => { month = new Date(); render(); };
+  document.querySelector('#screenSchedule #schToday').onclick = () => { month = new Date(); render(); };
   $('schForm').onsubmit = e => {
     e.preventDefault(); const input = { date: $('schDate').value, time: $('schTime').value, duration_min: Number($('schLength').value), note: $('schNote').value, recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('input:checked')].map(x => Number(x.value)), until: $('schUntil').value || null } };
     const result = validateEvent(input, Date.now()), errors = result.errors;
@@ -118,3 +120,57 @@ function init() {
 let initialized = false;
 RENDER.schedule = () => { if (!initialized) { init(); initialized = true; } render(); };
 setInterval(() => { if (S.screen === 'schedule') render(); }, 60000);
+
+export function openTodayEvent() { month = new Date(); render(); openEvent(dayKey(Date.now())); }
+export function openTodayDrawer() { month = new Date(); render(); openDay(dayKey(Date.now())); }
+
+const todayButton = (text, cls, action) => {
+  const el = node('button', text, cls);
+  el.type = 'button';
+  if (action) el.addEventListener('click', action);
+  return el;
+};
+export function renderTodayPanel() {
+  const now = Date.now(), today = parseDay(dayKey(now));
+  const summary = todaySummary(occurrencesBetween(addDays(startOfWeek(now), -56), addDays(today, 2)), now);
+  const panel = document.getElementById('schTodayPanel');
+  panel.replaceChildren();
+  const head = node('div', null, 'sch-today-head');
+  const heading = node('h2', T('schedule.todayPanel.heading')); heading.id = 'schTodayH';
+  const streak = node('span', null, 'sch-streak');
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', 'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z');
+  svg.append(path); streak.append(svg, document.createTextNode(streakLabel(summary.streak, T('schedule.todayPanel.noStreak'), T('schedule.todayPanel.streak'))));
+  head.append(heading, node('span', T('schedule.demo'), 'badge-demo'), streak, node('span', T('schedule.todayPanel.weekCount', summary.week), 'sch-week-count'));
+  panel.append(head);
+  const body = node('div', null, 'sch-today-body'), occ = summary.primary;
+  if (occ) {
+    const time = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date(occ.start));
+    body.append(node('strong', T('schedule.todayPanel.' + summary.status + 'Time', { time, len: occ.duration_min })));
+    if (summary.status === 'done' || summary.status === 'missed') body.append(node('span', (summary.status === 'done' ? '\u2713 ' : '\u25CC ') + T('schedule.' + summary.status), 'sch-chip sch-' + summary.status));
+    if ((summary.status === 'active' || summary.status === 'upcoming') && occ.note) body.append(node('p', occ.note, 'sch-note'));
+    if (summary.status === 'active') {
+      body.append(node('p', T('schedule.todayPanel.closes', { time: formatCountdown(summary.closes_in_ms) })));
+      const check = todayButton(T('schedule.todayPanel.checkIn'), 'btn btn-primary');
+      check.dataset.schCheckin = occ.key; check.dataset.go = 'schedule'; body.append(check);
+    }
+  } else {
+    body.append(node('p', T('schedule.todayPanel.nothing')));
+    body.append(todayButton(T('schedule.todayPanel.plan'), 'btn btn-primary', () => { go('schedule'); openTodayEvent(); }));
+  }
+  if (summary.more) body.append(todayButton(T('schedule.todayPanel.more', { n: summary.more }), 'sch-today-link', () => { go('schedule'); openTodayDrawer(); }));
+  panel.append(body);
+  const dots = node('div', null, 'sch-week-dots');
+  const days = T('schedule.todayPanel.days'), letters = T('schedule.todayPanel.letters'), states = T('schedule.todayPanel.states');
+  summary.week.dots.forEach((dot, i) => {
+    const item = node('span', null, 'sch-week-dot-item' + (dot.day === dayKey(now) ? ' sch-week-dot-today' : ''));
+    item.append(node('span', T('schedule.todayPanel.dot', { day: days[i], state: states[dot.state] }), 'sr-only'));
+    const circle = node('span', null, 'sch-week-dot sch-week-dot-' + dot.state); circle.setAttribute('aria-hidden', 'true');
+    const letter = node('span', letters[i]); letter.setAttribute('aria-hidden', 'true'); item.append(circle, letter); dots.append(item);
+  });
+  panel.append(dots);
+  const motivation = motivationKey(summary);
+  if (motivation) panel.append(node('p', T('schedule.motivation.' + motivation, { n: summary.streak, len: occ?.duration_min }), 'sch-motivation'));
+}
