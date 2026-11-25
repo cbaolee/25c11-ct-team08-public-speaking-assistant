@@ -131,3 +131,16 @@ test('editing and deleting occurrences preserve history and inputs', async () =>
   assert.deepEqual(s.deleteFromOccurrence(state, 'a', '2026-11-23').done, {});
   assert.deepEqual(state, snapshot);
 });
+
+test('completion session IDs are optional strings and survive storage', async () => {
+  const s = await store, storage = memory(), base = { version: 1, events: [], done: {} };
+  for (const session_id of [undefined, null, 'session-1']) {
+    const record = { checkin_at: now, done_at: now + 1 };
+    if (session_id !== undefined) record.session_id = session_id;
+    const state = s.markDone(base, 'a', record);
+    assert.equal(s.isValidState(state), true);
+    s.saveSchedule('u', state, storage);
+    assert.deepEqual(JSON.parse(storage.getItem(s.storageKey('u'))), state);
+  }
+  assert.equal(s.isValidState({ ...base, done: { a: { checkin_at: now, done_at: now, session_id: 42 } } }), false);
+});

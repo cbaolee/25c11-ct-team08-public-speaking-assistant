@@ -60,3 +60,10 @@ test('session summary counts days and identifies the last occurrence', async () 
   assert.deepEqual(sessionsSummary([]), { n: 0, last: null });
   assert.deepEqual(sessionsSummary(['2026-11-25', '2026-12-02']), { n: 2, last: '2026-12-02' });
 });
+
+test('result link requires a matching history session', async () => {
+  const { resultLink } = await view;
+  assert.equal(resultLink({}, [{ id: 'a' }]), null);
+  assert.equal(resultLink({ session_id: 'missing' }, [{ id: 'a' }]), null);
+  assert.equal(resultLink({ session_id: 'a' }, [{ id: 'a' }]), 'a');
+});

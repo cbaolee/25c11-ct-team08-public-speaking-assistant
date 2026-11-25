@@ -428,6 +428,8 @@ TEXT.schedule = {
   pickerNoTime: 'Choose a time',
   checkInClosed: 'This practice window has closed.',
   checkInComplete: 'Check-in complete',
+  viewResult: 'View result',
+  resultUnavailable: 'Result not available',
   scheduledPractice: 'Scheduled practice',
   backToday: 'Back to today',
   edit: 'Edit',

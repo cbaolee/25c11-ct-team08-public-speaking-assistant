@@ -28,7 +28,8 @@ function isValidDone(record) {
   return plain(record) &&
     Number.isFinite(record.checkin_at) &&
     Number.isFinite(record.done_at) &&
-    record.done_at >= record.checkin_at;
+    record.done_at >= record.checkin_at &&
+    (record.session_id == null || typeof record.session_id === 'string');
 }
 
 // Reject invalid stored data before using it in schedule calculations.
