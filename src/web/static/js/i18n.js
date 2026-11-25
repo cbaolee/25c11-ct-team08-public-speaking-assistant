@@ -464,7 +464,6 @@ TEXT.schedule.todayPanel = {
   nextPractices: 'Next practices',
   showing: 'Showing practices {start} to {end} of {total}',
   details: 'Details, {time}, {length}',
-  noNote: 'No note',
   closesIn: 'Closes in {time}',
   startsIn: 'Starts in {time}',
   completedAt: 'Completed at {time}',

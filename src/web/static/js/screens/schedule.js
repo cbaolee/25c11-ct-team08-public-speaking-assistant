@@ -119,8 +119,6 @@ function render() {
   const state = getSchedule(), keys = monthGrid(month.getFullYear(), month.getMonth()), now = Date.now();
   $('schMonth').textContent = fmt(month, { month: 'long', year: 'numeric' });
   $('schMonthLive').textContent = $('schMonth').textContent;
-  const current = new Date(now);
-  $('schToday').hidden = month.getFullYear() === current.getFullYear() && month.getMonth() === current.getMonth();
   const grid = $('schGrid'), focusedDay = document.activeElement?.dataset.schDay; grid.replaceChildren();
   const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[41]), 1));
   keys.forEach(key => {
@@ -257,6 +255,11 @@ function init() {
   const paintPicker = () => {
     picker.replaceChildren();
     const columns = node('span', null, 'sch-wheel-columns');
+    const back = button('', () => { const now = Date.now(); month = new Date(now); render(); closePicker(); $('schGrid').querySelector(`[data-sch-day="${dayKey(now)}"]`)?.focus(); }, 'btn btn-sm sch-picker-back');
+    const backIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); backIcon.setAttribute('viewBox', '0 0 24 24'); backIcon.setAttribute('aria-hidden', 'true');
+    const backPath = document.createElementNS('http://www.w3.org/2000/svg', 'path'); backPath.setAttribute('d', 'M19 12H5M12 19l-7-7 7-7'); backIcon.append(backPath); back.append(backIcon, node('span', T('schedule.backToday')));
+    const updateBack = () => { const today = new Date(); back.disabled = pickedYear === today.getFullYear() && pickedMonth === today.getMonth() && month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth(); };
+    updateBack();
     [['pickerMonth', 'previous', 'nextMonth', false], ['pickerYear', 'previousYear', 'nextYear', true]].forEach(([title, prev, next, year]) => {
       const section = node('span', null, 'sch-month-column');
       section.append(node('span', T('schedule.' + title), 'sch-wheel-title'));
@@ -287,7 +290,7 @@ function init() {
         if (year) pickedYear = clampWheel(pickedYear + delta, minYear, maxYear);
         else pickedMonth = wrapWheel(pickedMonth + delta, 0, 11);
         if (before === (year ? pickedYear : pickedMonth)) return;
-        list.getAnimations().forEach(animation => animation.cancel()); paint();
+        list.getAnimations().forEach(animation => animation.cancel()); paint(); updateBack();
         if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
           list.animate([{ transform: `translateY(${delta * 36}px)`, opacity: 0.55 }, { transform: 'translateY(0)', opacity: 1 }], { duration: 200, easing: 'ease-out' });
         }
@@ -297,7 +300,8 @@ function init() {
       section.addEventListener('wheel', e => { if (e.deltaY) { e.preventDefault(); const now = performance.now(); if (now - lastWheelStep >= 120) { lastWheelStep = now; change(e.deltaY < 0 ? -1 : 1); } } }, { passive: false });
       paint(); section.append(up, wheel, down); columns.append(section);
     });
-    picker.append(columns, button(T('schedule.pickerGo'), apply, 'btn btn-sm btn-primary sch-picker-go'));
+    const actions = node('span', null, 'sch-picker-actions'); actions.append(back, button(T('schedule.pickerGo'), apply, 'btn btn-sm btn-primary sch-picker-go'));
+    picker.append(columns, actions);
   };
   label.onclick = () => {
     if (!picker.hidden) { closePicker(); return; }
@@ -316,7 +320,6 @@ function init() {
   document.addEventListener('pointerdown', e => { if (!picker.hidden && !picker.parentElement.contains(e.target)) closePicker(); });
   $('schPrev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
   $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
-  document.querySelector('#screenSchedule #schToday').onclick = () => { month = new Date(); render(); $('schGrid').querySelector(`[data-sch-day="${dayKey(Date.now())}"]`)?.focus(); };
   $('schForm').onsubmit = e => {
     e.preventDefault(); const input = currentInput();
     if (editing) input.recurrence = editing.event.recurrence;
@@ -371,16 +374,16 @@ export function renderTodayPanel() {
     const viewport = node('div', null, 'sch-carousel-viewport');
     const track = node('div', null, 'sch-carousel-track'); track.id = 'schTodayTrack';
     const live = node('span', null, 'sr-only'); live.setAttribute('aria-live', 'polite');
-    const controls = node('div', null, 'sch-carousel-controls');
+    const carousel = node('div', null, 'sch-carousel-wrap');
     const arrow = (label, direction) => {
-      const b = todayButton('', 'sch-carousel-arrow sch-chevron', () => move(direction));
+      const b = todayButton('', 'sch-carousel-arrow sch-chevron ' + (direction < 0 ? 'sch-carousel-prev' : 'sch-carousel-next'), e => { e.stopPropagation(); move(direction); });
       b.dataset.todayRole = direction < 0 ? 'prev' : 'next';
       b.setAttribute('aria-label', T('schedule.todayPanel.' + label)); b.setAttribute('aria-controls', track.id);
       const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('aria-hidden', 'true');
       const line = document.createElementNS('http://www.w3.org/2000/svg', 'path'); line.setAttribute('d', direction < 0 ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'); icon.append(line); b.append(icon); return b;
     };
     const prev = arrow('previousPractices', -1), next = arrow('nextPractices', 1);
-    controls.append(prev, next); head.append(controls);
+    carousel.append(prev, viewport, next);
     const words = Object.fromEntries(['hour', 'hours', 'minute', 'minutes', 'lessThanMinute'].map(k => [k, T('schedule.todayPanel.' + k)]));
     items.forEach((item, index) => {
       const status = occurrenceStatus(item, now), card = node('article', null, 'sch-card');
@@ -392,7 +395,7 @@ export function renderTodayPanel() {
       const top = node('div', null, 'sch-card-top');
       top.append(node('strong', time(item.start)), node('span', T('schedule.minutes', { n: item.duration_min }), 'sch-card-length'));
       if (status === 'done' || status === 'missed') top.append(chip(status));
-      const note = node('p', item.note || T('schedule.todayPanel.noNote'), 'sch-card-note'); if (item.note) note.title = item.note;
+      const note = node('p', item.note, 'sch-card-note'); if (item.note) note.title = item.note; else note.setAttribute('aria-hidden', 'true');
       const statusLine = node('p', null, 'sch-card-status');
       if (status === 'active') {
         const remaining = windowClosesAt(item) - now; statusLine.classList.add('sch-tone-' + closesTone(remaining));
@@ -411,13 +414,13 @@ export function renderTodayPanel() {
       }
       card.append(open, top, note, statusLine, actions); track.append(card);
     });
-    viewport.append(track); body.append(viewport, live);
+    viewport.append(track); body.append(carousel, live);
     function visibleCount() { return window.matchMedia('(max-width: 720px)').matches ? 1 : 3; }
     function update(userMove = false) {
       const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, 0);
       const fades = edgeFades(todayCarouselIndex, items.length, visible);
       viewport.classList.toggle('sch-fade-left', fades.left); viewport.classList.toggle('sch-fade-right', fades.right);
-      controls.hidden = items.length <= visible; prev.disabled = !fades.left; next.disabled = !fades.right;
+      prev.hidden = !fades.left; next.hidden = !fades.right;
       const card = track.firstElementChild; const offset = !fades.right ? Math.max(0, track.scrollWidth - viewport.clientWidth) : card ? todayCarouselIndex * (card.getBoundingClientRect().width + 16) : 0;
       viewport.scrollLeft = 0;
       if (!userMove) track.style.transition = 'none';
@@ -425,7 +428,8 @@ export function renderTodayPanel() {
       if (!userMove) { void track.offsetWidth; track.style.removeProperty('transition'); }
       if (userMove) { const message = T('schedule.todayPanel.showing', { start: todayCarouselIndex + 1, end: Math.min(items.length, todayCarouselIndex + visible), total: items.length }); if (live.textContent !== message) live.textContent = message; }
     }
-    function move(direction) { const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, direction * visible); update(true); }
+    function move(direction) { const visible = visibleCount(); todayCarouselIndex = carouselStep(todayCarouselIndex, items.length, visible, direction * visible); update(true); const target = direction < 0 ? prev : next; (target.hidden ? (direction < 0 ? next : prev) : target).focus({ preventScroll: true }); }
+    update();
     requestAnimationFrame(() => update());
     window.addEventListener('resize', () => { if (panel.contains(viewport)) update(); }, { signal: todayResize.signal });
   } else {
@@ -447,7 +451,7 @@ export function renderTodayPanel() {
   if (motivation) panel.append(node('p', T('schedule.motivation.' + motivation, { n: summary.streak, len: occ?.duration_min }), 'sch-motivation'));
   if (focusRole) {
     const target = [...panel.querySelectorAll('[data-today-role]')].find(el => el.dataset.todayRole === focusRole && (focusKey == null || el.closest('.sch-card')?.dataset.todayKey === focusKey));
-    if (target && !target.disabled) { restoringFocus = true; target.focus({ preventScroll: true }); restoringFocus = false; }
+    if (target && !target.disabled && !target.hidden) { restoringFocus = true; target.focus({ preventScroll: true }); restoringFocus = false; }
   }
 }
 

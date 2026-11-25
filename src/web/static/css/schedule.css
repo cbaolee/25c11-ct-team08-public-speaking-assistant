@@ -96,7 +96,9 @@
 .sch-wheel-list { position: relative; display: grid; grid-template-rows: repeat(3, 36px); align-items: center; }
 .sch-wheel-adjacent { opacity: .35; font-size: 13px; }
 .sch-wheel-current { font-weight: 700; }
-.sch-picker-go { align-self: flex-end; }
+.sch-picker-actions { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.sch-picker-back { display: inline-flex; align-items: center; gap: 6px; }
+.sch-picker-back svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sch-picker-arrow:focus-visible, .sch-wheel:focus-visible, #screenSchedule #schMonth:focus-visible, #screenSchedule .sch-chevron:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .sch-datepicker, .sch-timepicker { position: relative; }
@@ -129,9 +131,14 @@
 .sch-segment[aria-checked="true"], .sch-day-toggle[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: white; }
 
 /* Today's practice carousel. */
-.sch-carousel-controls { display: flex; gap: 6px; }
-.sch-carousel-arrow { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink); cursor: pointer; }
-.sch-carousel-arrow:disabled { opacity: .35; cursor: default; }
+.sch-carousel-wrap { position: relative; flex-basis: 100%; min-width: 0; }
+.sch-carousel-arrow { position: absolute; top: 50%; z-index: 2; transform: translateY(-50%); display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink); cursor: pointer; }
+.sch-carousel-arrow[hidden] { display: none; }
+.sch-carousel-prev { left: -20px; }
+.sch-carousel-next { right: -20px; }
+.sch-carousel-arrow svg { width: 22px; height: 22px; stroke-width: 2.5; }
+.sch-carousel-arrow:hover { background: var(--accent-soft); }
+.sch-carousel-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sch-carousel-viewport { position: relative; flex-basis: 100%; min-width: 0; overflow: clip; padding: 4px 0; }
 .sch-carousel-viewport.sch-fade-right { mask-image: linear-gradient(to right, black 94%, transparent); }
 .sch-carousel-viewport.sch-fade-left { mask-image: linear-gradient(to right, transparent, black 6%); }
@@ -145,7 +152,7 @@
 .sch-card-top { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .sch-card-top .sch-chip { margin-left: auto; }
 .sch-card-length, .sch-card-helper { color: var(--muted); font-size: 13px; }
-.sch-card-note { position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-style: italic; }
+.sch-card-note { min-height: 1.5em; position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-style: italic; }
 .sch-card-status { font-size: 14px; }
 .sch-card-clock { width: 16px; height: 16px; margin-right: 6px; vertical-align: -3px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .sch-tone-ok { color: var(--ok); }
