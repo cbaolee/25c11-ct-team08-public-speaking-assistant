@@ -14,7 +14,7 @@ import { $, $$ } from './utils.js';
 /* Screen name ('scriptStudio') -> element id ('screenScriptStudio'). */
 export function screenId(name) { return 'screen' + name.charAt(0).toUpperCase() + name.slice(1); }
 
-export const SCREEN_ORDER = { home: 0, scriptStudio: 1, practice: 2, profile: 3 };
+export const SCREEN_ORDER = { home: 0, scriptStudio: 1, practice: 2, schedule: 3, profile: 4 };
 export function screenPos(name, from) {
   if (name === 'report') return (SCREEN_ORDER[from] !== undefined ? SCREEN_ORDER[from] : 0) + .5;
   return SCREEN_ORDER[name] !== undefined ? SCREEN_ORDER[name] : 0;

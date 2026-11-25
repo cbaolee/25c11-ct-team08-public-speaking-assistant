@@ -10,7 +10,7 @@ export const TEXT = {
   common: { skip: 'Skip to content', back: 'Back', cancel: 'Cancel', save: 'Save', close: 'Close', play: 'Play', pause: 'Pause', delete: 'Delete', na: 'N/A' },
   /* Same slugs and labels as CATEGORY_SLUG_MAP (src/text_processing/contracts.py) and data/templates/<slug>/ */
   topics: { cinematography: 'Cinematography', gender_studies: 'Gender Studies', information_technology: 'Information Technology', learning_experiences: 'Learning Experiences', sports: 'Sports', wildlife: 'Wildlife' },
-  nav: { label: 'Main', home: 'Home', script: 'Script', practice: 'Practice' },
+  nav: { label: 'Main', home: 'Home', script: 'Script', practice: 'Practice', schedule: 'Schedule' },
   top: { login: 'Log in', signup: 'Sign up', profile: 'Profile', settings: 'Settings', logout: 'Log out' },
 
   landing: {
@@ -414,6 +414,13 @@ export const TEXT = {
     S_tipDrift: 'Check the {n} red sentence(s): skipped or replaced key words change the meaning.'
   },
   chart: { table: 'View as table', time: 'Time', value: 'Value', type: 'Type', minutes: 'Minutes' }
+};
+TEXT.schedule = {
+  title: 'Schedule', demo: 'Demo only', intro: 'Plan practice sessions and check in when they start. Reminders are previews only.', newEvent: 'New event', reset: 'Reset demo', resetQuestion: 'Reset the demo schedule?', resetDetail: 'This replaces your schedule with the demo events.', resetDone: 'Demo schedule reset',
+  previous: 'Previous month', prev: 'Prev', nextMonth: 'Next month', next: 'Next', today: 'Today', empty: 'No practice planned yet.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
+  upcoming: 'Upcoming', active: 'Now', activeLegend: 'Active', done: 'Done', missed: 'Missed', date: 'Date', time: 'Time', length: 'Length', note: 'Note', repeat: 'Repeat', none: 'None', daily: 'Daily', weekly: 'Weekly', custom: 'Custom days', customDays: 'Custom days', until: 'Until (optional)', reminder: 'Reminder: {n} minutes before (fixed in this demo)', save: 'Save',
+  past: 'Pick a time in the future.', invalid: 'Enter a valid date and time.', invalidLength: 'Choose a valid length.', invalidNote: 'The note is too long.', invalidRepeat: 'Choose a valid repeat.', invalidDays: 'Choose at least one day.', invalidUntil: 'Until must be on or after the event date.', minutes: '{n} min', count: '{n}/{max}',
+  repeats: 'Repeats {kind}', repeatsUntil: 'Repeats {kind} until {date}', dailyLower: 'daily', weeklyLower: 'weekly', customLower: 'on custom days', email: 'Email preview', delete: 'Delete series', deleteQuestion: 'Delete this event and all its repeats?', deleteDetail: 'This removes the entire series.', deleted: 'Event deleted', created: 'Event created', emailTitle: 'Reminder email preview', to: 'To: {value}', from: 'From: Public Speaking Coach (demo)', subject: 'Subject: Practice in {lead} minutes: {length} min at {time}', greeting: 'Hello {name},', greetingNameless: 'Hello,', when: 'Your practice is on {when}.', emailLength: 'Length: {length} min.', emailNote: 'Note: {note}', openPractice: 'Open practice', skipped: 'Too close to start: no reminder would be sent.', wouldSend: 'Would be sent at {when} · Demo only, nothing is sent.', weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 };
 TEXT.wc = { title: 'Practice', heardAs: 'Heard as: {x}', hearIt: 'Hear it', hearYourself: 'Hear yourself', tryAgain: 'Try again', stop: 'Stop', checking: 'Checking...', recognised: 'Recognised as {x}', close: 'Close, listen again', heard: 'Heard {y}', notHeard: "We couldn't hear that, try again", sampleVoice: 'Sample voice from your browser', practiceOnly: 'Practice only: your score does not change', noVoice: 'No English voice is available', practiceSentence: 'Practice this sentence', stillWrong: 'Still to practise: {x}', errMic: 'Microphone unavailable. Check your permissions and device.', errRate: 'Too many attempts. Please try again later.', errStt: 'Speech recognition is unavailable. Try again later.', errNet: 'Could not check the recording. Try again.', closeLabel: 'Close practice', timer: '{elapsed} / {max}' };
 TEXT.script.page = 'p. {n}';
