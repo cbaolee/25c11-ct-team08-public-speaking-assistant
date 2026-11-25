@@ -145,3 +145,18 @@ test('check-in windows end at six hours or local midnight', async () => {
   assert.equal(m.occurrenceStatus(occ(start, close, 'x', t(26, 0, 20)), t(26, 1)), 'missed');
   assert.equal(m.occurrenceStatus(occ(start, start - 1, 'x', start), t(26, 1)), 'missed');
 });
+
+
+test('edit lead time and inclusive recurrence previews', async () => {
+  const m = await model, start = t(25, 15);
+  assert.equal(m.canEdit({ start }, start - 20 * 60000), true);
+  assert.equal(m.canEdit({ start }, start - 19 * 60000 - 59000), false);
+  const input = event({ date: '2026-11-23' });
+  const preview = (kind, days = []) => m.previewOccurrenceDays({ ...input, recurrence: { kind, days } }, '2026-11-24', '2026-11-29');
+  assert.deepEqual(preview('none'), []);
+  assert.deepEqual(m.previewOccurrenceDays(input, '2026-11-23', '2026-11-23'), ['2026-11-23']);
+  assert.deepEqual(preview('daily'), ['2026-11-24', '2026-11-25', '2026-11-26', '2026-11-27', '2026-11-28', '2026-11-29']);
+  assert.deepEqual(preview('weekly'), []);
+  assert.deepEqual(preview('custom', [1, 3, 7]), ['2026-11-25', '2026-11-29']);
+  assert.deepEqual(m.previewOccurrenceDays({ ...input, recurrence: { kind: 'weekly', days: [] } }, '2026-11-23', '2026-11-30'), ['2026-11-23', '2026-11-30']);
+});
