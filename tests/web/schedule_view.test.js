@@ -67,3 +67,14 @@ test('result link requires a matching history session', async () => {
   assert.equal(resultLink({ session_id: 'missing' }, [{ id: 'a' }]), null);
   assert.equal(resultLink({ session_id: 'a' }, [{ id: 'a' }]), 'a');
 });
+
+test('picker wheels wrap months and clamp years independently', async () => {
+  const { wrapWheel, clampWheel, wheelWindow } = await view;
+  assert.equal(wrapWheel(12, 0, 11), 0);
+  assert.equal(wrapWheel(-1, 0, 11), 11);
+  assert.equal(clampWheel(2032, 2021, 2031), 2031);
+  assert.equal(clampWheel(2020, 2021, 2031), 2021);
+  assert.deepEqual(wheelWindow(0, 0, 11, true), [11, 0, 1]);
+  assert.deepEqual(wheelWindow(2021, 2021, 2031), [null, 2021, 2022]);
+  assert.deepEqual(wheelWindow(2031, 2021, 2031), [2030, 2031, null]);
+});

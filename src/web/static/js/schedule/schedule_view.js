@@ -38,3 +38,9 @@ export function defaultTime(nowMs, dateKey) {
 export function sessionsSummary(days) { return { n: days.length, last: days.length ? days[days.length - 1] : null }; }
 
 export function resultLink(record, sessions) { return typeof record?.session_id === 'string' && record.session_id && sessions.some(session => session.id === record.session_id) ? record.session_id : null; }
+
+export function wrapWheel(value, min, max) { const size = max - min + 1; return ((value - min) % size + size) % size + min; }
+export function clampWheel(value, min, max) { return Math.max(min, Math.min(max, value)); }
+export function wheelWindow(value, min, max, wrap = false) {
+  return [-1, 0, 1].map(offset => { const next = value + offset; return wrap ? wrapWheel(next, min, max) : next < min || next > max ? null : next; });
+}
