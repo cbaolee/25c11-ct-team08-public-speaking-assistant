@@ -76,3 +76,13 @@
 }
 
 .sch-chevron svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.sch-month-wrap { position: relative; }
+.sch-month-wrap > button { min-width: 150px; }
+.sch-monthpicker { position: absolute; z-index: 10; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 14px; background: #FAF7F0; border: 1px solid var(--line); border-radius: var(--r-panel); box-shadow: var(--shadow-pop); animation: sch-picker-in .18s ease; font-variant-numeric: tabular-nums; }
+.sch-month-column { display: grid; justify-items: center; gap: 4px; }
+.sch-picker-arrow, .sch-month-value { min-width: 44px; min-height: 30px; border: 0; border-radius: var(--r-ctl); background: transparent; color: var(--ink); font: inherit; cursor: pointer; }
+.sch-picker-arrow:hover, .sch-month-value:hover { background: var(--accent-soft); }
+@keyframes sch-picker-in { from { opacity: 0; transform: translate(-50%, -5px); } to { opacity: 1; transform: translate(-50%, 0); } }
+@media (max-width: 720px) { .sch-picker-arrow, .sch-month-value { min-height: 44px; } }
+@media (prefers-reduced-motion: reduce) { .sch-monthpicker { animation: none; } }
