@@ -416,6 +416,9 @@ export const TEXT = {
   chart: { table: 'View as table', time: 'Time', value: 'Value', type: 'Type', minutes: 'Minutes' }
 };
 TEXT.schedule = {
+  checkInClosed: 'This practice window has closed.',
+  checkInComplete: 'Check-in complete',
+  scheduledPractice: 'Scheduled practice',
   title: 'Schedule', demo: 'Demo only', intro: 'Plan practice sessions and check in when they start. Reminders are previews only.', newEvent: 'New event', reset: 'Reset demo', resetQuestion: 'Reset the demo schedule?', resetDetail: 'This replaces your schedule with the demo events.', resetDone: 'Demo schedule reset',
   previous: 'Previous month', prev: 'Prev', nextMonth: 'Next month', next: 'Next', today: 'Today', empty: 'No practice planned yet.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
   upcoming: 'Upcoming', active: 'Now', activeLegend: 'Active', done: 'Done', missed: 'Missed', date: 'Date', time: 'Time', length: 'Length', note: 'Note', repeat: 'Repeat', none: 'None', daily: 'Daily', weekly: 'Weekly', custom: 'Custom days', customDays: 'Custom days', until: 'Until (optional)', reminder: 'Reminder: {n} minutes before (fixed in this demo)', save: 'Save',

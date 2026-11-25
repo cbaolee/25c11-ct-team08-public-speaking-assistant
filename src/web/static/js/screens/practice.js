@@ -682,6 +682,7 @@ export function runEvalReal(txt) {
 /* background: the user is elsewhere, so the report is offered in a pop-up instead of opened. */
 export function finishEvalReal(j, txt, background) {
   const m = EvaluateClient.mapResult(j, txt.text), base = { ts: Date.now(), title: txt.short, topicKey: txt.topic, an: m.an, sc: m.sc, dur: m.an.dur, accent: S.profile ? S.profile.accent : null, demo: false, raw: j };
+  document.dispatchEvent(new CustomEvent('psc:evaluation-complete', { detail: { status: m.sc.status, overall: m.sc.overall } }));
   let ses;
   if (m.sc.status !== 'ok') ses = Object.assign(j.saved && j.session_id ? { id: j.session_id, remote: true } : { id: 'local-' + S.nextId++ }, base);   // insufficient_audio: shown, not in History
   else {

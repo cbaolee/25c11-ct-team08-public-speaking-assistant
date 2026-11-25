@@ -13,3 +13,6 @@ export function formatCountdown(ms) {
   return hours ? `${hours} h ${minutes % 60} min` : `${minutes} min`;
 }
 export function streakLabel(n, noStreak, streak) { return n ? streak.replace('{n}', String(n)) : noStreak; }
+
+export function shouldCompleteCheckIn(ctx, detail) { return !!ctx && detail?.status === 'ok' && detail.overall != null; }
+export function shouldClearOnLeave(onPractice, background) { return !onPractice && !background; }
