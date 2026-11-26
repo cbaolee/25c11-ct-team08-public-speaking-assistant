@@ -140,3 +140,12 @@ test('event style variables and labels handle all day and optional lengths', asy
   assert.equal(lengthLabel(null, words), 'Any length');
   assert.equal(lengthLabel(10, words), '10 min');
 });
+
+test('chip capacity reserves the measured overflow line only when needed', async () => {
+  const { chipsThatFit } = await view;
+  assert.deepEqual(chipsThatFit(100, 28, 20, 14, 4, 3), { shown: 3, more: 0 });
+  assert.deepEqual(chipsThatFit(100, 28, 20, 14, 4, 4), { shown: 2, more: 2 });
+  assert.deepEqual(chipsThatFit(80, 28, 20, 14, 4, 3), { shown: 1, more: 2 });
+  assert.deepEqual(chipsThatFit(66, 28, 20, 14, 4, 2), { shown: 0, more: 2 });
+  assert.deepEqual(chipsThatFit(100, 28, 20, 14, 4, 0), { shown: 0, more: 0 });
+});

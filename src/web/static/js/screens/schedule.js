@@ -5,14 +5,14 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
 let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker, untilPicker;
-let openPopover = null;
+let openPopover = null, gridObserver, gridFrame = 0;
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
 export function getSchedule() {
@@ -123,7 +123,11 @@ function render() {
   const state = getSchedule(), keys = monthGrid(month.getFullYear(), month.getMonth()), now = Date.now();
   $('schMonth').textContent = fmt(month, { month: 'long', year: 'numeric' });
   $('schMonthLive').textContent = $('schMonth').textContent;
-  const grid = $('schGrid'), focusedDay = document.activeElement?.dataset.schDay; grid.replaceChildren();
+  const grid = $('schGrid'), focusedDay = document.activeElement?.dataset.schDay, focusedAdd = document.activeElement?.classList.contains('sch-add');
+  const panel = grid.closest('.sch-panel');
+  panel.style.setProperty('--sch-panel-top', (panel.getBoundingClientRect().top + window.scrollY) + 'px');
+  grid.replaceChildren();
+  const cells = [];
   const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[41]), 1));
   keys.forEach(key => {
     const list = occs.filter(o => o.day === key), counts = {};
@@ -136,12 +140,34 @@ function render() {
     if (new Date(parseDay(key)).getMonth() !== month.getMonth()) b.classList.add('sch-outside');
     if (key === dayKey(now)) { b.classList.add('sch-today'); b.append(node('span', T('schedule.today'), 'sr-only')); }
     b.append(node('span', String(new Date(parseDay(key)).getDate()), 'sch-day-number'));
-    list.slice(0, 2).forEach(o => b.append(chip(occurrenceStatus(o, now), sessionTimeLabel(o, time, labelWords()), true, o.color)));
-    if (list.length > 2) b.append(node('span', T('schedule.more', { n: list.length - 2 }), 'sch-more'));
-    grid.append(b);
+    const cell = node('div', null, 'sch-cell'); cell.append(b);
+    if (key >= dayKey(now)) {
+      const add = button('+', () => { selectedDay = key; openEvent(key); }, 'sch-add');
+      add.dataset.schDay = key; add.setAttribute('aria-label', T('schedule.addPracticeOn', { date })); cell.append(add);
+    }
+    grid.append(cell); cells.push({ b, list });
   });
   $('schEmpty').hidden = state.events.length !== 0;
-  if (focusedDay) grid.querySelector(`[data-sch-day="${focusedDay}"]`)?.focus();
+  const monthChip = (status, label, color) => {
+    const el = chip(status, label, true, color);
+    el.querySelector('.sch-chip-word').classList.add('sr-only');
+    el.title = T('schedule.' + status) + ' \u2013 ' + label;
+    return el;
+  };
+  const sample = monthChip('upcoming', '12:00 PM'), moreSample = node('span', T('schedule.more', { n: 1 }), 'sch-more');
+  cells[0].b.append(sample, moreSample);
+  const day = cells[0].b, styles = getComputedStyle(day);
+  const headerHeight = day.querySelector('.sch-day-number').getBoundingClientRect().height;
+  const chipHeight = sample.getBoundingClientRect().height, moreHeight = moreSample.getBoundingClientRect().height, gap = parseFloat(styles.rowGap) || 0;
+  sample.remove(); moreSample.remove();
+  const compact = matchMedia('(max-width: 720px)').matches;
+  cells.forEach(({ b, list }) => {
+    const innerHeight = b.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
+    const fit = compact ? { shown: Math.min(2, list.length), more: Math.max(0, list.length - 2) } : chipsThatFit(innerHeight, headerHeight, chipHeight, moreHeight, gap, list.length);
+    list.slice(0, fit.shown).forEach(o => b.append(monthChip(occurrenceStatus(o, now), sessionTimeLabel(o, time, labelWords()), o.color)));
+    if (fit.more) b.append(node('span', T('schedule.more', { n: fit.more }), 'sch-more'));
+  });
+  if (focusedDay) grid.querySelector(`[data-sch-day="${focusedDay}"].${focusedAdd ? 'sch-add' : 'sch-day'}`)?.focus();
 }
 function openDay(key, highlightKey = null) {
   selectedDay = key; $('schDayTitle').textContent = fullDate(parseDay(key));
@@ -372,7 +398,22 @@ function init() {
   };
 }
 let initialized = false;
-RENDER.schedule = () => { if (!initialized) { init(); initialized = true; } render(); };
+RENDER.schedule = () => {
+  if (!initialized) {
+    init(); initialized = true;
+    gridObserver = new ResizeObserver(() => {
+      cancelAnimationFrame(gridFrame);
+      gridFrame = requestAnimationFrame(() => { if (S.screen === 'schedule') render(); });
+    });
+    new MutationObserver(() => {
+      if (!$('screenSchedule').classList.contains('active')) { gridObserver.disconnect(); cancelAnimationFrame(gridFrame); }
+    }).observe($('screenSchedule'), { attributes: true, attributeFilter: ['class'] });
+    window.addEventListener('resize', () => {
+      if (S.screen === 'schedule') { cancelAnimationFrame(gridFrame); gridFrame = requestAnimationFrame(render); }
+    });
+  }
+  render(); gridObserver.observe($('schGrid'));
+};
 setInterval(() => { if (S.screen === 'schedule' && !S.modal.length) render(); else if (S.screen === 'home' && S.user) renderTodayPanel(); }, 60000);   // keeps the countdown and status changes fresh
 
 export function openTodayEvent() { month = new Date(); render(); openEvent(dayKey(Date.now())); }
