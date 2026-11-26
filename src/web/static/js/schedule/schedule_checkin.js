@@ -1,10 +1,10 @@
-import { T } from '../i18n.js';
+import { T, TOPICS } from '../i18n.js';
 import { go } from '../nav.js';
 import { S } from '../state.js';
 import { toast } from '../ui.js';
 import { canCheckIn, occurrenceStatus } from './schedule_model.js';
 import { markDone } from './schedule_store.js';
-import { shouldCompleteCheckIn, shouldClearOnLeave } from './schedule_view.js';
+import { shouldCompleteCheckIn, shouldClearOnLeave, lengthLabel } from './schedule_view.js';
 
 let context = null, callbacks;
 export function configureCheckIn(value) { callbacks = value; }
@@ -15,7 +15,7 @@ function paintBanner() {
   banner.replaceChildren();
   if (banner.hidden) return;
   const text = document.createElement('span');
-  text.textContent = T('schedule.scheduledPractice') + ' \u00B7 ' + T('schedule.minutes', { n: context.duration_min }) + (context.note ? ' \u00B7 ' + context.note : '') + ' \u00B7';
+  text.textContent = T('schedule.scheduledPractice') + ' \u00B7 ' + (context.all_day ? T('schedule.allDay') + ' \u00B7 ' : '') + lengthLabel(context.duration_min, T('schedule')) + (context.category && context.category !== 'any' ? ' \u00B7 ' + TOPICS[context.category] : '') + (context.note ? ' \u00B7 ' + context.note : '') + ' \u00B7';
   const badge = document.createElement('span');
   badge.className = 'badge-demo'; badge.textContent = T('schedule.demo');
   banner.append(text, badge);
@@ -27,7 +27,7 @@ export function startCheckIn(occ) {
     toast(T('schedule.checkInClosed')); callbacks.rerender(); return;
   }
   if (S.evaluation?.background) { go('practice'); return; }
-  context = { occKey: occ.key, event_id: occ.event_id, start: occ.start, duration_min: occ.duration_min, note: occ.note, checkin_at: now };
+  context = { occKey: occ.key, event_id: occ.event_id, start: occ.start, duration_min: occ.duration_min, all_day: occ.all_day, category: occ.category, note: occ.note, checkin_at: now };
   go('practice'); paintBanner();
 }
 new MutationObserver(() => {
