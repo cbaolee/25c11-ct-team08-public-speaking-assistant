@@ -115,6 +115,9 @@ export function countOccurrencesBefore(event, day) {
     cursor.setDate(cursor.getDate() + 1);
   }
 }
+export function remainingCount(event, day) {
+  return event.recurrence.end.kind === 'count' ? event.recurrence.end.count - countOccurrencesBefore(event, day) : null;
+}
 export function deleteFromOccurrence(state, eventId, day) {
   const event = state.events.find(e => e.id === eventId);
   if (!event) return state;

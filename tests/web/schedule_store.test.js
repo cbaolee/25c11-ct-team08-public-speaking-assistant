@@ -218,3 +218,14 @@ test('edit timestamps track schedule and detail changes independently', async ()
   const split = s.editOccurrence({ ...state, events: [countSeries()] }, 'a', '2026-11-27', {}, { now, newId: 'b' });
   assert.equal(split.events[1].created_at, e.created_at); assert.equal(split.events[1].details_edited_at, e.details_edited_at);
 });
+
+test('remainingCount counts sessions from the selected occurrence', async () => {
+  const s = await store;
+  const event = { date: '2026-11-25', recurrence: { kind: 'daily', days: [], end: { kind: 'count', count: 5 } } };
+  assert.equal(s.remainingCount(event, '2026-11-25'), 5);
+  assert.equal(s.remainingCount(event, '2026-11-27'), 3);
+  assert.equal(s.remainingCount(event, '2026-11-29'), 1);
+  for (const end of [{ kind: 'until', until: '2026-12-01' }, { kind: 'never' }]) {
+    assert.equal(s.remainingCount({ ...event, recurrence: { ...event.recurrence, end } }, '2026-11-27'), null);
+  }
+});

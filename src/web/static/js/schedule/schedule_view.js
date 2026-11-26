@@ -53,3 +53,32 @@ export function formatDurationWords(ms, words = { hour: 'hour', hours: 'hours', 
 export function closesTone(ms) { return ms >= 60 * 60000 ? 'ok' : 'danger'; }
 export function carouselStep(index, total, visible, step) { return Math.max(0, Math.min(Math.max(0, total - visible), index + step)); }
 export function edgeFades(index, total, visible) { return { left: index > 0, right: index + visible < total }; }
+
+// Kept local because this pure module is also loaded from a data URL in tests.
+const STYLE_COLORS = { blue: '#1D4ED8', green: '#047857', amber: '#D97706', brown: '#92400E', red: '#B91C1C', slate: '#1B2433', gray: '#5B6475', sky: '#BBD0FB' };
+export const DONE_FILL_OPACITY = 0.5;
+export const MISSED_BORDER_OPACITY = 0.6;
+const channels = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+export function blendOver(hex, opacity, baseHex) {
+  const base = channels(baseHex);
+  return '#' + channels(hex).map((value, i) => Math.round(value * opacity + base[i] * (1 - opacity)).toString(16).padStart(2, '0')).join('').toUpperCase();
+}
+export function contrastRatio(hexA, hexB) {
+  const luminance = hex => channels(hex).map(value => value / 255).map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4).reduce((sum, value, i) => sum + value * [0.2126, 0.7152, 0.0722][i], 0);
+  const a = luminance(hexA), b = luminance(hexB);
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+export function occurrenceStyle(status, colorKey) {
+  const color = STYLE_COLORS[colorKey] || STYLE_COLORS.blue;
+  const missed = status === 'missed', opacity = status === 'done' ? DONE_FILL_OPACITY : 1;
+  const background = missed ? '#FFFFFF' : blendOver(color, opacity, '#FFFFFF');
+  const text = contrastRatio('#FFFFFF', background) > contrastRatio('#1B2433', background) ? '#FFFFFF' : '#1B2433';
+  return { fill: missed ? null : color, fillOpacity: missed ? 0 : opacity, border: color, borderOpacity: missed ? MISSED_BORDER_OPACITY : 1, borderStyle: missed ? 'dashed' : 'solid', ring: status === 'active', text };
+}
+
+export function rgba(hex, opacity) { return `rgba(${channels(hex).join(', ')}, ${opacity})`; }
+export function styleVars(style) {
+  return { '--sch-ev-fill': style.fill ? rgba(style.fill, style.fillOpacity) : 'transparent', '--sch-ev-border': rgba(style.border, style.borderOpacity), '--sch-ev-border-style': style.borderStyle, '--sch-ev-text': style.text, '--sch-ev-ring': style.ring ? style.border : 'transparent' };
+}
+export function sessionTimeLabel(occ, fmtTime, words) { return occ.all_day ? words.allDay : fmtTime(occ.start); }
+export function lengthLabel(min, words) { return min == null ? words.anyLength : words.minutes.replace('{n}', String(min)); }

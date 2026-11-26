@@ -99,3 +99,44 @@ test('carousel steps clamp and fades reflect hidden cards', async () => {
   assert.deepEqual(edgeFades(3, 8, 3), { left: true, right: true });
   assert.deepEqual(edgeFades(5, 8, 3), { left: true, right: false });
 });
+
+test('occurrence styles use palette colors, status and accessible text', async () => {
+  const { occurrenceStyle, blendOver, contrastRatio, DONE_FILL_OPACITY, MISSED_BORDER_OPACITY } = await view;
+  assert.equal(contrastRatio('#FFFFFF', '#000000'), 21);
+  assert.equal(blendOver('#1D4ED8', 0.6, '#FFFFFF'), '#7795E8');
+  assert.equal(DONE_FILL_OPACITY, 0.5);
+  assert.equal(blendOver('#1D4ED8', DONE_FILL_OPACITY, '#FFFFFF'), '#8EA7EC');
+  for (const color of ['blue', 'sky']) {
+    for (const status of ['active', 'upcoming', 'done', 'missed']) {
+      const style = occurrenceStyle(status, color);
+      assert.equal(style.ring, status === 'active');
+      assert.equal(style.borderStyle, status === 'missed' ? 'dashed' : 'solid');
+      assert.equal(style.borderOpacity, status === 'missed' ? MISSED_BORDER_OPACITY : 1);
+      assert.equal(style.fillOpacity, status === 'missed' ? 0 : status === 'done' ? DONE_FILL_OPACITY : 1);
+    }
+  }
+  assert.equal(occurrenceStyle('active', 'sky').text, '#1B2433');
+  assert.equal(occurrenceStyle('active', 'blue').text, '#FFFFFF');
+  assert.equal(occurrenceStyle('active', 'slate').text, '#FFFFFF');
+  assert.deepEqual(occurrenceStyle('done', 'unknown'), occurrenceStyle('done', 'blue'));
+  for (const color of ['blue', 'green', 'amber', 'brown', 'red', 'slate', 'gray', 'sky']) {
+    for (const status of ['active', 'upcoming', 'done']) {
+      const style = occurrenceStyle(status, color);
+      const background = blendOver(style.fill, style.fillOpacity, '#FFFFFF');
+      assert.ok(contrastRatio(style.text, background) >= 4.5, `${color} ${status}`);
+    }
+  }
+});
+
+
+test('event style variables and labels handle all day and optional lengths', async () => {
+  const { rgba, styleVars, occurrenceStyle, sessionTimeLabel, lengthLabel } = await view;
+  assert.equal(rgba('#1D4ED8', 0.5), 'rgba(29, 78, 216, 0.5)');
+  assert.deepEqual(styleVars(occurrenceStyle('missed', 'blue')), { '--sch-ev-fill': 'transparent', '--sch-ev-border': 'rgba(29, 78, 216, 0.6)', '--sch-ev-border-style': 'dashed', '--sch-ev-text': '#1B2433', '--sch-ev-ring': 'transparent' });
+  assert.equal(styleVars(occurrenceStyle('active', 'blue'))['--sch-ev-ring'], '#1D4ED8');
+  const words = { allDay: 'All day', anyLength: 'Any length', minutes: '{n} min' };
+  assert.equal(sessionTimeLabel({ all_day: true, start: 42 }, () => { throw Error('unexpected'); }, words), 'All day');
+  assert.equal(sessionTimeLabel({ all_day: false, start: 42 }, n => `time ${n}`, words), 'time 42');
+  assert.equal(lengthLabel(null, words), 'Any length');
+  assert.equal(lengthLabel(10, words), '10 min');
+});
