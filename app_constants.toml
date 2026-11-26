@@ -208,3 +208,25 @@ save = 5
 
 [retention]
 insufficient_days = 7
+
+[script_limits]
+# Provisional, not yet measured. Anti-spam limits of POST /api/generate-script (ADR-015).
+# Shortest gap between two Regenerate requests of one user, in seconds
+regenerate_cooldown_s = 15
+# Gap used instead when the requested speech is long, in seconds
+regenerate_long_cooldown_s = 30
+# Speeches of at least this length use the long gap, in minutes
+regenerate_long_min_duration = 15
+# Most Regenerate requests of one user in one Regenerate window, in requests
+regenerate_max_per_window = 5
+# Length of the fixed Regenerate window, in seconds
+regenerate_window_s = 600
+# Most Generate and Regenerate requests together of one user in one window, in requests
+generate_max_per_window = 10
+# Length of the fixed window for that total, in seconds
+generate_window_s = 600
+# Wait suggested to the client while the user's previous script job is still running, in seconds
+active_job_retry_after_s = 5
+# A job still active this long after it was created is ignored as stuck, in seconds
+# (same as POLL_MAX_MS of the web UI, 5 minutes)
+active_job_stale_s = 300
