@@ -6,6 +6,7 @@ Saved scripts live in the `scripts` table (`/api/scripts*` in src/app/main.py), 
 import hashlib
 import logging
 import re
+import time
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
@@ -116,6 +117,7 @@ class ScriptGenerationPipeline:
         self.max_cache_size = max_cache_size
         self.max_jobs_capacity = 128
         self._jobs: OrderedDict[str, ScriptJobState] = OrderedDict()
+        self._active_since: dict[str, float] = {}  # job_id -> created or first seen active
         self._cache: OrderedDict[str, GeneratedScript] = OrderedDict()
 
     def _evict_jobs_if_needed(self) -> None:
@@ -134,6 +136,7 @@ class ScriptGenerationPipeline:
         job_id = str(uuid.uuid4())
         job = ScriptJobState(job_id=job_id, user_id=user_id, status="queued", progress=0)
         self._jobs[job_id] = job
+        self._active_since[job_id] = time.monotonic()
         self._evict_jobs_if_needed()
         return job
 
@@ -434,3 +437,24 @@ class ScriptGenerationPipeline:
             if cleanup_pdf and request.pdf_path:
                 Path(request.pdf_path).unlink(missing_ok=True)
         return job
+
+    def has_active_job(self, user_id: str, *, now: float | None = None) -> bool:
+        """True while `user_id` has a queued or running job in this process.
+
+        A job created `active_job_stale_s` or more ago is ignored as stuck. A job without a
+        creation time (not made by `create_job`) is timed from the first call that sees it.
+        """
+        now = time.monotonic() if now is None else now
+        stale_s = CONSTANTS["script_limits"]["active_job_stale_s"]
+        # `_jobs` has no lock and worker threads change job states, so read a snapshot. The
+        # answer can be out of date at once and knows nothing about other processes.
+        active = {
+            job.job_id: job.user_id
+            for job in tuple(self._jobs.values())
+            if job.status in ("queued", "extracting", "moderating", "generating")
+        }
+        self._active_since = {jid: self._active_since.get(jid, now) for jid in active}
+        return any(
+            owner == user_id and now - self._active_since[jid] < stale_s
+            for jid, owner in active.items()
+        )
