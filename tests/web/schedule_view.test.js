@@ -149,3 +149,24 @@ test('chip capacity reserves the measured overflow line only when needed', async
   assert.deepEqual(chipsThatFit(66, 28, 20, 14, 4, 2), { shown: 0, more: 2 });
   assert.deepEqual(chipsThatFit(100, 28, 20, 14, 4, 0), { shown: 0, more: 0 });
 });
+
+test('week helpers use calendar days, ranges and initial scroll', async () => {
+  const { weekDays, weekRangeLabel, initialScrollHour, blockGeometry } = await view;
+  const fmt = (d, options) => new Intl.DateTimeFormat('en-US', options).format(d);
+  assert.deepEqual(weekDays('2026-03-08'), ['2026-03-02','2026-03-03','2026-03-04','2026-03-05','2026-03-06','2026-03-07','2026-03-08']);
+  assert.equal(weekRangeLabel('2026-11-23', fmt), 'Nov 23 \u2013 29, 2026');
+  assert.equal(weekRangeLabel('2026-11-30', fmt), 'Nov 30 \u2013 Dec 6, 2026');
+  assert.equal(weekRangeLabel('2026-12-28', fmt), 'Dec 28, 2026 \u2013 Jan 3, 2027');
+  assert.equal(initialScrollHour(weekDays('2026-03-08'), '2026-03-08', 19), 19);
+  assert.equal(initialScrollHour(weekDays('2026-03-08'), '2026-03-09', 19), 7);
+  assert.deepEqual(blockGeometry(1435, null, 60), { top: 1435, height: 5 });
+  assert.deepEqual(blockGeometry(60, 10, 60), { top: 60, height: 30 });
+});
+test('week overlap clusters use reusable columns and treat touching blocks as separate', async () => {
+  const { layoutDayBlocks } = await view;
+  const layout = intervals => layoutDayBlocks(intervals.map(([startMin,endMin], key) => ({ key, startMin, endMin }))).map(({col, cols}) => [col, cols]);
+  assert.deepEqual(layout([[0,10],[10,20]]), [[0,1],[0,1]]);
+  assert.deepEqual(layout([[0,10],[5,15]]), [[0,2],[1,2]]);
+  assert.deepEqual(layout([[0,10],[1,11],[2,12]]), [[0,3],[1,3],[2,3]]);
+  assert.deepEqual(layout([[0,10],[5,15],[10,20]]), [[0,2],[1,2],[0,2]]);
+});

@@ -91,3 +91,34 @@ export function chipsThatFit(cellInnerHeight, headerHeight, chipHeight, moreHeig
   const shown = chipHeight > 0 ? Math.max(0, Math.min(count - 1, Math.floor((available - moreHeight - gap) / (chipHeight + gap)))) : 0;
   return { shown, more: count - shown };
 }
+
+export const WEEK_MIN_BLOCK_MIN = 30;
+const localKey = d => `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const localDate = key => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+export function weekDays(key) {
+  const date = localDate(key); date.setDate(date.getDate() - (date.getDay() + 6) % 7);
+  return Array.from({ length: 7 }, (_, i) => localKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + i)));
+}
+export function weekRangeLabel(key, fmt) {
+  const days = weekDays(key), a = localDate(days[0]), b = localDate(days[6]);
+  const differentYear = a.getFullYear() !== b.getFullYear();
+  const first = `${fmt(a, { month: 'short' })} ${a.getDate()}${differentYear ? ', ' + a.getFullYear() : ''}`;
+  const last = `${a.getMonth() !== b.getMonth() || differentYear ? fmt(b, { month: 'short' }) + ' ' : ''}${b.getDate()}, ${b.getFullYear()}`;
+  return `${first} \u2013 ${last}`;
+}
+export function blockGeometry(startMin, durationMin, hourPx) {
+  const start = Math.max(0, Math.min(1440, startMin));
+  return { top: start * hourPx / 60, height: Math.max(0, Math.min(1440 - start, Math.max(WEEK_MIN_BLOCK_MIN, durationMin || 0))) * hourPx / 60 };
+}
+export function initialScrollHour(days, today, nowHour) { return days.includes(today) ? nowHour : 7; }
+export function layoutDayBlocks(items) {
+  const sorted = items.map((item, index) => ({ ...item, index })).sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin || a.index - b.index);
+  const output = Array(items.length); let cluster = [], ends = [], clusterEnd = -Infinity;
+  const finish = () => { const cols = ends.length; cluster.forEach(item => { output[item.index] = { ...items[item.index], col: item.col, cols }; }); };
+  sorted.forEach(item => {
+    if (cluster.length && item.startMin >= clusterEnd) { finish(); cluster = []; ends = []; clusterEnd = -Infinity; }
+    let col = ends.findIndex(end => end <= item.startMin); if (col < 0) col = ends.length;
+    ends[col] = item.endMin; clusterEnd = Math.max(clusterEnd, item.endMin); cluster.push({ ...item, col });
+  });
+  if (cluster.length) finish(); return output;
+}

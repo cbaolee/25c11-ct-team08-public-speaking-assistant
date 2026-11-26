@@ -5,14 +5,16 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
 let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker, untilPicker;
-let openPopover = null, gridObserver, gridFrame = 0;
+let openPopover = null, gridObserver, gridFrame = 0, view = 'month', viewUser, weekScrollKey = '';
+const WEEK_HOUR_PX = 60;
+function loadView() { if (viewUser !== S.user?.id) { viewUser = S.user?.id; try { view = storage()?.getItem('psa.schedule.view.v1.' + viewUser) === 'week' ? 'week' : 'month'; } catch (_) { view = 'month'; } weekScrollKey = ''; } }
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
 export function getSchedule() {
@@ -119,13 +121,58 @@ function chip(status, label, compact = false, colorKey = DEFAULT_COLOR) {
   el.append(node('span', T('schedule.' + status), 'sch-chip-word'));
   return el;
 }
+function monthChip(status, label, color) {
+  const el = chip(status, label, true, color);
+  el.querySelector('.sch-chip-word').classList.add('sr-only');
+  el.title = T('schedule.' + status) + ' \u2013 ' + label;
+  return el;
+}
+function renderWeek(now) {
+  const root = $('schWeek'), keys = weekDays(dayKey(month)), today = dayKey(now), oldScroll = root.querySelector('.sch-week-scroll')?.scrollTop, focusKey = root.contains(document.activeElement) ? document.activeElement.dataset.occKey : null;
+  const focusDay = root.contains(document.activeElement) ? document.activeElement.dataset.schDay : null;
+  const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[6]), 1));
+  root.replaceChildren();
+  const wide = node('div', null, 'sch-week-wide'), headers = node('div', null, 'sch-week-row sch-week-headers'), all = node('div', null, 'sch-week-row sch-week-all');
+  headers.append(node('span')); all.append(node('span', T('schedule.allDay'), 'sch-week-axis'));
+  const scroll = node('div', null, 'sch-week-scroll'), body = node('div', null, 'sch-week-row sch-week-body');
+  body.setAttribute('role', 'list'); body.setAttribute('aria-label', T('schedule.weekTimeGrid'));
+  const axis = node('div', null, 'sch-week-hours'); axis.setAttribute('role', 'presentation'); axis.setAttribute('aria-hidden', 'true');
+  for (let h = 0; h < 24; h++) { const label = node('span', fmt(new Date(2000, 0, 1, h), { hour: 'numeric' })); label.style.top = (h * WEEK_HOUR_PX) + 'px'; axis.append(label); }
+  body.append(axis);
+  keys.forEach(key => {
+    const date = fullDate(parseDay(key)), header = node('div', null, 'sch-week-header sch-cell');
+    const day = button(fmt(parseDay(key), { weekday: 'short', day: 'numeric' }), () => openDay(key), 'sch-week-day'); day.dataset.schDay = key; day.setAttribute('aria-label', date);
+    if (key === today) day.classList.add('sch-week-today'); header.append(day);
+    if (key >= today) { const add = button('+', () => openEvent(key), 'sch-add'); add.dataset.schDay = key; add.setAttribute('aria-label', T('schedule.addPracticeOn', { date })); header.append(add); }
+    headers.append(header);
+    const allCell = node('div', null, 'sch-week-all-cell');
+    occs.filter(o => o.day === key && o.all_day).forEach(o => { const status = occurrenceStatus(o, now), b = button('', () => openDay(key, o.key), 'sch-week-all-button'); b.dataset.occKey = o.key; b.setAttribute('aria-label', [date, T('schedule.allDay'), lengthLabel(o.duration_min, labelWords()), T('schedule.' + status)].join(', ')); b.append(monthChip(status, T('schedule.allDay'), o.color)); allCell.append(b); }); all.append(allCell);
+    const column = node('div', null, 'sch-week-column'); column.setAttribute('role', 'listitem'); column.setAttribute('aria-label', date);
+    const items = occs.filter(o => o.day === key && !o.all_day).map(o => { const d = new Date(o.start), startMin = d.getHours() * 60 + d.getMinutes(); return { key: o.key, startMin, endMin: Math.min(1440, startMin + Math.max(WEEK_MIN_BLOCK_MIN, o.duration_min || 0)), occ: o }; });
+    layoutDayBlocks(items).forEach(item => { const o = item.occ, status = occurrenceStatus(o, now), length = lengthLabel(o.duration_min, labelWords()), geom = blockGeometry(item.startMin, o.duration_min, WEEK_HOUR_PX);
+      const b = button('', () => openDay(key, o.key), 'sch-week-block'); b.dataset.occKey = o.key; b.setAttribute('aria-label', [date, time(o.start), length, T('schedule.' + status)].join(', ')); applyEventStyle(b, status, o.color);
+      b.style.top = geom.top + 'px'; b.style.height = geom.height + 'px'; b.style.left = (item.col * 100 / item.cols) + '%'; b.style.width = (100 / item.cols) + '%';
+      const icon = node('span', { active: '\u25CF', done: '\u2713', upcoming: '\u25CB', missed: '\u25CC' }[status]); icon.setAttribute('aria-hidden', 'true'); b.title = T('schedule.' + status); b.append(icon, node('span', time(o.start) + (o.duration_min == null ? '' : ' \u00B7 ' + length), 'sch-week-block-label'), node('span', T('schedule.' + status), 'sr-only')); column.append(b); });
+    if (key === today) { const d = new Date(now), line = node('div', null, 'sch-now-line'); line.setAttribute('aria-hidden', 'true'); line.style.top = ((d.getHours() * 60 + d.getMinutes()) * WEEK_HOUR_PX / 60) + 'px'; column.append(line); }
+    body.append(column);
+  });
+  scroll.append(body); wide.append(headers, all, scroll); root.append(wide);
+  wide.style.setProperty('--sch-scrollbar-width', (scroll.offsetWidth - scroll.clientWidth) + 'px');
+  const newKey = keys[0]; scroll.scrollTop = newKey === weekScrollKey && oldScroll != null ? oldScroll : Math.max(0, initialScrollHour(keys, today, new Date(now).getHours()) * WEEK_HOUR_PX - 8); weekScrollKey = newKey;
+  if (focusKey) [...root.querySelectorAll('[data-occ-key]')].find(el => el.dataset.occKey === focusKey)?.focus();
+  else if (focusDay) [...root.querySelectorAll('[data-sch-day]')].find(el => el.dataset.schDay === focusDay)?.focus();
+}
 function render() {
+  loadView();
+  const panel = $('schGrid').closest('.sch-panel'); panel.style.setProperty('--sch-panel-top', (panel.getBoundingClientRect().top + window.scrollY) + 'px');
+  $('schWeek').hidden = view !== 'week'; $('schGrid').hidden = view === 'week'; $('schWeekdays').hidden = view === 'week';
+  $('schViewToggle').querySelectorAll('button').forEach(b => { const selected = b.value === view; b.setAttribute('aria-checked', String(selected)); b.tabIndex = selected ? 0 : -1; });
+  $('schPrev').setAttribute('aria-label', T(view === 'week' ? 'schedule.previousWeek' : 'schedule.previous')); $('schNext').setAttribute('aria-label', T(view === 'week' ? 'schedule.nextWeek' : 'schedule.nextMonth'));
+  if (view === 'week') { $('schMonth').textContent = weekRangeLabel(dayKey(month), fmt); $('schMonthLive').textContent = $('schMonth').textContent; $('schEmpty').hidden = true; renderWeek(Date.now()); return; }
   const state = getSchedule(), keys = monthGrid(month.getFullYear(), month.getMonth()), now = Date.now();
   $('schMonth').textContent = fmt(month, { month: 'long', year: 'numeric' });
   $('schMonthLive').textContent = $('schMonth').textContent;
   const grid = $('schGrid'), focusedDay = document.activeElement?.dataset.schDay, focusedAdd = document.activeElement?.classList.contains('sch-add');
-  const panel = grid.closest('.sch-panel');
-  panel.style.setProperty('--sch-panel-top', (panel.getBoundingClientRect().top + window.scrollY) + 'px');
   grid.replaceChildren();
   const cells = [];
   const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[41]), 1));
@@ -148,12 +195,6 @@ function render() {
     grid.append(cell); cells.push({ b, list });
   });
   $('schEmpty').hidden = state.events.length !== 0;
-  const monthChip = (status, label, color) => {
-    const el = chip(status, label, true, color);
-    el.querySelector('.sch-chip-word').classList.add('sr-only');
-    el.title = T('schedule.' + status) + ' \u2013 ' + label;
-    return el;
-  };
   const sample = monthChip('upcoming', '12:00 PM'), moreSample = node('span', T('schedule.more', { n: 1 }), 'sch-more');
   cells[0].b.append(sample, moreSample);
   const day = cells[0].b, styles = getComputedStyle(day);
@@ -284,6 +325,7 @@ function openEmail(occ, event) {
   openModal('schEmailModal');
 }
 function init() {
+  makeSegments('schViewToggle', ['month', 'week'], value => T('schedule.' + value + 'View'), () => { const value = $('schViewToggle').value; view = value; weekScrollKey = ''; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {} render(); });
   T('schedule.weekdays').forEach((name, i) => { $('schWeekdays').append(node('span', name)); const b = button(name, () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); updateRecurrence(); }, 'sch-day-toggle'); b.value = i + 1; b.setAttribute('aria-pressed', 'false'); $('schDayChecks').append(b); });
   ['upcoming', 'active', 'done', 'missed'].forEach(status => { const c = chip(status, null, false, DEFAULT_COLOR); if (status === 'active') c.lastChild.textContent = T('schedule.activeLegend'); $('schLegend').append(c); });
   makeSegments('schLength', ['any', ...DURATIONS_MIN], n => n === 'any' ? T('schedule.any') : T('schedule.minutes', { n }), updateRecurrence);
@@ -319,7 +361,7 @@ function init() {
     const back = button('', () => { const now = Date.now(); month = new Date(now); render(); closePicker(); $('schGrid').querySelector(`[data-sch-day="${dayKey(now)}"]`)?.focus(); }, 'btn btn-sm sch-picker-back');
     const backIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); backIcon.setAttribute('viewBox', '0 0 24 24'); backIcon.setAttribute('aria-hidden', 'true');
     const backPath = document.createElementNS('http://www.w3.org/2000/svg', 'path'); backPath.setAttribute('d', 'M19 12H5M12 19l-7-7 7-7'); backIcon.append(backPath); back.append(backIcon, node('span', T('schedule.backToday')));
-    const updateBack = () => { const today = new Date(); back.disabled = pickedYear === today.getFullYear() && pickedMonth === today.getMonth() && month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth(); };
+    const updateBack = () => { const today = new Date(); back.disabled = pickedYear === today.getFullYear() && pickedMonth === today.getMonth() && month.getFullYear() === today.getFullYear() && month.getMonth() === today.getMonth() && (view !== 'week' || weekDays(dayKey(month)).includes(dayKey(today))); };
     updateBack();
     [['pickerMonth', 'previous', 'nextMonth', false], ['pickerYear', 'previousYear', 'nextYear', true]].forEach(([title, prev, next, year]) => {
       const section = node('span', null, 'sch-month-column');
@@ -379,8 +421,8 @@ function init() {
   window.addEventListener('resize', () => { if (!picker.hidden) closePicker(); });
   document.addEventListener('scroll', e => { if (!picker.hidden && !picker.contains(e.target)) closePicker(); }, true);
   document.addEventListener('pointerdown', e => { if (!picker.hidden && !picker.parentElement.contains(e.target)) closePicker(); });
-  $('schPrev').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
-  $('schNext').onclick = () => { month = new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
+  $('schPrev').onclick = () => { month = view === 'week' ? new Date(addDays(month, -7)) : new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
+  $('schNext').onclick = () => { month = view === 'week' ? new Date(addDays(month, 7)) : new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
   $('schForm').onsubmit = e => {
     e.preventDefault(); const input = currentInput();
     if (editing && editing.event.recurrence.kind === 'none') input.recurrence = editing.event.recurrence;
@@ -412,7 +454,7 @@ RENDER.schedule = () => {
       if (S.screen === 'schedule') { cancelAnimationFrame(gridFrame); gridFrame = requestAnimationFrame(render); }
     });
   }
-  render(); gridObserver.observe($('schGrid'));
+  weekScrollKey = ''; render(); gridObserver.observe($('schGrid'));
 };
 setInterval(() => { if (S.screen === 'schedule' && !S.modal.length) render(); else if (S.screen === 'home' && S.user) renderTodayPanel(); }, 60000);   // keeps the countdown and status changes fresh
 
