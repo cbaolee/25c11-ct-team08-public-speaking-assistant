@@ -4,6 +4,35 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../src/web/static/js/schedule/schedule_view.js'), 'utf8');
 const view = import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+test('month to week selects today in the current month and otherwise the first day', async () => {
+  const { weekForMonthView } = await view;
+  const now = new Date(2026, 10, 27, 12).getTime();
+  for (const [month, expected] of [['2026-11', '2026-11-23'], ['2026-12', '2026-11-30'], ['2027-02', '2027-02-01'], ['2026-03', '2026-02-23'], ['2026-01', '2025-12-29']]) {
+    assert.equal(weekForMonthView(month, now), expected);
+  }
+});
+test('week to month prefers today, otherwise the Thursday of the week', async () => {
+  const { monthForWeekView } = await view;
+  assert.equal(monthForWeekView('2026-11-30', new Date(2026, 11, 1, 12).getTime()), '2026-12');
+  assert.equal(monthForWeekView('2026-12-28', new Date(2027, 0, 1, 12).getTime()), '2027-01');
+  const now = new Date(2026, 10, 27, 12).getTime();
+  for (const [day, expected] of [['2026-11-30', '2026-12'], ['2025-12-29', '2026-01'], ['2026-12-03', '2026-12'], ['2026-08-31', '2026-09']]) {
+    assert.equal(monthForWeekView(day, now), expected);
+  }
+});
+test('month and week round trip follows the Thursday rule for every other month in 2026', async () => {
+  const { weekForMonthView, monthForWeekView } = await view;
+  const now = new Date(2026, 10, 27, 12).getTime();
+  for (let m = 0; m < 12; m++) {
+    if (m === 10) continue;
+    const key = `2026-${String(m + 1).padStart(2, '0')}`;
+    const day = new Date(2026, m, 1).getDay();
+    // Friday through Sunday puts the first day's week in the previous month by Thursday.
+    const previous = new Date(2026, m - 1, 1);
+    const expected = day === 0 || day >= 5 ? `${previous.getFullYear()}-${String(previous.getMonth() + 1).padStart(2, '0')}` : key;
+    assert.equal(monthForWeekView(weekForMonthView(key, now), now), expected, key);
+  }
+});
 test('month grid starts Monday and spans six weeks across a year boundary', async () => {
   const { monthGrid } = await view;
   const days = monthGrid(2026, 0);

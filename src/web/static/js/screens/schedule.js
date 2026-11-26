@@ -7,7 +7,7 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
@@ -365,7 +365,13 @@ function openEmail(occ, event) {
   openModal('schEmailModal');
 }
 function init() {
-  makeSegments('schViewToggle', ['month', 'week'], value => T('schedule.' + value + 'View'), () => { const value = $('schViewToggle').value; view = value; weekScrollKey = ''; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {} render(); });
+  makeSegments('schViewToggle', ['month', 'week'], value => T('schedule.' + value + 'View'), () => {
+    const value = $('schViewToggle').value;
+    if (value === view) return;
+    if (value === 'week') month = new Date(parseDay(weekForMonthView(dayKey(month).slice(0, 7), Date.now())));
+    else { const [y, m] = monthForWeekView(dayKey(month), Date.now()).split('-').map(Number); month = new Date(y, m - 1, 1); }
+    view = value; weekScrollKey = ''; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {} render();
+  });
   T('schedule.weekdays').forEach((name, i) => { $('schWeekdays').append(node('span', name)); const b = button(name, () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); updateRecurrence(); }, 'sch-day-toggle'); b.value = i + 1; b.setAttribute('aria-pressed', 'false'); $('schDayChecks').append(b); });
   ['upcoming', 'active', 'done', 'missed'].forEach(status => { const c = chip(status, null, false, DEFAULT_COLOR); if (status === 'active') c.lastChild.textContent = T('schedule.activeLegend'); $('schLegend').append(c); });
   makeSegments('schLength', ['any', ...DURATIONS_MIN], n => n === 'any' ? T('schedule.any') : T('schedule.minutes', { n }), () => { updateRecurrence(); updateScriptErrors(); });

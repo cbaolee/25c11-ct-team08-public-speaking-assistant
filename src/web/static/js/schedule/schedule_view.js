@@ -99,6 +99,15 @@ export function weekDays(key) {
   const date = localDate(key); date.setDate(date.getDate() - (date.getDay() + 6) % 7);
   return Array.from({ length: 7 }, (_, i) => localKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + i)));
 }
+export function weekForMonthView(monthKey, now) {
+  const today = localKey(new Date(now));
+  return weekDays(today.slice(0, 7) === monthKey ? today : monthKey + '-01')[0];
+}
+export function monthForWeekView(weekStart, now) {
+  const days = weekDays(weekStart), today = localKey(new Date(now));
+  // The ISO week belongs to the month/year containing Thursday, with at least four days in that month.
+  return (days.includes(today) ? today : days[3]).slice(0, 7);
+}
 export function weekRangeLabel(key, fmt) {
   const days = weekDays(key), a = localDate(days[0]), b = localDate(days[6]);
   const differentYear = a.getFullYear() !== b.getFullYear();
