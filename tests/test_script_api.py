@@ -101,6 +101,7 @@ def _submit_and_poll(
         app_main.generate_script_endpoint(
             user=_user(user_id),
             background_tasks=bg,
+            repos=build_memory_repos(),
             topic=topic,
             category=category,
             duration_min=duration_min,
