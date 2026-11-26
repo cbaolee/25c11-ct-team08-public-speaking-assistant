@@ -240,3 +240,5 @@
   .sch-week { overflow-x: auto; }
   .sch-week-wide { min-width: 671px; height: 650px; }
 }
+
+.sch-switch:disabled, .sch-segment:disabled, .sch-day-toggle:disabled, .sch-swatch:disabled { opacity: .5; cursor: not-allowed; }

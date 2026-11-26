@@ -5,7 +5,7 @@ import { go } from '../nav.js';
 import { S, RENDER } from '../state.js';
 import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
-import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
+import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
 import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
@@ -19,9 +19,8 @@ const WEEK_HOUR_PX = 60;
 function loadView() { if (viewUser !== S.user?.id) { viewUser = S.user?.id; try { view = storage()?.getItem('psa.schedule.view.v1.' + viewUser) === 'week' ? 'week' : 'month'; } catch (_) { view = 'month'; } weekScrollKey = ''; } }
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
-function pruneCache() { if (S.user?.id) writeAiCache(storage(), S.user.id, pruneAiCache(readAiCache(storage(), S.user.id), Date.now())); }
+function pruneCache() { if (S.user?.id) { const store = storage(), cache = readAiCache(store, S.user.id), pruned = pruneAiCache(cache, Date.now()); if (Object.keys(pruned).length !== Object.keys(cache).length) writeAiCache(store, S.user.id, pruned); } }
 export function getSchedule() {
-  pruneCache();
   const id = S.user?.id;
   if (cachedUser !== id || !cachedState) { cachedUser = id; cachedState = loadSchedule(id, options()); }
   return cachedState;
@@ -305,7 +304,7 @@ function currentInput() {
   const end = endKind === 'until' ? { kind: 'until', until: $('schUntil').value } : endKind === 'count' ? { kind: 'count', count: Number($('schCount').value) } : { kind: 'never' };
   return { date: $('schDate').value, time: allDay ? null : $('schTime').value, all_day: allDay, duration_min: $('schLength').value === 'any' ? null : Number($('schLength').value), note: $('schNote').value,
     category: $('schCategory').value, color: $('schColor').value, script: currentScript(),
-    recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('[aria-pressed="true"]')].map(x => Number(x.value)), end } };
+    recurrence: normalizeRecurrence({ kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('[aria-pressed="true"]')].map(x => Number(x.value)), end }) };
 }
 function updateRecurrence() {
   const input = currentInput(), repeating = input.recurrence.kind !== 'none', end = input.recurrence.end;
@@ -382,7 +381,7 @@ function init() {
   makeSegments('schRepeat', ['none', 'daily', 'weekly', 'custom'], k => T('schedule.' + (k === 'custom' ? 'customOption' : k)), updateRecurrence);
   setSegment('schLength', 'any'); setSegment('schCategory', 'any'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never');
   $('schNote').maxLength = NOTE_MAX_CHARS; $('schNote').oninput = () => { $('schNoteCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS }); };
-  datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { const until = $('schUntil').value; untilPicker.set(until && until >= value ? until : '', value); timePicker.set(defaultTime(Date.now(), value)); updateRecurrence(); } });
+  datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { const until = $('schUntil').value; untilPicker.set(until && until >= value ? until : '', value); const current = $('schTime').value, now = Date.now(); if (!/^\d{2}:\d{2}$/.test(current) || Number(current.slice(0, 2)) > 23 || Number(current.slice(3)) > 59 || new Date(value + 'T' + current).getTime() <= now) timePicker.set(defaultTime(now, value)); updateRecurrence(); } });
   timePicker = makeTimePicker($('schTimePicker'), () => $('schDate').value, updateRecurrence);
   untilPicker = makeDatePicker($('schUntilPicker'), { min: dayKey(Date.now()), value: '', allowEmpty: true, onChange: updateRecurrence, markDays: (year, month) => { const input = currentInput(), end = dayKey(new Date(year, month + 1, 0).getTime()), limit = (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null) && (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null) < end ? (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null) : end; return previewOccurrenceDays(input, input.date, limit); } });
   $('schReminder').textContent = T('schedule.reminder', { n: REMINDER_LEAD_MIN });
@@ -485,6 +484,7 @@ function init() {
 }
 let initialized = false;
 RENDER.schedule = () => {
+  pruneCache();
   if (!initialized) {
     init(); initialized = true;
     gridObserver = new ResizeObserver(() => {
@@ -513,6 +513,7 @@ const todayButton = (text, cls, action) => {
   return el;
 };
 export function renderTodayPanel() {
+  pruneCache();
   const now = Date.now(), today = parseDay(dayKey(now));
   const occurrences = occurrencesBetween(addDays(startOfWeek(now), -56), addDays(today, 2));
   const summary = todaySummary(occurrences, now);
