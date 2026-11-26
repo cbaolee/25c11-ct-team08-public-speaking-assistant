@@ -21,7 +21,10 @@ export function togglePause() {
   renderPractice();
   $('#recNote').textContent = T(S.rec && S.rec.paused ? 'practice.pausedNote' : 'practice.recordingFollow');
 }
+let practiceSourceLock = null;
+export function setPracticeSourceLock(lock) { practiceSourceLock = lock; }
 export function goStep(i) {
+  if (i === 1 && practiceSourceLock) { toast(practiceSourceLock.message); return; }
   if (S.rec || i >= 3) return;
   const go = () => {
     S.choosing = i === 1; S.audio = null; renderPractice();
@@ -30,7 +33,7 @@ export function goStep(i) {
   };
   if (S.audio) openConfirmDialog(T('practice.stepBackT'), T('practice.stepBackD'), T('practice.discardOk'), go); else go();
 }
-export function selectPickerTab(k) { S.pickerTab = k; S.choosing = true; renderPractice(); }
+export function selectPickerTab(k) { if (practiceSourceLock) return; S.pickerTab = k; S.choosing = true; renderPractice(); }
 export function pickSample() {
   const n = S.sampleN % SAMPLE_TEXTS.length, text = SAMPLE_TEXTS[n], label = 'Text ' + (n + 1);
   S.sampleN++; S.choosing = true;
@@ -111,7 +114,7 @@ export function renderPractice() {
   }
   $('#sampleBtn').textContent = T(S.texts.sample ? 'practice.sampleAnother' : 'practice.sampleBtn');
   updateOwnCount();
-  $$('[data-src]').forEach(b => { b.disabled = !!S.rec; });        // the text must not change while recording
+  $$('[data-src]').forEach(b => { b.disabled = !!S.rec || !!practiceSourceLock; });        // the text must not change while recording
   $('#sampleBtn').disabled = !!S.rec; $('#ownSave').disabled = !!S.rec || !$('#ownText').value.trim();   // like Use this script
   if (S.rec && S.follow) paintFollow();
   // voice tabs
@@ -142,7 +145,7 @@ export function renderPractice() {
     const li = $('#st' + i);
     li.className = i < cur ? 'done' : i === cur ? 'cur' : '';
     if (i === cur) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
-    $('button', li).disabled = !!S.rec || !reach[i - 1] || i === cur;
+    $('button', li).disabled = !!S.rec || !reach[i - 1] || i === cur || (i === 1 && !!practiceSourceLock);
   });
   const changed = shownStep !== null && shownStep !== cur;
   moveStepPill(changed);
