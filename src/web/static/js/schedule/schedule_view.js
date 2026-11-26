@@ -87,7 +87,7 @@ export function chipsThatFit(cellInnerHeight, headerHeight, chipHeight, moreHeig
   const count = Math.max(0, Math.floor(total));
   if (!count) return { shown: 0, more: 0 };
   const available = Math.max(0, cellInnerHeight - headerHeight);
-  if (chipHeight > 0 && count * (chipHeight + gap) <= available) return { shown: count, more: 0 };
+  if (chipHeight > 0 && (count === 1 ? chipHeight : count * (chipHeight + gap)) <= available) return { shown: count, more: 0 };
   const shown = chipHeight > 0 ? Math.max(0, Math.min(count - 1, Math.floor((available - moreHeight - gap) / (chipHeight + gap)))) : 0;
   return { shown, more: count - shown };
 }

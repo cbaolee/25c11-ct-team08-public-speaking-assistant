@@ -11,7 +11,7 @@ import { canCheckIn, occurrenceStatus, windowClosesAt } from './schedule_model.j
 import { markDone } from './schedule_store.js';
 import { shouldCompleteCheckIn, shouldClearOnLeave, lengthLabel } from './schedule_view.js';
 
-let context = null, callbacks, previousPractice = null, generation = null;
+let context = null, callbacks, previousPractice = null, generation = null, loading = new Set();
 const POLL_MAX_MS = 5 * 60 * 1000;
 const pollIntervalMs = () => Number(CONFIG.SCRIPT_POLL_INTERVAL_MS) || 650;
 export function configureCheckIn(value) { callbacks = value; }
@@ -29,13 +29,13 @@ function paintBanner() {
 }
 export function clearCheckIn() {
   context = null; setPracticeSourceLock(null);
-  if (previousPractice) { S.texts.mine = previousPractice.mine; S.pickerTab = previousPractice.tab; previousPractice = null; }
+  if (previousPractice) { S.texts.mine = previousPractice.mine; S.pickerTab = previousPractice.tab; previousPractice = null; if (S.audio) { S.audio = null; S.choosing = true; } }
   paintBanner();
 }
 function begin(occ, at, script) {
   context = { occKey: occ.key, event_id: occ.event_id, start: occ.start, duration_min: occ.duration_min, all_day: occ.all_day, category: occ.category, note: occ.note, script: occ.script, checkin_at: at };
   if (script) {
-    previousPractice = { mine: S.texts.mine, tab: S.pickerTab };
+    if (previousPractice === null) previousPractice = { mine: S.texts.mine, tab: S.pickerTab };
     // Use the Studio handoff so issue #123 can validate unsaved generated scripts.
     runScriptAction(script, 'practice');
     setPracticeSourceLock({ kind: occ.script.kind, message: T('schedule.fixedScript') });
@@ -48,7 +48,7 @@ function begin(occ, at, script) {
 function cacheStorage() { try { return window.localStorage; } catch (_) { return null; } }
 function showGeneration(occ, at) {
   if (generation) generation.abort();
-  const ctl = new AbortController(); generation = ctl;
+  const ctl = new AbortController(); generation = ctl; ctl.occKey = occ.key;
   const progress = document.getElementById('schGenProgress'), cancel = document.getElementById('schGenCancel'), retry = document.getElementById('schGenRetry'), close = document.getElementById('schGenClose');
   progress.textContent = T('schedule.genProgress'); cancel.hidden = false; retry.hidden = true; close.hidden = true;
   const stop = () => { ctl.abort(); if (generation === ctl) generation = null; closeModal('schGenModal'); };
@@ -87,10 +87,12 @@ function handoffAi(occ, at, entry) {
   begin(occ, at, { text: entry.text, title: entry.title, cardName: entry.title, savedId: null, topic: occ.category, duration_min: occ.duration_min, source: 'generated' });
 }
 export function startCheckIn(occ) {
+  if (context?.occKey === occ.key || loading.has(occ.key) || generation?.occKey === occ.key) return;
   const now = Date.now();
   if (!canCheckIn(occ, now) || occurrenceStatus(occ, now) !== 'active') { toast(T('schedule.checkInClosed')); callbacks.rerender(); return; }
   if (S.evaluation?.background) { go('practice'); return; }
   if (occ.script?.kind === 'saved') {
+    loading.add(occ.key);
     api('/api/scripts/' + encodeURIComponent(occ.script.script_id)).then(readJson).then(({ ok, status, j }) => {
       if (status === 404) { openConfirmDialog(T('schedule.savedUnavailable'), T('schedule.savedUnavailableDetail'), T('schedule.practiceFree'), () => begin({ ...occ, script: { kind: 'free' } }, now), { primary: true }); return; }
       if (!ok || !j || typeof j.body !== 'string') throw new Error('request');
@@ -100,7 +102,7 @@ export function startCheckIn(occ) {
       const retry = document.createElement('button'); retry.type = 'button'; retry.className = 'btn btn-sm'; retry.textContent = T('schedule.genRetry');
       retry.onclick = () => { document.getElementById('toast').classList.remove('show'); startCheckIn(occ); };
       document.getElementById('toast').append(retry);
-    });
+    }).finally(() => loading.delete(occ.key));
   } else if (occ.script?.kind === 'ai') {
     const storage = cacheStorage(), cached = getAiScript(readAiCache(storage, S.user.id), occ.key, now);
     if (cached) handoffAi(occ, now, cached); else showGeneration(occ, now);

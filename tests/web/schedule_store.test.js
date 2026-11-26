@@ -229,3 +229,11 @@ test('remainingCount counts sessions from the selected occurrence', async () => 
     assert.equal(s.remainingCount({ ...event, recurrence: { ...event.recurrence, end } }, '2026-11-27'), null);
   }
 });
+
+ test('invalid migrated end date falls back to the seed', async () => {
+  const s = await store, m = await model, storage = memory(), v1 = v1Fixture();
+  v1.events[0].recurrence.until = '2026-11-24';
+  storage.setItem(s.storageKey('u'), JSON.stringify(v1));
+  assert.equal(s.migrateState(v1), null);
+  assert.deepEqual(s.loadSchedule('u', { storage, seed: m.seedSchedule, now }), { version: 2, ...m.seedSchedule(now) });
+});

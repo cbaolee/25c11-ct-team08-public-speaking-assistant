@@ -60,11 +60,12 @@ export function isValidState(x) {
 }
 export function migrateState(x) {
   if (!x || x.version !== 1 || !Array.isArray(x.events) || !x.events.every(isValidV1Event) || !plain(x.done) || !Object.values(x.done).every(isValidDone)) return null;
-  return { version: 2, events: x.events.map(e => {
+  const result = { version: 2, events: x.events.map(e => {
     const { until, ...recurrence } = e.recurrence;
     return { ...e, all_day: false, category: 'any', color: 'blue', script: { kind: 'free' }, details_edited_at: null,
       recurrence: { ...recurrence, end: until ? { kind: 'until', until } : { kind: 'never' } } };
   }), done: x.done };
+  return isValidState(result) ? result : null;
 }
 // Save a schedule when storage is available.
 export function saveSchedule(userId, state, storage) {

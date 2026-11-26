@@ -253,3 +253,12 @@ test('reminder state accounts for creation and detail edit boundaries', async ()
   const m = await model, o = { start: t(25, 19), day: '2026-11-25', all_day: false }, reminder = t(25, 18, 30);
   for (const [created_at, details_edited_at, at, expected] of [[reminder + 1, null, reminder, 'skipped'], [reminder, null, reminder - 1, 'scheduled'], [reminder, null, reminder, 'sent'], [reminder, reminder, reminder, 'sent_then_edited'], [reminder, reminder - 1, reminder, 'sent']]) assert.equal(m.reminderState(o, { created_at, details_edited_at }, at), expected);
 });
+
+ test('normalizes hidden recurrence fields without mutating input', async () => {
+  const m = await model, original = { kind: 'none', days: [1], end: { kind: 'count', count: 0 } };
+  assert.deepEqual(m.normalizeRecurrence(original), { kind: 'none', days: [], end: { kind: 'never' } });
+  assert.equal(original.end.count, 0);
+  assert.deepEqual(m.normalizeRecurrence({ kind: 'weekly', days: [1], end: { kind: 'until', until: '' } }), { kind: 'weekly', days: [], end: { kind: 'until', until: '' } });
+  assert.deepEqual(m.normalizeRecurrence({ kind: 'custom', days: [1], end: { kind: 'never' } }).days, [1]);
+  assert.equal(m.validateEvent(event({ recurrence: { kind: 'custom', days: [1, 9], end: { kind: 'never' } } }), now).errors.days, 'empty');
+});

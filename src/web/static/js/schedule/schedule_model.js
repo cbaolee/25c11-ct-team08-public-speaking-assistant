@@ -120,6 +120,9 @@ const validDate = date => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test
 const validTime = time => typeof time === 'string' && /^\d{2}:\d{2}$/.test(time) &&
   Number(time.slice(0, 2)) < 24 && Number(time.slice(3)) < 60;
 
+export function normalizeRecurrence(recurrence) {
+  return { ...recurrence, days: recurrence.kind === 'custom' ? recurrence.days : [], end: recurrence.kind === 'none' ? { kind: 'never' } : recurrence.end };
+}
 export function validateEvent(input, now) {
   const errors = {}, dateValid = validDate(input.date);
   if (!dateValid || typeof input.all_day !== 'boolean' || (input.all_day ? input.time !== null : !validTime(input.time))) errors.start = 'invalid';
@@ -138,7 +141,7 @@ export function validateEvent(input, now) {
   const r = input.recurrence;
   if (!r || !RECURRENCE_KINDS.includes(r.kind) || !r.end || !['never', 'until', 'count'].includes(r.end.kind)) errors.recurrence = 'invalid';
   else {
-    if (r.kind === 'custom' && (!Array.isArray(r.days) || !r.days.some(d => Number.isInteger(d) && d >= 1 && d <= 7))) errors.days = 'empty';
+    if (r.kind === 'custom' && (!Array.isArray(r.days) || (!r.days.length || !r.days.every(d => Number.isInteger(d) && d >= 1 && d <= 7)))) errors.days = 'empty';
     if (r.end.kind === 'until' && (!validDate(r.end.until) || (dateValid && r.end.until < input.date))) errors.until = 'before_start';
     if (r.end.kind === 'count' && (!Number.isInteger(r.end.count) || r.end.count < COUNT_MIN || r.end.count > COUNT_MAX)) errors.count = 'invalid';
   }
