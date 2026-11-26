@@ -519,7 +519,7 @@ def test_api_config_exposes_script_chat_limits_and_telemetry(script_api) -> None
     assert resp.status_code == 200
     body = resp.json()
     assert body["max_turn_text_chars"] == max_turn_text_chars
-    assert body["composer_max_words"] == composer_max_words
+    assert body["composer_max_words"] == composer_max_words == 2000
     assert body["max_pdf_size_bytes"] == max_pdf_size_bytes
     assert body["max_text_file_bytes"] == max_text_file_bytes
     assert body["file_size_limits_bytes"][".pdf"] == max_pdf_size_bytes
@@ -586,6 +586,21 @@ def test_chat_suggest_and_message_reject_oversized_text_before_moderation_or_llm
     assert r4.status_code == 422
     assert r4.json()["error_code"] == "text_too_long"
 
+    # 3. /generate-script also rejects > 2,000-word user_feedback & raw_text before moderation
+    r5 = client.post(
+        "/api/generate-script",
+        data={"topic": "Keystone species", "category": "free", "user_feedback": too_many_words},
+    )
+    assert r5.status_code == 422
+    assert r5.json()["error_code"] == "text_too_long"
+
+    r6 = client.post(
+        "/api/generate-script",
+        data={"topic": "Keystone species", "category": "free", "raw_text": too_many_words},
+    )
+    assert r6.status_code == 422
+    assert r6.json()["error_code"] == "text_too_long"
+
     assert mod_calls == []
     assert mock_groq.chat.completions.create.call_count == 0
     chat_session_store.clear()
@@ -643,6 +658,16 @@ def test_chat_uploads_enforce_per_type_limits_before_reading_full_body_or_modera
     assert r_bad_ext.status_code == 422
     assert r_bad_ext.json()["error_code"] == "unsupported_file_type"
 
+    # /generate-script enforces max_pdf_size_bytes (not 100 MB audio max_upload_bytes)
+    monkeypatch.setattr(app_main, "max_pdf_size_bytes", 1024)
+    r_pdf = client.post(
+        "/api/generate-script",
+        data={"topic": "Keystone species", "category": "free"},
+        files={"pdf": ("big.pdf", io.BytesIO(b"%PDF-1.4\n" + b"x" * 2048), "application/pdf")},
+    )
+    assert r_pdf.status_code == 422
+    assert r_pdf.json()["error_code"] == "file_too_large"
+
     assert mod_calls == []
     chat_session_store.clear()
 
@@ -667,6 +692,7 @@ def test_turn1_gating_and_continuous_multi_turn_groq_qa_with_compaction_and_tele
 
     # Mock Groq client handling both Q&A (120b) and compaction (20b)
     mock_groq = MagicMock()
+    recorded_user_prompts: list[str] = []
 
     def _fake_create(*, model: str, messages: list[dict[str, str]], **_: Any):
         resp = MagicMock()
@@ -675,6 +701,7 @@ def test_turn1_gating_and_continuous_multi_turn_groq_qa_with_compaction_and_tele
             payload = {"summary": "- Audience: policy makers\n- Focus: coral reef resilience"}
         else:
             user_text = messages[1]["content"]
+            recorded_user_prompts.append(user_text)
             if "Mode: Free-topic" in user_text or "Mode: Template-guided" in user_text:
                 payload = {
                     "reply_message": (
@@ -752,6 +779,11 @@ def test_turn1_gating_and_continuous_multi_turn_groq_qa_with_compaction_and_tele
     assert t2["ready_to_generate"] is False
     assert t2["context_compacted"] is False
     assert "**key statistics**" in t2["reply_message"]
+    assert any(
+        "Your previous question (do not repeat):" in prompt
+        and "**target audience**" in prompt
+        for prompt in recorded_user_prompts[1:]
+    )
 
     t3 = client.post(
         "/api/script-chat/message",
@@ -786,10 +818,13 @@ def test_turn1_gating_and_continuous_multi_turn_groq_qa_with_compaction_and_tele
     chat_session_store.clear()
 
 
-def test_generate_script_job_and_async_chat_job_telemetry(script_api) -> None:
+def test_generate_script_job_and_async_chat_job_telemetry(
+    script_api, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client, _, _ = script_api
     pipeline = app_main.get_script_pipeline()
     pipeline.template_engine.retriever = None
+    monkeypatch.setattr(app_main, "make_groq_client", lambda: None)
     chat_session_store.clear()
 
     # 1. Script generation telemetry (+10s buffer & ordered steps)
@@ -832,6 +867,92 @@ def test_generate_script_job_and_async_chat_job_telemetry(script_api) -> None:
     assert d_body["estimated_remaining_s"] == 0.0
     assert d_body["result"]["assistant_turn"] == 2
     assert d_body["result"]["can_generate"] is True
+    chat_session_store.clear()
+
+
+def test_async_chat_job_reports_compacting_context_running_during_compaction(
+    script_api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client, _, _ = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    chat_session_store.clear()
+
+    observed_during_compaction: list[dict[str, Any]] = []
+
+    class _ObservingGroqClient:
+        def __init__(self) -> None:
+            self.chat = self
+            self.completions = self
+
+        def create(self, *, model: str, messages: list[dict[str, str]], **_: Any) -> Any:
+            resp = MagicMock()
+            resp.usage.total_tokens = 120
+            sys_txt = messages[0]["content"].lower()
+            if "compress" in sys_txt:
+                with app_main._chat_turn_jobs_lock:
+                    for snap in app_main._chat_turn_jobs.values():
+                        if snap.get("status") == "running":
+                            observed_during_compaction.append(
+                                {
+                                    "stage": snap["stage"],
+                                    "steps": [dict(s) for s in snap["steps"]],
+                                }
+                            )
+                resp.choices = [
+                    MagicMock(message=MagicMock(content='{"summary": "- Compacted facts"}'))
+                ]
+            else:
+                resp.choices = [
+                    MagicMock(
+                        message=MagicMock(
+                            content=(
+                                '{"sufficient": false, "missing_items": ["examples"], '
+                                '"reply_message": "Share **examples**."}'
+                            )
+                        )
+                    )
+                ]
+            return resp
+
+    pipeline.template_engine.client = _ObservingGroqClient()
+    chat_mod = app_main.append_to_context_window.__globals__
+    monkeypatch.setitem(chat_mod, "CONTEXT_WINDOW_MAX_ENTRIES", 1)
+    monkeypatch.setitem(chat_mod, "CONTEXT_COMPACTION_KEEP_RECENT", 1)
+
+    sid = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "Reefs"},
+    ).json()["session_id"]
+
+    # Turn 1 message fills the 1-entry window (no compaction yet)
+    r1 = client.post(
+        "/api/script-chat/message",
+        data={"session_id": sid, "message": "Audience is marine biology teachers."},
+    )
+    assert r1.status_code == 200
+    assert r1.json()["context_compacted"] is False
+
+    # Turn 2 async job exceeds window -> triggers compaction; verify running state mid-call
+    job_resp = client.post(
+        "/api/script-chat/message/jobs",
+        data={"session_id": sid, "message": "Focus on 2024 coral bleaching statistics."},
+    )
+    assert job_resp.status_code == 202
+    job_id = job_resp.json()["job_id"]
+
+    assert len(observed_during_compaction) == 1
+    mid = observed_during_compaction[0]
+    assert mid["stage"] == "compacting_context"
+    assert {"key": "updating_context", "state": "done"} in mid["steps"]
+    assert {"key": "compacting_context", "state": "running"} in mid["steps"]
+
+    done_resp = client.get(f"/api/script-chat/jobs/{job_id}")
+    assert done_resp.status_code == 200
+    d_body = done_resp.json()
+    assert d_body["status"] == "completed"
+    assert d_body["result"]["context_compacted"] is True
+    assert {"key": "compacting_context", "state": "done"} in d_body["steps"]
     chat_session_store.clear()
 
 

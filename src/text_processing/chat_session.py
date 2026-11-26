@@ -20,6 +20,7 @@ import tempfile
 import threading
 import time
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -373,6 +374,7 @@ class ChatSessionStore:
         self._capacity = capacity
         self._ttl_seconds = ttl_seconds
         self._sessions: OrderedDict[str, ChatSessionState] = OrderedDict()
+        self._turn_locks: dict[str, threading.RLock] = {}
         self._lock = threading.Lock()
 
     def _prune_expired_locked(self, now: float) -> None:
@@ -384,6 +386,16 @@ class ChatSessionStore:
         ]
         for sid in expired_keys:
             del self._sessions[sid]
+            self._turn_locks.pop(sid, None)
+
+    def turn_lock(self, session_id: str) -> threading.RLock:
+        """Return a per-session re-entrant lock serializing concurrent turns on one session."""
+        with self._lock:
+            lock = self._turn_locks.get(session_id)
+            if lock is None:
+                lock = threading.RLock()
+                self._turn_locks[session_id] = lock
+            return lock
 
     def get(self, session_id: str, user_id: str) -> ChatSessionState | None:
         """Retrieve a session by ID with strict user_id scoping and sliding TTL."""
@@ -423,7 +435,8 @@ class ChatSessionStore:
             if sid in self._sessions:
                 del self._sessions[sid]
             elif len(self._sessions) >= self._capacity:
-                self._sessions.popitem(last=False)
+                evicted_sid, _ = self._sessions.popitem(last=False)
+                self._turn_locks.pop(evicted_sid, None)
 
             session.touch()
             self._sessions[sid] = session
@@ -434,6 +447,7 @@ class ChatSessionStore:
             session = self._sessions.get(session_id)
             if session is not None and session.user_id == user_id:
                 del self._sessions[session_id]
+                self._turn_locks.pop(session_id, None)
                 return True
             return False
 
@@ -441,6 +455,7 @@ class ChatSessionStore:
         """Empty all sessions."""
         with self._lock:
             self._sessions.clear()
+            self._turn_locks.clear()
 
     def __len__(self) -> int:
         with self._lock:
@@ -685,6 +700,7 @@ def append_to_context_window(
     max_entries: int | None = None,
     keep_recent: int | None = None,
     max_summary_chars: int | None = None,
+    on_compact_start: Callable[[], None] | None = None,
 ) -> tuple[ContextEntry | None, bool]:
     """Run sanitize -> moderate -> normalize -> append -> compact if ceiling exceeded."""
     cleaned = sanitize_text(raw_text)
@@ -747,6 +763,8 @@ def append_to_context_window(
     )
 
     if to_compact:
+        if on_compact_start is not None:
+            on_compact_start()
         new_summary, _ = compact_context_entries(
             session.compacted_summary,
             to_compact,
@@ -763,6 +781,8 @@ def append_to_context_window(
 
     # Single oversized entry + existing summary pushed over ceiling: shrink existing summary
     if session.compacted_summary:
+        if on_compact_start is not None:
+            on_compact_start()
         session.compacted_summary = _truncate_cleanly(session.compacted_summary, summary_budget)
         session.compaction_count += 1
         return entry, True
@@ -812,33 +832,54 @@ def analyze_slot_coverage(
         s for s in slots if not (s.name.startswith("argument_") or s.slot_type == "argument")
     ]
 
-    # Check argument slot coverage
+    notes_list = user_notes or []
+    note_texts = [t.strip() for t in (prompt, *notes_list) if t and t.strip()]
+    model = retriever.get_model() if retriever is not None else None
+    has_chunk_vecs = bool(chunks and chunk_embeddings is not None)
+    note_embeddings = (
+        retriever._encode(model, note_texts)
+        if (note_texts and model is not None and retriever is not None)
+        else None
+    )
+    has_note_vecs = note_embeddings is not None and len(note_texts) > 0
+
+    # Check argument slot coverage against uploaded chunks AND user chat/prompt notes
     uncovered_arguments: list[TemplateSlot] = []
     if not argument_slots:
         coverage_ratio = 1.0
-    elif not chunks or chunk_embeddings is None:
+    elif not chunks and not note_texts:
+        coverage_ratio = 0.0
+        uncovered_arguments = list(argument_slots)
+    elif not has_chunk_vecs and not note_texts:
         coverage_ratio = 0.0
         uncovered_arguments = list(argument_slots)
     else:
-        model = retriever.get_model() if retriever is not None else None
         covered_count = 0
 
         for slot in argument_slots:
             query = f"{slot.lead_in} {slot.name.replace('_', ' ')}".strip()
             max_cosine = 0.0
 
-            if model is not None:
+            if model is not None and retriever is not None and (has_chunk_vecs or has_note_vecs):
                 query_vec = retriever._encode(model, [query])
-                scores = (chunk_embeddings @ query_vec.T).squeeze()
-                scores_arr = np.atleast_1d(scores)
-                max_cosine = float(np.max(scores_arr)) if scores_arr.size > 0 else 0.0
+                if has_chunk_vecs:
+                    scores = (chunk_embeddings @ query_vec.T).squeeze()
+                    scores_arr = np.atleast_1d(scores)
+                    if scores_arr.size > 0:
+                        max_cosine = max(max_cosine, float(np.max(scores_arr)))
+                if has_note_vecs:
+                    note_scores = (note_embeddings @ query_vec.T).squeeze()
+                    note_arr = np.atleast_1d(note_scores)
+                    if note_arr.size > 0:
+                        max_cosine = max(max_cosine, float(np.max(note_arr)))
             else:
                 # Deterministic word overlap fallback when model is None
                 query_words = set(re.findall(r"\w+", query.lower()))
-                for chunk in chunks:
-                    chunk_words = set(re.findall(r"\w+", chunk.content.lower()))
-                    if query_words and chunk_words:
-                        overlap = len(query_words & chunk_words) / len(query_words)
+                candidate_texts = [c.content for c in chunks] + note_texts
+                for cand in candidate_texts:
+                    cand_words = set(re.findall(r"\w+", cand.lower()))
+                    if query_words and cand_words:
+                        overlap = len(query_words & cand_words) / len(query_words)
                         if overlap > max_cosine:
                             max_cosine = overlap
 
@@ -853,10 +894,8 @@ def analyze_slot_coverage(
 
     # Check entity slot coverage
     missing_entities: list[str] = []
-    notes_list = user_notes or []
     user_context = f"{prompt} {' '.join(notes_list)}".lower()
 
-    model = retriever.get_model() if retriever is not None else None
     has_embeddings = chunks and chunk_embeddings is not None and model is not None
 
     for slot in entity_slots:
@@ -1025,18 +1064,23 @@ def build_turn1_question(
     files_note = ", ".join(files_loaded) if files_loaded else "None"
 
     system_prompt = (
-        "You are a concise public-speaking coach starting a short Q&A before writing a speech. "
-        "Ask 1-2 focused context questions tailored to the missing items. "
-        "Wrap 1-3 key requested concepts in **bold** markdown (e.g. **target audience**). "
-        "Keep under 65 words. Never tell the user to click Generate yet. "
+        "You are a warm, natural public-speaking coach starting a short conversation "
+        "before writing a speech. Briefly acknowledge the topic (and any notes/files "
+        "already shared), then ask 1 natural, topic-specific opening question covering "
+        "at most 1-2 helpful details (such as angle, audience, or tone). "
+        "Wrap 1-2 key concepts in **bold** markdown (e.g. **target audience**). "
+        "Never recite a generic checklist (do not list 'main thesis, key points, examples, "
+        "counter-arguments' together). Keep under 60 words. Never tell the user to click "
+        "Generate yet. "
         'Return strict JSON: {"reply_message": "...", "missing_items": ["..."]}.'
     )
+    focus_hints = ", ".join(missing_items[:2]) or "target audience, main angle"
     user_prompt = (
         f"Mode: {mode_label} | Category: {category or 'General'} | Duration: {duration_min} min\n"
         f"Topic: {topic}\n"
         f"Initial prompt: {initial_prompt.strip() or 'None'}\n"
         f"Uploaded files: {files_note}\n"
-        f"Missing focus items: {', '.join(missing_items)}"
+        f"Optional coaching focus: {focus_hints}"
     )
     est_tokens = max(90, int(len(user_prompt) / 3.5) + TURN1_MAX_TOKENS)
 
@@ -1127,6 +1171,7 @@ def evaluate_and_build_followup(
     compacted_summary: str = "",
     context_entries: list[ContextEntry] | None = None,
     latest_user_answer: str = "",
+    last_question: str = "",
     missing_entities: list[str] | None = None,
     missing_groups: list[str] | None = None,
     coverage_ratio: float = 0.0,
@@ -1141,8 +1186,28 @@ def evaluate_and_build_followup(
     combined_texts = [e.text for e in entries]
     if compacted_summary.strip():
         combined_texts.insert(0, compacted_summary.strip())
+
+    raw_latest = latest_user_answer.strip()
+    entry_cap = max(
+        CONTEXT_ENTRY_MIN_CAP_CHARS,
+        CONTEXT_WINDOW_MAX_CHARS - CONTEXT_ENTRY_RESERVE_CHARS,
+    )
+    norm_latest = (
+        normalize_turn_entry(
+            raw_latest,
+            turn=entries[-1].turn if entries else 1,
+            source=entries[-1].source if entries else "chat",
+            max_entry_chars=entry_cap,
+        )
+        if raw_latest
+        else None
+    )
+    latest_in_window = bool(
+        entries and norm_latest is not None and entries[-1].text == norm_latest.text
+    )
+    extra_latest = "" if latest_in_window else (norm_latest.text if norm_latest else raw_latest)
     all_context_text = " ".join(
-        [initial_prompt.strip(), *combined_texts, latest_user_answer.strip()]
+        part for part in (initial_prompt.strip(), *combined_texts, extra_latest) if part
     ).strip()
 
     fallback_missing = _derive_missing_items(
@@ -1170,37 +1235,59 @@ def evaluate_and_build_followup(
         files_note = ", ".join(files_loaded) if files_loaded else "None"
 
         if is_free_topic:
-            criteria_block = (
-                "Free-topic readiness criteria: central thesis, target audience, "
-                "supporting arguments/examples, and clear takeaway/tone.\n"
-                f"Currently likely missing: {', '.join(fallback_missing)}"
-            )
+            open_hints = ", ".join(fallback_missing[:2]) or "optional tone or closing takeaway"
+            criteria_block = f"Optional coaching hints (pick at most 1 if needed): {open_hints}"
         else:
-            ent_text = (
-                ", ".join(_clean_entity_label(e) for e in (missing_entities or [])) or "None"
-            )
-            grp_text = ", ".join(missing_groups or []) or "None"
+            ent_text = ", ".join(_clean_entity_label(e) for e in (missing_entities or [])[:2])
+            grp_text = ", ".join((missing_groups or [])[:2])
+            hint_parts: list[str] = []
+            if ent_text:
+                hint_parts.append(f"Unmentioned details: {ent_text}")
+            if grp_text:
+                hint_parts.append(f"Optional coaching hints (pick at most 1 if needed): {grp_text}")
             criteria_block = (
-                f"Template slot coverage: {coverage_ratio:.0%}\n"
-                f"Missing entities: {ent_text}\n"
-                f"Missing content areas: {grp_text}"
+                "\n".join(hint_parts) if hint_parts else "Core template details are covered."
             )
 
         system_prompt = (
-            "You are a public-speaking coach gathering context before script generation. "
-            "Judge if the bounded context is sufficient to write a strong speech. "
-            "If insufficient (or if extra details would noticeably improve it), ask 1-2 focused "
-            "questions wrapping key requested items in **bold** (e.g. **audience**, **examples**). "
-            "If sufficient, confirm readiness briefly and invite any optional extra **examples** "
-            "or **tone** notes. Keep reply under 80 words.\n"
-            'Return JSON: {"sufficient": bool, "missing_items": [str], "reply_message": str}.'
+            "You are a warm, attentive public-speaking coach chatting with a speaker before "
+            "writing their speech.\n"
+            "1. Start with 1 brief, natural sentence acknowledging and building on the user's "
+            "latest message (reflect their chosen tone, focus, or angle so they feel heard).\n"
+            "2. Judge whether you have enough direction (topic + focus/angle or tone/audience) "
+            "to draft a strong speech. Do NOT demand counter-arguments or academic sections if "
+            "the speaker wants a deep, reflective, or story-driven speech.\n"
+            "3. If more context would help, ask ONE natural, topic-specific follow-up question "
+            "about at most 1-2 concrete details not already answered or asked in your previous "
+            "question. Wrap 1-2 key concepts in **bold**.\n"
+            "4. Never recite a robotic checklist of 'main thesis, key points, examples, "
+            "counter-arguments'. If sufficient, warmly confirm we are ready to draft and invite "
+            "any optional **examples** or **details**.\n"
+            "Keep reply under 75 words.\n"
+            'Return strict JSON: {"sufficient": bool, "missing_items": [str], '
+            '"reply_message": str}.'
         )
+        prev_q_line = (
+            f"Your previous question (do not repeat): {last_question.strip()}\n"
+            if last_question and last_question.strip()
+            else ""
+        )
+        if not raw_latest:
+            latest_line = "(file uploaded)"
+        elif latest_in_window:
+            latest_line = f"(see [Turn {entries[-1].turn} | {entries[-1].source}] above)"
+        else:
+            latest_line = _truncate_cleanly(
+                norm_latest.text if norm_latest else raw_latest,
+                CONTEXT_COMPACTION_MAX_SUMMARY_CHARS,
+            )
         user_prompt = (
             f"Topic: {topic} | Category: {category or 'General'} | Duration: {duration_min} min\n"
             f"Uploaded files: {files_note}\n"
             f"Compacted summary:\n{summary_block}\n"
             f"Active context window:\n{window_block}\n"
-            f"Latest user answer: {latest_user_answer.strip() or '(file uploaded)'}\n"
+            f"{prev_q_line}"
+            f"Latest user answer: {latest_line}\n"
             f"{criteria_block}"
         )
         est_tokens = max(120, int(len(user_prompt) / 3.5) + FOLLOWUP_MAX_TOKENS)
