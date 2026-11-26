@@ -82,3 +82,12 @@ export function styleVars(style) {
 }
 export function sessionTimeLabel(occ, fmtTime, words) { return occ.all_day ? words.allDay : fmtTime(occ.start); }
 export function lengthLabel(min, words) { return min == null ? words.anyLength : words.minutes.replace('{n}', String(min)); }
+
+export function chipsThatFit(cellInnerHeight, headerHeight, chipHeight, moreHeight, gap, total) {
+  const count = Math.max(0, Math.floor(total));
+  if (!count) return { shown: 0, more: 0 };
+  const available = Math.max(0, cellInnerHeight - headerHeight);
+  if (chipHeight > 0 && count * (chipHeight + gap) <= available) return { shown: count, more: 0 };
+  const shown = chipHeight > 0 ? Math.max(0, Math.min(count - 1, Math.floor((available - moreHeight - gap) / (chipHeight + gap)))) : 0;
+  return { shown, more: count - shown };
+}

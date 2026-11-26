@@ -450,7 +450,7 @@ TEXT.schedule = {
   previousYear: 'Previous year',
   nextYear: 'Next year',
   pickerGo: 'Go',
-  previous: 'Previous month', nextMonth: 'Next month', today: 'Today', empty: 'Pick a day to plan your first practice.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
+  addPracticeOn: 'Add practice on {date}', previous: 'Previous month', nextMonth: 'Next month', today: 'Today', empty: 'Pick a day to plan your first practice.', nothing: 'Nothing planned for this day.', more: '+{n} more', sessionOne: '{date}, {count} session: {statuses}', sessionMany: '{date}, {count} sessions: {statuses}', noSessions: '{date}, no sessions',
   upcoming: 'Upcoming', active: 'Now', activeLegend: 'Active', done: 'Done', missed: 'Missed', date: 'Date', time: 'Time', length: 'Length', note: 'Note', repeat: 'Repeat', none: 'None', daily: 'Daily', weekly: 'Weekly', custom: 'Custom days', until: 'Until (optional)', reminder: 'Reminder: {n} minutes before (fixed in this demo)', save: 'Save',
   past: 'Pick a time in the future.', invalid: 'Enter a valid date and time.', invalidLength: 'Choose a valid length.', invalidNote: 'The note is too long.', invalidRepeat: 'Choose a valid repeat.', invalidDays: 'Pick at least one day.', invalidUntil: 'Until must be on or after the event date.', minutes: '{n} min', count: '{n}/{max}',
   repeatOn: 'Repeat on',
