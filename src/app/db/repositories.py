@@ -110,6 +110,10 @@ class RateLimitRepo(Protocol):
     # fixed window of window_s seconds. key is a hash, never an email (0011_auth_rate_limits).
     def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool: ...
 
+    # Seconds until the current window of (bucket, key) ends, from 1 to window_s; window_s when
+    # nothing is known about the window. Read only: it never counts a hit.
+    def retry_after_s(self, bucket: str, key: str, window_s: int) -> int: ...
+
 
 class AudioStore(Protocol):
     def upload_file(

@@ -1,3 +1,4 @@
+import math
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -414,6 +415,14 @@ class MemoryRateLimitRepo:
             hits += 1
             self._state.rate_limits[(bucket, key)] = (start, hits)
             return hits <= max_hits
+
+    def retry_after_s(self, bucket: str, key: str, window_s: int) -> int:
+        with self._state.rate_limits_lock:
+            row = self._state.rate_limits.get((bucket, key))
+            if row is None:
+                return window_s
+            left_s = math.ceil(window_s - (self._clock() - row[0]))
+            return min(max(left_s, 1), window_s)
 
     def reset(self) -> None:
         with self._state.rate_limits_lock:
