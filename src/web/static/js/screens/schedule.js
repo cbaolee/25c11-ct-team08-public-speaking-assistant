@@ -93,24 +93,25 @@ function makeTimePicker(container, getDate, onChange = () => {}) {
     parts = to12h(current || '19:00'); const popup = shell.popup; popup.replaceChildren();
     const columns = node('div', null, 'sch-time-columns'); popup.append(columns);
     function draw() {
-      columns.replaceChildren();
       const candidates = (column, value) => to24h(column === 0 ? value : parts.h, column === 1 ? value : parts.m, column === 2 ? value : parts.pm);
       [[T('schedule.pickerHour'), Array.from({ length: 12 }, (_, i) => i + 1)], [T('schedule.pickerMinute'), MINUTE_STEPS], [T('schedule.pickerPeriod'), [false, true]]].forEach(([label, values], column) => {
-        const wrap = node('div', null, 'sch-time-column'), title = node('span', label); wrap.append(title);
-        const list = node('div', null, 'sch-time-list'); list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', label);
-        values.forEach(value => {
+        const wrap = columns.children[column] || node('div', null, 'sch-time-column'), title = node('span', label);
+        const list = wrap.querySelector('.sch-time-list') || node('div', null, 'sch-time-list');
+        if (!wrap.isConnected) { wrap.append(title); list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', label); wrap.append(list); columns.append(wrap); }
+        values.forEach((value, index) => {
           const text = column === 1 ? String(value).padStart(2, '0') : column === 2 ? T(value ? 'schedule.pickerPM' : 'schedule.pickerAM') : String(value);
           const selected = value === [parts.h, parts.m, parts.pm][column];
-          const b = button(text, () => { if (column === 0) parts.h = value; else if (column === 1) parts.m = value; else parts.pm = value; draw(); columns.children[column].querySelector('[aria-selected="true"]')?.focus(); }, 'sch-picker-control');
+          const b = list.children[index] || button(text, () => { if (column === 0) parts.h = value; else if (column === 1) parts.m = value; else parts.pm = value; draw(); b.focus({ preventScroll: true }); const top = b.offsetTop - list.offsetTop; if (top < list.scrollTop) list.scrollTop = top; else if (top + b.offsetHeight > list.scrollTop + list.clientHeight) list.scrollTop = top + b.offsetHeight - list.clientHeight; }, 'sch-picker-control');
           b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(selected)); b.tabIndex = selected ? 0 : -1;
           b.disabled = column === 1 ? !valid(candidates(column, value)) : column === 0 ? !MINUTE_STEPS.some(m => valid(to24h(value, m, parts.pm))) : !Array.from({ length: 12 }, (_, i) => i + 1).some(h => MINUTE_STEPS.some(m => valid(to24h(h, m, value))));
-          b.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); const enabled = [...list.querySelectorAll('button:not(:disabled)')], index = enabled.indexOf(b), next = enabled[(index + (e.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length]; next?.click(); } else if (e.key === 'Enter') { e.preventDefault(); apply(); } }; list.append(b);
-        }); wrap.append(list); columns.append(wrap);
+          b.onkeydown = e => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); const enabled = [...list.querySelectorAll('button:not(:disabled)')], index = enabled.indexOf(b), next = enabled[(index + (e.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length]; next?.click(); } else if (e.key === 'Enter') { e.preventDefault(); apply(); } }; if (!b.isConnected) list.append(b);
+        });
         const selected = list.querySelector('[aria-selected="true"]'); if (selected?.disabled) { selected.tabIndex = -1; const first = list.querySelector('button:not(:disabled)'); if (first) first.tabIndex = 0; }
       });
     }
     function apply() { const value = to24h(parts.h, parts.m, parts.pm); if (valid(value)) { current = value; update(); onChange(value); shell.close(); } }
     draw(); popup.append(button(T('schedule.pickerApply'), apply, 'btn btn-sm btn-primary'));
+    requestAnimationFrame(() => { if (!popup.hidden && columns.isConnected) columns.querySelectorAll('.sch-time-list').forEach(list => { const selected = list.querySelector('[aria-selected="true"]'); if (selected) list.scrollTop = selected.offsetTop - list.offsetTop; }); });
   }
   update(); return { set(value) { current = value; update(); }, close: shell.close };
 }
