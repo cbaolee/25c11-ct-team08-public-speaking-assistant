@@ -3,11 +3,11 @@ import { go } from '../nav.js';
 import { S, RENDER } from '../state.js';
 import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
-import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderSkipped, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays } from '../schedule/schedule_model.js';
+import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId } from '../schedule/schedule_store.js';
 import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
-import { canCheckIn, canEdit } from '../schedule/schedule_model.js';
+import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
@@ -152,7 +152,7 @@ function openDay(key, highlightKey = null) {
     if (occ.note) row.append(node('p', occ.note, 'sch-note'));
     if (event.recurrence.kind !== 'none') {
       const kind = T('schedule.' + event.recurrence.kind + 'Lower');
-      row.append(node('p', event.recurrence.until ? T('schedule.repeatsUntil', { kind, date: shortDate(parseDay(event.recurrence.until)) }) : T('schedule.repeats', { kind }), 'note'));
+      row.append(node('p', (event.recurrence.end.kind === 'until' ? event.recurrence.end.until : null) ? T('schedule.repeatsUntil', { kind, date: shortDate(parseDay((event.recurrence.end.kind === 'until' ? event.recurrence.end.until : null))) }) : T('schedule.repeats', { kind }), 'note'));
     }
     const actions = node('div', null, 'sch-actions');
     actions.append(button(T('schedule.email'), () => openEmail(occ, event)));
@@ -163,7 +163,7 @@ function openDay(key, highlightKey = null) {
         result.dataset.open = id; result.dataset.todayRole = 'result'; actions.append(result);
       } else row.append(node('p', T('schedule.resultUnavailable'), 'note'));
     }
-    if (canEdit(occ, Date.now())) actions.append(button(T('schedule.edit'), () => openEvent(key, occ, event)));
+    if (canEditDetails(occ, Date.now())) actions.append(button(T('schedule.edit'), () => openEvent(key, occ, event)));
     const slot = node('div'); slot.dataset.schCheckin = ''; if (canCheckIn(occ, Date.now()) && occurrenceStatus(occ, Date.now()) === 'active') slot.append(button(T('schedule.todayPanel.checkIn'), () => { closeModal('schDayDrawer'); startCheckIn(occ); }, 'btn btn-primary')); actions.append(slot); row.append(actions); list.append(row);
   });
   $('schDayNew').hidden = key < dayKey(Date.now());
@@ -185,16 +185,27 @@ function makeSegments(id, values, label, changed) {
   });
 }
 function currentInput() {
-  return { date: $('schDate').value, time: $('schTime').value, duration_min: Number($('schLength').value), note: $('schNote').value, recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('[aria-pressed="true"]')].map(x => Number(x.value)), until: $('schUntil').value || null } };
+  const until = $('schUntil').value;
+  return { date: $('schDate').value, time: $('schTime').value, all_day: false, duration_min: Number($('schLength').value), note: $('schNote').value,
+    category: editing?.event.category ?? 'any', color: editing?.event.color ?? 'blue', script: editing?.event.script ?? { kind: 'free' },
+    recurrence: { kind: $('schRepeat').value, days: [...$('schDayChecks').querySelectorAll('[aria-pressed="true"]')].map(x => Number(x.value)), end: until ? { kind: 'until', until } : { kind: 'never' } } };
 }
 function updateRecurrence() {
   const input = currentInput(), repeating = input.recurrence.kind !== 'none';
   $('schDays').hidden = input.recurrence.kind !== 'custom';
   $('schUntilField').hidden = !repeating;
   if (!repeating) { untilPicker.set('', input.date); return; }
-  const until = input.recurrence.until;
+  const until = (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null);
   if (!until) $('schUntilSummary').textContent = T('schedule.noEndSummary');
   else { const result = sessionsSummary(previewOccurrenceDays(input, input.date, until)); $('schUntilSummary').textContent = result.last ? T('schedule.sessionsSummary', { n: result.n, date: shortDate(parseDay(result.last)) }) : T('schedule.noSessionsSummary'); }
+}
+let lockTimer = null;
+function applyScheduleLock() {
+  const locked = !!editing && !canEditSchedule(editing.occ, Date.now());
+  $('schDate').disabled = locked || (!!editing && editing.event.recurrence.kind !== 'none');
+  $('schTime').disabled = locked;
+  $('schLockNote').hidden = !locked;
+  $('schLockNote').textContent = T('schedule.scheduleLocked');
 }
 function openEvent(key, occ = null, event = null) {
   if (openPopover) openPopover(false);
@@ -209,23 +220,25 @@ function openEvent(key, occ = null, event = null) {
   $('schDelete').hidden = !editing;
   $('schRepeatFields').hidden = !!editing;
   $('schRepeat').querySelectorAll('button').forEach(b => { b.disabled = !!editing; });
-  $('schDate').disabled = !!editing && event.recurrence.kind !== 'none';
+  applyScheduleLock();
   $('schEditRepeat').hidden = !editing || event.recurrence.kind === 'none';
   if (editing) {
     datePicker.set(occ.day, minimum); timePicker.set(event.time); setSegment('schLength', event.duration_min);
     $('schNote').value = event.note; setSegment('schRepeat', event.recurrence.kind);
-    untilPicker.set(event.recurrence.until || '', occ.day);
+    untilPicker.set((event.recurrence.end.kind === 'until' ? event.recurrence.end.until : null) || '', occ.day);
     $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(event.recurrence.days.includes(Number(b.value)))));
   }
   updateRecurrence();
   $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS });
+  clearInterval(lockTimer); lockTimer = setInterval(() => { if (!$('schEventModal').classList.contains('show')) { clearInterval(lockTimer); lockTimer = null; } else applyScheduleLock(); }, 15000);
   openModal('schEventModal', { focus: !$('schDate').disabled ? '#schDate' : !$('schTime').disabled ? '#schTime' : '#schNote' });
 }
 function openEmail(occ, event) {
   const body = $('schEmailBody'); body.replaceChildren();
   [T('schedule.to', { value: S.user.email }), T('schedule.from'), T('schedule.subject', { lead: REMINDER_LEAD_MIN, length: occ.duration_min, time: time(occ.start) }), S.user.name?.trim() ? T('schedule.greeting', { name: S.user.name }) : T('schedule.greetingNameless'), T('schedule.when', { when: dateTime(occ.start) }), T('schedule.emailLength', { length: occ.duration_min }), ...(occ.note ? [T('schedule.emailNote', { note: occ.note })] : [])].forEach(text => body.append(node('p', text)));
   const disabled = button(T('schedule.openPractice'), () => {}, 'btn btn-primary'); disabled.disabled = true; disabled.setAttribute('aria-disabled', 'true'); body.append(disabled);
-  $('schEmailFooter').textContent = reminderSkipped(occ, event.created_at) ? T('schedule.skipped') : T('schedule.wouldSend', { when: dateTime(reminderAt(occ)) });
+  const state = reminderState(occ, event, Date.now());
+  $('schEmailFooter').textContent = T('schedule.' + ({ skipped: 'skipped', scheduled: 'wouldSend', sent: 'reminderSent', sent_then_edited: 'reminderSentEdited' }[state]), { when: dateTime(reminderAt(occ)) });
   openModal('schEmailModal');
 }
 function init() {
@@ -237,13 +250,13 @@ function init() {
   $('schNote').maxLength = NOTE_MAX_CHARS; $('schNote').oninput = () => { $('schCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS }); };
   datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { const until = $('schUntil').value; untilPicker.set(until && until >= value ? until : '', value); timePicker.set(defaultTime(Date.now(), value)); updateRecurrence(); } });
   timePicker = makeTimePicker($('schTimePicker'), () => $('schDate').value, updateRecurrence);
-  untilPicker = makeDatePicker($('schUntilPicker'), { min: dayKey(Date.now()), value: '', allowEmpty: true, onChange: updateRecurrence, markDays: (year, month) => { const input = currentInput(), end = dayKey(new Date(year, month + 1, 0).getTime()), limit = input.recurrence.until && input.recurrence.until < end ? input.recurrence.until : end; return previewOccurrenceDays(input, input.date, limit); } });
+  untilPicker = makeDatePicker($('schUntilPicker'), { min: dayKey(Date.now()), value: '', allowEmpty: true, onChange: updateRecurrence, markDays: (year, month) => { const input = currentInput(), end = dayKey(new Date(year, month + 1, 0).getTime()), limit = (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null) && (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null) < end ? (input.recurrence.end.kind === 'until' ? input.recurrence.end.until : null) : end; return previewOccurrenceDays(input, input.date, limit); } });
   $('schReminder').textContent = T('schedule.reminder', { n: REMINDER_LEAD_MIN });
   $('schDelete').onclick = () => {
     if (!editing) return;
     const { occ, event } = editing;
     openConfirmDialog(T(event.recurrence.kind === 'none' ? 'schedule.deleteSingleQuestion' : 'schedule.deleteFollowingQuestion'), '', T('schedule.delete'), () => {
-      if (!canEdit(occ, Date.now())) { $('schStartError').textContent = T('schedule.editTooLate'); $('schStartError').classList.add('show'); return; }
+      if (!canEditDetails(occ, Date.now())) { $('schStartError').textContent = T('schedule.editTooLate'); $('schStartError').classList.add('show'); return; }
       saveScheduleState(deleteFromOccurrence(getSchedule(), event.id, occ.day)); closeModal('schEventModal'); render(); openDay(selectedDay); toast(T('schedule.deleted'));
     });
   };
@@ -324,13 +337,15 @@ function init() {
     e.preventDefault(); const input = currentInput();
     if (editing) input.recurrence = editing.event.recurrence;
     const result = validateEvent(input, Date.now()), errors = result.errors;
-    if (editing && !canEdit(editing.occ, Date.now())) errors.start = 'too_late';
-    const fields = [['start', 'Start', errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', 'schDayChecks'], ['until', 'Until', 'invalidUntil', 'schUntil']];
+    if (editing && !canEditDetails(editing.occ, Date.now())) errors.start = 'too_late';
+    else if (editing && !canEditSchedule(editing.occ, Date.now()) && (input.date !== editing.occ.day || input.time !== editing.event.time)) errors.start = 'locked';
+    const fields = [['start', 'Start', errors.start === 'locked' ? 'scheduleLockedError' : errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : 'invalid', 'schTime'], ['duration_min', 'Length', 'invalidLength', 'schLength'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', 'schDayChecks'], ['until', 'Until', 'invalidUntil', 'schUntil']];
     fields.forEach(([key, target, message, id]) => { $('sch' + target + 'Error').textContent = errors[key] ? T('schedule.' + message) : ''; $('sch' + target + 'Error').classList.toggle('show', !!errors[key]); if (id) $(id).setAttribute('aria-invalid', String(!!errors[key])); });
     $('schDate').setAttribute('aria-invalid', String(!!errors.start));
     if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[0] === 'start' && !$('schDate').disabled) $('schDate').focus(); else if (['schLength', 'schRepeat'].includes(first[3])) $(first[3]).querySelector('[aria-checked="true"]').focus(); else if (first[3] === 'schDayChecks') $('schDayChecks').querySelector('button').focus(); else if (first[3]) $(first[3]).focus(); return; }
+    if (editing && editing.event.recurrence.kind !== 'none') { if (input.date === editing.occ.day) delete input.date; delete input.recurrence; }
     const wasEditing = !!editing;
-    saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), sample: false })); if (openPopover) openPopover(false); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));
+    saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), details_edited_at: null, sample: false })); if (openPopover) openPopover(false); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));
   };
 }
 let initialized = false;

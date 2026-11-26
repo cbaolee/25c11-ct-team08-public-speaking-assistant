@@ -1,5 +1,5 @@
 export const STORAGE_PREFIX = 'psa.schedule.v1.';
-export const STORE_VERSION = 1;
+export const STORE_VERSION = 2;
 // Build the per-user storage key.
 export function storageKey(userId) { return STORAGE_PREFIX + userId; }
 const date = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -7,7 +7,7 @@ const plain = v => v !== null && typeof v === 'object' &&
   (Object.getPrototypeOf(v) === Object.prototype || Object.getPrototypeOf(v) === null);
 
 // These values must match DURATIONS_MIN, NOTE_MAX_CHARS, and RECURRENCE_KINDS in schedule_model.js.
-function isValidEvent(e) {
+function isValidV1Event(e) {
   return !!e &&
     typeof e.id === 'string' &&
     date(e.date) &&
@@ -24,6 +24,23 @@ function isValidEvent(e) {
     typeof e.sample === 'boolean';
 }
 
+// These lists must match schedule_model.js.
+function isValidEvent(e) {
+  const r = e?.recurrence, end = r?.end, script = e?.script;
+  return !!e && typeof e.id === 'string' && date(e.date) && typeof e.all_day === 'boolean' &&
+    (e.all_day ? e.time === null : typeof e.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(e.time)) &&
+    (e.duration_min === null || [5,10,15,20].includes(e.duration_min)) &&
+    ['any','cinematography','gender_studies','information_technology','learning_experiences','sports','wildlife'].includes(e.category) &&
+    ['blue','green','amber','brown','red','slate','gray','sky'].includes(e.color) &&
+    !!script && ['free','saved','ai'].includes(script.kind) &&
+    (script.kind !== 'saved' || (typeof script.script_id === 'string' && !!script.script_id.trim() && typeof script.title === 'string')) &&
+    (script.kind !== 'ai' || (e.duration_min !== null && e.category !== 'any')) &&
+    typeof e.note === 'string' && e.note.length <= 200 && !!r && ['none','daily','weekly','custom'].includes(r.kind) &&
+    Array.isArray(r.days) && r.days.every(d => Number.isInteger(d) && d >= 1 && d <= 7) && (r.kind !== 'custom' || r.days.length > 0) &&
+    !!end && (end.kind === 'never' || (end.kind === 'until' && date(end.until) && end.until >= e.date) ||
+    (end.kind === 'count' && Number.isInteger(end.count) && end.count >= 1 && end.count <= 99)) &&
+    Number.isFinite(e.created_at) && (e.details_edited_at === null || Number.isFinite(e.details_edited_at)) && typeof e.sample === 'boolean';
+}
 function isValidDone(record) {
   return plain(record) &&
     Number.isFinite(record.checkin_at) &&
@@ -41,6 +58,14 @@ export function isValidState(x) {
     plain(x.done) &&
     Object.values(x.done).every(isValidDone);
 }
+export function migrateState(x) {
+  if (!x || x.version !== 1 || !Array.isArray(x.events) || !x.events.every(isValidV1Event) || !plain(x.done) || !Object.values(x.done).every(isValidDone)) return null;
+  return { version: 2, events: x.events.map(e => {
+    const { until, ...recurrence } = e.recurrence;
+    return { ...e, all_day: false, category: 'any', color: 'blue', script: { kind: 'free' }, details_edited_at: null,
+      recurrence: { ...recurrence, end: until ? { kind: 'until', until } : { kind: 'never' } } };
+  }), done: x.done };
+}
 // Save a schedule when storage is available.
 export function saveSchedule(userId, state, storage) {
   if (!userId || !storage) return false;
@@ -57,7 +82,7 @@ export function loadSchedule(userId, opts) {
   if (userId && opts.storage) {
     try {
       const raw = opts.storage.getItem(storageKey(userId));
-      if (raw !== null) { const state = JSON.parse(raw); if (isValidState(state)) return state; }
+      if (raw !== null) { const state = JSON.parse(raw); if (isValidState(state)) return state; const migrated = migrateState(state); if (migrated) { saveSchedule(userId, migrated, opts.storage); return migrated; } }
     } catch (e) { /* A blocked or damaged store starts with samples. */ }
   }
   return resetSchedule(userId, opts);
@@ -78,38 +103,39 @@ function previousDay(day) {
   value.setDate(value.getDate() - 1);
   return `${String(value.getFullYear()).padStart(4, '0')}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
 }
-function hasEarlierOccurrence(event, day) {
-  const [y, m, d] = event.date.split('-').map(Number), cursor = new Date(y, m - 1, d);
+export function countOccurrencesBefore(event, day) {
+  const [y, m, d] = event.date.split('-').map(Number), cursor = new Date(y, m - 1, d), firstWeekday = cursor.getDay() || 7;
+  let count = 0;
   while (true) {
     const key = `${String(cursor.getFullYear()).padStart(4, '0')}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
-    if (key >= day || (event.recurrence.until && key > event.recurrence.until)) return false;
-    const weekday = cursor.getDay() || 7;
-    if (event.recurrence.kind === 'daily' ||
-        (event.recurrence.kind === 'weekly' && key === event.date) ||
-        (event.recurrence.kind === 'custom' && event.recurrence.days.includes(weekday))) return true;
+    const end = event.recurrence.end;
+    if (key >= day || (end.kind === 'until' && key > end.until) || (end.kind === 'count' && count >= end.count)) return count;
+    const weekday = cursor.getDay() || 7, kind = event.recurrence.kind;
+    if (kind === 'daily' || (kind === 'none' && key === event.date) || (kind === 'weekly' && weekday === firstWeekday) || (kind === 'custom' && event.recurrence.days.includes(weekday))) count++;
     cursor.setDate(cursor.getDate() + 1);
   }
 }
 export function deleteFromOccurrence(state, eventId, day) {
   const event = state.events.find(e => e.id === eventId);
   if (!event) return state;
-  if (event.recurrence.kind === 'none' || !hasEarlierOccurrence(event, day)) return deleteEvent(state, eventId);
-  return { ...state, events: state.events.map(e => e.id === eventId ?
-    { ...e, recurrence: { ...e.recurrence, until: previousDay(day) } } : e) };
+  if (event.recurrence.kind === 'none' || !countOccurrencesBefore(event, day)) return deleteEvent(state, eventId);
+  return { ...state, events: state.events.map(e => e.id === eventId ? { ...e, recurrence: { ...e.recurrence, end: { kind: 'until', until: previousDay(day) } } } : e) };
 }
 export function editOccurrence(state, eventId, day, changes, { now, newId }) {
   const event = state.events.find(e => e.id === eventId);
   if (!event) return state;
-  const { time, duration_min, note } = changes;
-  const patch = Object.fromEntries(Object.entries({ time, duration_min, note }).filter(([, value]) => value !== undefined));
-  if (event.recurrence.kind === 'none') {
-    if (changes.date !== undefined) patch.date = changes.date;
-    return { ...state, events: state.events.map(e => e.id === eventId ? { ...e, ...patch, created_at: now } : e) };
-  }
-  const keepOld = hasEarlierOccurrence(event, day);
-  const old = { ...event, recurrence: { ...event.recurrence, until: previousDay(day) } };
-  const next = { ...event, ...patch, id: newId, date: day, recurrence: { ...event.recurrence, days: [...event.recurrence.days] }, created_at: now };
-  return { ...state, events: state.events.flatMap(e => e.id === eventId ? (keepOld ? [old, next] : [next]) : [e]) };
+  const keys = ['date','time','all_day','duration_min','note','category','color','script','recurrence'];
+  const patch = Object.fromEntries(keys.filter(k => changes[k] !== undefined).map(k => [k, changes[k]]));
+  if (event.recurrence.kind !== 'none' && patch.date < day) delete patch.date;
+  const different = k => k in patch && JSON.stringify(patch[k]) !== JSON.stringify(event[k]);
+  const created_at = ['date','time','all_day','recurrence'].some(different) ? now : event.created_at;
+  const details_edited_at = ['duration_min','note','category','color','script'].some(different) ? now : event.details_edited_at;
+  if (event.recurrence.kind === 'none') return { ...state, events: state.events.map(e => e.id === eventId ? { ...e, ...patch, created_at, details_edited_at } : e) };
+  const before = countOccurrencesBefore(event, day);
+  const old = { ...event, recurrence: { ...event.recurrence, end: { kind: 'until', until: previousDay(day) } } };
+  const end = event.recurrence.end.kind === 'count' ? { kind: 'count', count: event.recurrence.end.count - before } : event.recurrence.end;
+  const next = { ...event, ...patch, id: newId, date: patch.date ?? day, recurrence: patch.recurrence ?? { ...event.recurrence, end }, created_at, details_edited_at };
+  return { ...state, events: state.events.flatMap(e => e.id === eventId ? (before ? [old, next] : [next]) : [e]) };
 }
 // Record the first completion without changing the input.
 export function markDone(state, occKey, record) {

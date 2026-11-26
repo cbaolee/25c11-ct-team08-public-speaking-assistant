@@ -7,7 +7,7 @@ const source = fs.readFileSync(path.join(__dirname, '../../src/web/static/js/sch
 const model = import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
 const t = (d, h = 0, min = 0) => new Date(2026, 10, d, h, min).getTime();
 const now = t(25, 14);
-const event = (overrides = {}) => ({ id: 'a', date: '2026-11-25', time: '15:00', duration_min: 10, note: '', recurrence: { kind: 'none', days: [], until: null }, sample: false, ...overrides });
+const event = (overrides = {}) => ({ id: 'a', date: '2026-11-25', time: '15:00', all_day: false, category: 'any', color: 'blue', script: { kind: 'free' }, duration_min: 10, note: '', recurrence: { kind: 'none', days: [], end: { kind: 'never' } }, sample: false, ...overrides });
 const occ = (start, checkin_at = null, key = 'x', done_at = checkin_at) => ({
   start, day: `${new Date(start).getFullYear()}-${String(new Date(start).getMonth() + 1).padStart(2, '0')}-${String(new Date(start).getDate()).padStart(2, '0')}`,
   checkin_at, done_at, key,
@@ -27,9 +27,9 @@ test('recurrences respect local days, range, until, done and sorting', async () 
   const m = await model, range = { from: t(23), to: t(30) };
   const expand = e => m.expandOccurrences([e], range);
   assert.deepEqual(expand(event()).map(o => o.day), ['2026-11-25']);
-  assert.deepEqual(expand(event({ recurrence: { kind: 'daily', days: [], until: '2026-11-27' } })).map(o => o.day), ['2026-11-25', '2026-11-26', '2026-11-27']);
-  assert.deepEqual(expand(event({ date: '2026-11-18', recurrence: { kind: 'weekly', days: [], until: null } })).map(o => o.day), ['2026-11-25']);
-  assert.deepEqual(expand(event({ date: '2026-11-23', recurrence: { kind: 'custom', days: [1, 3, 5], until: null } })).map(o => o.day), ['2026-11-23', '2026-11-25', '2026-11-27']);
+  assert.deepEqual(expand(event({ recurrence: { kind: 'daily', days: [], end: { kind: 'until', until: '2026-11-27' } } })).map(o => o.day), ['2026-11-25', '2026-11-26', '2026-11-27']);
+  assert.deepEqual(expand(event({ date: '2026-11-18', recurrence: { kind: 'weekly', days: [], end: { kind: 'never' } } })).map(o => o.day), ['2026-11-25']);
+  assert.deepEqual(expand(event({ date: '2026-11-23', recurrence: { kind: 'custom', days: [1, 3, 5], end: { kind: 'never' } } })).map(o => o.day), ['2026-11-23', '2026-11-25', '2026-11-27']);
   const sorted = m.expandOccurrences([event({ id: 'z' }), event({ id: 'a' }), event({ id: 'b', time: '12:00' })], range, { 'a@2026-11-25': { checkin_at: now, done_at: now + 1 } });
   assert.deepEqual(sorted.map(o => o.event_id), ['b', 'a', 'z']); assert.equal(sorted[1].checkin_at, now); assert.equal(sorted[1].done_at, now + 1);
   assert.equal(m.isoWeekday(now), 3); assert.equal(m.dayKey(m.startOfWeek(now)), '2026-11-23'); assert.equal(m.dayKey(m.addDays(t(30), 1)), '2026-12-01');
@@ -38,7 +38,7 @@ test('recurrences respect local days, range, until, done and sorting', async () 
 test('validation reports invalid fields and accepts a future event', async () => {
   const m = await model;
   assert.equal(m.validateEvent(event(), now).ok, true);
-  for (const [change, field, code] of [[{ time: '13:00' }, 'start', 'past'], [{ date: '2026-02-30' }, 'start', 'invalid'], [{ duration_min: 7 }, 'duration_min', 'invalid'], [{ note: 'x'.repeat(201) }, 'note', 'too_long'], [{ recurrence: { kind: 'custom', days: [], until: null } }, 'days', 'empty'], [{ recurrence: { kind: 'daily', days: [], until: '2026-11-24' } }, 'until', 'before_start']]) assert.equal(m.validateEvent(event(change), now).errors[field], code);
+  for (const [change, field, code] of [[{ time: '13:00' }, 'start', 'past'], [{ date: '2026-02-30' }, 'start', 'invalid'], [{ duration_min: 7 }, 'duration_min', 'invalid'], [{ note: 'x'.repeat(201) }, 'note', 'too_long'], [{ recurrence: { kind: 'custom', days: [], end: { kind: 'never' } } }, 'days', 'empty'], [{ recurrence: { kind: 'daily', days: [], end: { kind: 'until', until: '2026-11-24' } } }, 'until', 'before_start']]) assert.equal(m.validateEvent(event(change), now).errors[field], code);
 });
 
 test('streak counts consecutive prior weeks and adds current week', async () => {
@@ -114,13 +114,13 @@ test('validation handles invalid times, recurrence and note boundaries', async (
 });
 test('recurrence expansion respects until and the first event day', async () => {
   const m = await model, range = { from: t(1), to: new Date(2026, 11, 1).getTime() };
-  const daily = m.expandOccurrences([event({ recurrence: { kind: 'daily', days: [], until: '2026-11-27' } })], range);
+  const daily = m.expandOccurrences([event({ recurrence: { kind: 'daily', days: [], end: { kind: 'until', until: '2026-11-27' } } })], range);
   assert.deepEqual(daily.map(o => o.day), ['2026-11-25', '2026-11-26', '2026-11-27']);
-  const weekly = m.expandOccurrences([event({ recurrence: { kind: 'weekly', days: [], until: null } })], range);
+  const weekly = m.expandOccurrences([event({ recurrence: { kind: 'weekly', days: [], end: { kind: 'never' } } })], range);
   assert.deepEqual(weekly.map(o => o.day), ['2026-11-25']);
 });
 test('unbounded daily recurrence remains finite over two years', async () => {
-  const m = await model, e = event({ date: '2026-01-01', recurrence: { kind: 'daily', days: [], until: null } });
+  const m = await model, e = event({ date: '2026-01-01', recurrence: { kind: 'daily', days: [], end: { kind: 'never' } } });
   assert.equal(m.expandOccurrences([e], { from: new Date(2026, 0, 1).getTime(), to: new Date(2028, 0, 1).getTime() }).length, 730);
 });
 test('reminder is not skipped exactly thirty minutes before start', async () => {
@@ -149,8 +149,8 @@ test('check-in windows end at six hours or local midnight', async () => {
 
 test('edit lead time and inclusive recurrence previews', async () => {
   const m = await model, start = t(25, 15);
-  assert.equal(m.canEdit({ start }, start - 20 * 60000), true);
-  assert.equal(m.canEdit({ start }, start - 19 * 60000 - 59000), false);
+  assert.equal(m.canEditSchedule({ start }, start - 30 * 60000 - 1), true);
+  assert.equal(m.canEditSchedule({ start }, start - 19 * 60000 - 59000), false);
   const input = event({ date: '2026-11-23' });
   const preview = (kind, days = []) => m.previewOccurrenceDays({ ...input, recurrence: { kind, days } }, '2026-11-24', '2026-11-29');
   assert.deepEqual(preview('none'), []);
@@ -159,4 +159,97 @@ test('edit lead time and inclusive recurrence previews', async () => {
   assert.deepEqual(preview('weekly'), []);
   assert.deepEqual(preview('custom', [1, 3, 7]), ['2026-11-25', '2026-11-29']);
   assert.deepEqual(m.previewOccurrenceDays({ ...input, recurrence: { kind: 'weekly', days: [] } }, '2026-11-23', '2026-11-30'), ['2026-11-23', '2026-11-30']);
+});
+
+test('v2 locks, all-day windows, count rules and reminder states', async () => {
+  const m = await model, start = t(26, 15), o = { start, day: '2026-11-26', all_day: false };
+  assert.equal(m.canEditSchedule(o, m.reminderAt(o) - 1), true);
+  assert.equal(m.canEditSchedule(o, m.reminderAt(o)), false);
+  assert.equal(m.canEditDetails(o, start - 1), true); assert.equal(m.canEditDetails(o, start), false);
+  const all = { start: t(26), day: '2026-11-26', all_day: true };
+  assert.equal(m.windowClosesAt(all), t(27)); assert.equal(m.reminderAt(all), t(26, 8)); assert.equal(m.canEditSchedule(all, all.start), false);
+  const e = event({ date: '2026-11-26', recurrence: { kind: 'daily', days: [], end: { kind: 'count', count: 5 } } });
+  assert.deepEqual(m.seriesSummary(e), { n: 5, last: '2026-11-30' });
+  assert.equal(m.reminderState(o, { created_at: start, details_edited_at: null }, start), 'skipped');
+  assert.equal(m.reminderState(o, { created_at: 0, details_edited_at: null }, start - 3600000), 'scheduled');
+  assert.equal(m.reminderState(o, { created_at: 0, details_edited_at: null }, start), 'sent');
+  assert.equal(m.reminderState(o, { created_at: 0, details_edited_at: start }, start), 'sent_then_edited');
+});
+
+test('timed edit locks at reminder and start boundaries', async () => {
+  const m = await model, o = { start: t(25, 19), day: '2026-11-25', all_day: false };
+  for (const [at, schedule, details] of [[t(25, 18, 30) - 1, true, true], [t(25, 18, 30), false, true], [o.start - 1, false, true], [o.start, false, false]]) {
+    assert.equal(m.canEditSchedule(o, at), schedule); assert.equal(m.canEditDetails(o, at), details);
+  }
+});
+
+test('all-day edit locks start at midnight', async () => {
+  const m = await model, o = { start: t(26), day: '2026-11-26', all_day: true };
+  for (const [at, expected] of [[t(25, 23, 59), true], [t(26), false], [t(26, 8), false]]) {
+    assert.equal(m.canEditSchedule(o, at), expected); assert.equal(m.canEditDetails(o, at), expected);
+  }
+});
+
+test('daily occurrences have independent edit locks', async () => {
+  const m = await model, e = event({ time: '19:00', recurrence: { kind: 'daily', days: [], end: { kind: 'never' } } });
+  const [today, tomorrow] = m.expandOccurrences([e], { from: t(25), to: t(27) });
+  assert.equal(m.canEditSchedule(today, t(25, 18, 45)), false); assert.equal(m.canEditDetails(today, t(25, 18, 45)), true);
+  assert.equal(m.canEditSchedule(tomorrow, t(25, 18, 45)), true); assert.equal(m.canEditDetails(tomorrow, t(25, 18, 45)), true);
+});
+
+test('all-day check-in spans the local day and reminder is at eight', async () => {
+  const m = await model, o = { start: t(26), day: '2026-11-26', all_day: true };
+  assert.equal(m.windowClosesAt(o), t(27)); assert.equal(m.reminderAt(o), t(26, 8));
+  assert.equal(m.canCheckIn(o, t(26)), true); assert.equal(m.canCheckIn(o, t(26, 23, 59)), true); assert.equal(m.canCheckIn(o, t(27)), false);
+});
+
+test('all-day sorts before a timed midnight occurrence', async () => {
+  const m = await model, items = m.expandOccurrences([event({ id: 'a', date: '2026-11-26', time: '00:00' }), event({ id: 'z', date: '2026-11-26', time: null, all_day: true })], { from: t(26), to: t(27) });
+  assert.deepEqual(items.map(o => o.event_id), ['z', 'a']);
+});
+
+test('series end and summary count calendar occurrences', async () => {
+  const m = await model;
+  for (const [kind, days, count, last] of [['daily', [], 1, '2026-11-25'], ['daily', [], 5, '2026-11-29'], ['weekly', [], 3, '2026-12-09'], ['custom', [1, 3, 5], 4, '2026-12-02']]) {
+    const e = event({ recurrence: { kind, days, end: { kind: 'count', count } } });
+    assert.equal(m.seriesUntil(e), last); assert.deepEqual(m.seriesSummary(e), { n: count, last });
+  }
+  const e = event({ date: '2026-03-01', recurrence: { kind: 'daily', days: [], end: { kind: 'count', count: 99 } } });
+  assert.equal(m.seriesUntil(e), m.dayKey(m.addDays(m.parseDay(e.date), 98)));
+  assert.deepEqual(m.seriesSummary(e), { n: 99, last: '2026-06-07' });
+});
+
+test('until and never series summaries', async () => {
+  const m = await model, e = event({ recurrence: { kind: 'daily', days: [], end: { kind: 'until', until: '2026-11-27' } } });
+  assert.equal(m.seriesUntil(e), '2026-11-27'); assert.deepEqual(m.seriesSummary(e), { n: 3, last: '2026-11-27' });
+  e.recurrence.end = { kind: 'never' }; assert.equal(m.seriesUntil(e), null); assert.equal(m.seriesSummary(e), null);
+});
+
+test('validation reports all-day date and time errors', async () => {
+  const m = await model;
+  for (const [patch, code] of [[{ all_day: true, time: null }, 'all_day_today'], [{ all_day: true, time: null, date: '2026-11-24' }, 'past'], [{ all_day: true, time: '15:00', date: '2026-11-26' }, 'invalid']]) assert.equal(m.validateEvent(event(patch), now).errors.start, code);
+});
+
+test('validation reports AI requirements and missing saved script', async () => {
+  const m = await model, ai = { kind: 'ai' };
+  assert.equal(m.validateEvent(event({ script: ai, duration_min: null, category: 'sports' }), now).errors.duration_min, 'ai_needs_length');
+  assert.equal(m.validateEvent(event({ script: ai }), now).errors.category, 'ai_needs_category');
+  const errors = m.validateEvent(event({ script: ai, duration_min: null }), now).errors;
+  assert.equal(errors.duration_min, 'ai_needs_length'); assert.equal(errors.category, 'ai_needs_category');
+  assert.equal(m.validateEvent(event({ script: { kind: 'saved', script_id: '', title: 'Title' } }), now).errors.script, 'saved_missing');
+});
+
+test('validation checks count limits, end kind, category, color and optional duration', async () => {
+  const m = await model, input = count => event({ recurrence: { kind: 'daily', days: [], end: { kind: 'count', count } } });
+  for (const count of [0, 100, 1.5]) assert.equal(m.validateEvent(input(count), now).errors.count, 'invalid');
+  for (const count of [1, 99]) assert.equal(m.validateEvent(input(count), now).ok, true);
+  assert.equal(m.validateEvent(event({ recurrence: { kind: 'daily', days: [], end: { kind: 'unknown' } } }), now).errors.recurrence, 'invalid');
+  assert.equal(m.validateEvent(event({ color: 'bad', category: 'bad' }), now).errors.color, 'invalid');
+  assert.equal(m.validateEvent(event({ color: 'bad', category: 'bad' }), now).errors.category, 'invalid');
+  assert.equal(m.validateEvent(event({ duration_min: null }), now).ok, true);
+});
+
+test('reminder state accounts for creation and detail edit boundaries', async () => {
+  const m = await model, o = { start: t(25, 19), day: '2026-11-25', all_day: false }, reminder = t(25, 18, 30);
+  for (const [created_at, details_edited_at, at, expected] of [[reminder + 1, null, reminder, 'skipped'], [reminder, null, reminder - 1, 'scheduled'], [reminder, null, reminder, 'sent'], [reminder, reminder, reminder, 'sent_then_edited'], [reminder, reminder - 1, reminder, 'sent']]) assert.equal(m.reminderState(o, { created_at, details_edited_at }, at), expected);
 });
