@@ -86,6 +86,16 @@ export function loadConfig() {
     CONFIG.SCRIPT_TITLE_MAX_CHARS = c.script_title_max_chars ?? CONFIG.SCRIPT_TITLE_MAX_CHARS;
     CONFIG.MAX_PDF_SIZE_BYTES = c.max_pdf_size_bytes ?? CONFIG.MAX_PDF_SIZE_BYTES;
     CONFIG.MAX_PDF_PAGES = c.max_pdf_pages ?? CONFIG.MAX_PDF_PAGES;
+    CONFIG.MAX_TURN_TEXT_CHARS = c.max_turn_text_chars ?? CONFIG.MAX_TURN_TEXT_CHARS;
+    CONFIG.MAX_TEXT_FILE_BYTES = c.max_text_file_bytes ?? CONFIG.MAX_TEXT_FILE_BYTES;
+    CONFIG.MAX_TEXT_FILE_WORDS = c.max_text_file_words ?? CONFIG.MAX_TEXT_FILE_WORDS;
+    CONFIG.ETA_BUFFER_S = c.eta_buffer_s ?? CONFIG.ETA_BUFFER_S;
+    const st = c.script_telemetry || {};
+    CONFIG.SCRIPT_TELEMETRY = {
+      etaBufferS: st.eta_buffer_s ?? c.eta_buffer_s ?? CONFIG.SCRIPT_TELEMETRY.etaBufferS,
+      chatStepDurationsS: st.chat_turn_step_durations_s ?? CONFIG.SCRIPT_TELEMETRY.chatStepDurationsS,
+      generateStageDurationsS: st.generate_stage_durations_s ?? CONFIG.SCRIPT_TELEMETRY.generateStageDurationsS,
+    };
     CONFIG.PART_GOOD_MIN = c.part_good_min ?? CONFIG.PART_GOOD_MIN;
   }).catch(() => {});
 }

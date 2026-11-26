@@ -3,7 +3,17 @@ import { T, TOPICS } from '../i18n.js';
 import { paintAvatar } from '../nav.js';
 import { saveScriptAs } from '../screens/saved_scripts.js';
 import { openReader, runScriptAction } from '../screens/script_reader.js';
-import { composerActionState, pickScriptTitle, regenerateFeedback } from '../screens/script_studio_state.js';
+import {
+  canTriggerGenerateKeyword,
+  composerActionState,
+  computeBufferedRemainingS,
+  formatReplyMarkup,
+  normalizeTelemetrySteps,
+  pickScriptTitle,
+  regenerateFeedback,
+  shouldShowGenerateButton,
+  validateTurnText,
+} from '../screens/script_studio_state.js';
 import { CONFIG, RENDER, S } from '../state.js';
 import { openModal, popIn, toast } from '../ui.js';
 import { $, $$, IC, clearErr, esc, showErr, wordsOf } from '../utils.js';
@@ -24,26 +34,32 @@ const FALLBACK_USER_NAME = 'you';                                      // same f
    on the chat route. The parser codes unsupported_file_type, file_too_large, file_too_small, invalid_text_encoding and
    text_too_long come from DocumentParserError in the Member 1 brief; no document says which HTTP status or response body
    carries them, so the error_code is read first (GUESS: they reach the chat routes as error_code). */
-const ERR_KIND = { invalid_pdf: 'file', no_text_layer: 'file', unsupported_file_type: 'file', file_too_large: 'file', file_too_small: 'file',
+const ERR_KIND = { invalid_pdf: 'file', no_text_layer: 'file', unsupported_file_type: 'file', file_too_large: 'file', too_large: 'file', file_too_small: 'file',
   invalid_text_encoding: 'file', invalid_text_file: 'file', empty_file: 'file', empty_document: 'file', text_too_long: 'file',
   content_rejected: 'blocked', session_not_found: 'session',
   rate_limited: 'rate', moderation_unavailable: 'moderation', generation_unavailable: 'generation', net: 'net' };
 const ERR_TEXT = { rate: 'script.errRate', moderation: 'script.errModeration', net: 'eval.errNet' };   // other groups: server message, else script.errGeneric
-const FILE_ERR_TEXT = { unsupported_file_type: 'script.errFileType', file_too_large: 'script.errFileBig', file_too_small: 'script.errFileSmall',
+const FILE_ERR_TEXT = { unsupported_file_type: 'script.errFileType', file_too_large: 'script.errFileBig', too_large: 'script.errFileBig', file_too_small: 'script.errFileSmall',
   empty_file: 'script.errFileSmall', empty_document: 'script.errFileSmall', invalid_text_file: 'script.errFileEncoding',
   invalid_text_encoding: 'script.errFileEncoding', text_too_long: 'script.errFileWords', no_text_layer: 'script.errFileNoText' };   // other file codes: script.errFile
 
-/* Chat endpoints (Member 2 contract). */
+/* Chat endpoints (Member 2 contract + PR 1 async step/ETA job routes). */
 const URL_SUGGEST = '/api/script-chat/suggest', URL_SELECT = '/api/script-chat/select-topic', URL_MESSAGE = '/api/script-chat/message';
-/* Typing exactly one of these words (whole message, trimmed, any case) means "Generate Script"; it only counts while
-   gathering, before the first script (after it every text is Regenerate feedback). A message that carries a file is never a keyword. */
-const GENERATE_KEYWORDS = new Set(['generate', 'done', 'tạo', 'xong']);
+const URL_MESSAGE_JOBS = '/api/script-chat/message/jobs', URL_CHAT_JOBS = '/api/script-chat/jobs/';
+const STEPS_SUGGEST = ['validating_input', 'moderating', 'matching_templates'];
+const STEPS_SELECT = ['validating_input', 'analyzing_slots', 'analyzing_with_llm'];
+const STEPS_MESSAGE = ['validating_input', 'moderating', 'updating_context', 'compacting_context', 'analyzing_with_llm'];
+const STEPS_GENERATE = ['validating_input', 'extracting', 'moderating', 'generating', 'validating_output'];
 const TOPIC_MAX_CHARS = 120;                                           // longest free-topic text sent as `topic`
-/* Client-side file limits (a quick check before upload). Keep in sync with parser limits; the server is the source of truth.
-   PDF: app_constants.toml [script] min_pdf_size_bytes = 1024 (line 42) and max_pdf_size_bytes = 26_214_400 (line 43).
-   .md / .txt: MAX_TEXT_FILE_BYTES = 2 * 1024 * 1024 in the Member 1 parser contract; the smallest allowed size is 1 byte. */
-const TEXT_LIMITS = { min: 1, max: 2 * 1024 * 1024 };
-const fileLimits = () => ({ '.pdf': { min: 1024, max: CONFIG.MAX_PDF_SIZE_BYTES }, '.md': TEXT_LIMITS, '.txt': TEXT_LIMITS });
+/* Client-side file limits (hydrated from GET /api/config; the server remains the source of truth). */
+const fileLimits = () => {
+  const txtMax = Number(CONFIG.MAX_TEXT_FILE_BYTES) || 2 * 1024 * 1024;
+  return {
+    '.pdf': { min: 1024, max: Number(CONFIG.MAX_PDF_SIZE_BYTES) || 26214400 },
+    '.md': { min: 1, max: txtMax },
+    '.txt': { min: 1, max: txtMax },
+  };
+};
 
 /* ---------- Chat state: the session state below lives in memory only, gone on reload ----------
    (The visible conversation, i.e. the user's messages and the finished scripts, is also kept in localStorage per user:
@@ -51,18 +67,22 @@ const fileLimits = () => ({ '.pdf': { min: 1024, max: CONFIG.MAX_PDF_SIZE_BYTES 
    chatStage: 'idle' | 'picking_topic' | 'gathering' | 'generated'. chatEpoch grows on every New chat so that answers
    of an older turn can tell they are stale. chatAbort / chatPollTimer belong to the turn that is running.
    chatSeed = {prompt, fileName} of the first request (names a free-topic script); chatCards = the bubble holding the topic cards.
-   chatGenBtn = the Generate Script button of the newest Assistant reply (only that bubble keeps one), or null. */
+   assistantTurn = 1 on opening question (no Generate), >= 2 on gathering follow-ups (every Turn 2+ reply keeps its Generate button in chatGenBtns). */
 /* chatHasScript = this session already produced a script (stays true while chatting on afterwards); a script restored
    from localStorage does not count. While it is true the Composer's action button is Regenerate (see syncComposerAction). Part of NO_SESSION, so New chat / expired session / other account reset it.
    chatRegenCount = Regenerate runs started in this session (see startGenerate). */
-const NO_SESSION = { chatSessionId: null, chatStage: 'idle', chatHasScript: false, chatRegenCount: 0, chatGenBtn: null, selectedTemplate: null, sessionFiles: [], chatSeed: null, chatCards: null };
+const NO_SESSION = { chatSessionId: null, chatStage: 'idle', chatHasScript: false, chatRegenCount: 0, assistantTurn: 0, canGenerateNow: false, chatGenBtns: [], selectedTemplate: null, sessionFiles: [], chatSeed: null, chatCards: null };
+const activeLoadingBubbles = new Set();
 export function initChatState() {
-  Object.assign(S, NO_SESSION, { chatEpoch: 0, chatPollTimer: null, chatAbort: null, chatOwner: null });
+  Object.assign(S, NO_SESSION, { chatGenBtns: [], chatEpoch: 0, chatPollTimer: null, chatAbort: null, chatOwner: null });
 }
 initChatState();
+function syncGenerateButtons() {
+  S.chatGenBtns = (S.chatGenBtns || []).filter(b => b && b.isConnected);
+  S.chatGenBtns.forEach(b => { b.disabled = !!S.chatBusy; });
+}
 const setComposerBusy = on => {
-  S.chatBusy = on; syncComposerAction();
-  if (S.chatGenBtn) S.chatGenBtn.disabled = on;
+  S.chatBusy = on; syncComposerAction(); syncGenerateButtons();
 };
 /* #composerSend is Send until the session has a script, then Regenerate in the same place (the text box is the feedback).
    Compares with the last state kept on the button first, so a repeat call touches nothing; only a mode change rewrites the
@@ -81,10 +101,19 @@ function syncComposerAction() {
   }
   btn._state = next; btn.disabled = next.disabled;
 }
-/* Removes the Generate Script button (the whole .acts row) of the previous reply; a new reply or a finished script replaces it */
+/* Removes all Turn 2+ Generate action buttons once the first script of the session finishes (Composer is now Regenerate). */
 function dropGenerateButton() {
-  const btn = S.chatGenBtn; S.chatGenBtn = null;
-  if (btn) (btn.closest('.acts') || btn).remove();
+  (S.chatGenBtns || []).forEach(btn => { if (btn && btn.isConnected) (btn.closest('.acts') || btn).remove(); });
+  S.chatGenBtns = [];
+}
+function stopLoadingTicker(ai) {
+  if (!ai) return;
+  if (ai._etaTimer) { clearInterval(ai._etaTimer); ai._etaTimer = null; }
+  activeLoadingBubbles.delete(ai);
+}
+function stopAllLoadingTickers() {
+  activeLoadingBubbles.forEach(ai => { if (ai._etaTimer) clearInterval(ai._etaTimer); ai._etaTimer = null; });
+  activeLoadingBubbles.clear();
 }
 /* Category and Duration belong to the session once it exists, so they are locked until New chat (disabling the select disables its custom button too) */
 const lockSetup = on => { $('#composerTopic').disabled = on; $('#composerDuration').disabled = on; };
@@ -107,8 +136,9 @@ function renderSessionFiles() {
 export function startNewChat(opts = {}) {
   S.chatEpoch += 1;
   clearTimeout(S.chatPollTimer); S.chatPollTimer = null;
+  stopAllLoadingTickers();
   if (S.chatAbort) { S.chatAbort.abort(); S.chatAbort = null; }
-  Object.assign(S, NO_SESSION);
+  Object.assign(S, NO_SESSION, { chatGenBtns: [] });
   setComposerBusy(false); lockSetup(false); renderSessionFiles();
   $('#chatFeed').innerHTML = '';
   addBubble('ai', '<p></p>', !opts.restore).querySelector('p').textContent = T('script.greeting', { name: S.user ? S.user.name : FALLBACK_USER_NAME });
@@ -290,6 +320,7 @@ function scriptCardHtml() {
     '<div class="acts"><button class="btn btn-primary btn-sm" type="button" data-a="practice"></button><button class="btn btn-sm" type="button" data-a="save"></button><button class="btn btn-sm" type="button" data-a="copy"></button><button class="btn btn-sm" type="button" data-a="download"></button></div>';
 }
 function fillScriptBubble(ai, sc) {
+  stopLoadingTicker(ai);
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' + scriptCardHtml();
   $('.fc-name', ai).textContent = sc.cardName;
   const wc = wordsOf(sc.text);
@@ -347,6 +378,7 @@ export function restoreChat() {
 /* Error bubble; the text is set with textContent (it may come from the server). Only a failed script turn
    (ai._script.req) gets the Try again button; a failed chat turn gives the typed text back (picking a topic is retried by clicking the card again). */
 function renderErrorBubble(ai, text) {
+  stopLoadingTicker(ai);
   const retry = ai._script && ai._script.req;
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p>' + (retry ? '<div class="acts"><button class="btn btn-sm" type="button" data-a="retry"></button></div>' : '');
   $('.note', ai).textContent = text;
@@ -361,10 +393,14 @@ export function chatErrorKind(code, status) {
 /* One place for every chat error. `ai` is the loading bubble of the failed turn (ai._script.req and .again are kept for Try again).
    Each error group has its own message. A session error starts a new chat but keeps the user's text (except in a Regenerate turn, see below). */
 export function handleChatError(ai, code, message, status) {
+  stopLoadingTicker(ai);
   const kind = chatErrorKind(code, status);
   if (kind === 'file') {   // own message per error code (a server message is only the fallback); the typed text comes back
-    const input = $('#composerInput');
-    ai.remove(); showErr($('#composerError'), Object.hasOwn(FILE_ERR_TEXT, code) ? T(FILE_ERR_TEXT[code]) : (message || T('script.errFile')));
+    const input = $('#composerInput'), textTooLongNoFile = code === 'text_too_long' && !ai._file;
+    const errMsg = textTooLongNoFile
+      ? (message || T('script.errLong', { max: (Number(CONFIG.COMPOSER_MAX_WORDS) || 2000).toLocaleString('en-US') }))
+      : (Object.hasOwn(FILE_ERR_TEXT, code) ? T(FILE_ERR_TEXT[code]) : (message || T('script.errFile')));
+    ai.remove(); showErr($('#composerError'), errMsg);
     if (!input.value.trim() && ai._sent) { input.value = ai._sent; fitComposer(); }
     return;
   }
@@ -386,10 +422,64 @@ export function handleChatError(ai, code, message, status) {
   toast(text, true);
   renderErrorBubble(ai, text);
 }
-/* Skeleton bubble shown while a turn runs. `sent` is the text the person typed, kept so a session error can give it back. */
-function loadingBubble(text, sent, file) {
-  const ai = addBubble('ai', '<div class="skel" style="width:92%"></div><div class="skel" style="width:78%"></div><div class="skel" style="width:60%"></div><p class="note" role="status"></p>');
-  $('.note', ai).textContent = text; ai._sent = sent; ai._file = file;
+function stepLabel(key) {
+  const map = T('script.steps');
+  return (map && typeof map === 'object' && map[key]) ? map[key] : String(key || '').replace(/_/g, ' ');
+}
+function renderStepItems(listEl, steps) {
+  if (!listEl) return;
+  const visible = steps.filter(s => s.state !== 'skipped' && !(s.key === 'compacting_context' && s.state === 'pending'));
+  listEl.replaceChildren();
+  visible.forEach(s => {
+    const li = document.createElement('li');
+    li.className = 'turn-step is-' + s.state;
+    li.setAttribute('data-step-key', s.key);
+    const dot = document.createElement('span'); dot.className = 'st-dot'; dot.setAttribute('aria-hidden', 'true');
+    const txt = document.createElement('span'); txt.textContent = stepLabel(s.key);
+    li.append(dot, txt);
+    listEl.appendChild(li);
+  });
+}
+function refreshEtaBadge(ai) {
+  const etaEl = ai && $('.turn-eta', ai);
+  if (!etaEl || !ai._telemetry) return;
+  const elapsed = ai._syncedAt ? (Date.now() - ai._syncedAt) / 1000 : 0;
+  const teleCfg = CONFIG.SCRIPT_TELEMETRY || {};
+  const durs = ai._isScriptGen ? teleCfg.generateStageDurationsS : teleCfg.chatStepDurationsS;
+  const buf = Number.isFinite(teleCfg.etaBufferS) ? teleCfg.etaBufferS : CONFIG.ETA_BUFFER_S;
+  const rem = computeBufferedRemainingS(ai._telemetry, elapsed, durs, buf);
+  if (rem > 0) {
+    etaEl.hidden = false;
+    etaEl.textContent = T('script.etaRemaining', { s: rem });
+  } else {
+    etaEl.hidden = true;
+    etaEl.textContent = '';
+  }
+}
+function updateLoadingBubble(ai, telemetry, headline) {
+  if (!ai) return;
+  const statusEl = $('.turn-status', ai), listEl = $('.turn-steps', ai);
+  if (headline && statusEl && statusEl.textContent !== headline) statusEl.textContent = headline;
+  const steps = normalizeTelemetrySteps(telemetry && telemetry.steps, ai._fallbackSteps);
+  ai._telemetry = Object.assign({}, telemetry || {}, { steps });
+  ai._syncedAt = Date.now();
+  renderStepItems(listEl, steps);
+  refreshEtaBadge(ai);
+}
+/* Live processing-step & +10s-buffered ETA bubble shown while a chat turn or script generation job runs. */
+function loadingBubble(text, sent, file, fallbackSteps = STEPS_MESSAGE, isScriptGen = false) {
+  const ai = addBubble(
+    'ai',
+    '<div class="turn-head"><p class="note turn-status" role="status"></p><span class="pill num turn-eta" hidden></span></div>' +
+    '<ol class="turn-steps"></ol>' +
+    '<div class="skel" style="width:88%"></div><div class="skel" style="width:62%"></div>'
+  );
+  const rawRemove = ai.remove;
+  ai.remove = () => { stopLoadingTicker(ai); rawRemove(); };
+  ai._sent = sent; ai._file = file; ai._fallbackSteps = fallbackSteps; ai._isScriptGen = isScriptGen;
+  updateLoadingBubble(ai, { steps: normalizeTelemetrySteps(null, fallbackSteps) }, text);
+  ai._etaTimer = setInterval(() => refreshEtaBadge(ai), 1000);
+  activeLoadingBubbles.add(ai);
   return ai;
 }
 /* After a temporary failure: put the sent text and file back together, but only when the composer is still empty
@@ -430,11 +520,11 @@ export function generateScript(req, again) {
   const stale = () => ep !== S.chatEpoch || S.user !== owner;
   S.chatAbort = ctl; setComposerBusy(true);
   /* `sent` is what a session error gives back to the text box: for Regenerate the feedback the person typed (blank: nothing), else the first prompt */
-  const ai = loadingBubble(again ? T('script.regenerating') : T('script.generating'), again ? (typeof req.feedback === 'string' ? req.feedback : '') : req.txt);
+  const ai = loadingBubble(again ? T('script.regenerating') : T('script.generating'), again ? (typeof req.feedback === 'string' ? req.feedback : '') : req.txt, null, STEPS_GENERATE, true);
   ai._script = { req, again: again === true };   // kept on the bubble so Try again repeats this same mode
   /* req: sid = chat session, topic = category slug, tplId / tplTitle = picked template (empty when writing freely),
      genTopic = the `topic` field, txt / file = first prompt and file name (only used to name the script) */
-  const fd = new FormData(), status = $('.note', ai);
+  const fd = new FormData();
   fd.append('session_id', req.sid);
   fd.append('topic', req.genTopic);
   fd.append('category', req.tplId ? req.topic : 'free');
@@ -452,7 +542,8 @@ export function generateScript(req, again) {
     if (stale()) return;
     if (!ok || !j || j.status === 'failed') { failFrom(j, httpStatus); return; }
     if (j.status !== 'completed') {
-      status.textContent = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : T('script.generating')) + ' (' + (j.progress || 0) + '%)';
+      const stageTxt = (j.status === 'extracting' ? T('script.extracting') : j.status === 'moderating' ? T('script.checking') : (again ? T('script.regenerating') : T('script.generating'))) + ' (' + (j.progress || 0) + '%)';
+      updateLoadingBubble(ai, j, stageTxt);
       S.chatPollTimer = setTimeout(() => poll(id), pollIntervalMs()); return;
     }
     const res = j.result || {}, text = res.script || '';
@@ -470,6 +561,7 @@ export function generateScript(req, again) {
   api('/api/generate-script', { method: 'POST', body: fd, signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
     if (stale()) return;
     if (!ok || !j || !j.job_id) { failFrom(j, httpStatus); return; }
+    updateLoadingBubble(ai, j);
     poll(j.job_id);
   }).catch(() => fail('net', null));
 }
@@ -489,7 +581,8 @@ export function fitComposer() {
   ta.style.transition = 'none'; ta.style.height = '0px';
   const text = ta.scrollHeight - pad;
   ta.style.height = prev + 'px'; void ta.offsetHeight; ta.style.transition = '';
-  const btn = $('#attachBtn'), lo = Math.max(line, ((btn && btn.offsetHeight) || 44) - pad - edge), hi = COMPOSER_MAX_LINES * line;
+  const btn = $('#attachBtn'), maxLines = Number(CONFIG.COMPOSER_MAX_LINES) || COMPOSER_MAX_LINES;
+  const lo = Math.max(line, ((btn && btn.offsetHeight) || 44) - pad - edge), hi = maxLines * line;
   const open = Math.min(hi, Math.max(lo, text));
   const tall = text > lo + 1;
   if (!tall) S.composerFolded = false;                           // nothing to fold any more
@@ -521,13 +614,31 @@ export function onComposerFile(e) {
   if (!f) return;
   const v = validateChatFile(f);
   if (!v.ok) { showErr($('#composerError'), T(v.key)); return; }
+  const dot = f.name.lastIndexOf('.'), ext = dot < 0 ? '' : f.name.slice(dot).toLowerCase();
+  if ((ext === '.md' || ext === '.txt') && typeof f.arrayBuffer === 'function' && typeof TextDecoder === 'function') {
+    const token = {}; S.chatFileCheck = token;
+    f.arrayBuffer().then(buf => {
+      if (S.chatFileCheck !== token) return;
+      S.chatFileCheck = null;
+      let decoded = '';
+      try { decoded = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch (_) {
+        showErr($('#composerError'), T('script.errFileEncoding')); return;
+      }
+      if (!decoded.trim()) { showErr($('#composerError'), T('script.errFileSmall')); return; }
+      const maxWords = Number(CONFIG.MAX_TEXT_FILE_WORDS) || 15000;
+      if (wordsOf(decoded) > maxWords) { showErr($('#composerError'), T('script.errFileWords')); return; }
+      clearErr($('#composerError')); S.chatFile = { name: f.name, size: f.size, raw: f }; renderChatFile();
+    }).catch(() => { if (S.chatFileCheck === token) S.chatFileCheck = null; });
+    return;
+  }
+  S.chatFileCheck = null;
   clearErr($('#composerError')); S.chatFile = { name: f.name, size: f.size, raw: f }; renderChatFile();
 }
 /* Step 1: ask for topic cards. While picking_topic, new text or a new file asks again and the new cards replace the old.
    depends on Member 2 confirming what session_id does on /suggest: the one line that sends it is marked below, so
    switching to another rule (for example dropping it) is a one-line change. */
 function sendSuggest(txt, file) {
-  const fd = new FormData(), ai = loadingBubble(T('script.extracting'), txt, file);
+  const fd = new FormData(), ai = loadingBubble(T('script.extracting'), txt, file, STEPS_SUGGEST, false);
   fd.append('category', $('#composerTopic').value); fd.append('duration_min', $('#composerDuration').value);
   if (txt) fd.append('prompt', txt);
   if (file) fd.append('file', file.raw, file.name);
@@ -537,7 +648,8 @@ function sendSuggest(txt, file) {
   chatTurn(URL_SUGGEST, { method: 'POST', body: fd }, ai, j => {
     if (!j.session_id) { unlock(); handleChatError(ai, 'bad_response', null); return; }
     const old = S.chatSeed || {}, list = Array.isArray(j.suggestions) ? j.suggestions.filter(t => t && t.template_id && t.topic) : [];
-    S.chatSessionId = j.session_id; S.chatStage = 'picking_topic'; lockSetup(true); setSessionFiles(j.files_loaded);
+    S.chatSessionId = j.session_id; S.chatStage = 'picking_topic'; S.assistantTurn = 0; S.canGenerateNow = false;
+    lockSetup(true); setSessionFiles(j.files_loaded);
     S.chatSeed = { prompt: txt || old.prompt || '', fileName: file ? file.name : old.fileName || '' };
     if (S.chatCards) S.chatCards.remove();
     S.chatCards = ai; renderTopicCards(ai, list, j.recommend_free_topic === true);
@@ -552,6 +664,7 @@ function topicButton(tpl, title, meta, primary) {
 }
 /* One button per suggestion (as many as the server sent) plus Write freely, which is the primary button when recommended */
 function renderTopicCards(ai, list, recommendFree) {
+  stopLoadingTicker(ai);
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p><div class="tcards"></div>';
   $('.note', ai).textContent = T(list.length ? 'script.pickTopic' : 'script.noTopics');
   const box = $('.tcards', ai);
@@ -562,42 +675,97 @@ function renderTopicCards(ai, list, recommendFree) {
 /* Step 2: the clicked card locks every card at once (no double click, no second pick); a failed call unlocks them again. */
 function pickTopic(btn) {
   if (S.chatBusy || S.chatStage !== 'picking_topic') return;
-  const all = $$('[data-a=topic]', btn.closest('.tcards')), tpl = btn._tpl, ai = loadingBubble(T('script.thinking'), '');
+  const all = $$('[data-a=topic]', btn.closest('.tcards')), tpl = btn._tpl, ai = loadingBubble(T('script.thinking'), '', null, STEPS_SELECT, false);
   all.forEach(x => { x.disabled = true; }); btn.classList.add('picked'); btn.setAttribute('aria-pressed', 'true');
   chatTurn(URL_SELECT, { method: 'POST', json: { session_id: S.chatSessionId, template_id: tpl.template_id } }, ai, j => {
     S.selectedTemplate = tpl; S.chatStage = 'gathering'; renderGatherBubble(ai, j);
   }, () => { all.forEach(x => { x.disabled = false; }); btn.classList.remove('picked'); btn.removeAttribute('aria-pressed'); });
 }
-/* reply_message plus the Generate Script button (primary only when the server says ready_to_generate). Only the newest reply
-   keeps a button: the previous one is removed here. Once the session has a script this step brings no button. */
+/* Turn 1 (`assistant_turn === 1`, `can_generate === false`) shows only the highlighted question (no Generate button).
+   From Turn 2 onward, every gathering reply renders its own "Generate now if you do not want to provide more information"
+   button (kept across later Turn 2+ replies until the first script finishes). */
 function renderGatherBubble(ai, j) {
-  dropGenerateButton();
-  const withBtn = S.chatHasScript !== true;
-  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="reply"></p>' + (withBtn ? '<div class="acts"><button class="btn btn-sm" type="button" data-a="generate"></button></div>' : '');
-  $('.reply', ai).textContent = j.reply_message || '';
+  stopLoadingTicker(ai);
+  if (Number.isFinite(Number(j.assistant_turn))) S.assistantTurn = Number(j.assistant_turn);
+  if (typeof j.can_generate === 'boolean') S.canGenerateNow = j.can_generate;
+  else if (S.assistantTurn >= 2) S.canGenerateNow = true;
+  const withBtn = shouldShowGenerateButton({
+    hasScript: S.chatHasScript,
+    assistantTurn: S.assistantTurn,
+    canGenerate: j.can_generate,
+  });
+  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="reply"></p>' +
+    (withBtn ? '<div class="acts"><button class="btn btn-sm gen-now-btn" type="button" data-a="generate"></button></div>' : '');
+  $('.reply', ai).innerHTML = formatReplyMarkup(j.reply_message || '');
   if (withBtn) {
-    const g = $('[data-a=generate]', ai); g.textContent = T('script.generate'); g.classList.toggle('btn-primary', j.ready_to_generate === true);
-    g.disabled = S.chatBusy === true; S.chatGenBtn = g;
+    const g = $('[data-a=generate]', ai);
+    g.textContent = T('script.generateNow');
+    g.classList.toggle('btn-primary', j.ready_to_generate === true);
+    g.disabled = S.chatBusy === true;
+    S.chatGenBtns.push(g);
   }
   revealBubble(ai);
 }
-/* Step 3: never writes a script, only updates chips and reply. After a script this is only the file step of a Regenerate
-   (`regenFeedback` is a string then): the file goes alone (the text is feedback, not a message), the stage and chatHasScript stay,
-   and on success the Regenerate starts at once with the same busy Composer. The server's reply to that file step is NOT shown
-   (it asks for more detail, which contradicts the Regenerate that follows): its loading bubble is removed and the Regenerate's own
-   loading bubble takes its place in the same tick, so the Chat Feed shows one continuous skeleton. Nothing of it goes to the chat history. */
+/* Step 3: Turn 2+ message turn. Normal gathering turns submit an async step-tracked job (`POST /api/script-chat/message/jobs`)
+   and poll `GET /api/script-chat/jobs/{id}` so live steps (including `compacting_context`) and +10s-buffered ETA update smoothly.
+   When `regenFeedback` is a string (the hidden file step right before a Regenerate), synchronous `/message` runs and chains
+   straight into `startGenerate(regenFeedback)` with the same busy Composer. */
 function sendMessage(txt, file, regenFeedback) {
   const regen = typeof regenFeedback === 'string';
-  const fd = new FormData(), ai = loadingBubble(T('script.extracting'), regen ? regenFeedback : txt, file);   // `sent` = the draft a failed turn gives back
-  if (regen) ai._regen = true;
+  const fd = new FormData(), ai = loadingBubble(file ? T('script.extracting') : T('script.thinking'), regen ? regenFeedback : txt, file, STEPS_MESSAGE, false);
+  if (regen) {
+    ai._regen = true;
+    fd.append('session_id', S.chatSessionId);
+    if (file) fd.append('file', file.raw, file.name);
+    chatTurn(URL_MESSAGE, { method: 'POST', body: fd }, ai, j => {
+      setSessionFiles(j.files_loaded);
+      ai.remove();
+    }, null, () => startGenerate(regenFeedback));
+    return;
+  }
   fd.append('session_id', S.chatSessionId);
-  if (txt && !regen) fd.append('message', txt);
+  if (txt) fd.append('message', txt);
   if (file) fd.append('file', file.raw, file.name);
-  chatTurn(URL_MESSAGE, { method: 'POST', body: fd }, ai, j => {
+  const ep = S.chatEpoch, owner = S.user, ctl = new AbortController();
+  const stale = () => ep !== S.chatEpoch || S.user !== owner;
+  const fail = (code, msg, httpStatus) => { if (!stale()) { setComposerBusy(false); handleChatError(ai, code, msg, httpStatus); } };
+  S.chatAbort = ctl; setComposerBusy(true);
+  const finishTurn = res => {
+    if (!res || res.session_id !== S.chatSessionId) { fail('session_mismatch', null); return; }
     if (S.chatHasScript !== true) S.chatStage = 'gathering';
-    setSessionFiles(j.files_loaded);
-    if (regen) ai.remove(); else renderGatherBubble(ai, j);
-  }, null, regen ? () => startGenerate(regenFeedback) : undefined);
+    setSessionFiles(res.files_loaded);
+    setComposerBusy(false);
+    renderGatherBubble(ai, res);
+  };
+  let tries = 0, netRetries = 0;
+  const poll = id => {
+    if (stale()) return;
+    if (++tries > Math.ceil(POLL_MAX_MS / pollIntervalMs())) { fail('poll_timeout', null); return; }
+    api(URL_CHAT_JOBS + id, { signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
+      if (stale()) return;
+      netRetries = 0;
+      if (!ok || !j || j.status === 'failed') { fail(errCode(j), j && j.message, httpStatus); return; }
+      if (j.status !== 'completed') {
+        updateLoadingBubble(ai, j, stepLabel(j.stage || 'analyzing_with_llm') + '...');
+        S.chatPollTimer = setTimeout(() => poll(id), pollIntervalMs());
+        return;
+      }
+      finishTurn(j.result || j);
+    }).catch(() => {
+      if (stale()) return;
+      if (++netRetries <= 2) { S.chatPollTimer = setTimeout(() => poll(id), pollIntervalMs()); return; }
+      fail('net', null);
+    });
+  };
+  api(URL_MESSAGE_JOBS, { method: 'POST', body: fd, signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
+    if (stale()) return;
+    const goneSession = httpStatus === 404 && S.chatSessionId && errCode(j) !== 'job_not_found';
+    if (!ok || !j) { fail(errCode(j) || (goneSession ? 'session_not_found' : null), j && j.message, httpStatus); return; }
+    if (j.status === 'completed' && j.result) { finishTurn(j.result); return; }
+    if (!j.job_id) { fail('bad_response', null, httpStatus); return; }
+    updateLoadingBubble(ai, j, stepLabel(j.stage || 'moderating') + '...');
+    poll(j.job_id);
+  }).catch(() => fail('net', null));
 }
 /* The request body of a script run, built from the session state (never from an earlier script's req).
    `topic` is the template id when one was picked, else the free-topic text; `category` is always the slug chosen in the Category select. */
@@ -606,7 +774,7 @@ function buildGenerateReq() {
   return { sid: S.chatSessionId, topic: category, tplId: sel.template_id, tplTitle: sel.topic || '', dur: +$('#composerDuration').value || 5,
     genTopic: sel.template_id || freeTopicText(seed.prompt, seed.fileName, category), txt: seed.prompt || '', file: seed.fileName ? { name: seed.fileName } : null };
 }
-const canGenerate = () => !S.chatBusy && (S.chatStage === 'gathering' || S.chatStage === 'generated');
+const canGenerate = () => !S.chatBusy && ((S.chatStage === 'gathering' && S.canGenerateNow === true) || S.chatStage === 'generated');
 /* Step 4: Generate Script button (in the reply bubble) or keyword; after a script, the Composer's Regenerate button. Once the session
    has a script this is a Regenerate and `feedback` (text typed in the Composer, may be blank) goes to the backend; the first run ignores it. Each Regenerate gets its own attempt number, so a
    blank one still writes a new version (the backend caches by feedback text; typed text that repeats an old one may return the old script). */
@@ -634,10 +802,12 @@ function regenerateFromComposer() {
   }
   if (file) sendMessage('', file, txt); else startGenerate(txt);
 }
-/* Shows the too-long error and returns true when the text is over the word limit. */
+/* Shows the too-long error (NFC character limit or word limit) and returns true without clearing the user's draft. */
 function rejectLong(txt, err) {
-  if (wordsOf(txt) <= CONFIG.COMPOSER_MAX_WORDS) return false;
-  showErr(err, T('script.errLong', { max: CONFIG.COMPOSER_MAX_WORDS.toLocaleString('en-US') }));
+  const check = validateTurnText(txt, { maxWords: CONFIG.COMPOSER_MAX_WORDS, maxChars: CONFIG.MAX_TURN_TEXT_CHARS });
+  if (check.ok) return false;
+  const key = check.reason === 'chars' ? 'script.errLongChars' : 'script.errLong';
+  showErr(err, T(key, { max: check.limit.toLocaleString('en-US') }));
   return true;
 }
 export function sendChat() {
@@ -653,7 +823,7 @@ export function sendChat() {
   $('#composerInput').value = ''; S.chatFile = null; renderChatFile();
   S.composerFolded = false; fitComposer();   // back to one short line
   const talking = S.chatStage === 'gathering' || S.chatStage === 'generated';
-  if (talking && !file && GENERATE_KEYWORDS.has(txt.normalize('NFC').toLowerCase())) startGenerate();
+  if (canTriggerGenerateKeyword({ stage: S.chatStage, hasScript: S.chatHasScript, canGenerateNow: S.canGenerateNow, hasFile: !!file, text: txt })) startGenerate();
   else if (talking) sendMessage(txt, file);
   else sendSuggest(txt, file);   // idle, or picking_topic (asks again, see sendSuggest)
 }

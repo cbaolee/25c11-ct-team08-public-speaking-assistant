@@ -27,7 +27,7 @@ export const CONFIG = {
   FOLLOW_AUTO_MAX_AHEAD: 4,            // a tap further ahead (sentences) is a skip, not measured
   FOLLOW_WPM_SAVE_DELAY_MS: 800,       // wait after the last slider move before PATCH /api/profile, in ms
   CHAT_HISTORY_MAX_MESSAGES: 20,       // most Script Studio chat messages kept in localStorage
-  COMPOSER_MAX_WORDS: 3000,            // most words in one Script Studio message
+  COMPOSER_MAX_WORDS: 2000,            // most words in one Script Studio message
   COMPOSER_MAX_LINES: 5.5,             // the Script Studio text box grows up to this many lines
   SCRIPT_POLL_INTERVAL_MS: 650,        // wait between two status checks of a script being generated
   EVALUATE_BACKGROUND_AFTER_MS: 5000,  // after this the evaluation goes on in the background and the user is sent Home
@@ -37,6 +37,15 @@ export const CONFIG = {
   SCRIPT_TITLE_MAX_CHARS: 70,          // longest saved script name ([storage])
   MAX_PDF_SIZE_BYTES: 26214400,        // largest PDF for Script Studio ([script], 25 MB)
   MAX_PDF_PAGES: 10,                   // most PDF pages ([script])
+  MAX_TURN_TEXT_CHARS: 18000,          // most NFC characters in one Script Studio turn ([script])
+  MAX_TEXT_FILE_BYTES: 2097152,        // largest .md / .txt upload ([script], 2 MB)
+  MAX_TEXT_FILE_WORDS: 15000,          // most words in an uploaded .md / .txt file ([script])
+  ETA_BUFFER_S: 10,                    // safety buffer added to Script Studio stage estimates ([script])
+  SCRIPT_TELEMETRY: {
+    etaBufferS: 10,
+    chatStepDurationsS: { validating_input: 0.5, moderating: 1.0, matching_templates: 1.5, analyzing_slots: 1.0, updating_context: 0.5, compacting_context: 2.5, analyzing_with_llm: 3.5 },
+    generateStageDurationsS: { validating_input: 1.0, extracting: 2.0, moderating: 1.5, generating: 8.0, validating_output: 1.0 },
+  },
 };
 
 
