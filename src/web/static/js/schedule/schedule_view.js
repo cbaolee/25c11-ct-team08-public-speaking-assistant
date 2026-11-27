@@ -99,6 +99,7 @@ export function weekDays(key) {
   const date = localDate(key); date.setDate(date.getDate() - (date.getDay() + 6) % 7);
   return Array.from({ length: 7 }, (_, i) => localKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + i)));
 }
+export function otherView(view) { return view === 'month' ? 'week' : 'month'; }
 export function weekForMonthView(monthKey, now) {
   const today = localKey(new Date(now));
   return weekDays(today.slice(0, 7) === monthKey ? today : monthKey + '-01')[0];
