@@ -7,15 +7,14 @@ import { openModal, closeModal, toast, enhanceSelect } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, cardTags, cardScriptLine, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, slotStartTime, slotTarget, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, cardTags, cardScriptLine, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, wheelStep } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
 
 const $ = id => document.getElementById(id);
 let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker, untilPicker;
-let openPopover = null, gridObserver, gridFrame = 0, view = 'month', viewUser, weekScrollKey = '';
-const WEEK_HOUR_PX = 60;
+let openPopover = null, gridObserver, gridFrame = 0, view = 'month', viewUser;
 const VIEW_EXIT_MS = 120, VIEW_ENTER_MS = 180;
 let viewAnimations = [], viewTransition = 0;
 function cancelViewAnimations() {
@@ -42,7 +41,7 @@ async function changeView(visible) {
   await animateView(incoming, [{ opacity: 0, transform: 'scale(.985)', transformOrigin: 'top center' }, { opacity: 1, transform: 'scale(1)', transformOrigin: 'top center' }], VIEW_ENTER_MS, 'ease-out');
   if (token === viewTransition) { panel.style.height = ''; panel.style.overflow = ''; viewAnimations = []; }
 }
-function loadView() { if (viewUser !== S.user?.id) { viewUser = S.user?.id; try { view = storage()?.getItem('psa.schedule.view.v1.' + viewUser) === 'week' ? 'week' : 'month'; } catch (_) { view = 'month'; } weekScrollKey = ''; } }
+function loadView() { if (viewUser !== S.user?.id) { viewUser = S.user?.id; try { view = storage()?.getItem('psa.schedule.view.v1.' + viewUser) === 'week' ? 'week' : 'month'; } catch (_) { view = 'month'; } } }
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
 function pruneCache() { if (S.user?.id) { const store = storage(), cache = readAiCache(store, S.user.id), pruned = pruneAiCache(cache, Date.now()); if (Object.keys(pruned).length !== Object.keys(cache).length) writeAiCache(store, S.user.id, pruned); } }
@@ -159,56 +158,38 @@ function monthChip(status, label, color) {
   return el;
 }
 function renderWeek(now) {
-  const root = $('schWeek'), keys = weekDays(dayKey(month)), today = dayKey(now), oldScroll = root.querySelector('.sch-week-scroll')?.scrollTop, focusKey = root.contains(document.activeElement) ? document.activeElement.dataset.occKey : null;
-  const focusDay = root.contains(document.activeElement) ? document.activeElement.dataset.schDay : null;
-  const focusHour = document.activeElement?.classList.contains('sch-slot') ? document.activeElement.dataset.schHour : null;
-  const isOpen = (d, h) => slotStartTime(keys[d], h, now) !== null;
-  const todayIndex = keys.indexOf(today), preferredHour = new Date(now).getHours();
-  let initialSlot = focusHour !== null && keys.includes(focusDay) && isOpen(keys.indexOf(focusDay), Number(focusHour)) ? { dayIndex: keys.indexOf(focusDay), hour: Number(focusHour) } : null;
-  if (!initialSlot && todayIndex >= 0 && isOpen(todayIndex, preferredHour)) initialSlot = { dayIndex: todayIndex, hour: preferredHour };
-  if (!initialSlot) { const d = keys.findIndex((_, i) => Array.from({ length: 24 }, (_, h) => isOpen(i, h)).some(Boolean)); if (d >= 0) initialSlot = { dayIndex: d, hour: isOpen(d, 9) ? 9 : Array.from({ length: 24 }, (_, h) => h).find(h => isOpen(d, h)) }; }
-  const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[6]), 1));
+  const root = $('schWeek'), keys = weekDays(dayKey(month)), today = dayKey(now);
+  const focused = root.contains(document.activeElement) ? document.activeElement : null;
+  const focusDay = focused?.dataset.schDay, focusAdd = focused?.classList.contains('sch-add');
+  const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[6]), 1)), cells = [];
   root.replaceChildren();
-  const wide = node('div', null, 'sch-week-wide'), headers = node('div', null, 'sch-week-row sch-week-headers'), all = node('div', null, 'sch-week-row sch-week-all');
-  headers.append(node('span')); all.append(node('span', T('schedule.allDay'), 'sch-week-axis'));
-  const scroll = node('div', null, 'sch-week-scroll'), body = node('div', null, 'sch-week-row sch-week-body');
-  body.setAttribute('role', 'list'); body.setAttribute('aria-label', T('schedule.weekTimeGrid'));
-  const axis = node('div', null, 'sch-week-hours'); axis.setAttribute('role', 'presentation'); axis.setAttribute('aria-hidden', 'true');
-  for (let h = 0; h < 24; h++) { const label = node('span', fmt(new Date(2000, 0, 1, h), { hour: 'numeric' })); label.style.top = (h * WEEK_HOUR_PX) + 'px'; axis.append(label); }
-  body.append(axis);
-  keys.forEach((key, dayIndex) => {
-    const date = fullDate(parseDay(key)), header = node('div', null, 'sch-week-header sch-cell');
-    const day = button(fmt(parseDay(key), { weekday: 'short', day: 'numeric' }), () => openDay(key), 'sch-week-day'); day.dataset.schDay = key; day.setAttribute('aria-label', date);
-    if (key === today) day.classList.add('sch-week-today'); header.append(day);
-    headers.append(header);
-    const allCell = node('div', null, 'sch-week-all-cell');
-    occs.filter(o => o.day === key && o.all_day).forEach(o => { const status = occurrenceStatus(o, now), b = button('', () => openDay(key, o.key), 'sch-week-all-button'); b.dataset.occKey = o.key; b.setAttribute('aria-label', [date, T('schedule.allDay'), lengthLabel(o.duration_min, labelWords()), T('schedule.' + status)].join(', ')); b.append(monthChip(status, T('schedule.allDay'), o.color)); allCell.append(b); }); all.append(allCell);
-    const column = node('div', null, 'sch-week-column'); column.setAttribute('role', 'listitem'); column.setAttribute('aria-label', date);
-    for (let h = 0; h < 24; h++) {
-      const start = slotStartTime(key, h, now); if (start === null) continue;
-      const slot = button('', () => { const fresh = slotStartTime(key, h, Date.now()); if (fresh === null) renderWeek(Date.now()); else openEvent(key, null, null, fresh); }, 'sch-slot');
-      slot.dataset.schDay = key; slot.dataset.schHour = String(h); slot.style.top = (h * WEEK_HOUR_PX) + 'px'; slot.style.height = WEEK_HOUR_PX + 'px';
-      slot.tabIndex = initialSlot?.dayIndex === dayIndex && initialSlot.hour === h ? 0 : -1;
-      slot.setAttribute('aria-label', T('schedule.addPracticeAt', { date, time: time(new Date(key + 'T' + start)) }));
-      const plus = node('span', '+', 'sch-slot-plus'); plus.setAttribute('aria-hidden', 'true'); slot.append(plus);
-      slot.addEventListener('focus', () => { root.querySelectorAll('.sch-slot').forEach(el => { el.tabIndex = el === slot ? 0 : -1; }); slot.scrollIntoView({ block: 'nearest' }); });
-      slot.addEventListener('keydown', e => { if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return; e.preventDefault(); const target = slotTarget(dayIndex, h, e.key, (d, hour) => !!root.querySelector(`.sch-slot[data-sch-day="${keys[d]}"][data-sch-hour="${hour}"]`)); if (target) root.querySelector(`.sch-slot[data-sch-day="${keys[target.dayIndex]}"][data-sch-hour="${target.hour}"]`)?.focus(); });
-      column.append(slot);
-    }
-    const items = occs.filter(o => o.day === key && !o.all_day).map(o => { const d = new Date(o.start), startMin = d.getHours() * 60 + d.getMinutes(); return { key: o.key, startMin, endMin: Math.min(1440, startMin + Math.max(WEEK_MIN_BLOCK_MIN, o.duration_min || 0)), occ: o }; });
-    layoutDayBlocks(items).forEach(item => { const o = item.occ, status = occurrenceStatus(o, now), length = lengthLabel(o.duration_min, labelWords()), geom = blockGeometry(item.startMin, o.duration_min, WEEK_HOUR_PX);
-      const b = button('', () => openDay(key, o.key), 'sch-week-block'); b.dataset.occKey = o.key; b.setAttribute('aria-label', [date, time(o.start), length, T('schedule.' + status)].join(', ')); applyEventStyle(b, status, o.color);
-      b.style.top = geom.top + 'px'; b.style.height = geom.height + 'px'; b.style.left = (item.col * 100 / item.cols) + '%'; b.style.width = (100 / item.cols) + '%';
-      const icon = node('span', { active: '\u25CF', done: '\u2713', upcoming: '\u25CB', missed: '\u25CC' }[status]); icon.setAttribute('aria-hidden', 'true'); b.title = T('schedule.' + status); b.append(icon, node('span', time(o.start) + (o.duration_min == null ? '' : ' \u00B7 ' + length), 'sch-week-block-label'), node('span', T('schedule.' + status), 'sr-only')); column.append(b); });
-    if (key === today) { const d = new Date(now), line = node('div', null, 'sch-now-line'); line.setAttribute('aria-hidden', 'true'); line.style.top = ((d.getHours() * 60 + d.getMinutes()) * WEEK_HOUR_PX / 60) + 'px'; column.append(line); }
-    body.append(column);
+  keys.forEach(key => {
+    const list = occs.filter(o => o.day === key), counts = {}, date = fullDate(parseDay(key));
+    list.forEach(o => { const status = occurrenceStatus(o, now); counts[status] = (counts[status] || 0) + 1; });
+    const description = Object.entries(counts).map(([status, count]) => `${count} ${T('schedule.' + (status === 'active' ? 'activeLegend' : status)).toLowerCase()}`).join(', ');
+    const b = button('', () => openDay(key), 'sch-day sch-wday'); b.dataset.schDay = key;
+    b.setAttribute('aria-label', list.length ? T(list.length === 1 ? 'schedule.sessionOne' : 'schedule.sessionMany', { date, count: list.length, statuses: description }) : T('schedule.noSessions', { date }));
+    if (key === today) { b.classList.add('sch-today'); b.setAttribute('aria-current', 'date'); b.append(node('span', T('schedule.today'), 'sr-only')); }
+    b.append(node('span', fmt(parseDay(key), { weekday: 'short' }) + ' ' + new Date(parseDay(key)).getDate(), 'sch-wday-head'));
+    const cell = node('div', null, 'sch-cell'); cell.append(b);
+    if (key >= today) { cell.classList.add('sch-can-add'); const add = button('+', () => { selectedDay = key; openEvent(key); }, 'sch-add'); add.dataset.schDay = key; add.setAttribute('aria-label', T('schedule.addPracticeOn', { date })); cell.append(add); }
+    root.append(cell); cells.push({ b, list });
   });
-  scroll.append(body); wide.append(headers, all, scroll); root.append(wide);
-  wide.style.setProperty('--sch-scrollbar-width', (scroll.offsetWidth - scroll.clientWidth) + 'px');
-  const newKey = keys[0]; scroll.scrollTop = newKey === weekScrollKey && oldScroll != null ? oldScroll : Math.max(0, initialScrollHour(keys, today, new Date(now).getHours()) * WEEK_HOUR_PX - 8); weekScrollKey = newKey;
-  if (focusHour !== null) root.querySelector(`.sch-slot[data-sch-day="${focusDay}"][data-sch-hour="${focusHour}"]`)?.focus();
-  else if (focusKey) [...root.querySelectorAll('[data-occ-key]')].find(el => el.dataset.occKey === focusKey)?.focus();
-  else if (focusDay) [...root.querySelectorAll('[data-sch-day]')].find(el => el.dataset.schDay === focusDay)?.focus();
+  const makeItem = o => { const status = occurrenceStatus(o, now), label = sessionTimeLabel(o, time, labelWords()); const el = chip(status, label + (o.duration_min == null ? '' : ' \u00B7 ' + lengthLabel(o.duration_min, labelWords())), false, o.color); el.classList.add('sch-witem'); el.title = T('schedule.' + status) + ' \u2013 ' + label; return el; };
+  const sample = chip('upcoming', T('schedule.allDay'), false, DEFAULT_COLOR); sample.classList.add('sch-witem');
+  const moreSample = node('span', T('schedule.more', { n: 1 }), 'sch-more');
+  cells[0].b.append(sample, moreSample);
+  const styles = getComputedStyle(cells[0].b), head = cells[0].b.querySelector('.sch-wday-head'), headStyles = getComputedStyle(head);
+  const headerHeight = head.getBoundingClientRect().height + parseFloat(headStyles.marginTop) + parseFloat(headStyles.marginBottom), chipHeight = sample.getBoundingClientRect().height, moreHeight = moreSample.getBoundingClientRect().height, gap = parseFloat(styles.rowGap) || 0;
+  sample.remove(); moreSample.remove();
+  const compact = matchMedia('(max-width: 720px)').matches;
+  cells.forEach(({ b, list }) => {
+    const innerHeight = b.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
+    const fit = compact ? { shown: Math.min(3, list.length), more: Math.max(0, list.length - 3) } : chipsThatFit(innerHeight, headerHeight, chipHeight, moreHeight, gap, list.length);
+    list.slice(0, fit.shown).forEach(o => b.append(makeItem(o)));
+    if (fit.more) b.append(node('span', T('schedule.more', { n: fit.more }), 'sch-more'));
+  });
+  if (focusDay) root.querySelector(`[data-sch-day="${focusDay}"].${focusAdd ? 'sch-add' : 'sch-day'}`)?.focus();
 }
 function render() {
   loadView();
@@ -376,12 +357,12 @@ function applyScheduleLock() {
   $('schLockNote').hidden = !locked;
   $('schLockNote').textContent = T('schedule.scheduleLocked');
 }
-function openEvent(key, occ = null, event = null, presetTime = null) {
+function openEvent(key, occ = null, event = null) {
   if (openPopover) openPopover(false);
   editing = occ ? { occ, event } : null; savedRequest++; savedItems = []; savedSelection = event?.script?.kind === 'saved' ? { id: event.script.script_id, title: event.script.title } : null;
   const form = $('schForm'); form.reset(); setChoice('schLength', 'any'); setChoice('schCategory', 'any'); setSegment('schScript', event?.script?.kind || 'free'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never'); $('schAllDay').setAttribute('aria-checked', 'false'); $('schCount').value = '1'; $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   const minimum = dayKey(Date.now()), chosen = key && key >= minimum ? key : minimum;
-  datePicker.set(chosen, minimum); timePicker.set(!occ && /^([01]\d|2[0-3]):[0-5]\d$/.test(presetTime || '') && MINUTE_STEPS.includes(Number(presetTime.slice(3))) && new Date(chosen + 'T' + presetTime).getTime() > Date.now() ? presetTime : defaultTime(Date.now(), chosen));
+  datePicker.set(chosen, minimum); timePicker.set(defaultTime(Date.now(), chosen));
   untilPicker.set('', chosen); $('schDays').hidden = true;
   ['Start', 'Length', 'Category', 'Script', 'Color', 'Note', 'Repeat', 'Days', 'Until', 'Count'].forEach(k => { $('sch' + k + 'Error').textContent = ''; $('sch' + k + 'Error').classList.remove('show'); });
   ['schDate', 'schTime', 'schLength', 'schNote', 'schRepeat', 'schUntil'].forEach(id => $(id).removeAttribute('aria-invalid'));
@@ -423,7 +404,7 @@ function init() {
     const visible = view === 'week' ? [$('schWeek')] : [$('schWeekdays'), $('schGrid')];
     if (value === 'week') month = new Date(parseDay(weekForMonthView(dayKey(month).slice(0, 7), Date.now())));
     else { const [y, m] = monthForWeekView(dayKey(month), Date.now()).split('-').map(Number); month = new Date(y, m - 1, 1); }
-    view = value; weekScrollKey = ''; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {}
+    view = value; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {}
     $('schViewToggle').dataset.view = view;
     $('schViewToggle').querySelectorAll('[role="radio"]').forEach(b => { b.setAttribute('aria-checked', String(b.value === view)); b.tabIndex = b.value === view ? 0 : -1; });
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) render(); else changeView(visible);
@@ -539,8 +520,15 @@ function init() {
   window.addEventListener('resize', () => { if (!picker.hidden) closePicker(); });
   document.addEventListener('scroll', e => { if (!picker.hidden && !picker.contains(e.target)) closePicker(); }, true);
   document.addEventListener('pointerdown', e => { if (!picker.hidden && !picker.parentElement.contains(e.target)) closePicker(); });
-  $('schPrev').onclick = () => { month = view === 'week' ? new Date(addDays(month, -7)) : new Date(month.getFullYear(), month.getMonth() - 1, 1); render(); };
-  $('schNext').onclick = () => { month = view === 'week' ? new Date(addDays(month, 7)) : new Date(month.getFullYear(), month.getMonth() + 1, 1); render(); };
+  const shiftPeriod = dir => { month = view === 'week' ? new Date(addDays(month, dir * 7)) : new Date(month.getFullYear(), month.getMonth() + dir, 1); render(); };
+  $('schPrev').onclick = () => shiftPeriod(-1);
+  $('schNext').onclick = () => shiftPeriod(1);
+  let wheelState = { acc: 0, lastWheel: -Infinity, lastStep: -Infinity };
+  $('schGrid').closest('.sch-panel').addEventListener('wheel', e => {
+    if (matchMedia('(max-width: 720px)').matches || e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || S.modal.length || !picker.hidden || picker.contains(e.target) || openPopover) return;
+    e.preventDefault(); const result = wheelStep(wheelState, e.deltaY, e.deltaMode, Date.now()); wheelState = result.state;
+    if (result.step) shiftPeriod(result.step);
+  }, { passive: false });
   $('schForm').onsubmit = e => {
     e.preventDefault(); const input = currentInput();
     if (editing && editing.event.recurrence.kind === 'none') input.recurrence = editing.event.recurrence;
@@ -575,7 +563,7 @@ RENDER.schedule = () => {
       if (S.screen === 'schedule') { cancelAnimationFrame(gridFrame); gridFrame = requestAnimationFrame(() => { if (!viewAnimations.length) render(); }); }
     });
   }
-  weekScrollKey = ''; render(); gridObserver.observe($('schGrid'));
+  render(); gridObserver.observe($('schGrid')); gridObserver.observe($('schWeek'));
 };
 setInterval(() => { if (S.screen === 'schedule' && !S.modal.length) render(); else if (S.screen === 'home' && S.user) renderTodayPanel(); }, 60000);   // keeps the countdown and status changes fresh
 

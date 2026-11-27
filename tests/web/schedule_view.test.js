@@ -187,54 +187,27 @@ test('chip capacity reserves the measured overflow line only when needed', async
   assert.deepEqual(chipsThatFit(100, 28, 20, 14, 4, 0), { shown: 0, more: 0 });
 });
 
-test('week helpers use calendar days, ranges and initial scroll', async () => {
-  const { weekDays, weekRangeLabel, initialScrollHour, blockGeometry } = await view;
+test('week helpers use calendar days and ranges', async () => {
+  const { weekDays, weekRangeLabel } = await view;
   const fmt = (d, options) => new Intl.DateTimeFormat('en-US', options).format(d);
   assert.deepEqual(weekDays('2026-03-08'), ['2026-03-02','2026-03-03','2026-03-04','2026-03-05','2026-03-06','2026-03-07','2026-03-08']);
   assert.equal(weekRangeLabel('2026-11-23', fmt), 'Nov 23 \u2013 29, 2026');
   assert.equal(weekRangeLabel('2026-11-30', fmt), 'Nov 30 \u2013 Dec 6, 2026');
   assert.equal(weekRangeLabel('2026-12-28', fmt), 'Dec 28, 2026 \u2013 Jan 3, 2027');
-  assert.equal(initialScrollHour(weekDays('2026-03-08'), '2026-03-08', 19), 19);
-  assert.equal(initialScrollHour(weekDays('2026-03-08'), '2026-03-09', 19), 7);
-  assert.deepEqual(blockGeometry(1435, null, 60), { top: 1435, height: 5 });
-  assert.deepEqual(blockGeometry(60, 10, 60), { top: 60, height: 30 });
 });
-test('week overlap clusters use reusable columns and treat touching blocks as separate', async () => {
-  const { layoutDayBlocks } = await view;
-  const layout = intervals => layoutDayBlocks(intervals.map(([startMin,endMin], key) => ({ key, startMin, endMin }))).map(({col, cols}) => [col, cols]);
-  assert.deepEqual(layout([[0,10],[10,20]]), [[0,1],[0,1]]);
-  assert.deepEqual(layout([[0,10],[5,15]]), [[0,2],[1,2]]);
-  assert.deepEqual(layout([[0,10],[1,11],[2,12]]), [[0,3],[1,3],[2,3]]);
-  assert.deepEqual(layout([[0,10],[5,15],[10,20]]), [[0,2],[1,2],[0,2]]);
-});
-
-
-test('slot start chooses the next valid local five minute time', async () => {
-  const { slotStartTime } = await view, key = '2026-11-27';
-  const now = (h, m, sec = 0) => new Date(2026, 10, 27, h, m, sec).getTime();
-  assert.equal(slotStartTime(key, 16, now(15, 20)), '16:00');
-  assert.equal(slotStartTime(key, 14, now(15, 20)), null);
-  assert.equal(slotStartTime(key, 15, now(15, 20, 30)), '15:25');
-  assert.equal(slotStartTime(key, 15, now(15, 55)), '16:00');
-  assert.equal(slotStartTime(key, 23, now(23, 57)), null);
-  assert.equal(slotStartTime('2026-11-28', 0, now(15, 0)), '00:00');
-  assert.equal(slotStartTime('2026-11-26', 23, now(0, 0)), null);
-  assert.equal(slotStartTime(key, 0, now(0, 0)), '00:05');
-});
-test('slot navigation skips closed positions and respects boundaries', async () => {
-  const { slotTarget } = await view;
-  const open = (d, h) => d >= 1 && d <= 5 && (d !== 2 || h >= 12) && h !== 14;
-  assert.deepEqual(slotTarget(3, 13, 'ArrowDown', open), { dayIndex: 3, hour: 15 });
-  assert.deepEqual(slotTarget(3, 15, 'ArrowUp', open), { dayIndex: 3, hour: 13 });
-  assert.deepEqual(slotTarget(3, 13, 'ArrowRight', open), { dayIndex: 4, hour: 13 });
-  assert.deepEqual(slotTarget(3, 9, 'ArrowLeft', open), { dayIndex: 2, hour: 12 });
-  assert.deepEqual(slotTarget(1, 9, 'ArrowRight', open), { dayIndex: 2, hour: 12 });
-  assert.deepEqual(slotTarget(2, 15, 'Home', open), { dayIndex: 2, hour: 12 });
-  assert.deepEqual(slotTarget(2, 15, 'End', open), { dayIndex: 2, hour: 23 });
-  assert.equal(slotTarget(1, 0, 'ArrowUp', open), null);
-  assert.equal(slotTarget(5, 23, 'ArrowDown', open), null);
-  assert.equal(slotTarget(5, 9, 'ArrowRight', open), null);
-  assert.equal(slotTarget(1, 9, 'ArrowLeft', open), null);
+test('wheel step accumulates, resets, normalizes and respects cooldown without mutation', async () => {
+  const { wheelStep, WHEEL_STEP } = await view;
+  assert.deepEqual(WHEEL_STEP, { threshold: 50, cooldownMs: 400, idleMs: 200 });
+  const initial = { acc: 0, lastWheel: -Infinity, lastStep: -Infinity };
+  assert.equal(wheelStep(initial, 50, 0, 0).step, 1);
+  assert.equal(wheelStep(initial, -50, 0, 0).step, -1);
+  assert.deepEqual(initial, { acc: 0, lastWheel: -Infinity, lastStep: -Infinity });
+  let r = wheelStep(initial, 25, 0, 0); r = wheelStep(r.state, 25, 0, 100); assert.equal(r.step, 1);
+  r = wheelStep(initial, 30, 0, 0); r = wheelStep(r.state, 30, 0, 201); assert.equal(r.step, 0); assert.equal(r.state.acc, 30);
+  r = wheelStep(initial, 50, 0, 0); r = wheelStep(r.state, 100, 0, 399); assert.equal(r.step, 0); assert.equal(r.state.acc, 0);
+  r = wheelStep(r.state, 50, 0, 400); assert.equal(r.step, 1);
+  assert.equal(wheelStep(initial, 4, 1, 0).step, 1);
+  assert.equal(wheelStep(initial, -1, 2, 0).step, -1);
 });
 
 test('practice event choices use labelled selects with field errors', () => {
