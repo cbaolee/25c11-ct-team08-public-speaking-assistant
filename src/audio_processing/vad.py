@@ -1,33 +1,34 @@
 import wave
+from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from collections.abc import Sequence
- 
+
+from src.audio_processing.alignment import AlignedItem
 from src.audio_processing.contracts import (
     MASTER_SAMPLE_RATE,
-    MasterAudio,
-    SpeechSegment,
-    Pause,
     ClassifiedPause,
+    InsufficientAudio,
+    MasterAudio,
+    Pause,
     PauseKind,
-    InsufficientAudio
+    SpeechSegment,
 )
-from src.audio_processing.alignment import AlignedItem
 from src.audio_processing.text_norm import normalize_token, trailing_punct
 
-
-# Dung sai đồng bộ đồng hồ VAD và STT khi xác định "từ ngay trước pause". Đây KHÔNG phải ngưỡng chấm
-# điểm của ADR-003; chỉ bù độ lệch thời gian giữa hai nguồn. Giá trị khởi điểm, sẽ hiệu chỉnh ở M7.
+# Clock tolerance between VAD and STT when finding "the word right before a pause". This is NOT a
+# scoring threshold of ADR-003; it only absorbs the time offset between the two sources.
+# Starting value, tune in M7.
 WORD_PAUSE_TOLERANCE_S = 0.1
+MIN_VOICED_RATIO = 0.30
 
 
 @dataclass(frozen=True)
 class VadParams:
     threshold: float = 0.5
-    min_speech_duration_ms: int = 250   
-    min_silence_duration_ms: int = 100 
-    speech_pad_ms: int = 30 
+    min_speech_duration_ms: int = 250
+    min_silence_duration_ms: int = 100
+    speech_pad_ms: int = 30
 
 
 def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pause]:
@@ -37,8 +38,8 @@ def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pa
     The input list of speech segment must be sorted
     """
     pauses = []
-    for previous, following in zip(segments, segments[1:]):
-        gap = round(following.start_s - previous.end_s, 6)  # chống sai số float ở biên min_pause_s
+    for previous, following in zip(segments, segments[1:], strict=False):
+        gap = round(following.start_s - previous.end_s, 6)  # float guard at the min_pause_s edge
         if gap >= min_pause_s:
             pauses.append(Pause(start_s=previous.end_s, end_s=following.start_s))
     return pauses
@@ -47,26 +48,28 @@ def find_pauses(segments: list[SpeechSegment], *, min_pause_s: float) -> list[Pa
 @lru_cache(maxsize=1)
 def _load_model():
     from silero_vad import load_silero_vad
- 
+
     return load_silero_vad()
- 
- 
+
+
 def _read_samples(path: Path):
     import numpy as np
     import torch
- 
+
     with wave.open(str(path), "rb") as wav:
         layout = (wav.getframerate(), wav.getnchannels(), wav.getsampwidth())
         if layout != (MASTER_SAMPLE_RATE, 1, 2):
-            raise ValueError(f"Expected 16 kHz mono 16-bit WAV, got (rate, channels, bytes)={layout}")
+            raise ValueError(
+                f"Expected 16 kHz mono 16-bit WAV, got (rate, channels, bytes)={layout}"
+            )
         raw = wav.readframes(wav.getnframes())
     samples = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
     return torch.from_numpy(samples)
- 
- 
+
+
 def detect_speech(master: MasterAudio, *, params: VadParams) -> list[SpeechSegment]:
     from silero_vad import get_speech_timestamps
- 
+
     samples = _read_samples(master.path)
     raw = get_speech_timestamps(
         samples,
@@ -78,38 +81,40 @@ def detect_speech(master: MasterAudio, *, params: VadParams) -> list[SpeechSegme
         speech_pad_ms=params.speech_pad_ms,
     )
     return [
-        SpeechSegment(start_s=item["start"] / MASTER_SAMPLE_RATE,
-                      end_s=item["end"] / MASTER_SAMPLE_RATE)
+        SpeechSegment(
+            start_s=item["start"] / MASTER_SAMPLE_RATE, end_s=item["end"] / MASTER_SAMPLE_RATE
+        )
         for item in raw
     ]
 
 
 def check_audio_quality(segments: list[SpeechSegment], duration_s: float) -> None:
     """
-    Kiểm tra tỉ lệ tiếng nói trong audio.
-    Nếu tiếng nói < 30% hoặc không có tiếng nói, raise InsufficientAudio.
+    Check the share of speech in the audio.
+    Raise InsufficientAudio when speech is < 30% or there is no speech.
     """
     if not segments:
         raise InsufficientAudio("Speech < 30% of audio duration")
-    
-    # Tính tổng thời gian tiếng nói dựa trên start_s và end_s
+
+    # Total speech time from start_s and end_s
     total_speech = sum((seg.end_s - seg.start_s) for seg in segments)
     speech_ratio = total_speech / duration_s
-    
-    if speech_ratio < 0.30:
+
+    if speech_ratio < MIN_VOICED_RATIO:
         raise InsufficientAudio(r"Speech < 30% of audio duration")
 
 
 def after_ref_index(
     items: Sequence[AlignedItem], pause_start_s: float, ref_tokens: Sequence[str]
 ) -> int | None:
-    """ref_index của từ nghe được ngay trước pause; None nếu không có từ nào trước.
+    """ref_index of the word heard right before the pause; None when no word comes before it.
 
-    Ứng viên: item có hyp (end_s không None; del bị loại) và
-    end_s <= pause_start_s + WORD_PAUSE_TOLERANCE_S (dung sai đồng bộ VAD/STT, không phải ngưỡng
-    chấm điểm ADR-003; hiệu chỉnh ở M7). Chọn end_s lớn nhất, hoà thì item xuất hiện sau cùng trong items. Nếu item đó là ins (không có
-    ref_index) thì dùng ref gần nhất phía trước nó trong items (phase3 #2), bỏ qua item mà token
-    gốc ref_tokens[ref_index] chỉ có dấu câu (normalize_token rỗng, vd "—"); item del vẫn tính.
+    Candidates: items with a hyp (end_s not None; del excluded) and
+    end_s <= pause_start_s + WORD_PAUSE_TOLERANCE_S (VAD/STT clock tolerance, not an
+    ADR-003 scoring threshold; tuned in M7). Take the largest end_s; on a tie, the item that
+    comes last in items. If that item is an ins (no ref_index), use the nearest earlier ref
+    in items (phase3 #2), skipping items whose original token ref_tokens[ref_index] is only
+    punctuation (normalize_token empty, e.g. "—"); del items still count.
     """
     best_pos = None
     for pos, item in enumerate(items):
@@ -134,19 +139,19 @@ def classify_pauses(
     hesitation_threshold_s: float,
     forgot_word_s: float = 1.2,
 ) -> list[ClassifiedPause]:
-    """Phân loại mọi Pause (ADR-004 D6), giữ đủ số lượng và thứ tự đầu vào.
+    """Classify every Pause (ADR-004 D6), keeping the count and input order.
 
-    Ưu tiên: punctuation > forgot_word (>= forgot_word_s) > hesitation (>= ngưỡng) > natural.
-    "Tại dấu câu" = token gốc script.split()[after_ref_index] có trailing_punct khác rỗng,
-    nên cùng một từ xuất hiện có/không có dấu câu được phân biệt theo vị trí (1.9.2 #26).
-    Biên tính bao gồm (>=).
+    Priority: punctuation > forgot_word (>= forgot_word_s) > hesitation (>= threshold) > natural.
+    "At punctuation" = token script.split()[after_ref_index] has a non-empty trailing_punct,
+    so the same word with and without punctuation is told apart by position (1.9.2 #26).
+    Edges are inclusive (>=).
     """
     ref_tokens = script.split()
     result = []
     for pause in pauses:
         ref = after_ref_index(items, pause.start_s, ref_tokens)
         at_punct = ref is not None and bool(trailing_punct(ref_tokens[ref]))
-        duration = round(pause.end_s - pause.start_s, 6)  # chống sai số float ở biên 0.7/1.2
+        duration = round(pause.end_s - pause.start_s, 6)  # float guard at the 0.7/1.2 edges
         if at_punct:
             kind = PauseKind.PUNCTUATION
         elif duration >= forgot_word_s:

@@ -1,0 +1,258 @@
+# Values the team may want to tune, in one place.
+# Read by src/app/constants.py at startup (restart the server after a change).
+# Secrets and per-environment values (API keys, SUPABASE_*, APP_ENV) stay in .env.
+# Values marked "(.env)" can also be overridden there; .env wins over this file.
+#
+# Fixed contracts that live in SQL and CANNOT be changed here (a new migration is needed):
+#   - scripts.duration_min in (5, 10, 15, 20)
+#   - schema_version of the stored evaluation result (ADR-004)
+
+[storage]
+# Number of newest sessions kept with full result, audio and charts (.env: RETENTION_FULL_SESSIONS)
+retention_full_sessions = 10
+# Most compact sessions (script, scores and summary only) kept per user; older ones are deleted
+# (.env: MAX_COMPACT_SESSIONS)
+max_compact_sessions = 30
+# Lifetime of signed audio URLs, in seconds (.env: SIGNED_URL_TTL_S)
+signed_url_ttl_s = 600
+# Largest avatar upload, in bytes (2 MB)
+avatar_max_bytes = 2_097_152
+# Avatar is resized to a square of this size, in pixels
+avatar_size_px = 256
+# Largest avatar width or height before resizing, in pixels; larger pictures are rejected
+avatar_max_side_px = 4096
+# Saved scripts per user; POST /api/scripts returns 409 script_limit_reached at this count
+max_saved_scripts = 10
+# Longest saved script title, in characters (POST /api/scripts and PATCH /api/scripts/{id})
+script_title_max_chars = 70
+# Most rows one list call may return (sessions and saved scripts); must be >= max_saved_scripts
+max_list_page_size = 50
+# Largest uploaded audio file, in bytes (100 MB)
+max_upload_bytes = 104_857_600
+
+[audio]
+# Pauses shorter than this are ignored, in seconds
+min_pause_s = 0.35
+# Longest practice recording accepted, in seconds (32 min)
+max_audio_seconds = 1920
+# Baseline recording accepted only inside [min, max], in seconds
+baseline_min_seconds = 10
+baseline_max_seconds = 60
+# Longest ffmpeg decode or Opus encode before it is stopped, in seconds.
+# A 32-minute file takes about 5 s to decode and 24-29 s to encode on a dev laptop.
+decode_timeout_s = 90
+# Extra seconds decoded past max_audio_seconds before the file is cut
+duration_cap_margin_s = 10
+# STT HTTP timeouts, in seconds. The connect timeout is also the longest stall while the
+# audio file is being sent; the read timeout is the longest wait between two reads.
+stt_connect_timeout_s = 30
+stt_read_timeout_s = 120
+
+[script]
+# Practice script limits: 4000 words takes 32 minutes at 125 WPM.
+# The character cap stops a few huge "words".
+max_script_words = 4000
+max_script_chars = 40_000
+# Uploaded PDF limits: smallest and largest file in bytes (1 KB, 25 MB), most pages
+min_pdf_size_bytes = 1024
+max_pdf_size_bytes = 26_214_400
+max_pdf_pages = 10
+# Uploaded Markdown/plain-text (.md, .txt) limits: largest file in bytes (2 MB) and max words.
+# Prevents oversized text documents from stalling local embeddings and Layer 2 moderation.
+max_text_file_bytes = 2_097_152
+max_text_file_words = 15_000
+# Words the LLM writes for each template slot (min and max)
+slot_fill_min_words = 80
+slot_fill_max_words = 150
+# Template topic suggester: max topics shown (4-5) and min cosine score for a strong match
+topic_suggest_top_k = 5
+topic_suggest_min_score = 0.35
+# Minimum cosine similarity for retrieving document chunks and verifying paragraph citations
+retrieval_min_score = 0.25
+citation_min_support_score = 0.52
+# Per-turn chat text limit in characters (NFC code points), paired with [web] composer_max_words
+max_turn_text_chars = 18_000
+# Bounded pre-generation chat context window & compaction policy
+context_window_max_chars = 4_500
+context_window_max_entries = 8
+context_compaction_keep_recent = 2
+context_compaction_max_summary_chars = 1_500
+# Smaller Groq model used to compact older chat context entries (.env: GROQ_COMPACTION_MODEL)
+groq_compaction_model = "openai/gpt-oss-20b"
+# Pre-generation chat session store capacity and sliding TTL (30 minutes)
+chat_session_store_capacity = 100
+chat_session_ttl_s = 1800.0
+# Slot coverage thresholds (0-token cosine threshold and template readiness ratio)
+slot_coverage_min_score = 0.35
+slot_coverage_ready_threshold = 0.7
+# Free-topic readiness word-count floor and initial thesis word threshold
+free_topic_min_words = 150
+free_topic_thesis_min_words = 15
+# Groq token budgets, temperatures, rate-limit wait cap, and UI hint cap for compaction & Q&A
+compaction_max_tokens = 300
+turn1_max_tokens = 160
+followup_max_tokens = 220
+compaction_temperature = 0.2
+turn1_temperature = 0.4
+followup_temperature = 0.4
+followup_legacy_temperature = 0.5
+qa_limiter_max_wait_s = 5.0
+qa_max_missing_items_display = 3
+# Context entry char reserve/floor, compaction summary floor, and deterministic low-signal threshold
+context_entry_reserve_chars = 500
+context_entry_min_cap_chars = 400
+context_compaction_min_summary_chars = 200
+compaction_low_signal_max_words = 8
+# Pipeline & endpoint caps: citable note min words, LRU cache size, job store caps, chunk & read sizes
+citable_note_min_words = 8
+pipeline_cache_max_size = 64
+script_jobs_max_capacity = 128
+chat_turn_jobs_max_capacity = 128
+upload_read_chunk_bytes = 65_536
+moderation_max_chunks = 20
+suggest_query_max_chunks = 3
+# Telemetry ETA buffer added to base stage estimates, in seconds, and generating stage scaling
+eta_buffer_s = 10
+generate_stage_base_s = 4.0
+generate_stage_per_min_s = 0.8
+
+[script.chat_turn_step_durations]
+validating_input = 0.5
+moderating = 1.0
+matching_templates = 1.5
+analyzing_slots = 1.0
+updating_context = 0.5
+compacting_context = 2.5
+analyzing_with_llm = 3.5
+
+[script.generate_stage_durations]
+validating_input = 1.0
+extracting = 2.0
+moderating = 1.5
+generating = 8.0
+validating_output = 1.0
+
+[api_keys]
+# How long a key that hit its quota (HTTP 429/402) is skipped before it is tried again, in seconds.
+# Keys refused with 401/403 stay skipped until the server restarts.
+exhausted_cooldown_s = 600
+
+[web]
+# Sent to the browser by GET /api/config. No secrets here.
+# Range a user may pick from in Settings > Reading speed, in words per minute
+follow_wpm_min = 60
+follow_wpm_max = 240
+# Slider range used until the user picks their own (min_choose < max_choose), in words per minute
+follow_wpm_min_choose = 100
+follow_wpm_max_choose = 180
+# Slider step and default speed, in words per minute
+follow_wpm_step = 5
+follow_wpm_default = 145
+# Auto speed (Settings > Reading speed): taps on the sentence being read set the slider.
+# Share of the measured speed mixed into the current one at each tap (0..1)
+follow_auto_weight = 0.4
+# Taps closer than this many seconds or words apart are not measured
+follow_auto_min_s = 1.5
+follow_auto_min_words = 3
+# A tap further ahead than this many sentences is a skip, not reading: not measured
+follow_auto_max_ahead = 4
+# Wait after the last slider move before saving follow_wpm, in milliseconds
+follow_wpm_save_delay_ms = 800
+# Max words in Practice "Own" text
+own_max_words = 1500
+# Length of the baseline recording, in seconds
+baseline_seconds = 30
+# Shortest baseline the UI accepts, in seconds
+baseline_min_seconds = 10
+# Speaking rate used only for "about 0:25" time hints, in words per minute
+speaking_wpm_for_estimate = 145
+# Seconds before the highlight reaches the first sentence while recording
+follow_lead_s = 1.0
+# Pause added after each sentence by the highlight, in seconds
+follow_gap_s = 0.5
+# Sessions per History page, and most pages loaded on Home and History
+history_page_size = 20
+history_max_pages = 5
+# Most chat messages kept in localStorage for the Script Studio chat
+chat_history_max_messages = 20
+# Most words one Script Studio message may have
+composer_max_words = 2000
+# Script Studio text box grows up to this many lines, then scrolls inside
+composer_max_lines = 5.5
+# Wait between two status checks of a script being generated, in milliseconds
+script_poll_interval_ms = 650
+# Wait before a running evaluation moves to the background (user goes to Home), in milliseconds
+evaluate_background_after_ms = 5_000
+
+# Part score from which a part counts as "good" in the Overview, Key numbers and the
+# rule-based coach note (UI proposal, not yet agreed by the team; CLAUDE.md 1.7)
+part_good_min = 85
+
+
+[auth]
+# Provisional, not measured.
+otp_length = 6  # must match Supabase "Email OTP Length"
+otp_ttl_s = 600  # MemoryAuth only; Supabase uses its own expiry
+resend_cooldown_s = 60
+verify_attempts_per_window = 5
+verify_window_s = 600
+require_email_otp = true
+# Unconfirmed accounts are deleted this long after the last code was sent (ADR-011).
+# Must match the interval in db/migration_main/0009_purge_unconfirmed_accounts.sql.
+unconfirmed_ttl_min = 60
+# Lifetime of the HttpOnly refresh-token cookie (psa_refresh). Each refresh sets it again,
+# so this is how long a browser stays logged in without opening the app.
+refresh_cookie_days = 30
+
+[retry]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.
+sentence_min_error_ratio = 0.30
+word_max_seconds = 6
+sentence_max_seconds = 30
+clip_pad_s = 0.15
+attempts_per_window = 20
+window_s = 600
+server_grace_s = 2
+max_target_chars = 500
+
+[coach]
+# Heuristic to block implications of a score for insufficient_audio sessions.
+insufficient_banned_words = ["score", "scores", "scored", "scoring", "grade", "grades", "graded", "rating", "ratings", "rated", "ranked", "points", "marks", "out of", "/100", "excellent"]
+# Provisional values, not yet measured (voice_evaluate_tasks.md 11.3). Calibrate in M7.
+max_error_words = 15
+timeout_s = 20
+max_output_chars = 900
+cache_ttl_s = 3600
+max_focus_items = 3      # focus points shown and accepted from the LLM (11.3)
+rule_max_warnings = 2    # warnings turned into focus points by the rule-based fallback
+retry_unavailable = 1    # extra LLM provider attempts after 500/503 or a timeout (provider overloaded)
+retry_backoff_s = 2      # wait before that extra attempt
+max_completion_tokens = 1024  # includes reasoning tokens; Cerebras checks quota against it before running
+reasoning_effort = "low"      # supported by both Cerebras models in use
+
+[evaluate_job]
+# Measured with a 32-minute recording (two different scripts, 4000-word script) on a dev
+# laptop: Deepgram 138 s (decode 5, VAD 34, STT 54 incl. 24 s Opus encode, align 23,
+# semantic 20), Gladia 118 s, then 29 s of Opus encoding before saving. max_wait_s covers
+# about 170 s plus a Deepgram failure, the coach note and the storage upload.
+job_ttl_s = 900
+max_running_per_user = 1
+poll_interval_ms = 700
+max_wait_s = 360  # must equal EVAL_JOB.maxWaitS in state.js
+stt_estimate_tau_s = 20  # client-side estimate inside the stt stage (not measured progress)
+done_close_delay_ms = 400  # pause at 100% before the report opens (0 with reduced motion)
+announce_step_pct = 25   # screen reader hears the percent every N points or on a stage change
+
+[evaluate_job.stage_weights]
+upload = 5
+decode = 10
+vad = 10
+stt = 35
+align = 10
+fluency = 5
+pitch = 10
+semantic = 10
+save = 5
+
+[retention]
+insufficient_days = 7

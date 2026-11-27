@@ -1,13 +1,13 @@
 ---
 topic: "User Acceptance Testing Briefing"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }} on the {{ argument_project_name }} project. Over the next {{ argument_uat_duration }}, you'll be doing something really important: user acceptance testing, or UAT for short. In the next few minutes, I'll explain what that means, how it will work, and what we need from you.
 
 Let's start with the most important question: what is UAT, and why do we need you?
 
-Before today, our own team has already tested the system thoroughly. But there's one thing we can't fully test ourselves: whether the system actually works for your real, day-to-day work. You're the experts in your business processes, not us. So the purpose of UAT is for you to confirm that the system does what you need, in the way you need it, before it goes live.
+Before today, our own team has already tested the system thoroughly. But there's one thing we can't fully test ourselves: whether the system actually works for your real, day-to-day work. In my view, {{ argument_why_user_testing_matters }}.
 
 Now, let me explain how it will work.
 

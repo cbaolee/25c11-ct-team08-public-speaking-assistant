@@ -1,17 +1,17 @@
 ---
 topic: "Knowledge Sharing Session (Brown Bag Talk)"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Hi everyone! Welcome, and thanks for coming. Please, go ahead and enjoy your lunch. That's the whole point of a brown bag session: we eat, we learn something, and nobody has to take notes unless they want to.
 
 I'm {{ argument_speaker_name }}, and I work on {{ argument_speaker_team }}. Today, I'd like to share some lessons from {{ argument_project_or_topic_name }}.
 
-Before I start, let me set some expectations. This isn't a polished conference talk. It's more like a conversation with slides. I'll talk for about fifteen to twenty minutes, and then we'll have time for questions and discussion. If something isn't clear, or if you have a different experience, feel free to interrupt me at any point. The best brown bag sessions often turn into discussions halfway through.
+Before I start, let me set some expectations. This isn't a polished conference talk. I believe that {{ argument_informal_sharing_value }}.
 
 So, why this topic? {{ argument_why_this_topic_matters }}
 
-And I should say upfront: this talk includes some things that went well, but also some things that went badly. I think the mistakes are actually the most useful part. Every team makes mistakes, but not every team talks about them openly. And when we share them, the rest of the company gets to learn from them without having to make them again. So, in the spirit of a blameless culture, I'll talk about what happened, not about who did what.
+And I should say upfront: this talk includes some things that went well, but also some things that went badly. My view is that {{ argument_learning_from_mistakes }}.
 
 First, a bit of background, so everyone has the same context.
 
@@ -51,7 +51,7 @@ Lesson number three: {{ argument_lesson_three_title }}.
 
 {{ argument_lesson_three_story }}
 
-I think this is something we often underestimate in engineering. We spend a lot of energy choosing the right tools and frameworks, but a lot of problems actually come from misunderstandings, unclear expectations, or information that doesn't reach the right people at the right time.
+I think this is something we often underestimate in engineering. I would argue that {{ argument_underestimated_engineering_problem }}.
 
 What we changed was {{ argument_lesson_three_change }}. It's a small thing, but it made a surprisingly big difference. {{ argument_lesson_three_result }}
 
@@ -63,7 +63,7 @@ And I don't think that's unique to our project. I suspect that if each of us loo
 
 One thing I'd like to be honest about is how we noticed these problems, because that's often the hardest part. In each case, the warning signs were there earlier than we admitted. {{ argument_early_warning_signs }} We saw them, but each one on its own looked small, and everyone was busy, so nobody stopped to connect them. If I had to name one practice that would have helped most, it would be a short, regular check-in, maybe fifteen minutes every two weeks, where the team asks just one question: "What's quietly getting worse?" Not what's on fire, but what's drifting. Those are the problems that are still cheap to fix.
 
-I'm curious how this looks from your side. In your own team, how do you usually find out that something is going wrong: from a dashboard, from a customer complaint, or from someone simply saying it out loud? Think about it for a moment, because I'll come back to it in the questions.
+I'm curious how this looks from your side. From what I have seen, {{ argument_detecting_problems_early }}.
 
 So, what can you take away from all of this, even if you're working on something completely different? Let me suggest a few practical things.
 

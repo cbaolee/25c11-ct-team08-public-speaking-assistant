@@ -1,6 +1,6 @@
 ---
 topic: "Answering \"Tell Me About a Project You Built\""
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Sure. The project I'd like to talk about is {{ argument_project_name }}, which {{ argument_project_purpose }}
@@ -25,6 +25,6 @@ Working with the team taught me a lot as well. We used {{ argument_team_workflow
 
 If I built it again today, I'd change one thing: {{ argument_lesson_learned }}
 
-So overall, this project taught me how to take an idea from a real problem to something people actually use, and how to handle a difficult technical issue calmly and systematically.
+So overall, I believe this project shows that {{ argument_project_biggest_takeaway }}.
 
 I can go deeper into any part of it: the architecture, the code, or the challenge I just described.

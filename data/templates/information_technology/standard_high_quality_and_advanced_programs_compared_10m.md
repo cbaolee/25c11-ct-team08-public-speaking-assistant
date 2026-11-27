@@ -1,6 +1,6 @@
 ---
 topic: "Standard, High-Quality and Advanced Programs Compared"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Three programs, one faculty, and a lot of confused families. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} If you're applying to IT at {{ argument_university_name }}, there's one choice that puzzles almost everyone: the difference between the standard program, the high-quality program, and the advanced program.
@@ -15,7 +15,7 @@ The standard program is the main program of the faculty. It's usually the one wi
 
 Its biggest advantage is cost. Tuition fees are generally the lowest of the three. The curriculum provides a solid foundation in programming, mathematics, and core computer science, and most courses are taught in Vietnamese, which makes it easier to understand complex technical concepts, especially in the first years.
 
-The trade-offs are usually larger classes, which means less individual attention, and less emphasis on English. Since English is extremely important in the IT industry, for documentation, tools, and international teams, students in the standard program often need to improve their English on their own initiative.
+The trade-offs are usually larger classes, which means less individual attention, and less emphasis on English. In my view, {{ argument_english_matters_in_standard_program }}.
 
 The standard program suits students who want a strong, affordable education, are comfortable learning independently, and are willing to build their English and practical skills outside the classroom.
 
@@ -33,7 +33,7 @@ The advanced program, at universities that offer it, is often built on a curricu
 
 Its strengths are strong English skills, an international-style education, and good preparation for working in multinational companies or continuing to a master's degree overseas.
 
-But it also has challenges. Tuition fees are usually the highest of the three. The workload can be demanding, especially in the first year, if your English isn't yet strong, because you'll be learning difficult technical subjects in a second language. And there may be a minimum English requirement for admission or for progressing into the main courses.
+But it also has challenges. I would argue that {{ argument_advanced_program_challenges }}.
 
 The advanced program suits students with good English, or a strong determination to reach that level quickly, who are aiming for an international career or study abroad.
 
@@ -63,7 +63,7 @@ And fifth, what are the admission requirements? Scores and English requirements 
 
 If you visit the university before deciding, a few questions are worth asking directly. How many students are in a typical class in each program? Which courses are taught in English, and from which year? Is it possible to move from one program to another after the first year, and under what conditions? And what do recent graduates of each program actually do now? Current students are often the most honest source. Ask them what surprised them most in their first semester, and whether they'd choose the same program again.
 
-One last point, and the most important one. The program you choose matters, but it matters less than what you do during your four years. Students who build real projects, take internships, join clubs and competitions, and keep improving their English often succeed regardless of which program they're in. The program gives you a starting environment. Your effort decides where you go from there.
+One last point, and the most important one. My strong view is that {{ argument_effort_over_program_choice }}.
 
 Each program in a line: the standard program offers a solid, affordable foundation, mostly in Vietnamese. The high-quality program offers an enhanced environment with more English and support, at a higher cost. And the advanced program offers an international-style curriculum taught in English, at the highest cost and with the highest language demands. Choose based on your budget, your English, your goals, and how you learn, and always check the latest official information from the university.
 

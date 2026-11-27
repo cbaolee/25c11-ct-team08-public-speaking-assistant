@@ -1,6 +1,6 @@
 ---
 topic: "Psychological impact of crowd noise on athlete performance"
-Category: "Sports"
+category: "Sports"
 duration_min: 15
 ---
 Good evening, athletes, trainers, and students of the game. Tonight we will examine how ambient sound shapes competitive outcomes.

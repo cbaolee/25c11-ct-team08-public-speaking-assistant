@@ -1,6 +1,6 @@
 ---
 topic: "Internship Experience Sharing"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 If you're about to apply for your first internship, I have bad news and good news. The bad news: you'll probably be rejected a few times. The good news: almost everyone is, and it gets much better after that. Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'd like to share my internship experience with you: how I got it, what it was actually like, the mistakes I made, and what I wish someone had told me before I started.
@@ -31,13 +31,13 @@ The main project I worked on was this. {{ argument_main_project_description }}
 
 The lessons are what I'd most like you to keep. There are five.
 
-Lesson one: real-world code is very different from school assignments. At school, you usually write small programs from scratch, alone, and you never touch them again after the deadline. In a company, you mostly read and change existing code that many people wrote over several years. So the skill of reading code, searching through it, and understanding it before changing it is far more important than I expected.
+Lesson one: real-world code is very different from school assignments. In my view, {{ argument_real_world_code_gap }}.
 
-Lesson two: asking questions is a skill. At first, I was afraid of asking too many questions and looking stupid. So I sometimes stayed stuck for a whole day on something my mentor could have explained in five minutes. Later, I learned a better approach. Try on your own first, for a reasonable amount of time, maybe thirty minutes to an hour. Write down what you've tried. Then ask a specific question, like: "I'm trying to do this. I tried A and B, and I got this error. Could you point me in the right direction?" Mentors love questions like that, because they show effort and are easy to answer.
+Lesson two: asking questions is a skill. I now believe that {{ argument_asking_questions_skill }}.
 
 Lesson three: code review is a gift, not a judgment. My first pull request received a lot of comments. I was a bit shocked. But every comment taught me something: naming, error handling, edge cases, or team conventions. By the end of the internship, my pull requests received far fewer comments, and that was one of the clearest signs of my progress.
 
-Lesson four: communication matters as much as code. My mentor didn't only care whether I finished tasks. They cared whether I gave updates, told them early when I was stuck, and explained what I'd done clearly in stand-up meetings. A short daily update, like "Yesterday I finished this, today I'm working on that, and I'm blocked on this," made a big difference to how much the team trusted me.
+Lesson four: communication matters as much as code. I would argue that {{ argument_communication_matters_as_code }}.
 
 And lesson five: take notes about everything. Commands, system names, who to ask about what, and things you learned. In the first weeks, there's so much new information that you'll forget most of it otherwise. My notes became my personal guide, and I still use some of them.
 

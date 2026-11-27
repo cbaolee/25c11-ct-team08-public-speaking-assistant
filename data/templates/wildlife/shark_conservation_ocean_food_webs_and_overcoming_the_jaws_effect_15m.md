@@ -6,7 +6,7 @@ duration_min: 15
 
 All I have to do is hum two alternating bass notes -- duh-dun... duh-dun... -- and every single person in this room immediately pictures a dorsal fin slicing through the water.
 
-When the movie Jaws hit theaters in the summer of {{ argument_movie_release_year }}, it didn't just invent the modern summer blockbuster; it triggered a global wave of panic and trophy hunting that marine biologists call the Jaws Effect. Overnight, an ancient ocean predator that had kept the seas healthy for {{ argument_shark_evolutionary_age_statistic }} -- surviving four mass extinctions and swimming the oceans before there were even trees on land -- was recast in the public mind as a vindictive, man-eating monster that deserved to be wiped out. Even the book's author, {{ argument_author_name }}, spent the last years of his life apologizing and campaigning to save the animals his story had demonized.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 Let's look at the real numbers for a second. In an average year worldwide, sharks are responsible for roughly {{ argument_annual_human_fatalities_by_sharks }} human fatalities -- fewer than falling coconuts, lightning strikes, or backyard lawnmowers.
 
@@ -24,11 +24,13 @@ Second, and even more important, just by cruising along the reef drop-off, shark
 
 Why do we need {{ argument_reef_grazer_fish_species }} on a reef? Because they are the full-time scrubbing crew that eat fast-growing seaweed off the coral so baby corals have clean rock to settle on.
 
-In our comparative dives between remote, shark-filled atolls in {{ argument_pristine_atoll_name }} and heavily fished reefs in {{ argument_overfished_reef_name }}, the difference hits you the moment you put your face in the water. Where the sharks are gone, {{ argument_mesopredator_fish_species }} take over, wipe out the {{ argument_reef_grazer_fish_species }}, and within a few years, thick mats of slimy algae smother the coral reef to death.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 Remove the shark from the top of the reef, and the entire rainbow cathedral beneath it turns into a mossy ruin.
 
 Where are {{ argument_annual_sharks_killed_by_humans }} sharks going every year? Many people know about the cruel practice of shark finning -- slicing off a shark's fins for luxury soup and throwing the living body back into the sea to drown. Thanks to public campaigns and import bans in {{ argument_fin_ban_countries_list }}, the high-end fin trade has finally started to shrink.
+
+To frame shark conservation, ocean food webs, and overcoming the jaws effect in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
 Yet an even bigger, quieter killer remains out on the high seas: industrial bycatch and the growing market for cheap shark meat and squalene liver oil used in {{ argument_consumer_products_using_shark }}.
 

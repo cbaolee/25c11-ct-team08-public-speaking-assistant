@@ -1,19 +1,19 @@
-"""Xem và đánh giá pause do VAD tìm ra.
+"""View and evaluate the pauses found by VAD.
 
-Hai chế độ, chạy từ thư mục gốc của repo:
+Two modes, run from the repo root:
 
-1) Xem nhanh, KHÔNG cần nhãn tay (tự nghe và kiểm tra):
+1) Quick view, NO hand labels needed (listen and check yourself):
     uv run python -m scripts.eval_vad samples/a.wav
-    uv run python -m scripts.eval_vad samples/a.wav --csv check_sheet.csv    # bảng để điền kết quả nghe
-    uv run python -m scripts.eval_vad samples/a.wav --sweep --csv sweep.csv  # xem số pause đổi thế nào theo tham số
+    uv run python -m scripts.eval_vad samples/a.wav --csv check_sheet.csv    # sheet to fill in listening results
+    uv run python -m scripts.eval_vad samples/a.wav --sweep --csv sweep.csv  # see how pause count changes with params
 
-2) So với nhãn gán tay từ Audacity (tính recall, precision):
+2) Compare with hand labels from Audacity (computes recall, precision):
     uv run python -m scripts.eval_vad samples/a.wav samples/a_labels.txt
     uv run python -m scripts.eval_vad samples/a.wav samples/a_labels.txt --sweep --csv out.csv
     uv run python -m scripts.eval_vad samples/a.wav samples/a_labels.txt --export-labels pred.txt
 
-Đây là công cụ đo đạc của nhóm, không phải một phần của ứng dụng và không chạy trong CI.
-File âm thanh và nhãn là dữ liệu nhạy cảm, không commit lên Git.
+This is the team's measurement tool, not part of the app, and it does not run in CI.
+Audio files and labels are sensitive data, do not commit them to Git.
 """
 from __future__ import annotations
 
@@ -27,25 +27,25 @@ from pathlib import Path
 from src.audio_processing.contracts import AudioRejected, MasterAudio, Pause, SpeechSegment
 from src.audio_processing.decode import decode_to_master
 from src.audio_processing.vad import VadParams, detect_speech, find_pauses
-# NOTE: chỉnh các dòng import "src." cho khớp cách import của repo.
+# NOTE: adjust the "src." import lines to match how the repo imports.
 
-# Giới hạn dùng riêng cho công cụ này (không đọc từ cấu hình ứng dụng).
-MAX_SECONDS = 1320
+# Limits used only by this tool (not read from the app config).
+MAX_SECONDS = 1920
 CAP_MARGIN_S = 10
 DECODE_TIMEOUT_S = 120
 
 
-# ---------- nhãn Audacity ----------
+# ---------- Audacity labels ----------
 
 def load_labels(path: Path, tag: str = "p") -> list[Pause]:
-    """Đọc file nhãn Audacity (mỗi dòng: bắt đầu<TAB>kết thúc<TAB>nhãn, đơn vị giây).
+    """Read an Audacity label file (each line: start<TAB>end<TAB>label, in seconds).
 
-    Chỉ lấy các dòng có nhãn đúng bằng `tag`. Trả về danh sách đã sắp xếp, không chồng lấn.
+    Only keep lines whose label equals `tag`. Returns a sorted, non-overlapping list.
     """
     pauses: list[Pause] = []
     text = path.read_text(encoding="utf-8-sig")
     for number, line in enumerate(text.splitlines(), start=1):
-        if not line.strip() or line.startswith("\\"):   # dòng "\" là phạm vi tần số của Audacity
+        if not line.strip() or line.startswith("\\"):   # a "\" line is Audacity's frequency range
             continue
         parts = line.split("\t")
         if len(parts) < 3:
@@ -70,15 +70,15 @@ def load_labels(path: Path, tag: str = "p") -> list[Pause]:
 
 
 def write_labels(path: Path, pauses: list[Pause], tag: str = "v") -> None:
-    """Ghi pause dự đoán thành file nhãn để nhập vào Audacity (File → Import → Labels)."""
+    """Write predicted pauses as a label file to import into Audacity (File → Import → Labels)."""
     lines = [f"{p.start_s:.6f}\t{p.end_s:.6f}\t{tag}" for p in pauses]
     path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
 
 
-# ---------- so khớp ----------
+# ---------- matching ----------
 
 def _iou(a: Pause, b: Pause) -> float:
-    """Intersection over Union của hai khoảng thời gian."""
+    """Intersection over Union of two time ranges."""
     inter = min(a.end_s, b.end_s) - max(a.start_s, b.start_s)
     if inter <= 0:
         return 0.0
@@ -87,16 +87,16 @@ def _iou(a: Pause, b: Pause) -> float:
 
 @dataclass(frozen=True)
 class Matching:
-    pairs: list[tuple[Pause, Pause]]   # (nhãn tay, dự đoán)
+    pairs: list[tuple[Pause, Pause]]   # (hand label, prediction)
     unmatched_reference: list[Pause]
     unmatched_predicted: list[Pause]
 
 
 def match(reference: list[Pause], predicted: list[Pause], *, min_iou: float = 0.5) -> Matching:
-    """Ghép một-một pause nhãn tay với pause dự đoán khi IoU >= min_iou.
+    """Match hand-labelled pauses one-to-one with predicted pauses when IoU >= min_iou.
 
-    Cả hai danh sách phải đã sắp xếp và không chồng lấn trong nội bộ.
-    Duyệt hai con trỏ song song, độ phức tạp O(n + m).
+    Both lists must be sorted and non-overlapping within themselves.
+    Walks two pointers in parallel, O(n + m) complexity.
     """
     pairs: list[tuple[Pause, Pause]] = []
     matched_ref: set[int] = set()
@@ -110,7 +110,7 @@ def match(reference: list[Pause], predicted: list[Pause], *, min_iou: float = 0.
             matched_pred.add(j)
             i += 1
             j += 1
-        elif ref.end_s <= pred.end_s:     # khoảng nào kết thúc trước thì không còn khớp được nữa
+        elif ref.end_s <= pred.end_s:     # whichever range ends first can no longer match
             i += 1
         else:
             j += 1
@@ -121,21 +121,21 @@ def match(reference: list[Pause], predicted: list[Pause], *, min_iou: float = 0.
     )
 
 
-# ---------- chỉ số ----------
+# ---------- metrics ----------
 
 @dataclass(frozen=True)
 class Report:
     min_pause_s: float
-    n_reference: int            # tất cả pause gán tay
-    n_reference_long: int       # pause gán tay dài >= min_pause_s (mẫu số của recall)
-    n_predicted: int            # pause VAD báo (đã lọc >= min_pause_s)
-    n_found_long: int           # pause gán tay dài đã được VAD bắt
-    n_matched: int              # số cặp khớp (mẫu số của sai số)
-    missed: list[Pause]         # pause gán tay dài mà VAD bỏ sót
-    false_alarms: list[Pause]   # pause VAD báo mà không có nhãn tay tương ứng
-    mean_duration_error_s: float | None       # dự đoán − nhãn tay, có dấu (âm = VAD đo ngắn hơn)
+    n_reference: int            # all hand-labelled pauses
+    n_reference_long: int       # hand-labelled pauses >= min_pause_s (recall denominator)
+    n_predicted: int            # pauses VAD reports (filtered to >= min_pause_s)
+    n_found_long: int           # long hand-labelled pauses that VAD caught
+    n_matched: int              # number of matched pairs (error denominator)
+    missed: list[Pause]         # long hand-labelled pauses that VAD missed
+    false_alarms: list[Pause]   # pauses VAD reports with no matching hand label
+    mean_duration_error_s: float | None       # prediction − hand label, signed (negative = VAD shorter)
     mean_abs_duration_error_s: float | None
-    mean_start_error_s: float | None          # dự đoán − nhãn tay, có dấu
+    mean_start_error_s: float | None          # prediction − hand label, signed
     mean_end_error_s: float | None
 
     @property
@@ -153,11 +153,11 @@ def _mean(values: list[float]) -> float | None:
 
 def summarize(reference: list[Pause], predicted: list[Pause], *,
               min_pause_s: float, min_iou: float = 0.5) -> Report:
-    """Tính recall, precision và sai số.
+    """Compute recall, precision and errors.
 
-    Recall: trong các pause gán tay dài >= min_pause_s, VAD bắt được bao nhiêu.
-    Precision: trong các pause VAD báo, bao nhiêu cái khớp với một nhãn tay bất kỳ
-    (kể cả nhãn ngắn hơn ngưỡng, vì pause đó có thật).
+    Recall: of the hand-labelled pauses >= min_pause_s, how many VAD caught.
+    Precision: of the pauses VAD reports, how many match any hand label
+    (including labels shorter than the threshold, since that pause is real).
     """
     matching = match(reference, predicted, min_iou=min_iou)
     reference_long = [r for r in reference if r.duration_s >= min_pause_s]
@@ -182,7 +182,7 @@ def summarize(reference: list[Pause], predicted: list[Pause], *,
     )
 
 
-# ---------- chạy pipeline ----------
+# ---------- run pipeline ----------
 
 def run_once(master: MasterAudio, reference: list[Pause], params: VadParams, *,
              min_pause_s: float, min_iou: float) -> tuple[Report, list[Pause]]:
@@ -191,7 +191,7 @@ def run_once(master: MasterAudio, reference: list[Pause], params: VadParams, *,
     return summarize(reference, predicted, min_pause_s=min_pause_s, min_iou=min_iou), predicted
 
 
-# ---------- hiển thị ----------
+# ---------- display ----------
 
 def _pct(value: float | None) -> str:
     return "n/a" if value is None else f"{value * 100:.1f}%"
@@ -257,14 +257,14 @@ def format_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-# ---------- chế độ xem nhanh (không cần nhãn tay) ----------
+# ---------- quick view mode (no hand labels needed) ----------
 
 @dataclass(frozen=True)
 class Overview:
     duration_s: float
     segments: list[SpeechSegment]
-    pauses: list[Pause]        # khoảng ngắt >= min_pause_s (đây là pause được tính điểm)
-    short_gaps: list[Pause]    # khoảng ngắt từ show_short_s đến dưới min_pause_s (chỉ để tham khảo)
+    pauses: list[Pause]        # gaps >= min_pause_s (these are the scored pauses)
+    short_gaps: list[Pause]    # gaps from show_short_s up to below min_pause_s (reference only)
 
     @property
     def speech_s(self) -> float:
@@ -288,7 +288,7 @@ def describe(segments: list[SpeechSegment], duration_s: float, *,
 
 
 def clock(seconds: float) -> str:
-    """Định dạng m:ss.mmm để nhảy tới đúng chỗ trong trình phát nhạc/video."""
+    """Format m:ss.mmm to jump to the right spot in a media player."""
     total_ms = round(seconds * 1000)
     minutes, rest_ms = divmod(total_ms, 60_000)
     secs, ms = divmod(rest_ms, 1000)
@@ -333,13 +333,13 @@ CHECK_SHEET_COLUMNS = ["start_s", "end_s", "duration_s", "start_clock", "vad_kin
 
 
 def write_check_sheet(path: Path, overview: Overview) -> None:
-    """Bảng để tự nghe và điền: mỗi dòng là một khoảng ngắt VAD tìm thấy.
+    """Sheet to listen and fill in: each row is one gap VAD found.
 
-    Hai cột cuối (your_verdict, note) để trống cho bạn điền, ví dụ "dung" / "sai" / "khong chac".
+    The last two columns (your_verdict, note) are left blank for you, e.g. "dung" / "sai" / "khong chac".
     """
     rows = [("pause", p) for p in overview.pauses] + [("short", p) for p in overview.short_gaps]
     rows.sort(key=lambda item: item[1].start_s)
-    with path.open("w", newline="", encoding="utf-8-sig") as handle:   # utf-8-sig để Excel đọc đúng
+    with path.open("w", newline="", encoding="utf-8-sig") as handle:   # utf-8-sig so Excel reads it right
         writer = csv.writer(handle)
         writer.writerow(CHECK_SHEET_COLUMNS)
         for kind, p in rows:
@@ -377,7 +377,7 @@ def format_overview_table(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
-# ---------- dòng lệnh ----------
+# ---------- command line ----------
 
 def _int_list(text: str) -> list[int]:
     return [int(part) for part in text.split(",") if part.strip()]
@@ -428,7 +428,7 @@ def main(argv: list[str] | None = None) -> int:
     base = VadParams(threshold=args.threshold, min_speech_duration_ms=args.min_speech_ms,
                      min_silence_duration_ms=args.min_silence_ms, speech_pad_ms=args.pad_ms)
 
-    with tempfile.TemporaryDirectory() as tmp:   # Master là dữ liệu nhạy cảm, xóa khi xong
+    with tempfile.TemporaryDirectory() as tmp:   # Master is sensitive data, delete when done
         try:
             master = decode_to_master(args.audio, Path(tmp), max_seconds=MAX_SECONDS,
                                       cap_margin_s=CAP_MARGIN_S, timeout_s=DECODE_TIMEOUT_S)

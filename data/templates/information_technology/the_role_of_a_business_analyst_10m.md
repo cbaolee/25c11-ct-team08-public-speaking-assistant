@@ -1,13 +1,13 @@
 ---
 topic: "The Role of a Business Analyst"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 There's a story that's been told in software companies for decades, usually with a funny cartoon of a tree swing. The customer explains what they want. The salesperson promises something slightly different. The designer draws something else. The developers build something else again. And in the end, what the customer actually needed was a simple tire hanging from a tree branch.
 
 Good {{ argument_time_of_day }}, everyone. My name is {{ argument_speaker_name }}. {{ argument_speaker_background }} And today's topic is the person whose job is to make sure that cartoon never describes your project: the business analyst, often called the BA. It's a role that's essential in almost every software project, but that many people, even in IT, don't fully understand.
 
-The cartoon is a joke, but it describes a very real problem. A huge number of software projects fail or go over budget not because the developers can't code, but because the team built the wrong thing. The business needs were misunderstood, incomplete, or changed without anyone noticing.
+The cartoon is a joke, but it describes a very real problem. In my view, {{ argument_requirements_cause_failures }}.
 
 That is the problem a business analyst exists to solve.
 
@@ -33,7 +33,7 @@ And the fifth is supporting the solution. That includes helping with user accept
 
 Which skills does a good BA need?
 
-The most important skills are not technical. Communication comes first: listening carefully, asking good questions, and explaining complex ideas simply, to both a CEO and a developer. Next comes analytical thinking: breaking big, messy problems into clear, logical pieces. Then there's curiosity, and a healthy habit of asking "why?" until you reach the real need.
+The most important skills are not technical. I would argue that {{ argument_ba_communication_first }}.
 
 But technical understanding matters too. A BA doesn't usually write production code, but it helps a lot to understand how software is built, how databases work, and what is easy or difficult for developers. Many BAs also use basic SQL to explore data, and tools for diagrams, wireframes, and managing requirements.
 
@@ -55,7 +55,7 @@ If you're interested in this path, there are also internationally recognized cer
 
 Before I finish, let me clear up two common myths.
 
-Myth one: "A BA just writes documents." Not true. Documents are a tool, not the goal. The real value of a BA is in understanding problems deeply and helping people agree on the right solution. Many of the most important moments in a BA's work happen in conversations, not in documents.
+Myth one: "A BA just writes documents." Not true. Documents are a tool, not the goal. My position is that {{ argument_ba_value_beyond_documents }}.
 
 Myth two: "You need to be a great programmer to be a BA." Also not true. Technical understanding helps, but your ability to listen, think clearly, and communicate matters much more.
 

@@ -1,6 +1,6 @@
 ---
 topic: "Aerodynamic drafting techniques in cycling"
-Category: "Sports"
+category: "Sports"
 duration_min: 5
 ---
 Good evening, athletes, trainers, and students of the game. We will explore how precise drafting maneuvers reshape race outcomes.

@@ -16,6 +16,8 @@ Everything about this animal is engineered for the cold. Its large, crescent-sha
 
 In a traditional boreal winter, the deep, cold snow is the {{ argument_target_boreal_ungulate }}'s greatest ally, keeping lowland competitors and predators like {{ argument_predator_species_name }} at bay while females retreat into dense, ancient conifer stands to give birth in the spring.
 
+To frame boreal forest caribou and moose, permafrost thaw, and taiga preservation in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 Today, however, winter in {{ argument_boreal_study_region }} is becoming unrecognizable. Increasingly, mid-winter temperatures spike above freezing, bringing rain-on-snow events. When the temperature drops back to {{ argument_refreeze_temperature_statistic }} the next night, the snowpack turns into a sheet of solid concrete ice.
 
 {{ argument_target_boreal_ungulate }} cannot dig through solid ice; they cut their legs trying and starve to death with tons of lichen locked just centimeters beneath their hooves. Meanwhile, predators like {{ argument_predator_species_name }} can run right on top of the ice crust at high speed, turning the winter landscape into a killing field.
@@ -27,6 +29,8 @@ Our field necropsies show individual {{ argument_secondary_boreal_species }} inf
 While climate change alters the boreal forest from above, industrial logging, oil and gas seismic lines, and mining roads are slicing it apart from within.
 
 Over the past {{ argument_industrial_expansion_timeframe }}, human industry has cut {{ argument_seismic_line_length_statistic }} of straight clearing lines across {{ argument_boreal_study_region }}. Even a narrow five-meter seismic line changes the predator-prey balance of the entire forest. Why? Because {{ argument_predator_species_name }} use these straight, packed corridors like high-speed superhighways, traveling {{ argument_predator_speed_increase_factor }} faster into the deep peatlands where {{ argument_target_boreal_ungulate }} used to be safe.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 At the same time, thawing permafrost is collapsing ancient spruce forests into drunken, waterlogged bogs, releasing methane and altering the hydrology of {{ argument_wetland_nesting_bird_count }} migratory bird species that fly north every spring to breed in the boreal nursery.
 

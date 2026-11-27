@@ -6,32 +6,30 @@ duration_min: 5
 
 We use the phrase "dead as a dodo" as a punchline. When we picture the {{ argument_extinct_island_bird_name }} of {{ argument_island_homeland_name }}, we picture a cartoon: a fat, clumsy, foolish bird that was almost asking to go extinct because it didn't know how to fly.
 
-As an evolutionary biologist, I want to set the record straight tonight: the {{ argument_extinct_island_bird_name }} was not stupid, and it was not a failure of evolution.
+On the ground, conservation teams still face stubborn practical obstacles: {{ argument_conservation_challenge_detail }}.
 
-For {{ argument_evolutionary_success_million_years }} million years, that meter-tall, powerful fruit-eating pigeon was a masterpiece of island adaptation -- surviving cyclones and droughts with a hooked beak that could crack open hard palm nuts no other animal could touch.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
 
-The {{ argument_extinct_island_bird_name }} didn't go extinct in {{ argument_dodo_extinction_year }} because it was poorly designed; it went extinct in less than {{ argument_extinction_timespan_years }} years after humans arrived because no creature can evolve fast enough to survive ships full of rats, pigs, and hungry sailors all at once.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
-For two centuries after the last {{ argument_extinct_island_bird_name }} died, people comforted themselves with a dangerous myth. They said, "Okay, rare animals on tiny islands can go extinct -- but abundant animals on huge continents are totally safe."
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
-Then came the story of the {{ argument_extinct_continental_bird_name }} in North America.
+To frame the dodo, passenger pigeons, and hard lessons from modern extinctions in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
-In the year {{ argument_baseline_abundance_year }}, the {{ argument_extinct_continental_bird_name }} was the most abundant bird on planet Earth -- numbering up to {{ argument_peak_population_billions }} billion individuals, making up {{ argument_continental_bird_share_percentage }} of all the birds on the entire continent!
+Tracing the ripple effects through the wider ecosystem demonstrates that {{ argument_trophic_impact_analysis }}.
 
 When a single flock flew overhead in {{ argument_historical_witness_state }}, naturalist {{ argument_historical_naturalist_name }} wrote that the flock was {{ argument_flock_width_miles }} wide, {{ argument_flock_length_miles }} long, and blocked out the noon sun like a solar eclipse for three straight days.
 
-Nobody believed human beings could ever wipe out five billion birds.
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
-Yet by the late 1800s, two new technologies collided with the flocks: the telegraph and the railroad.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
-Whenever a giant nesting colony settled in a forest, telegraph operators wired the coordinates to thousands of commercial hunters, who rode the train in, shot and netted the birds by the millions, and shipped barrels of cheap meat back to city markets.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
-Because {{ argument_extinct_continental_bird_name }} were colonial breeders that needed the noisy social energy of thousands of neighbors around them just to trigger their hormones to lay a single egg, once the giant flocks were broken into small scattered groups, breeding stopped completely.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
-On {{ argument_Martha_death_date }}, at one o'clock in the afternoon in the {{ argument_zoo_city_name }} Zoo, a twenty-nine-year-old female named {{ argument_last_individual_name }} -- the very last {{ argument_extinct_continental_bird_name }} in the universe -- fell off her perch and died.
+Balancing ecological protection with human livelihoods raises difficult tradeoffs: {{ argument_economic_tradeoff_critique }}.
 
-For the first time in history, humanity knew the exact hour and minute that a species went from one to zero.
-
-Out of the shock of losing {{ argument_last_individual_name }} and the {{ argument_extinct_island_bird_name }} was born the modern conservation movement: the first migratory bird treaties, endangered species laws, and the IUCN Red List.
+A concrete example from the field brings this reality into sharp focus: {{ argument_local_case_evidence }}.
 
 Extinction is not a thing of the distant dinosaur past; it is a one-way door. And the lesson written on {{ argument_last_individual_name }}'s memorial statue is the one we must never forget: abundance is no armor against greed, and the best time to save a species is while it still fills the sky. Thank you.

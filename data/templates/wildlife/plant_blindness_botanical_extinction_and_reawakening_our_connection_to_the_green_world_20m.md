@@ -18,29 +18,35 @@ Plant blindness is our built-in tendency to look straight at the living, breathi
 
 And today, I want to convince you that plant blindness isn't just a funny quirk of human psychology; it is one of the greatest threats to the survival of wildlife -- and humanity -- in the twenty-first century.
 
+To frame plant blindness, botanical extinction, and reawakening our connection to the green world in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 Why do human beings suffer from plant blindness? First, blame our evolutionary wiring.
 
-Your visual cortex processes roughly ten million bits of data every second from your eyes, yet your conscious mind can only pay attention to about forty bits at a time. To keep our ancestors alive on the savanna, our brains evolved a strict filter: only pay attention to things that move, have eyes facing you, or change color quickly -- because a plant has never jumped out of a bush and chased a human down for lunch!
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 Because plants move on a timescale of hours and seasons rather than seconds, grow without faces, and blend together in shades of green, our brain's spam filter automatically deletes them from our conscious awareness.
 
 Second, blame our modern education and urban lives. An average ten-year-old child in {{ argument_modern_country_name }} today can easily name over {{ argument_corporate_logos_known_count }} corporate brand logos and pokemon characters at a glance -- yet cannot name five wild native plants growing within fifty meters of their own front door.
 
-In universities across {{ argument_academic_decline_region }}, standalone Botany departments have been shut down or merged out of existence over the past thirty years, leaving us with a critical shortage of field botanists who can actually tell an endangered wild species from a common weed at the exact moment the planet needs them most.
+On the ground, conservation teams still face stubborn practical obstacles: {{ argument_conservation_challenge_detail }}.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 What happens when our laws, our media, and our conservation budgets are run by people with plant blindness?
 
 Look at how we divide the pie. Plants make up over {{ argument_plant_share_of_biomass_percentage }} of all the living biomass on planet Earth. By weight, life on Earth is plants; animals and humans are just a tiny frosting of less than half a percent sitting on top of a giant green cake.
 
-Now look at how we treat endangered species. Since the year {{ argument_modern_extinction_baseline_year }}, documented wild plant extinctions have occurred at more than twice the rate of all mammal, bird, and amphibian extinctions combined. Over {{ argument_threatened_plant_percentage_global }} of the world's {{ argument_known_plant_species_total }} known plant species are currently threatened with extinction -- and roughly {{ argument_newly_described_threatened_percentage }} of the two thousand brand-new plant species scientists discover every year are already on the brink of extinction the day they get their scientific name!
+Now look at how we treat endangered species. Expanding on this key point for plant blindness, botanical extinction, and reawakening our connection to the green world: {{ argument_empirical_field_evidence }}.
 
 Yet when my team analyzed conservation funding across {{ argument_funding_study_region }}, even though plants make up {{ argument_endangered_list_plant_percentage }} of the species on the official Endangered Species List, they received less than {{ argument_plant_conservation_funding_share }} of total recovery funding.
 
 A single charismatic mammal species often receives more conservation funding in one year than hundreds of critically endangered wild plant species combined.
 
+At the same time, real-world conservation around plant blindness, botanical extinction, and reawakening our connection to the green world is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
+
 And here is the ecological reality every wildlife lover needs to hear: you cannot save the animals if you let their plants go extinct.
 
-Wait until the {{ argument_endangered_host_tree_or_plant }} disappears from {{ argument_ecosystem_example_name }}, and the {{ argument_dependent_animal_count }} species of specialized insects, birds, bats, and mammals that depend on its specific nectar, bark, or fruit at a critical week of the year vanish right behind it like dominoes. Saving animals while ignoring plants is like trying to save the passengers on an ocean liner while letting the hull sink to the bottom of the sea.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
 How do we cure plant blindness? We don't cure it by forcing people to memorize dusty Latin names on flashcards. We cure it by changing the speed of the camera and showing people what wild plants are actually doing when we think they are standing still.
 
@@ -48,27 +54,31 @@ When you put a time-lapse camera on a forest floor in {{ argument_time_lapse_for
 
 You see wild {{ argument_climbing_vine_species }} whipping its tip around in circles like a radar dish -- sniffing the air for the chemical scent of its favorite host plant and steering straight toward it while actively avoiding toxic neighbors.
 
-You discover that plants have more senses than humans do. While they don't have eyes or ears made of flesh, a wild plant can sense {{ argument_plant_senses_count }} distinct environmental signals: it sees the exact color ratio of red to far-red light bouncing off a neighbor's leaf before the neighbor even casts a shadow on it; it feels the exact frequency of a {{ argument_chewing_caterpillar_species }}'s jaws vibrating on a leaf -- distinguishing the vibration of a chewing caterpillar from the vibration of the wind or a harmless raindrop -- and immediately floods its veins with mustard-oil toxins!
+You discover that plants have more senses than humans do. Expanding on this key point for plant blindness, botanical extinction, and reawakening our connection to the green world: {{ argument_key_ecological_mechanism }}.
 
-And when we look at wild {{ argument_acoustic_bat_vine_species }} in the rainforests of {{ argument_bat_vine_country }}, we see a plant that literally hacked the sonar of bats: growing a specialized dish-shaped leaf right above its flowers that acts like a parabolic acoustic mirror, bouncing a bat's ultrasonic calls back from every angle so the bat can find the flower in a cluttered jungle in half the time!
+Turning insight into lasting protection requires pairing ecological science with practical community stewardship and policy action: {{ argument_community_stewardship_practice }}.
+
+Tracing the ripple effects through the wider ecosystem demonstrates that {{ argument_trophic_impact_analysis }}.
 
 Once you realize that every tree, vine, and wildflower you walk past is tasting the soil, smelling the air, listening to vibrations, and trading with fungi underground, you can never see "green wallpaper" again.
 
 Over the past {{ argument_movement_duration_years }} years, through our coalition {{ argument_botanical_conservation_coalition }}, we have worked to cure plant blindness across three fronts: citizen technology, urban rewilding, and legal equality for flora.
 
-First, we turned the smartphone -- the very machine that pulled kids indoors -- into a window back into the plant world. By training computer-vision AI on {{ argument_training_photos_millions }} geotagged field photographs and launching community Botanical BioBlitzes across {{ argument_bioblitz_cities_count }} cities and rural districts, anyone can point their phone camera at a wild leaf and learn its name, its indigenous cultural story, and which butterflies and birds depend on it in two seconds.
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
 Last year alone, everyday hikers using that tool rediscovered {{ argument_citizen_rediscovered_plants_count }} "lost" plant species in {{ argument_rediscovery_regions_list }} that professional botanists hadn't seen in over fifty years -- including a cliffside shrub down to just {{ argument_surviving_individual_count }} surviving plants that is now protected and multiplying in six botanical gardens!
 
 Second, in cities like {{ argument_rebel_botanist_city }}, we partnered with teachers, artists, and "rebel botanists" who walk down city sidewalks with sticks of washable chalk, writing the names and superpowers of tiny wild plants growing out of cracks in the pavement right on the sidewalk next to them.
 
+Looking across neighboring habitats and conservation programs also reveals why certain strategies build stronger long-term resilience than others: {{ argument_comparative_resilience_detail }}.
+
 Watching hurried commuters stop in their tracks, look down at a tiny flower they had stepped over every day for five years, smile, and take a photo proves that human curiosity about plants isn't dead -- it was just waiting for an introduction.
 
-Third, we are fighting to close the legal gap in international conservation treaties and national laws. Working with lawmakers in {{ argument_policy_reform_country }}, we passed the {{ argument_plant_protection_act_name }} -- ensuring that critically endangered plants on public and private lands receive the exact same legal habitat protection and anti-poaching enforcement as endangered eagles or wolves, while training Micro-Reserve Guardians in {{ argument_micro_reserve_region }} to protect small one-hectare botanical hotspots that hold rare endemic wildflowers.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
 
 I want to leave you with one simple challenge for tomorrow morning when you walk out your front door on the way to work or school.
 
-Before you look at your phone, stop at the very first wild tree or weed growing by the side of the path. Touch its bark or its leaf. Notice how its veins are built to catch the sun and channel the rain. Learn its name, and learn the name of just one insect or bird that calls that plant home.
+A concrete example from the field brings this reality into sharp focus: {{ argument_local_case_evidence }}.
 
 The day you know the name and the story of a plant, it stops being scenery -- and becomes a neighbor.
 

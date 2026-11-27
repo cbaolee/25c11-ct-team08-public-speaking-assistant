@@ -1,13 +1,13 @@
 ---
 topic: "Reporting a Project Delay to Stakeholders"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you for joining at short notice. I asked for this meeting because I have an important update on {{ argument_project_name }}, and I wanted you to hear it directly from me, as early as possible, rather than in a status report.
 
 I'll get straight to the point. We will not be able to meet the planned {{ argument_milestone_name }} date of {{ argument_original_date }}. Our new estimated date is {{ argument_new_date }}. That's a delay of about {{ argument_delay_length }}.
 
-I know this isn't the news any of us wanted, and I take full responsibility for keeping you informed and for getting the project back on track. So in the next few minutes, I'd like to explain what happened, what the impact is, what we're doing about it, and what we need from you.
+I know this isn't the news any of us wanted, and I take full responsibility for keeping you informed and for getting the project back on track. I believe that {{ argument_accountability_in_delays }}.
 
 First, what happened.
 

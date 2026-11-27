@@ -1,10 +1,10 @@
 'use strict';
-// Dữ liệu fixture là TỔNG HỢP (tests/fixtures/README.md), không phải kết quả đo.
+// Fixture data is SYNTHETIC (tests/fixtures/README.md), not measured results.
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { mapResult, displayRound, pickBaselineProfile } = require('../../src/web/static/js/evaluate_client.js');
+const { mapResult, displayRound, pickBaselineProfile, expandCompact, clampFollowWpm, parseFollowWpm, followSchedule, followRetime, followJump } = require('../../src/web/static/js/evaluate_client.js');
 
 const load = n => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'fixtures', n), 'utf8'));
 const clone = o => JSON.parse(JSON.stringify(o));
@@ -145,4 +145,187 @@ test('pickBaselineProfile: insufficient / null profile / bad threshold / garbage
   assert.equal(pickBaselineProfile({ status: 'ok', profile: { hesitation_threshold_s: null, flags: [] } }), null);
   assert.equal(pickBaselineProfile(null), null);
   assert.equal(pickBaselineProfile({ status: 'insufficient_audio', profile: { hesitation_threshold_s: 0.7, flags: [] } }), null);
+});
+
+test('expandCompact: words from the script, mistakes marked, sentences split, no timings', () => {
+  const summary = { status: 'ok', overall: 80, components: { accuracy: 90 }, audio: { duration_s: 12, voiced_ratio: 0.8 } };
+  const mistakes = [
+    { type: 'alignment', status: 'sub', ref_index: 1, ref_word: 'quick', hyp_word: 'quack', sentence_index: 0 },
+    { type: 'alignment', status: 'del', ref_index: 4, ref_word: 'very', hyp_word: null, sentence_index: 1 },
+    { type: 'filler', after_ref_index: 2, text: 'um', source: 'stt', start_s: 1.0, end_s: 1.2 },
+    { type: 'pause', kind: 'hesitation', after_ref_index: 2, start_s: 1.2, end_s: 2.4 }
+  ];
+  const script = 'The quick fox. It is very fast!';
+  const json = expandCompact(summary, mistakes, script);
+  assert.equal(json.alignment.length, 7);
+  assert.deepEqual(json.sentences.map(x => x.ref_text), ['The quick fox.', 'It is very fast!']);
+  assert.deepEqual(json.alignment.map(a => a.sentence_index), [0, 0, 0, 1, 1, 1, 1]);
+  assert.equal(json.overall, 80);                                   // summary fields kept
+
+  const { an, sc } = mapResult(json, script);
+  assert.deepEqual(an.words.map(w => w.status), ['ok', 'wrong', 'ok', 'ok', 'missing', 'ok', 'ok']);
+  assert.ok(an.words.every(w => w.start === null && w.end === null));
+  assert.equal(an.words[2].fillerAfter, true);
+  assert.equal(an.words[2].pauseAfter.kind, 'hesitation');
+  assert.equal(sc.overall, 80);
+  assert.equal(an.dur, 12);
+});
+
+test('expandCompact: empty mistakes and empty script do not crash', () => {
+  const json = expandCompact({ status: 'ok' }, null, '');
+  assert.deepEqual(json.alignment, []);
+  assert.deepEqual(json.sentences, []);
+  assert.doesNotThrow(() => mapResult(json, ''));
+});
+
+// ---- follow-along schedule (demo highlight, not scored) ----
+const near = (a, b, m) => assert.ok(Math.abs(a - b) < 1e-9, `${m || ''} ${a} != ${b}`);
+
+test('followSchedule: hand-computed (120 wpm = 0.5 s/word, lead 1, gap 0.5)', () => {
+  const r = followSchedule({ wordCounts: [4, 2], wpm: 120, leadS: 1, gapS: 0.5 });
+  assert.deepEqual(r, [{ start: 1, end: 3 }, { start: 3.5, end: 4.5 }]);
+});
+
+test('followSchedule: wpm 145 equals the old buildFollow formula', () => {
+  const counts = [7, 3, 12, 1], per = 60 / 145;
+  let t = 1.0; const old = counts.map(n => { const seg = { start: t, end: t + n * per }; t = seg.end + 0.5; return seg; });
+  assert.deepEqual(followSchedule({ wordCounts: counts, wpm: 145, leadS: 1.0, gapS: 0.5 }), old);
+});
+
+test('followSchedule: 100 wpm lasts 1.8x of 180 wpm (word time only)', () => {
+  const end = w => followSchedule({ wordCounts: [10, 20, 30], wpm: w, leadS: 0, gapS: 0 }).at(-1).end;
+  near(end(180), 20); near(end(100), 36); near(end(100) / end(180), 1.8);
+});
+
+test('followSchedule: empty input and out-of-range wpm', () => {
+  assert.deepEqual(followSchedule({ wordCounts: [], wpm: 145, leadS: 1, gapS: 0.5 }), []);
+  assert.deepEqual(followSchedule({ wpm: 145 }), []);
+  const one = w => followSchedule({ wordCounts: [60], wpm: w, leadS: 0, gapS: 0 })[0].end;
+  near(one(50), 36); near(one(999), 20); near(one(NaN), 60 * 60 / 145); near(one('abc'), 60 * 60 / 145);   // clamp to [100,180], not a number -> 145
+});
+
+test('followSchedule: startIndex/startTime moves the tail, keeps prev', () => {
+  const prev = [{ start: 1, end: 3 }, { start: 3.5, end: 4.5 }];
+  const r = followSchedule({ wordCounts: [4, 2, 6], wpm: 120, leadS: 1, gapS: 0.5, startIndex: 2, startTime: 10, prev });
+  assert.deepEqual(r.slice(0, 2), prev);
+  assert.deepEqual(r[2], { start: 10, end: 13 });
+});
+
+test('followRetime: mid-sentence speed change keeps earlier sentences and read fraction', () => {
+  const o = { wordCounts: [4, 2, 6], leadS: 1, gapS: 0.5 };
+  const segs = followSchedule({ ...o, wpm: 120 });            // [1,3] [3.5,4.5] [5,8]
+  const r = followRetime(segs, 1, 4, { ...o, wpm: 180 });     // halfway through sentence 1 at t=4; 180 wpm = 1/3 s/word
+  assert.deepEqual(r[0], segs[0]);
+  near(r[1].start, 4 - 1 / 3); near(r[1].end, 4 + 1 / 3);     // half of 2/3 s already read, half left
+  near(r[2].start, 4 + 1 / 3 + 0.5); near(r[2].end - r[2].start, 2);
+  assert.ok(r[1].start <= 4 && r[2].start > 4);                // current index stays 1
+});
+
+test('followRetime: still in the lead-in keeps the first start; empty segs', () => {
+  const o = { wordCounts: [4, 2], leadS: 1, gapS: 0.5 };
+  const r = followRetime(followSchedule({ ...o, wpm: 120 }), -1, 0.4, { ...o, wpm: 180 });
+  near(r[0].start, 1); near(r[0].end, 1 + 4 / 3);
+  assert.deepEqual(followRetime([], 0, 1, { ...o, wpm: 120 }), []);
+});
+
+test('clampFollowWpm / parseFollowWpm', () => {
+  assert.equal(clampFollowWpm(100), 100); assert.equal(clampFollowWpm(99), 100); assert.equal(clampFollowWpm(181), 180); assert.equal(clampFollowWpm(null), 145);
+  for (const ok of ['100', '145', '180', 150]) assert.equal(parseFollowWpm(ok), Number(ok));
+  for (const bad of [null, undefined, '', 'abc', '97', '146', '95', '185', '145.5', NaN, 1e9]) assert.equal(parseFollowWpm(bad), 145, String(bad));
+});
+
+test('clampFollowWpm / parseFollowWpm: limits from /api/config', () => {
+  const lim = { min: 120, max: 200, step: 10, def: 160 };
+  assert.equal(parseFollowWpm('200', lim), 200); assert.equal(parseFollowWpm(190, lim), 190);
+  for (const bad of ['205', '110', 145, null]) assert.equal(parseFollowWpm(bad, lim), 160, String(bad));
+  assert.equal(clampFollowWpm(250, lim), 200); assert.equal(clampFollowWpm(50, lim), 120); assert.equal(clampFollowWpm(null, lim), 160);
+  assert.equal(parseFollowWpm('180', { max: 200 }), 180);       // missing limits fall back to FOLLOW_WPM
+  const segs = followSchedule({ wordCounts: [4], wpm: 240, limits: { max: 240 } });
+  assert.equal(segs[0].end, 1);                                  // 4 words at 240 wpm, not clamped to 180
+});
+
+test('followRetime: edge cases (gap, last sentence, empty sentence, now past old end)', () => {
+  const o = { wordCounts: [4, 2, 6], leadS: 1, gapS: 0.5 };
+  const segs = followSchedule({ ...o, wpm: 120 });            // [1,3] [3.5,4.5] [5,8]
+  // (a) now inside the gap after sentence 1 (4.5..5): frac clamps to 1 -> sentence ends exactly at now
+  let r = followRetime(segs, 1, 4.75, { ...o, wpm: 180 });
+  near(r[1].end, 4.75); near(r[1].start, 4.75 - 2 / 3); near(r[2].start, 4.75 + 0.5);
+  // (d) now a bit after the old end of the last sentence (8.2): same clamp, nothing breaks
+  r = followRetime(segs, 2, 8.2, { ...o, wpm: 100 });         // 100 wpm = 0.6 s/word, d = 3.6
+  assert.deepEqual(r.slice(0, 2), segs.slice(0, 2));
+  near(r[2].end, 8.2); near(r[2].start, 8.2 - 3.6); assert.equal(r.length, 3);
+  // (b) last sentence, halfway (6.5 of [5,8]) at 180 wpm: d_new = 2, start = 6.5 - 1 = 5.5
+  r = followRetime(segs, 2, 6.5, { ...o, wpm: 180 });
+  near(r[2].start, 5.5); near(r[2].end, 7.5);
+  // (c) empty sentence (n = 0): zero length, frac 0, no NaN
+  const z = { wordCounts: [3, 0, 2], leadS: 0, gapS: 0.5 };
+  const zs = followSchedule({ ...z, wpm: 120 });              // [0,1.5] [2,2] [2.5,3.5]
+  assert.deepEqual(zs[1], { start: 2, end: 2 });
+  r = followRetime(zs, 1, 2.2, { ...z, wpm: 180 });
+  for (const g of r) { assert.ok(Number.isFinite(g.start) && Number.isFinite(g.end)); }
+  near(r[1].start, 2.2); near(r[1].end, 2.2); near(r[2].start, 2.7);
+});
+
+test('followSchedule(undefined) does not throw', () => {
+  assert.deepEqual(followSchedule(undefined), []);
+  assert.deepEqual(followSchedule(null), []);
+});
+
+test('followJump: the clicked sentence starts now, earlier ones are done, later ones follow', () => {
+  const o = { wordCounts: [4, 2, 6], wpm: 120, leadS: 1, gapS: 0.5 };
+  const segs = followSchedule(o);                                   // [1,3] [3.5,4.5] [5,8]
+  const back = followJump(segs, 0, 6, o);                           // jump back to sentence 0 at t = 6
+  assert.equal(back[0].start, 6); assert.equal(back[0].end, 8); assert.equal(back[1].start, 8.5);
+  const fwd = followJump(segs, 2, 2, o);                            // jump ahead to sentence 2 at t = 2
+  assert.equal(fwd[2].start, 2); assert.ok(fwd[0].start < 2 && fwd[1].start < 2 && fwd[1].end <= 2);
+});
+
+test('followMeasureWpm / followBlendWpm: auto speed from two taps', () => {
+  const { followMeasureWpm, followBlendWpm } = require('../../src/web/static/js/evaluate_client.js');
+  const o = { gapS: 0.5, minS: 3, minWords: 5, maxAhead: 4, lo: 60, hi: 240 };
+  const counts = [10, 10, 10, 10, 10, 10, 10];
+  assert.equal(followMeasureWpm(counts, 0, 0, 2, 11, o), 120);       // 20 words in 10 s (+2 gaps of 0.5 s)
+  assert.equal(followMeasureWpm(counts, 2, 0, 1, 5, o), null);       // backwards
+  assert.equal(followMeasureWpm(counts, 0, 0, 6, 30, o), null);      // skipped 6 sentences
+  assert.equal(followMeasureWpm(counts, 0, 0, 1, 2, { ...o, minS: 3 }), null);   // under minS
+  assert.equal(followMeasureWpm(counts, 0, 0, 1, 3.5, o), 200);
+  assert.equal(followMeasureWpm(counts, 0, 0, 2, 4, o), 240);        // 20 words in 3 s = 400 wpm: taken as the fastest
+  const lim = { min: 100, max: 180, step: 5 };
+  assert.equal(followBlendWpm(145, 120, 0.4, lim), 135);
+  assert.equal(followBlendWpm(170, 240, 1, lim), 180);
+});
+
+test('sentence practice counts only reference errors and includes the threshold', () => {
+  const client = require('../../src/web/static/js/evaluate_client.js');
+  const words = Array.from({length: 10}, (_, i) => ({si: 0, status: i < 3 ? 'wrong' : 'ok'}));
+  const stat = client.sentenceErrorStats(words)[0];
+  assert.equal(stat.ratio, 0.3);
+  assert.equal(client.needsSentencePractice(stat, 0.3), true);
+  assert.equal(client.needsSentencePractice(stat, 0.31), false);
+  assert.equal(client.needsSentencePractice(client.sentenceErrorStats([{si: 1, status: 'ok'}])[0], 0.3), false);
+  assert.deepEqual(client.sentenceErrorStats([]), []);
+  assert.deepEqual(client.sentenceErrorStats([{si: 2, status: 'ins'}]), []);
+});
+
+
+test('sentence statistics omit empty and insertion-only sentences independently', () => {
+  const client = require('../../src/web/static/js/evaluate_client.js');
+  const stats = client.sentenceErrorStats([{ si: 3, status: 'ins' }, { si: 4, status: 'ok' }, { si: 4, status: 'ins' }]);
+  assert.deepEqual(stats, [{ si: 4, nRef: 1, nErr: 0, ratio: 0 }]);
+  assert.equal(client.needsSentencePractice(undefined, 0.3), false);
+  assert.equal(client.needsSentencePractice({ nRef: 0, ratio: 0 }, 0), false);
+});
+
+
+test('evaluation progress stays monotonic and estimates only within STT', () => {
+  const { displayProgress } = require('../../src/web/static/js/evaluate_client.js');
+  const weights = { upload: 5, decode: 10, vad: 10, stt: 35, align: 10 };
+  const stages = [{ key: 'upload', state: 'done' }, { key: 'decode', state: 'done' }, { key: 'vad', state: 'done' }, { key: 'stt', state: 'running' }, { key: 'align', state: 'pending' }];
+  const later = displayProgress(25, 25, stages, weights, 10000, 20);
+  assert.ok(later > 25 && later < 60);
+  assert.equal(displayProgress(25, 25, stages, weights, 10000), 25); // no tau -> no estimate
+  assert.equal(displayProgress(later, 25, stages, weights, 0), later);
+  stages[3].state = 'done';
+  assert.equal(displayProgress(25, 60, stages, weights, 100), 60);
+  assert.equal(displayProgress(60, 100, stages, weights, 0), 100);
 });

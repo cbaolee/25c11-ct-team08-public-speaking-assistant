@@ -1,6 +1,6 @@
 ---
 topic: "Shot placement patterns in professional darts"
-Category: "Sports"
+category: "Sports"
 duration_min: 10
 ---
 Good afternoon, sports fans and fellow tacticians. In this session we will dissect the strategic geometry that underpins elite darting performance.

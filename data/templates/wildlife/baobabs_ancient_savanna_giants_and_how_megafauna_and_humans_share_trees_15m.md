@@ -6,7 +6,7 @@ duration_min: 15
 
 There is an old legend told around evening fires across the savannas of {{ argument_savanna_region_name }}. It says that when the Creator first planted the {{ argument_target_baobab_species }}, the tree kept walking around and complaining so much that the Creator lost patience, pulled the tree out of the ground, and stuffed it back into the earth upside down -- with its roots sticking straight up into the sky and its head buried in the dirt.
 
-Stand in front of an ancient {{ argument_target_baobab_species }} during the dry season when its leaves have dropped, and you will swear that legend is true. Its massive, bottle-shaped trunk -- glowing silvery-pink in the sunset and reaching {{ argument_trunk_circumference_statistic }} around -- is topped by gnarled, twisted branches that look exactly like a root system reaching for the clouds.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 Across {{ argument_savanna_region_name }} and {{ argument_island_baobab_region }}, these trees aren't just plants; they are living villages, water reservoirs, and thousand-year-old monuments that anchor the entire dryland world.
 
@@ -20,11 +20,13 @@ And even if an elephant or a storm rips a huge chunk of bark off the outside, a 
 
 Wait until the sun goes down over {{ argument_savanna_region_name }}, and watch a blooming {{ argument_target_baobab_species }} come alive.
 
-All day long, its large green flower buds hang upside down on long stalks like Christmas ornaments, tightly closed. Then, just as twilight falls, the buds pop open so fast you can literally watch the petals unfurl with the naked eye in {{ argument_flower_opening_minutes }} minutes -- releasing a musky, sour-sweet scent into the night breeze.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 That scent is an open dinner invitation for the night shift: {{ argument_nocturnal_pollinator_bat_or_lemur }} and hawk moths, which dive face-first into the giant white pom-pom flowers to lap up nectar and carry pollen across miles of dark savanna before the flowers wilt at sunrise the very next morning.
 
 Six months later, those flowers turn into fuzzy, hard-shelled pods packed with dry white fruit pulp that has {{ argument_vitamin_c_multiplier }} times more Vitamin C than an orange, {{ argument_calcium_multiplier }} times more calcium than milk, and more antioxidants than blueberries.
+
+To frame baobabs, ancient savanna giants, and how megafauna and humans share trees in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
 And who opens those hard pods and plants the seeds? The largest land animals on Earth: {{ argument_savanna_megafauna_disperser }} and baboons, which swallow the seeds whole and plant them in piles of manure {{ argument_dispersal_distance_km }} kilometers away.
 

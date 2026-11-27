@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0",
+  "schema_version": "2.1",
   "status": "insufficient_audio",
   "reason": "low_voiced_ratio",
   "overall": null,
@@ -58,5 +58,7 @@
   "display_only": {
     "loudness_db": null,
     "loudness_ref_db": null
-  }
+  },
+  "session_id": null,
+  "saved": false
 }

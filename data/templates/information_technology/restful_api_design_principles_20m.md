@@ -1,6 +1,6 @@
 ---
 topic: "RESTful API Design Principles"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Picture an API that works perfectly. Every feature is there. And yet, two days after receiving it, the developer who has to integrate with it sends a polite message: "I'm not sure how this is supposed to work." The endpoint names are inconsistent. Errors come back as two hundred OK, with an error message hidden inside. And every list returns all ten thousand records at once.
@@ -21,7 +21,7 @@ REST is not a protocol, and it's not a library. It's an architectural style, a s
 
 First, client-server separation. The client, say, a mobile app, and the server evolve independently. The app doesn't care how the server stores data, and the server doesn't care how the app draws its screens.
 
-Second, statelessness. Every request must contain all the information the server needs to process it. The server doesn't remember anything about the client between requests. If you're authenticated, you send your token with every request. This may sound inefficient, but it's what allows us to put ten servers behind a load balancer and send each request to any of them.
+Second, statelessness. In my view, {{ argument_statelessness_value }}.
 
 Third, cacheability. Responses should say whether they can be cached and for how long. Good caching can remove a huge amount of load from your servers.
 
@@ -51,7 +51,7 @@ A method is safe if it doesn't change anything. GET is safe. Browsers, crawlers,
 
 A method is idempotent if calling it once or calling it ten times has the same effect. GET, PUT, and DELETE are idempotent. If you delete book forty-two twice, it's still just deleted. POST, however, is not idempotent: sending the same "create order" request twice may create two orders.
 
-Why does this matter? Because networks fail. A mobile app on a weak connection may send a request, never receive the response, and retry. If the request was idempotent, retrying is harmless. If it wasn't, the customer might be charged twice. For critical POST operations like payments, many well-designed APIs accept an idempotency key, a unique value sent by the client, so the server can recognize and ignore duplicate requests.
+Why does this matter? I would argue that {{ argument_idempotency_matters }}.
 
 The third principle, and one that saves hours of debugging: return meaningful status codes.
 
@@ -63,7 +63,7 @@ On the client error side: four hundred, Bad Request, when the input is invalid. 
 
 And on the server side, five hundred, Internal Server Error, when something unexpected breaks, and five oh three, Service Unavailable, during overload or maintenance.
 
-The single most frustrating anti-pattern here is returning two hundred OK for everything and putting "error: true" in the body. It breaks monitoring tools, it breaks client libraries, and it forces every developer to read the documentation just to know whether a request worked. Let the status code tell the truth.
+The single most frustrating anti-pattern here is returning two hundred OK for everything and putting "error: true" in the body. My position is that {{ argument_honest_status_codes }}.
 
 Fourth: keep your request and response bodies consistent.
 
@@ -83,7 +83,7 @@ For filtering and sorting, query parameters work well and are easy to read. A re
 
 Principle number six: plan for change with versioning.
 
-Your API will change. The question is whether those changes will break the people who depend on you. The golden rule is that adding things is usually safe, but removing or renaming things is a breaking change. Adding a new optional field won't break existing clients. Renaming "title" to "bookTitle" will break all of them.
+Your API will change. The question is whether those changes will break the people who depend on you. I believe that {{ argument_backward_compatibility_view }}.
 
 When you do need a breaking change, introduce a new version. The most common and most visible approach is to put the version in the URL, like slash v1 slash books and slash v2 slash books. Other teams use a custom header or the Accept header, which keeps URLs cleaner but is less obvious. Whichever you choose, support the old version for a reasonable period, announce the deprecation clearly, and give developers time to migrate.
 

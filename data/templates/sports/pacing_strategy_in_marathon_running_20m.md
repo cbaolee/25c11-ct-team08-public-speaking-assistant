@@ -1,6 +1,6 @@
 ---
 topic: "Pacing strategy in marathon running"
-Category: "Sports"
+category: "Sports"
 duration_min: 20
 ---
 Good afternoon, sports fans and fellow tacticians. In the next twenty minutes we will chart the evolution of marathon pacing from historic “even‑splits” myth to today’s data‑driven personalization.

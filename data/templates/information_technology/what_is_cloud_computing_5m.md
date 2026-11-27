@@ -1,11 +1,11 @@
 ---
 topic: "What Is Cloud Computing"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Two quick questions to start. Raise your hand if you've used the cloud today. Now raise your hand if, today, you've sent an email, watched a video online, or opened a shared document. If your hand went up the second time but not the first, you've just discovered why this topic is so confusing. Good {{ argument_time_of_day }}. I'm {{ argument_speaker_name }}, and in the next few minutes, I'd like to answer a question that sounds simple but often isn't: what exactly is "the cloud"?
 
-There's a joke among engineers that sums it up nicely: "There is no cloud. It's just someone else's computer." That joke is mostly right. The cloud isn't floating in the sky. It's made of huge buildings called data centers, filled with thousands of servers, cables, and cooling systems, owned by companies like Amazon, Microsoft, and Google. What makes it "cloud computing" is not where the computers are, but how we use them.
+There's a joke among engineers that sums it up nicely: "There is no cloud. It's just someone else's computer." That joke is mostly right. In my view, {{ argument_cloud_is_someone_elses_computer }}.
 
 An old story about electricity explains it well. About a hundred years ago, many factories generated their own electricity. They had to buy generators, maintain them, and hire people to run them. Then the power grid came along. Suddenly, a factory could just plug in, use as much electricity as it needed, and pay for what it used.
 
@@ -21,7 +21,7 @@ The second is Platform as a Service, or PaaS. This is like ordering a pizza for 
 
 The third is Software as a Service, or SaaS. This is like eating at a restaurant. Everything is ready, and you simply use it. Gmail, Google Docs, Zoom, and Microsoft 365 are all SaaS.
 
-The cloud is not a free lunch, though. Costs can grow quickly if nobody keeps an eye on them. Switching providers later can be difficult, which is known as vendor lock-in. Outages still happen, and when a major provider has a problem, thousands of websites can go down together. And security is a shared responsibility: the provider secures the data centers, but you are still responsible for your passwords, your settings, and your data.
+The cloud is not a free lunch, though. I would argue that {{ argument_cloud_costs_and_lock_in }}.
 
 You don't have to look far for an example. {{ argument_local_example }}
 

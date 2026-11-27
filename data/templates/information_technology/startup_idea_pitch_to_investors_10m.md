@@ -1,13 +1,13 @@
 ---
 topic: "Startup Idea Pitch to Investors"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, and thank you for your time today. My name is {{ argument_founder_name }}, and I'm {{ argument_founder_role }} of {{ argument_startup_name }}.
 
 A story first. {{ argument_customer_story }}
 
-That situation isn't rare. It's the problem we're solving.
+That situation isn't rare. In my view, {{ argument_why_this_problem_matters }}.
 
 {{ argument_problem_statement }}
 
@@ -17,13 +17,11 @@ Our solution is {{ argument_startup_name }}. {{ argument_solution_description }}
 
 What does that look like for a real user?
 
-[Product walkthrough, about one minute, with screenshots or a short live demo. Focus on the moment the user gets value, not on every feature.]
-
 What makes this possible is {{ argument_technical_advantage }} We believe this is hard to copy quickly, because {{ argument_defensibility }}
 
 Why now? {{ argument_why_now }}
 
-Now, let's talk about the market. {{ argument_market_size }} We're starting with a focused segment: {{ argument_beachhead_market }} We chose it because these customers feel the problem most strongly, are easy for us to reach, and can become strong references for the wider market.
+Now, let's talk about the market. {{ argument_market_size }} We're starting with a focused segment: {{ argument_beachhead_market }} We believe this is the right starting point because {{ argument_why_this_beachhead }}.
 
 How we make money. {{ argument_business_model }}
 

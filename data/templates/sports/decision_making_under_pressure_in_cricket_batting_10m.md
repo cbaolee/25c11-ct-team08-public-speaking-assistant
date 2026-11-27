@@ -1,6 +1,6 @@
 ---
 topic: "Decision making under pressure in cricket batting"
-Category: "Sports"
+category: "Sports"
 duration_min: 10
 ---
 Good afternoon. Whether you are on the touchline or in the analytics room, today's topic changes how we view competition.

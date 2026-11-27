@@ -1,11 +1,11 @@
 ---
 topic: "Negotiating Project Scope Changes"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone, and thank you for making time for this discussion. As you know, last week {{ argument_requester_name }} asked whether we could add {{ argument_requested_change }} to the current phase of {{ argument_project_name }}. I'd like to use today's meeting to look at that request together, understand the impact, and agree on the best way forward.
 
-Let me start by saying something clearly: we welcome this kind of request. Changes during a project are completely normal. They usually mean that, as the project becomes real, you're learning more about what your users need. That's a good thing. Our job is to help you decide how to handle the change in a way that protects what matters most to you.
+Let me start by saying something clearly: we welcome this kind of request. Changes during a project are completely normal. Our view is that {{ argument_changes_are_normal }}.
 
 So, first, I'd like to make sure we really understand the request, and the reason behind it.
 
@@ -23,7 +23,7 @@ If we simply add it to the current phase, without changing anything else, it wou
 
 There's also a risk aspect. {{ argument_risk_of_change }}
 
-I want to be clear that I'm not saying this to discourage the change. I'm sharing it so we can make the decision with all the facts on the table. Every project has three things that are connected: scope, time, and budget. If one of them changes, at least one of the others usually has to move too. So the real question isn't "can we do it?" It's "what are we willing to adjust to make room for it?"
+I want to be clear that I'm not saying this to discourage the change. I believe that {{ argument_transparent_tradeoffs }}.
 
 So, we've prepared several options. Let me walk you through them.
 
@@ -39,7 +39,7 @@ Each of these is a valid choice. It really depends on what matters most to you r
 
 Our recommendation would be option {{ argument_recommended_option }}, because {{ argument_recommendation_reason }}. But you know your business priorities better than anyone, so I'd really like to hear your perspective.
 
-I also want to be transparent about one option that isn't on the list: adding the full feature without changing the date, the budget, or anything else. I understand why that's tempting. But in practice, it means the team works long overtime, testing gets squeezed, and the risk of problems after launch goes up sharply. We'd be agreeing to a plan we already know is unlikely to hold, and you'd find out at the worst possible moment. I'd rather we make a harder choice together today than a comfortable promise we can't keep.
+I also want to be transparent about one option that isn't on the list: adding the full feature without changing the date, the budget, or anything else. My position is that {{ argument_no_free_scope_change }}.
 
 What's most important to you here: the launch date, the budget, or having this feature in the first release?
 

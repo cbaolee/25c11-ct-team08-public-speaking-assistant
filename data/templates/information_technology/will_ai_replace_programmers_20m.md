@@ -1,6 +1,6 @@
 ---
 topic: "Will AI Replace Programmers"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 "Will AI replace programmers?" People ask that question constantly: students, parents, junior developers, and sometimes very senior engineers. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, I'd like to answer it directly.
@@ -23,11 +23,11 @@ These arguments are real, and I don't want to dismiss them.
 
 Now, let's look at the other side.
 
-Argument one: writing code was never the whole job. Studies of how developers spend their time consistently find that writing new code is only part of it. The rest is understanding requirements, reading existing code, designing systems, reviewing others' work, debugging, testing, communicating with colleagues and customers, and making trade-offs. AI helps with parts of these, but the hardest parts are about understanding what's actually needed, in a messy, specific, human context.
+Argument one: writing code was never the whole job. In my view, {{ argument_coding_was_never_whole_job }}.
 
 Let me give you an example. A client asks for "a simple booking system." What does "simple" mean? Should customers be able to cancel? Until when? What happens if two people book the same slot at the same time? What if the payment succeeds but the confirmation email fails? What about customers who don't have a smartphone? None of these questions are about syntax. They're about understanding a business, its users, and what can go wrong. An AI can help you list such questions. But someone still has to ask the client, make decisions, and take responsibility for them.
 
-Argument two: someone has to be responsible. When software handles money, health data, or safety-critical systems, someone must understand what it does, verify that it's correct, and be accountable when it fails. AI tools can produce code that looks correct but contains subtle bugs or security vulnerabilities. The more code AI produces, the more important it becomes to have skilled people who can review it, test it, and understand it deeply.
+Argument two: someone has to be responsible. I would argue that {{ argument_responsibility_needs_humans }}.
 
 Argument three: we've seen this pattern before. The history of programming is a history of automation. Assembly language automated machine code. Compilers and high-level languages automated much of assembly. Frameworks, libraries, and cloud services automated huge amounts of work that developers used to do by hand. Each time, people predicted that fewer programmers would be needed. And each time, software became cheaper to build, so people wanted much more of it, and the demand for developers grew. Economists call this kind of effect the Jevons paradox: when something becomes more efficient to produce, total demand for it can increase. Whether this pattern will repeat with AI isn't guaranteed, but it's a serious counter-argument.
 
@@ -47,9 +47,9 @@ So, where does this leave us? An assessment.
 
 First, the job is shifting, not disappearing. Less time typing routine code, more time on specifying problems precisely, designing systems, reviewing and testing, and integrating AI into products. A useful way to think about it: developers are moving from being only writers of code, to being writers, reviewers, and directors of code, some of which is produced by AI.
 
-Second, the entry point is the biggest concern. This is the part that worries me most. Junior developers have traditionally learned by doing exactly the kind of routine tasks that AI now handles well. If companies hire fewer juniors because AI does that work, how will the next generation of seniors be trained? There are early signs that entry-level hiring has become harder in parts of the industry, although it's difficult to separate the effect of AI from other factors, such as economic conditions and the end of the very high hiring levels of a few years ago. Either way, it means that if you're a student today, you need to be more deliberate about building real skills, not less.
+Second, the entry point is the biggest concern. My biggest concern is that {{ argument_junior_entry_point_risk }}.
 
-Third, the value of shallow knowledge is falling, and the value of deep knowledge is rising. If your only skill is translating clear instructions into code in one framework, AI can increasingly do that. But if you understand how systems work, why they fail, how to design them, and how to judge whether a solution is correct, AI makes you more productive, not less needed.
+Third, the value of shallow knowledge is falling, and the value of deep knowledge is rising. I believe that {{ argument_deep_knowledge_rising_value }}.
 
 And fourth, new kinds of work are appearing. Every major wave of automation has created jobs that didn't exist before, and we can already see some of them. Companies building products with AI need engineers who can connect language models to real data and systems safely, design evaluations that measure whether an AI feature actually works, monitor AI systems in production for errors, cost, and drift, and protect them against new kinds of attacks, such as prompt injection. There's also growing demand for people who combine software skills with deep knowledge of a specific field, because applying AI well in medicine, law, finance, or education requires understanding those fields. Many of these roles are still being defined, and their names will probably change several times. But they all have one thing in common: they require strong software engineering fundamentals, plus an understanding of how AI systems behave and fail.
 

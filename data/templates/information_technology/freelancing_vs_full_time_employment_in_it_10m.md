@@ -1,11 +1,11 @@
 ---
 topic: "Freelancing vs Full-Time Employment in IT"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Take two developers. One wakes up at seven, commutes to an office, and joins the morning stand-up. The other opens a laptop at a cafe at ten and answers messages from three different clients. Which one has the better working life? It depends. Hi everyone. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, let's compare these two very different ways of working in IT: full-time employment and freelancing.
 
-On social media, freelancing often looks like a dream: working from a beach, choosing your own hours, picking exciting clients, and earning more than your friends in offices. Meanwhile, full-time jobs are sometimes described as boring and restrictive. But the reality is more nuanced. Both paths have real advantages and real costs. And the right choice depends a lot on your skills, your stage of career, your personality, and your financial situation.
+On social media, freelancing often looks like a dream: working from a beach, choosing your own hours, picking exciting clients, and earning more than your friends in offices. In my view, {{ argument_freelance_myth_vs_reality }}.
 
 So today, I'll compare them across several dimensions, share what it actually takes to succeed as a freelancer, and give you a few questions to help you decide what's right for you, right now.
 
@@ -15,7 +15,7 @@ As a full-time employee, you work for one company, usually with a fixed salary, 
 
 The biggest advantage is stability. You know how much you'll earn each month. In many countries, you also receive benefits such as social insurance, health insurance, paid leave, and sometimes bonuses or training budgets.
 
-The second advantage is learning, especially early in your career. In a good company, you work alongside more experienced engineers, receive code reviews, learn established processes, and work on larger systems than you could build alone. For juniors, this kind of structured learning is extremely valuable, and hard to replace.
+The second advantage is learning, especially early in your career. I would argue that {{ argument_learning_in_full_time_roles }}.
 
 And the third is career progression: clear paths toward senior, lead, or management roles, and a professional network inside the company.
 
@@ -61,7 +61,7 @@ Then the requests start. Can we add online ordering? Can the menu be in two lang
 
 Now imagine the same project done professionally. Before starting, the developer writes a one-page agreement listing exactly what's included: the pages, the booking feature, one language, and two rounds of design changes. It states the price, a timeline, and payment in three parts: thirty percent upfront, forty percent when the design is approved, and the rest at launch. It also says that new features, like online ordering, will be quoted separately.
 
-When the client asks for online ordering, the developer doesn't say "no." They say: "Great idea. That's not included in our current agreement, but I can add it as a second phase. Here's the estimate." The client feels respected, the developer is paid fairly, and the relationship stays positive.
+When the client asks for online ordering, the developer doesn't say "no." They say: "Great idea. My position is that {{ argument_scope_agreements_protect_freelancers }}.
 
 The technical skills in both versions are identical. The difference is entirely in business skills. And that's the part of freelancing nobody posts on social media.
 

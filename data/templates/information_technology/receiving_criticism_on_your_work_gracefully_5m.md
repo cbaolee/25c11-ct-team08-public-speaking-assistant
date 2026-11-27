@@ -1,6 +1,6 @@
 ---
 topic: "Receiving Criticism on Your Work Gracefully"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 {{ argument_feedback_giver_name }}, thank you for telling me this directly. It isn't the easiest thing to hear, but I'd much rather know now than find out later, when it's harder to fix.
@@ -29,6 +29,6 @@ Does that sound like the right approach to you? Is there anything you'd change o
 
 Great. Would it be okay if I check in with you again once I've made those changes, just to make sure I'm on the right track? Even a quick five-minute look would be really useful.
 
-And, more generally, please keep this kind of feedback coming. It's how I get better, and I know it's not always comfortable to give, either. So thank you for taking the time.
+And, more generally, please keep this kind of feedback coming. I truly believe that {{ argument_feedback_drives_growth }}.
 
 I'll get started on it right away.

@@ -1,13 +1,13 @@
 ---
 topic: "Studying IT Abroad: Pros and Cons"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. If you've ever pictured yourself studying computer science in another country, in a new city, with a new language and a new kind of classroom, then this talk is for you. My name is {{ argument_speaker_name }}, and today we'll look closely at a dream that many IT students share: studying abroad.
 
 Let me begin with my own story. {{ argument_speaker_study_abroad_story }}
 
-I'm sharing this because, when people talk about studying abroad, they often show only the beautiful photos: the campus, the snow, the new friends, the graduation ceremony. And those moments are real. But so are the lonely evenings, the money worries, and the moments when you wonder if you made the right choice. My goal today is to give you an honest picture, both the advantages and the challenges, then a way to compare destinations, and finally practical guidance on how to decide, how to prepare, how to survive your first months, and how to make the most of it if you go.
+I'm sharing this because, when people talk about studying abroad, they often show only the beautiful photos: the campus, the snow, the new friends, the graduation ceremony. In my view, {{ argument_honest_picture_of_abroad }}.
 
 Let's start with the reasons to go.
 
@@ -41,7 +41,7 @@ The good news is that costs vary enormously between countries. Some countries, l
 
 Challenge two: loneliness and culture shock.
 
-Even the most confident people go through hard moments: missing family and food from home, feeling like an outsider, struggling with a new language in everyday life, or simply being tired of always having to explain yourself. Culture shock is real, and it often comes in waves. It helps to know this in advance, so you don't think something is wrong with you when it happens.
+Even the most confident people go through hard moments: missing family and food from home, feeling like an outsider, struggling with a new language in everyday life, or simply being tired of always having to explain yourself. I would argue that {{ argument_emotional_challenges_abroad }}.
 
 Challenge three: academic adjustment.
 
@@ -53,11 +53,11 @@ Student visas usually come with conditions, such as limits on how many hours you
 
 Challenge five: the job market for international graduates.
 
-Finding a job abroad as an international graduate can be harder than many expect. Some employers are reluctant to sponsor work visas, and competition can be intense. It's possible, and many people succeed, but it requires planning from your first year: internships, networking, and strong projects.
+Finding a job abroad as an international graduate can be harder than many expect. My honest view is that {{ argument_job_market_abroad_reality }}.
 
 And challenge six: the long-term question of staying or returning.
 
-Some graduates build careers abroad. Others return home and bring valuable international experience. Both are valid choices, but it's worth thinking about your long-term goals and your family situation early, because they affect where you should study and what kind of experience you should aim for.
+Some graduates build careers abroad. Others return home and bring valuable international experience. I believe that {{ argument_return_or_stay_choice }}.
 
 Before we talk about how to decide, let me say a few words about choosing a destination, because "abroad" can mean very different experiences.
 

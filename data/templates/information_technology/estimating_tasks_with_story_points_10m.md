@@ -1,6 +1,6 @@
 ---
 topic: "Estimating Tasks with Story Points"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Raise your hand if you've ever said "this will take two days," and it took two weeks. Keep your hand up if it happened more than once. Thank you, you can put them down now. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and today we're going to talk about something every software team struggles with: estimation. More specifically, how to estimate work using story points.
@@ -11,7 +11,7 @@ I'm guessing you all came up with different answers, and most of you weren't ver
 
 That one's easy, isn't it? Almost everyone agrees immediately.
 
-That little experiment shows the key idea behind story points. Humans are not very good at absolute estimates, like "this will take exactly fourteen hours." But we're surprisingly good at relative estimates, like "this is about twice as big as that." Story points take advantage of that.
+That little experiment shows the key idea behind story points. I would argue that {{ argument_relative_estimation_value }}.
 
 So, what is a story point?
 
@@ -33,7 +33,7 @@ If everyone shows similar numbers, great. We take that estimate and move on. But
 
 So, the real value of planning poker isn't just the number. It's the conversation that brings hidden assumptions to the surface.
 
-Once a team has used story points for a few sprints, it can measure its velocity: the average number of points it completes per sprint. If a team typically completes about thirty points per sprint, and the remaining work in the backlog adds up to around one hundred and twenty points, we can forecast that it will take roughly four sprints. That's a much more realistic forecast than adding up hundreds of individual hour estimates. Just remember that velocity changes when the team changes: a new member, a holiday period, or a large production incident will all lower it for a while. So forecasts should always be presented as a range, and updated every sprint, not treated as a promise made once.
+Once a team has used story points for a few sprints, it can measure its velocity: the average number of points it completes per sprint. In my view, {{ argument_velocity_misuse }}.
 
 Now, a warning about the most common mistakes, because story points are very easy to misuse.
 
@@ -45,7 +45,7 @@ The third: using velocity as a performance target. If managers reward teams for 
 
 And the fourth: estimating giant stories. If something is estimated at thirteen or more, it's usually a sign that it's too big and too uncertain. The right move is to split it into smaller stories.
 
-I should also mention that story points are not the only option. Some teams use simpler t-shirt sizes, like small, medium, and large. Others skip detailed estimation altogether and simply count how many similarly sized stories they finish. What matters most is not the specific technique, but that the team has an honest, shared understanding of the work.
+I should also mention that story points are not the only option. Personally, I believe {{ argument_estimation_alternatives_view }}.
 
 {{ argument_team_specific_application }}
 

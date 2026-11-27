@@ -1,6 +1,6 @@
 ---
 topic: "Sprint Review Demo to Stakeholders"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 15
 ---
 Good {{ argument_time_of_day }}, and welcome to the review of sprint {{ argument_sprint_number }}. For those who don't know me, I'm {{ argument_speaker_name }}, {{ argument_speaker_role }} on the {{ argument_team_name }} team. We'll show you what we built, and then we want to hear what you think, because your feedback directly shapes what we work on next.
@@ -19,7 +19,7 @@ In numbers, we planned {{ argument_planned_items_count }} items for this sprint,
 
 Now for the most interesting part: the demo.
 
-I'll walk you through each feature from the point of view of a real user, because ultimately, that's who we're building for. For each feature, I'll explain the problem it solves, show you how it works, and then pause for a moment in case you have questions.
+I'll walk you through each feature from the point of view of a real user, because ultimately, that's who we're building for. I believe that {{ argument_user_perspective_demo }}.
 
 Feature one: {{ argument_feature_one_name }}.
 
@@ -59,7 +59,7 @@ We've also identified one risk that I'd like to bring to your attention. {{ argu
 
 Which brings us to the part that matters most to us: your feedback.
 
-Three questions might guide the discussion. Based on what you've seen today, are we building the right thing? Is there anything we showed that you think should work differently, or that your users might struggle with? And has anything changed on your side, in the market, with customers, or in the business, that we should know about when planning our next steps?
+Three questions might guide the discussion. In my view, {{ argument_stakeholder_feedback_value }}.
 
 Please be honest. Critical feedback now is far cheaper than changes after release. Who would like to start?
 
@@ -73,6 +73,6 @@ For the next sprint, our proposed focus is {{ argument_next_sprint_focus }}. Thi
 
 If you're interested in testing any of today's features yourself before they're released, {{ argument_how_to_try_features }}
 
-Before we close, I'd like to take a moment to thank the team. A lot of hard work went into this sprint, and I'm proud of what we've achieved together. And thank you to all of you for your time, your attention, and your input. Your feedback is what makes sure we're building something people actually need.
+Before we close, I'd like to take a moment to thank the team. A lot of hard work went into this sprint, and I'm proud of what we've achieved together. I would argue that {{ argument_team_recognition_matters }}.
 
 That's all from me. Any last questions before we close? After that, you get your day back.

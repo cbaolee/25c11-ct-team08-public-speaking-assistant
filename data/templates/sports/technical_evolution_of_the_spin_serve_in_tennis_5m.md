@@ -1,6 +1,6 @@
 ---
 topic: "Technical evolution of the spin serve in tennis"
-Category: "Sports"
+category: "Sports"
 duration_min: 5
 ---
 Good afternoon. Whether you are on the touchline or in the analytics room, today's topic changes how we view competition.

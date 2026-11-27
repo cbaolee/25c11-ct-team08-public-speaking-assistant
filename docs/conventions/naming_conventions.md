@@ -35,7 +35,6 @@ Pattern: `<type>/<issue number>-<short description>`
 
 - Same format as commits: `<type>(<scope>): <subject>`. With squash merge, the PR title becomes the commit on `develop`.
 - Open the PR as a **Draft** as soon as you have a partial result.
-- Keep each PR under 300 changed lines and focused on one thing.
 - Link the issue with `Closes #number` in the "Linked issue" section of the PR template.
 
 ## 4. Issues

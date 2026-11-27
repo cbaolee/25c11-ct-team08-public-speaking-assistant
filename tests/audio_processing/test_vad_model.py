@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-torch = pytest.importorskip("torch")
-pytest.importorskip("numpy")
-silero_vad = pytest.importorskip("silero_vad")
-
 from src.audio_processing import vad as vad_module
 from src.audio_processing.contracts import MasterAudio, SpeechSegment
 from src.audio_processing.vad import VadParams, _read_samples, detect_speech
+
+torch = pytest.importorskip("torch")
+pytest.importorskip("numpy")
+silero_vad = pytest.importorskip("silero_vad")
 
 
 def _write_wav(path: Path, samples: list[int], *, rate=16000, channels=1) -> Path:
@@ -54,8 +54,9 @@ def test_detect_speech_converts_samples_to_seconds_and_passes_params(tmp_path, m
         return [{"start": 16000, "end": 40000}, {"start": 48000, "end": 56000}]
 
     monkeypatch.setattr(silero_vad, "get_speech_timestamps", fake_get_speech_timestamps)
-    params = VadParams(threshold=0.4, min_speech_duration_ms=200,
-                       min_silence_duration_ms=150, speech_pad_ms=10)
+    params = VadParams(
+        threshold=0.4, min_speech_duration_ms=200, min_silence_duration_ms=150, speech_pad_ms=10
+    )
     result = detect_speech(_master(wav, 1.0), params=params)
 
     assert result == [SpeechSegment(1.0, 2.5), SpeechSegment(3.0, 3.5)]

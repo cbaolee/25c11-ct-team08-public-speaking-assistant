@@ -1,17 +1,17 @@
 ---
 topic: "Sprint Retrospective Facilitation"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 15
 ---
 Hi everyone, welcome, and thanks for joining. Grab a coffee if you haven't already, and let's get settled.
 
 This is our retrospective for sprint {{ argument_sprint_number }}. I'll be facilitating today. We have about {{ argument_meeting_length }}, and I promise we'll finish on time.
 
-Before we jump in, a quick reminder of why we do this. The sprint review was about the product: what we built. The retrospective is about us: how we worked together. It's our chance to step back, look at our process, and pick one or two things to make the next sprint a little better than this one. Not perfect, just a little better.
+Before we jump in, a quick reminder of why we do this. The sprint review was about the product: what we built. In my view, {{ argument_why_retros_matter }}.
 
 And to make that possible, I'd like to start with the idea that many agile teams use at the beginning of every retro, often called the Prime Directive. In my own words, it goes like this: whatever we discover today, we assume that everyone did the best job they could, with what they knew at the time, the skills they had, the resources available, and the situation they were in.
 
-What that means in practice is simple. We're here to improve the system, not to blame people. If something went wrong, the question is never "whose fault was it?" The question is "what made this easy to go wrong, and how can we make it harder next time?" Everything said in this room is meant to help the team. Does that sound okay to everyone?
+What that means in practice is simple. I strongly believe that {{ argument_blameless_culture_value }}.
 
 Great. A quick check-in to warm up. I'd like each of you to describe this sprint in just one word. No explanation needed, just one word. I'll start, and then we'll go around. For me, the word is {{ argument_facilitator_check_in_word }}.
 
@@ -57,7 +57,7 @@ Theme one, then. Who'd like to start?
 
 These are great insights. I'm hearing a few possible solutions. Can we turn one of them into an action item?
 
-A good action item has three qualities: it's specific, it's small enough to actually do in one sprint, and it has a clear owner. Not "improve communication," but something like "the product owner will share any change to requirements in the team channel the same day it's decided." Does everyone agree with that wording? And who would like to own it?
+A good action item has three qualities: it's specific, it's small enough to actually do in one sprint, and it has a clear owner. I would argue that {{ argument_small_action_items }}.
 
 Same process for the next theme.
 

@@ -1,11 +1,11 @@
 ---
 topic: "Resolving a Technical Disagreement in the Team"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Okay, everyone, can I jump in for a moment? I think we've had a really good discussion so far, and I can feel that we're starting to go around in circles a little. So I'd like to take a step back, summarize where we are, and suggest a way for us to reach a decision together.
 
-This disagreement, honestly, is a good sign. It means people care about getting this right. And from what I've heard, nobody here is being stubborn for the sake of it. Both sides have strong, reasonable arguments. Let's treat this as a problem we're solving together, not as a debate that one side has to win.
+This disagreement, honestly, is a good sign. It means people care about getting this right. In my view, {{ argument_disagreement_as_healthy }}.
 
 I'll sum up the two positions as I understand them, and please correct me if I get anything wrong.
 
@@ -25,7 +25,7 @@ Rather than continuing to argue about which option is better in general, I'd lik
 
 A few candidate criteria, and please add or remove any. How well does each option meet our requirements for {{ argument_key_requirement }}? How much time will it take to deliver, given our deadline of {{ argument_deadline }}? How easy will it be to maintain over the next year or two? How well does it fit the skills our team already has? And how easy would it be to change our minds later if we turn out to be wrong?
 
-That last one is important. Some decisions are like a one-way door: once you walk through, it's very hard to go back. Others are like a two-way door: if it doesn't work out, you can simply turn around. If this decision is a two-way door, we shouldn't spend another week debating it. We should pick one, try it, and adjust. If it's a one-way door, it's worth investing a bit more time to get it right.
+That last one is important. I would argue that {{ argument_one_way_two_way_doors }}.
 
 To make this concrete: choosing the internal name of a module, or which logging format we use, is usually a two-way door. If we get it wrong, we change it next sprint, and nobody outside the team notices. Choosing a database for customer data, or a public API that other companies will build on, is closer to a one-way door. Migrating data or breaking other people's integrations later is slow, risky, and expensive. My honest view is that this decision is {{ argument_door_type_assessment }}, but I'd like to hear whether you see it the same way.
 
@@ -39,7 +39,7 @@ For the experiment to be fair, I'd suggest two small rules. First, let's write d
 
 And to make sure we don't end up stuck again, I'd suggest that if the results are still unclear after that, {{ argument_decision_maker }} makes the final decision. Not because anyone's opinion is worth more, but because at some point, a good decision made on time is better than a perfect decision made too late.
 
-Whatever we decide, and this part matters, once the decision is made, I'd like us to commit to it as a team, even those of us who argued for the other option. It's completely fine to disagree during the discussion. That's what makes our decisions better. But once we've decided, let's all put our full energy into making it work. Some teams call this "disagree and commit." And if the evidence later shows we made the wrong choice, nobody should say "I told you so." We'll just learn from it and adjust.
+Whatever we decide, and this part matters, once the decision is made, I'd like us to commit to it as a team, even those of us who argued for the other option. My strong view is that {{ argument_disagree_and_commit }}.
 
 And let's write this decision down, including the options we considered, the criteria, and why we chose what we chose. Six months from now, when someone new joins the team and asks "why did we do it this way?", we'll have a clear answer.
 

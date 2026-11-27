@@ -1,6 +1,6 @@
 ---
 topic: "University Open Day: Introducing the IT Faculty"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone, and a very warm welcome to {{ argument_university_name }}'s Open Day! On behalf of the {{ argument_faculty_name }}, it's a pleasure to have you here. My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }}.
@@ -13,7 +13,7 @@ Let's start with who we are.
 
 {{ argument_faculty_history_and_mission }}
 
-At the heart of everything we do is a simple idea: we want our graduates not only to master today's technology, but to be able to learn tomorrow's technology on their own. Tools and programming languages change every few years. Strong fundamentals, a habit of learning, and the ability to work with others last a whole career. That idea shapes how we design our programs, how we teach, and what we expect from our students.
+At the heart of everything we do is a simple idea: we want our graduates not only to master today's technology, but to be able to learn tomorrow's technology on their own. We believe that {{ argument_learning_to_learn }}.
 
 Now, let's look at what you can study with us.
 
@@ -29,11 +29,11 @@ In your third year, you'll go deeper into your chosen specialization, for exampl
 
 And in your fourth year, you'll bring everything together through an internship at a company and a graduation project or thesis, where you'll solve a real problem from start to finish, under the guidance of a supervisor.
 
-How we teach matters as much as what we teach. In our faculty, learning doesn't just happen in lecture halls. Many courses include lab sessions, where you write code and work with real tools. Most core courses include group projects, because teamwork is a daily reality in the IT industry. And we encourage students to go beyond the curriculum through competitions, research, and personal projects.
+How we teach matters as much as what we teach. In my view, {{ argument_hands_on_teaching }}.
 
 Speaking of going beyond the curriculum, let me introduce our labs and research activities. {{ argument_labs_and_research }}
 
-What I'd like students to know is that research isn't only for PhD students. Undergraduate students who are curious and motivated are welcome to join research groups, often starting from their second or third year. Some of them co-author scientific papers before they graduate, which is a big advantage if you're interested in graduate study, at home or abroad.
+What I'd like students to know is that research isn't only for PhD students. I would argue that {{ argument_undergraduate_research_value }}.
 
 Now, let's talk about student life, because university is about much more than classes.
 
@@ -83,7 +83,7 @@ The second question is: "Do I need to know programming before I start?" No. Our 
 
 The third question is: "How important is English?" Very important. Much of the technical documentation and many tools in IT are in English, and some of our courses use English materials. If your English isn't strong yet, don't worry, but start improving it now. It will make a big difference.
 
-The fourth question is: "Will AI replace IT jobs?" AI is changing how IT work is done, and we've updated our curriculum to reflect that, including courses and projects involving AI tools. But AI also creates new needs: people who can design systems, judge whether AI outputs are correct and safe, and apply technology to real problems. Our goal is to prepare students to work with AI, not to compete against it.
+The fourth question is: "Will AI replace IT jobs?" AI is changing how IT work is done, and we've updated our curriculum to reflect that, including courses and projects involving AI tools. My view is that {{ argument_ai_and_it_education }}.
 
 And the fifth question, usually from parents: "Will my child be supported, especially in the first year?" Yes. Every student has an academic advisor, and we have peer mentoring programs where senior students help freshmen adjust. We also provide student services for counseling and wellbeing. University is a big change, and we don't expect students to handle it all alone.
 

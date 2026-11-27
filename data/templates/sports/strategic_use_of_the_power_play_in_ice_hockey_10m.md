@@ -1,6 +1,6 @@
 ---
 topic: "Strategic use of the power play in ice hockey"
-Category: "Sports"
+category: "Sports"
 duration_min: 10
 ---
 Welcome, fellow competitors and sports science enthusiasts. Over the next ten minutes we will examine why the power play remains a decisive factor in modern hockey.

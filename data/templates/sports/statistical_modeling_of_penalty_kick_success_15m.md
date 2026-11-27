@@ -1,6 +1,6 @@
 ---
 topic: "Statistical modeling of penalty kick success"
-Category: "Sports"
+category: "Sports"
 duration_min: 15
 ---
 Good afternoon. Whether you are on the touchline or in the analytics room, today's topic changes how we view competition.

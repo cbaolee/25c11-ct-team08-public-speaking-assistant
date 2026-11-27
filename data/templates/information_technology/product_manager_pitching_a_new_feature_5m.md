@@ -1,6 +1,6 @@
 ---
 topic: "Product Manager Pitching a New Feature"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone. Thanks for giving me a few minutes. I'm {{ argument_speaker_name }}, product manager for {{ argument_product_area }}, and today I'd like to pitch a new feature: {{ argument_feature_name }}. By the end of this, I'll be asking for your support to {{ argument_the_ask }}.
@@ -17,7 +17,7 @@ Our proposal, in one sentence: {{ argument_feature_one_sentence }}
 
 Let me show you how it would work for {{ argument_user_persona_name }}. {{ argument_feature_user_flow }}
 
-Why do we believe this will work? We've done three things to test the idea before asking for investment.
+Why do we believe this will work? In my view, {{ argument_why_this_feature_now }}. We've also tested the idea in three ways.
 
 First, {{ argument_validation_one }}. Second, {{ argument_validation_two }}. And third, {{ argument_validation_three }}.
 

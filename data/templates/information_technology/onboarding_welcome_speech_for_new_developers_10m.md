@@ -1,6 +1,6 @@
 ---
 topic: "Onboarding Welcome Speech for New Developers"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone, and a very warm welcome to {{ argument_company_name }}! My name is {{ argument_speaker_name }}, and I'm {{ argument_speaker_role }}. I'm really happy to see all of you here today.
@@ -29,17 +29,17 @@ Your first week is all about getting set up and getting to know people. You'll g
 
 Each of you will also have an onboarding buddy. Your buddy is an experienced team member whose job is to help you find your way around: technical questions, "where do I find this document?", "who should I ask about that?", or even "where's the best place to get lunch around here?" There's no question too small for your buddy.
 
-Within your first couple of weeks, our goal is for you to make your first contribution: usually a small bug fix or a minor improvement, which goes through code review and gets released. It might sound like a small thing, but it's a really important milestone. It means you've gone through the whole process, from writing code to seeing it live, and that's when everything starts to click.
+Within your first couple of weeks, our goal is for you to make your first contribution: usually a small bug fix or a minor improvement, which goes through code review and gets released. I believe that {{ argument_early_contribution_value }}.
 
 Over your first month or two, you'll gradually take on bigger tasks, become more familiar with our codebase and products, and start to feel at home. Your manager will meet you regularly to check how things are going, and to make sure you have everything you need.
 
 Now, a few pieces of advice, all of them drawn from what helps new colleagues find their feet.
 
-First, ask questions. Lots of them. When you're new, you have a superpower that the rest of us have lost: fresh eyes. If something seems confusing to you, there's a good chance it's confusing to others too, and your question might lead to a real improvement. A simple guideline many people find useful: try on your own for a reasonable amount of time, maybe thirty minutes to an hour, and if you're still stuck, ask. Don't spend three days silently struggling with something that a colleague could help you with in five minutes.
+First, ask questions. Lots of them. In my view, {{ argument_questions_as_superpower }}.
 
 Second, write things down. You're going to receive a huge amount of information in the next few weeks. Nobody can remember all of it. Keep your own notes. And if you find that our documentation is missing something, or out of date, please update it. That's one of the most valuable contributions a new team member can make.
 
-Third, focus on understanding before speed. It's tempting to want to prove yourself quickly by closing as many tasks as possible. But in your first weeks, understanding how and why things work the way they do is far more valuable. Speed will come naturally later.
+Third, focus on understanding before speed. My strong view is that {{ argument_understanding_before_speed }}.
 
 Fourth, get to know people, not just code. Have lunch with your teammates. Join a coffee chat. Say hello to people from other teams. Some of the best ideas, and the best friendships, come from those informal conversations.
 

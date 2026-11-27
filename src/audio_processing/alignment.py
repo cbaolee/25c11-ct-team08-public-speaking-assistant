@@ -1,5 +1,5 @@
-"""Alignment hai tầng (ADR-005 P8): tầng 1 gióng token con (align_tokens), tầng 2 phân loại
-near_miss và gộp về ref_index (align, P5)."""
+"""Two-level alignment (ADR-005 P8): level 1 aligns sub-tokens (align_tokens), level 2 classifies
+near_miss and merges back to ref_index (align, P5)."""
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -20,18 +20,18 @@ Op = Literal["equal", "sub", "del", "ins"]
 
 @dataclass(frozen=True)
 class HypToken:
-    hyp_index: int  # vị trí trên danh sách từ STT ĐÃ loại filler (D15)
-    text: str  # token con đã chuẩn hoá
+    hyp_index: int  # position in the STT word list AFTER fillers are removed (D15)
+    text: str  # normalized sub-token
 
 
 @dataclass(frozen=True)
 class TokenOp:
     op: Op
-    ref_index: int | None  # None nếu ins
+    ref_index: int | None  # None for ins
     ref_sub: str | None
-    hyp_index: int | None  # None nếu del
+    hyp_index: int | None  # None for del
     hyp_sub: str | None
-    homophone: bool  # equal nhờ pron trùng mà chuỗi khác
+    homophone: bool  # equal because the pronunciations match while the spelling differs
 
 
 AlignStatus = Literal["equal", "near_miss", "sub", "del", "ins"]
@@ -39,14 +39,14 @@ AlignStatus = Literal["equal", "near_miss", "sub", "del", "ins"]
 
 @dataclass(frozen=True)
 class AlignedItem:
-    """Cùng tên trường và kiểu với AlignmentItem (ADR-004); chuyển sang Pydantic ở bước ráp."""
+    """Same fields and types as AlignmentItem (ADR-004); made Pydantic when assembled."""
 
     status: AlignStatus
-    ref_index: int | None  # None nếu ins
-    hyp_index: int | None  # None nếu del
-    ref_word: str | None  # token gốc, giữ dấu câu
+    ref_index: int | None  # None for ins
+    hyp_index: int | None  # None for del
+    ref_word: str | None  # original token, punctuation kept
     hyp_word: str | None
-    start_s: float | None  # None nếu del; không nội suy
+    start_s: float | None  # None for del; never interpolated
     end_s: float | None
     sentence_index: int
     homophone: bool = False
@@ -65,28 +65,28 @@ def align(
     *,
     pron: Callable[[str], list[list[str]]] = pronunciations,
 ) -> AlignmentResult:
-    """Gióng script với STT rồi gộp về ref_index (ADR-005 P5, P8 bước 3-4, P10, P11).
+    """Align the script with STT, then merge back to ref_index (ADR-005 P5, P8 steps 3-4, P10, P11).
 
-    Mỗi token gốc của script.split() có đúng một item không phải ins (D2); ins đếm theo từ nghe
-    được (D16). Thứ tự items theo đường gióng. Số đếm và cờ: xem AlignmentResult.
+    Each original token of script.split() has exactly one item that is not ins (D2); ins is counted
+    per heard word (D16). Items follow the alignment path. Counts and flags: see AlignmentResult.
     """
     ref_tokens = normalize_script(script)
-    kept = [w for w in words if not is_filler(w.word)]  # cùng bộ lọc với prepare_hyp (D15)
+    kept = [w for w in words if not is_filler(w.word)]  # same filter as prepare_hyp (D15)
     ops = align_tokens(indexed_subtokens(ref_tokens), prepare_hyp(words), pron=pron)
 
     sentence_of = [0] * len(ref_tokens)
     for s, (a, b, _) in enumerate(split_sentences(script)):
         sentence_of[a:b] = [s] * (b - a)
 
-    # Bước A: duyệt ops, gom trạng thái các token con theo ref_index, ghi thứ tự xuất hiện.
-    entries: list[tuple[str, int]] = []  # ("ref", ref_index) hoặc ("ins", hyp_index)
+    # Step A: walk the ops, collect sub-token statuses per ref_index, record the order they appear.
+    entries: list[tuple[str, int]] = []  # ("ref", ref_index) or ("ins", hyp_index)
     acc: dict[int, tuple[list[str], set[int], list[bool]]] = {}  # r -> (statuses, hyp, [homo])
     ins_seen: set[int] = set()
     flushed: set[int] = set()
     pair_oov = False
 
     def flush_empty(idx: int) -> None:
-        # Token chỉ dấu câu (không có token con) không có op: đặt ngay sau op không-ins trước nó.
+        # A punctuation-only token has no op: place it right after the previous non-ins op.
         while idx < len(ref_tokens) and not ref_tokens[idx].subtokens:
             if idx not in flushed:
                 flushed.add(idx)
@@ -96,7 +96,7 @@ def align(
     flush_empty(0)
     for op in ops:
         if op.op == "ins":
-            if op.hyp_index not in ins_seen:  # một hyp_index chỉ sinh một ins (D16, phase3 #8)
+            if op.hyp_index not in ins_seen:  # one hyp_index makes only one ins (D16, phase3 #8)
                 ins_seen.add(op.hyp_index)
                 entries.append(("ins", op.hyp_index))
             continue
@@ -110,7 +110,7 @@ def align(
             homo[0] = homo[0] or op.homophone
             pair_oov = pair_oov or not pron(op.ref_sub) or not pron(op.hyp_sub)
         elif op.op == "sub":
-            m = classify_pair(op.ref_sub, op.hyp_sub, pron=pron)  # P8 bước 3
+            m = classify_pair(op.ref_sub, op.hyp_sub, pron=pron)  # P8 step 3
             statuses.append(m.status)
             homo[0] = homo[0] or (m.status == "equal" and m.homophone)
             pair_oov = pair_oov or m.oov
@@ -120,24 +120,25 @@ def align(
             hyp_set.add(op.hyp_index)
         flush_empty(r + 1)
 
-    # Bước B: dựng item theo thứ tự entries.
+    # Step B: build the items in the order of entries.
     items: list[AlignedItem] = []
-    cur_sentence = 0  # câu của ref gần nhất phía trước (phase3 #10: chưa có thì 0)
+    cur_sentence = 0  # sentence of the nearest earlier ref (phase3 #10: 0 when there is none)
     for kind, idx in entries:
         if kind == "ins":
             w = kept[idx]
-            items.append(AlignedItem("ins", None, idx, None, w.word, w.start_s, w.end_s,
-                                     cur_sentence))
+            items.append(
+                AlignedItem("ins", None, idx, None, w.word, w.start_s, w.end_s, cur_sentence)
+            )
             continue
         cur_sentence = sentence_of[idx]
         raw = ref_tokens[idx].raw
-        if idx not in acc:  # không có token con: equal, không có hyp (Q1)
+        if idx not in acc:  # no sub-tokens: equal, no hyp (Q1)
             items.append(AlignedItem("equal", idx, None, raw, None, None, None, cur_sentence))
             continue
         statuses, hyp_set, homo = acc[idx]
         if all(s == "del" for s in statuses):
             status: AlignStatus = "del"
-        elif "sub" in statuses or "del" in statuses:  # có sub, hoặc chỉ một phần del (P5)
+        elif "sub" in statuses or "del" in statuses:  # has a sub, or only part of it is del (P5)
             status = "sub"
         elif "near_miss" in statuses:
             status = "near_miss"
@@ -146,9 +147,19 @@ def align(
         hs = sorted(hyp_set)
         if hs:
             first, last = kept[hs[0]], kept[hs[-1]]
-            items.append(AlignedItem(
-                status, idx, hs[0], raw, " ".join(kept[h].word for h in hs),
-                first.start_s, last.end_s, cur_sentence, status == "equal" and homo[0]))
+            items.append(
+                AlignedItem(
+                    status,
+                    idx,
+                    hs[0],
+                    raw,
+                    " ".join(kept[h].word for h in hs),
+                    first.start_s,
+                    last.end_s,
+                    cur_sentence,
+                    status == "equal" and homo[0],
+                )
+            )
         else:
             items.append(AlignedItem(status, idx, None, raw, None, None, None, cur_sentence))
 
@@ -166,18 +177,14 @@ def align(
 
 
 def prepare_hyp(words: Sequence[WordTimestamp]) -> list[HypToken]:
-    """Loại filler, đánh hyp_index 0,1,2... trên các từ còn lại, chuẩn hoá từng từ.
+    """Drop fillers, number hyp_index 0,1,2... over the remaining words, normalize each word.
 
-    Từ bung thành nhiều token con thì các token con chung hyp_index (phase3 #8).
-    Từ chuẩn hoá ra rỗng ("—") không sinh HypToken nhưng vẫn chiếm một hyp_index,
-    để chỉ số khớp với vị trí trong danh sách từ STT đã loại filler (D15).
+    A word that expands into several sub-tokens gives them the same hyp_index (phase3 #8).
+    A word that normalizes to nothing ("—") makes no HypToken but still uses one hyp_index,
+    so the index matches the position in the STT word list without fillers (D15).
     """
     kept = [w for w in words if not is_filler(w.word)]
-    return [
-        HypToken(idx, sub)
-        for idx, w in enumerate(kept)
-        for sub in normalize_token(w.word)
-    ]
+    return [HypToken(idx, sub) for idx, w in enumerate(kept) for sub in normalize_token(w.word)]
 
 
 def align_tokens(
@@ -186,22 +193,22 @@ def align_tokens(
     *,
     pron: Callable[[str], list[list[str]]] = pronunciations,
 ) -> list[TokenOp]:
-    """Levenshtein mức token; khớp = chuỗi bằng nhau hoặc pron_keys giao nhau.
+    """Token-level Levenshtein; a match = equal strings or overlapping pron_keys.
 
-    Chi phí: khớp 0; sub, del, ins mỗi loại 1. Giữa các đường cùng cost tối thiểu chọn đường
-    nhiều equal nhất (ADR-005 P8, làm rõ 11/11); vẫn hoà thì truy vết ngược từ (n, m) ưu tiên
-    equal > sub > del > ins ở từng ô. Kết quả theo thứ tự từ đầu đến cuối.
+    Cost: match 0; sub, del, ins 1 each. Among paths with the same minimum cost, choose the one
+    with the most equal steps (ADR-005 P8, clarified 11/11); if still tied, backtrack from (n, m)
+    preferring equal > sub > del > ins in each cell. The result runs from start to end.
     """
     n, m = len(ref), len(hyp)
 
-    keys: dict[str, frozenset[tuple[str, ...]]] = {}  # pron_keys tính một lần cho mỗi từ
+    keys: dict[str, frozenset[tuple[str, ...]]] = {}  # pron_keys computed once per word
 
     def keys_of(word: str) -> frozenset[tuple[str, ...]]:
         if word not in keys:
             keys[word] = pron_keys(word, pron=pron)
         return keys[word]
 
-    # match[i-1][j-1] = 1 nếu ref[i-1] khớp hyp[j-1] (bằng chuỗi hoặc đồng âm).
+    # match[i-1][j-1] = 1 if ref[i-1] matches hyp[j-1] (same string or homophone).
     match = [bytearray(m) for _ in range(n)]
     for i in range(n):
         r = ref[i][1]
@@ -209,8 +216,8 @@ def align_tokens(
             h = hyp[j].text
             match[i][j] = 1 if r == h or (keys_of(r) & keys_of(h)) else 0
 
-    # D[i][j] = số phép sửa tối thiểu để biến i token ref đầu thành j token hyp đầu.
-    # E[i][j] = số equal lớn nhất trong các đường đạt cost D[i][j]. Chọn theo (cost, -n_eq).
+    # D[i][j] = fewest edits that turn the first i ref tokens into the first j hyp tokens.
+    # E[i][j] = most equal steps among paths that reach cost D[i][j]. Order by (cost, -n_eq).
     d = [[0] * (m + 1) for _ in range(n + 1)]
     e = [[0] * (m + 1) for _ in range(n + 1)]
     for i in range(1, n + 1):
@@ -226,18 +233,28 @@ def align_tokens(
                     best_c, best_e = c, q
             d[i][j], e[i][j] = best_c, best_e
 
-    # Truy vết ngược từ (n, m); thứ tự thử: equal, sub, del, ins; lấy bước đầu mà
-    # (cost, n_eq) của ô trước cộng bước đó bằng đúng cặp của ô hiện tại.
+    # Backtrack from (n, m); try equal, sub, del, ins in that order and take the first step whose
+    # previous cell's (cost, n_eq) plus that step gives exactly the current cell's pair.
     ops: list[TokenOp] = []
     i, j = n, m
     while i > 0 or j > 0:
-        if (i > 0 and j > 0 and match[i - 1][j - 1] and d[i - 1][j - 1] == d[i][j]
-                and e[i - 1][j - 1] + 1 == e[i][j]):
+        if (
+            i > 0
+            and j > 0
+            and match[i - 1][j - 1]
+            and d[i - 1][j - 1] == d[i][j]
+            and e[i - 1][j - 1] + 1 == e[i][j]
+        ):
             r, h = ref[i - 1], hyp[j - 1]
             ops.append(TokenOp("equal", r[0], r[1], h.hyp_index, h.text, r[1] != h.text))
             i, j = i - 1, j - 1
-        elif (i > 0 and j > 0 and not match[i - 1][j - 1] and d[i - 1][j - 1] + 1 == d[i][j]
-                and e[i - 1][j - 1] == e[i][j]):
+        elif (
+            i > 0
+            and j > 0
+            and not match[i - 1][j - 1]
+            and d[i - 1][j - 1] + 1 == d[i][j]
+            and e[i - 1][j - 1] == e[i][j]
+        ):
             r, h = ref[i - 1], hyp[j - 1]
             ops.append(TokenOp("sub", r[0], r[1], h.hyp_index, h.text, False))
             i, j = i - 1, j - 1
@@ -245,7 +262,7 @@ def align_tokens(
             r = ref[i - 1]
             ops.append(TokenOp("del", r[0], r[1], None, None, False))
             i -= 1
-        else:  # ins: các nhánh trên không thoả thì chỉ còn nhánh này
+        else:  # ins: none of the branches above fits, so only this one is left
             h = hyp[j - 1]
             ops.append(TokenOp("ins", None, None, h.hyp_index, h.text, False))
             j -= 1

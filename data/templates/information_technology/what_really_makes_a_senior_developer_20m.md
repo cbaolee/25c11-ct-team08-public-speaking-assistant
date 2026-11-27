@@ -1,6 +1,6 @@
 ---
 topic: "What Really Makes a Senior Developer"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Here's a question that sounds simple: what's the difference between a developer with five years of experience and a senior developer? If your answer is "about five years," I hope this talk changes your mind. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}
@@ -13,7 +13,7 @@ The plan is simple: what "senior" really means, the six dimensions in which deve
 
 What does "senior" actually mean?
 
-Many people think it's about years of experience. But you've probably met people with ten years of experience who still work like juniors, and people with four years who are clearly senior. As the saying goes, some people have ten years of experience, and some people have one year of experience repeated ten times.
+Many people think it's about years of experience. In my view, {{ argument_seniority_not_years }}.
 
 Others think senior means knowing many technologies. But a long list of frameworks on a CV doesn't make someone senior either.
 
@@ -37,7 +37,7 @@ Dimension two: system thinking and design. Juniors think mostly about the piece 
 
 Dimension three: ownership and delivery. For a junior, responsibility often ends when the pull request is approved. A senior cares whether the feature actually works in production and whether it solved the problem. When things change, they communicate early. Picture a junior and a senior who both realize, halfway through a task, that it's much bigger than expected. The junior keeps working quietly, hoping to catch up, and misses the deadline. The senior goes to the team lead and says: "This is bigger than we thought, for this specific reason. We can deliver a smaller version by Friday, or the full version next Wednesday. What matters more?" That conversation, early and with options, is ownership.
 
-Dimension four: communication. This is the dimension many developers underestimate the most, and often the one that makes the biggest difference in promotions. Senior developers write clearly: design documents, pull request descriptions, and bug reports that others can actually understand. They explain technical ideas to non-technical people in terms of impact: "If we don't fix this, checkout will fail during the next big sale." And they know how to disagree respectfully, with evidence, and then commit to the team's decision.
+Dimension four: communication. I would argue that {{ argument_communication_underestimated }}.
 
 Dimension five: multiplying others. At the junior level, your main job is to grow yourself, and that's exactly right. At the senior level, an important part of your value comes from making others better: thoughtful code reviews that teach, mentoring, documentation that saves everyone time. There's a well-known idea that a senior engineer is a "force multiplier." If you make five teammates each ten percent more effective, your impact is bigger than if you simply wrote more code yourself. And being the "hero" who is the only person who understands a critical system isn't a sign of seniority. It's a risk for the team.
 
@@ -67,17 +67,15 @@ A junior developer's week is usually dominated by focused implementation: maybe 
 
 A senior developer's week looks different. They still write code, often a significant amount, and usually the trickiest parts. But a good share of their time goes elsewhere: reviewing pull requests, discussing designs with other engineers, clarifying requirements with product managers, helping a junior colleague who's stuck, investigating a production issue, or thinking about how to remove a recurring source of bugs.
 
-Some developers find this shift uncomfortable at first. "I'm writing less code, so am I less productive?" The answer is no. The senior's work has moved to a higher level of leverage. An hour spent clarifying requirements can save a week of building the wrong thing. An hour spent reviewing a design can prevent a month of painful rework. And an hour spent helping a junior get unstuck can save them a whole day. So if you notice your week starting to include more of these activities, don't worry that you're "coding less." It's usually a sign that you're growing.
+Some developers find this shift uncomfortable at first. My position is that {{ argument_less_code_more_impact }}.
 
 How long does all this take? It varies enormously, depending on the company, the person, and the opportunities. In many companies, the journey from junior to senior takes somewhere around three to seven years. But some people move faster because they grow deliberately in all six dimensions, and some stay at the same level for many years because they only grew in one. Your growth isn't just a function of time. It's a function of how you use that time.
 
 And watch out for a few traps along the way. Chasing titles instead of skills: a bigger title without matching skills becomes uncomfortable quickly, and it often shows in the next interview. Technology hopping: constantly switching to the newest framework feels like progress, but it often means staying shallow. Being the hero who works through the night to save every release: it leads to burnout and creates risk for the team. And avoiding the people side: communication and collaboration are often exactly what stops technically strong people from growing further.
 
-A word on AI, because it's changing this journey. AI coding assistants can now generate a lot of routine code very quickly, which means some of the simple tasks juniors traditionally learned on are increasingly automated. At the same time, the skills that define seniority, judgment, system thinking, debugging, understanding the business, and responsibility for quality, are becoming even more valuable, because someone has to decide what to build and whether the AI's output is correct and secure. Use AI tools, and learn to use them well. But make sure you understand every line you submit.
+A word on AI, because it's changing this journey. I believe that {{ argument_ai_and_path_to_senior }}.
 
 Now, let's make this personal with a short exercise. Please take a piece of paper, or open a note on your phone.
-
-[Self-assessment, about two minutes. For each of the six dimensions, participants score themselves from one to five, where one means "I'm just starting" and five means "I'm consistently strong here," and then circle the one dimension where improvement would make the biggest difference right now.]
 
 How did that feel? Most people discover two things. They're usually stronger in the technical dimensions and weaker in communication, ownership, or business understanding. And their growth doesn't depend on learning yet another framework. It depends on deliberately working on the dimension they circled.
 

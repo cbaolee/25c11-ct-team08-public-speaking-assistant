@@ -10,7 +10,7 @@ Giant California redwoods? The towering mahogany trees of the Amazon? Fast-growi
 
 Every one of those is great -- and every one of them loses the trophy to a tiny, squishy, rootless plant that barely grows as tall as your thumb: {{ argument_target_moss_species }}, or peat moss.
 
-Put on a pair of tall rubber boots and walk out with me onto the wet, spongy carpet of {{ argument_peatland_location_name }}. Every step you take bounces like a waterbed. Beneath your boots lies {{ argument_peat_depth_meters }} meters of dark, waterlogged peat built up brick by brick over the last {{ argument_peat_accumulation_years }} years by this one little moss.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
 
 Now look at the global math, because the first time I saw this number as an ecologist, I thought it was a typo:
 
@@ -24,19 +24,21 @@ Think about what happens when a leaf falls off a tree in a normal forest. Within
 
 {{ argument_target_moss_species }} breaks that rule completely. It is a master ecosystem engineer that literally pickles its own dead body so nothing can ever eat it.
 
-First, {{ argument_target_moss_species }} acts like a super-absorbent sponge. Its leaves are made mostly of giant, empty dead cells with tiny pores that can soak up and hold {{ argument_water_holding_capacity_multiplier }} times the moss's own dry weight in rainwater -- raising the water table until the ground is completely waterlogged and zero oxygen can get down into the soil.
+To frame peatlands and sphagnum moss, bog ecosystems, and the world's greatest carbon vault in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
-Second, the living moss actively exchanges ions with the rainwater, pumping out hydrogen ions until the bog water becomes as acidic as {{ argument_acidity_comparison_liquid }} -- while releasing special phenolic compounds called sphagnan that tan dead plant matter the exact same way leather tanners preserve cowhide.
+First, acts like a super-absorbent sponge. Expanding on this key point for peatlands and sphagnum moss, bog ecosystems, and the world's greatest carbon vault: {{ argument_primary_threat_drivers }}.
+
+A concrete example from the field brings this reality into sharp focus: {{ argument_local_case_evidence }}.
 
 With no oxygen, high acid, and natural tanning chemicals, bacteria and fungi simply cannot work. When the bottom of the {{ argument_target_moss_species }} stem dies, it never rots.
 
-Instead of returning to the atmosphere, every gram of carbon that {{ argument_target_moss_species }} pulls out of the air stays locked at the bottom of the bog for ten thousand years. It is so preservative that when peat cutters in {{ argument_archaeological_bog_region }} accidentally uncover Iron Age "bog bodies" buried {{ argument_bog_body_age_years }} years ago, the people still have their eyelashes, fingerprints, and last meal preserved inside their stomachs!
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 Because a peat bog is so wet, so acidic, and so low in nutrients, ordinary plants and animals can't live there. Instead, peatlands are sanctuaries for some of the coolest, rarest wildlife on Earth.
 
 In the northern blanket bogs of {{ argument_temperate_bog_region }}, {{ argument_target_moss_species }} carpets glow in neon shades of ruby red, emerald green, and bronze, dotted with insect-eating {{ argument_bog_carnivorous_plant }}, rare bog orchids, and breeding {{ argument_golden_plover_or_curlew_species }} whose haunting calls echo across the moor.
 
-And in the tropical peat swamp forests of {{ argument_tropical_peatland_region }} -- where trees grow on top of {{ argument_tropical_peat_depth_meters }}-meter-deep domes of wet peat -- the dark tea-colored water shelters the world's smallest fish, while the canopy above is one of the last strongholds on Earth for {{ argument_tropical_peat_flagship_mammal }} and {{ argument_second_tropical_peat_species }}.
+Tracing the ripple effects through the wider ecosystem demonstrates that {{ argument_trophic_impact_analysis }}.
 
 For centuries, humans looked at peat bogs and saw only soggy, useless swamps that needed to be "improved."
 
@@ -44,21 +46,23 @@ Across {{ argument_drained_regions_list }}, we dug millions of kilometers of str
 
 And in {{ argument_tropical_peatland_region }}, industrial conglomerates bulldozed the peat swamp forests and dug deep drainage canals to plant monocultures of {{ argument_industrial_plantation_crop }}.
 
-Watch what happens the moment you dig a ditch and drain the water out of a peat bog. Oxygen rushes down into the dry peat for the first time in ten millennia. Immediately, dormant bacteria wake up and start feasting on ten thousand years of stored carbon -- turning a carbon sink into a roaring carbon smokestack.
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
-Even worse, dry peat is literally young coal. When a stray spark hits a drained peatland during an El Niño drought like the one in {{ argument_peat_fire_crisis_year }}, the fire doesn't just burn the trees on top; the ground itself catches fire, smoldering meters underground for months where even monsoon rains struggle to put it out.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
+
+Even worse, dry peat is literally young coal. Expanding on this key point for peatlands and sphagnum moss, bog ecosystems, and the world's greatest carbon vault: {{ argument_empirical_field_evidence }}.
 
 Today, damaged and drained peatlands -- covering just 0.4 percent of the Earth's land -- emit {{ argument_drained_peat_global_emissions_percentage }} of all global human-caused greenhouse gas emissions every single year: more than the entire global aviation and shipping industries combined!
 
 Here is the thrilling news: fixing a broken peatland is one of the fastest, cheapest climate wins on the planet.
 
-To stop a drained bog from leaking millions of tons of carbon and catching fire, you don't have to wait fifty years for slow trees to grow. You just have to plug the ditches so the rainwater stays on the land!
+Balancing ecological protection with human livelihoods raises difficult tradeoffs: {{ argument_economic_tradeoff_critique }}.
 
 Over the past {{ argument_restoration_years_count }} years, across {{ argument_rewetting_project_site }} and in partnership with village Fire-Free Communities in {{ argument_tropical_peatland_region }}, our teams have been building simple peat dams, timber sluices, and contour bunds across thousands of kilometers of old drainage canals.
 
-On bare scars where peat mining stripped the surface down to black dirt, we use helicopters and low-ground-pressure tractors to spread "moss smoothies" -- tiny fragments of living {{ argument_target_moss_species }} mixed with protective straw mulch that knit back into a living, self-watering moss carpet in just {{ argument_moss_carpet_recovery_years }} years.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
-And for farmers living on drained peatlands in {{ argument_agricultural_peat_region }}, we are pioneering paludiculture -- or wet farming -- growing profitable wet-loving crops like {{ argument_paludiculture_crops_list }} right on rewetted bogs so farmers keep making a great living while keeping the carbon locked safely underwater.
+On the ground, conservation teams still face stubborn practical obstacles: {{ argument_conservation_challenge_detail }}.
 
 Within weeks of raising the water table back to the surface at {{ argument_rewetting_project_site }}, carbon emissions dropped by {{ argument_emissions_drop_percentage }}, wildfire risk plummeted to near zero, and the bog filtered rainwater so cleanly that local water treatment costs fell by {{ argument_water_treatment_savings_percentage }}.
 

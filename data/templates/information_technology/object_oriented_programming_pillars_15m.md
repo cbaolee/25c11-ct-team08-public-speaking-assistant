@@ -1,6 +1,6 @@
 ---
 topic: "Object-Oriented Programming Pillars"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 15
 ---
 If a program can be written perfectly well with just functions and variables, why did our industry bother to invent objects at all? It's a fair question, and many people quietly wonder about it. Good {{ argument_time_of_day }}, everyone, and thank you for joining this session of {{ argument_event_or_course_name }}. I'm {{ argument_speaker_name }}, and over the next quarter of an hour or so, we're going to answer that question by exploring one of the most influential ideas in software development: object-oriented programming, and in particular, its four pillars.
@@ -9,7 +9,7 @@ If you've written code in languages like Java, C++, C#, or Python, you've almost
 
 Some history first.
 
-In the early days, many programs were written in a procedural style: a long list of instructions and functions operating on shared data. That works fine for small programs. But as software grew to hundreds of thousands of lines, a serious problem appeared. Data could be changed from anywhere. Fixing a bug in one place broke something in another place. Teams stepped on each other's toes. Programs became hard to understand, hard to test, and very hard to change.
+In the early days, many programs were written in a procedural style: a long list of instructions and functions operating on shared data. In my view, {{ argument_why_procedural_breaks_down }}.
 
 Object-oriented programming was a response to that problem. Its central idea is simple: instead of separating data and the functions that work on it, we bundle them together into units called objects. Each object represents a thing, real or abstract, that has its own data and its own behavior.
 
@@ -25,7 +25,7 @@ Consider a bank account. It has a balance. Now, should any piece of code anywher
 
 A coffee machine works the same way. You press a button and you get coffee. You don't need to know how the water is heated or how the pressure is controlled, and the machine doesn't let you reach inside and adjust the boiler by hand. It gives you a simple interface and protects its internals.
 
-What problem does encapsulation solve, then? It protects data from being changed in invalid ways, and it limits the damage of change. If I later decide to store the balance differently, only the account class needs to change. Every other part of the system keeps calling deposit and withdraw exactly as before.
+What problem does encapsulation solve, then? I would argue that {{ argument_encapsulation_value }}.
 
 In practice, this is why we mark fields as private and expose public methods. A useful rule of thumb: make everything as private as possible, and only open up what others really need.
 
@@ -53,7 +53,7 @@ The key test for inheritance is the "is-a" relationship. A car is a vehicle. A s
 
 The problem inheritance solves is duplication. Common behavior is written once in the parent and reused by every child. Fix a bug in the parent, and every child benefits.
 
-However, and this is important, inheritance is also the most commonly misused pillar. Deep inheritance hierarchies, five or six levels down, become fragile. A small change at the top can unexpectedly break classes far below. And sometimes developers use inheritance just to reuse code, even when the "is-a" relationship doesn't truly hold. Making a "Car" class inherit from an "Engine" class, for instance, makes no sense, because a car is not an engine. A car has an engine.
+However, and this is important, inheritance is also the most commonly misused pillar. My position is that {{ argument_inheritance_misuse }}.
 
 That's why experienced developers often follow the principle: favor composition over inheritance. Composition means building objects out of other objects, a car contains an engine, rather than forcing everything into a family tree. Use inheritance when there's a genuine "is-a" relationship, and use composition for "has-a" relationships.
 
@@ -85,7 +85,7 @@ Second, be careful with inheritance. Ask "is-a or has-a?" before you extend a cl
 
 Third, design around behavior, not just data. A good object isn't just a box of fields with getters and setters. It's something that knows how to do meaningful work and protects its own rules.
 
-And one honest note: object-oriented programming isn't the only way to build software. Functional programming takes a very different approach, and many modern languages happily mix both styles. The goal is not to be "pure OOP." The goal is to write code that is clear, safe, and easy to change, and the four pillars are a proven way to get there.
+And one honest note: object-oriented programming isn't the only way to build software. I believe that {{ argument_oop_not_only_paradigm }}.
 
 In four short phrases: encapsulation protects data, abstraction hides complexity, inheritance enables reuse, and polymorphism enables flexibility. Together, they help us build software that can grow without collapsing under its own weight.
 

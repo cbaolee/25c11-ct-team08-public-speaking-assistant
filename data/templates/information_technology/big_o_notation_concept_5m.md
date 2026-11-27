@@ -1,13 +1,13 @@
 ---
 topic: "Big-O Notation Concept"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 A program that handles a hundred records in a blink can freeze on a million. Same code, same laptop. The only thing that changed is the size of the input. I'm {{ argument_speaker_name }}, and in the next five minutes I'd like to give you the idea that explains why: Big-O notation. It has a slightly scary name, but the idea behind it is simple.
 
 Now picture that program going live, where it has to handle {{ argument_large_dataset_example }}. Does it still run in a second? Or does it take an hour? Big-O notation is the tool that lets us answer that question before it becomes a real problem.
 
-What exactly is Big-O, then? Stripped to its core, it describes how the running time or memory use of an algorithm grows as the input gets bigger. Pay attention to that word, "grows." Big-O doesn't tell us that a program takes exactly three seconds. Hardware changes, languages change. What Big-O tells us is the shape of the growth: if the input doubles, what happens to the work?
+What exactly is Big-O, then? Stripped to its core, it describes how the running time or memory use of an algorithm grows as the input gets bigger. Why should a working developer care? In my view, {{ argument_why_big_o_matters }}.
 
 Five growth classes cover most of what you'll meet.
 
@@ -19,7 +19,7 @@ Third, O of n, or linear time. The work grows in direct proportion to the input.
 
 Fourth, O of n log n. This is the typical cost of efficient sorting algorithms like merge sort. It's a little more than linear, but still very manageable for large inputs.
 
-And fifth, O of n squared, or quadratic time. This usually appears when we have a loop inside another loop, for example comparing every item with every other item. With a thousand items, that's about a million comparisons. With a million items, it's a trillion. That's when programs start to freeze.
+And fifth, O of n squared, or quadratic time. This usually appears when we have a loop inside another loop, for example comparing every item with every other item. I would argue that {{ argument_quadratic_cost_in_practice }}.
 
 Two rules help us read Big-O correctly. The first rule: we drop constants. An algorithm that takes two n steps is still O of n, because in the long run, the shape of the growth matters more than the constant factor. The second rule: we keep only the dominant term. If an algorithm takes n squared plus n steps, we call it O of n squared, because when n is large, the n squared part completely dominates.
 

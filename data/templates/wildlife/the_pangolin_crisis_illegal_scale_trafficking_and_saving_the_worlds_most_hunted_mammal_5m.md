@@ -6,32 +6,30 @@ duration_min: 5
 
 If I showed you a picture of an elephant or a tiger, every three-year-old in the world would shout its name in a second.
 
-Now, what if I showed you a shy, nocturnal creature the size of a house cat, covered from nose to tail in overlapping armor scales made of keratin, that walks on its back legs like a tiny polite Tyrannosaurus rex and slurps up ants with a tongue longer than its own body?
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
-Ten years ago, most people had never even heard the word {{ argument_target_pangolin_species }}.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
 
-That makes this next fact all the more heartbreaking: the gentle {{ argument_target_pangolin_species }} is the number-one most illegally trafficked mammal on planet Earth -- pushed to the edge of the Red List before most of humanity even knew its name.
+To frame the pangolin crisis, illegal scale trafficking, and saving the world's most hunted mammal in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
-For {{ argument_evolutionary_age_million_years }} million years, the {{ argument_target_pangolin_species }} had the ultimate defense against lions, leopards, and hyenas.
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
-Whenever a predator walks up, the {{ argument_target_pangolin_species }} doesn't bite -- in fact, it doesn't even have any teeth! Instead, it tucks its head between its front legs and rolls up into an armored, razor-edged ball so tight that even a lion's jaws cannot crunch through it.
+Against a human poacher, curling into a ball is a tragedy. Expanding on this key point for the pangolin crisis, illegal scale trafficking, and saving the world's most hunted mammal: {{ argument_key_ecological_mechanism }}.
 
-Against a four-legged predator, curling into a ball is brilliant.
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
-Against a human poacher, curling into a ball is a tragedy. Because when a {{ argument_target_pangolin_species }} gets scared by a poacher's flashlight or sniffing dog in the forests of {{ argument_habitat_region_name }}, it doesn't run away; it curls up on the ground so the poacher can simply pick it up like a soccer ball and drop it into a sack.
+On the ground, conservation teams still face stubborn practical obstacles: {{ argument_conservation_challenge_detail }}.
 
-Why have over {{ argument_poached_individuals_decade_statistic }} {{ argument_target_pangolin_species }} been snatched from the wild in a single decade -- pushing all {{ argument_total_pangolin_species_count }} species in {{ argument_distribution_continents }} onto the IUCN Red List of Threatened Species?
+A concrete example from the field brings this reality into sharp focus: {{ argument_local_case_evidence }}.
 
-First, their meat is sold as an expensive status symbol in high-end black-market restaurants. Second, tens of tons of their scales are smuggled in shipping containers to {{ argument_demand_market_region }} for traditional medicine potions.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
-Here is the scientific truth we need to shout from every rooftop: a {{ argument_target_pangolin_species }} scale has zero medical magic inside it. It is made of 100% keratin -- the exact same protein as your fingernails. Taking a pill made of ground-up {{ argument_target_pangolin_species }} scales does no more for your health than chewing on your own thumb!
+At the same time, real-world conservation around the pangolin crisis, illegal scale trafficking, and saving the world's most hunted mammal is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
 
-Meanwhile, back in the forest, losing a single {{ argument_target_pangolin_species }} means losing a tireless natural pest controller that eats {{ argument_annual_ants_termites_eaten }} million ants and termites every single year.
+Balancing ecological protection with human livelihoods raises difficult tradeoffs: {{ argument_economic_tradeoff_critique }}.
 
-Today, a global rescue effort is fighting to keep the walking pine cones alive.
+Stepping back into the historical record helps explain how this shift unfolded: {{ argument_historical_shift_context }}.
 
-In {{ argument_demand_reduction_country }}, health authorities officially removed {{ argument_target_pangolin_species }} scales from the national pharmacopoeia and insurance lists in {{ argument_policy_change_year }}. At ports in {{ argument_transit_hub_location }}, our K9 detection dogs sniff out smuggled scales hidden inside frozen meat shipments in seconds.
-
-And when live animals are rescued from traffickers in {{ argument_rescue_center_location }}, specialized rehabilitation teams spend months walking with them through the woods at night so they can find wild termite mounds and return home free.
+Tracing the ripple effects through the wider ecosystem demonstrates that {{ argument_trophic_impact_analysis }}.
 
 Now that you know the name and the story of the {{ argument_target_pangolin_species }}, pass it on. An animal shouldn't vanish in the dark just because the world didn't look up in time. Thank you.

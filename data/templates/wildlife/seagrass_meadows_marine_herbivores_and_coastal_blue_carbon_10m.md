@@ -8,7 +8,7 @@ When you go on a beach vacation and wade out into waist-deep water, what do you 
 
 For decades, coastal hotels in {{ argument_tourist_coast_region }} actually paid crews to rip out underwater seagrass meadows so tourists could have "clean" swimming beaches.
 
-As a marine ecologist, watching someone rip up seagrass makes my heart sink. Because that humble underwater lawn isn't seaweed; it is the only true flowering plant that returned to the ocean {{ argument_evolutionary_return_age }} ago -- producing flowers, pollen, and seeds completely underwater -- and it is one of the most powerful life-support systems on our planet.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 Acre for acre, a healthy seagrass meadow locks away carbon up to {{ argument_carbon_capture_multiplier }} times faster than a tropical rainforest on land.
 
@@ -16,15 +16,19 @@ Put on a mask and hover motionless just two feet above a seagrass meadow in {{ a
 
 You see tiny baby {{ argument_commercial_fish_species_list }} hiding from big predators, camouflaged pipefish swaying like blades of grass, and {{ argument_seahorse_or_invertebrate_species }} clinging to the stems with their curly tails. A single acre of seagrass can shelter {{ argument_juvenile_fish_per_acre_statistic }} baby fish and invertebrates. Without these shallow nurseries, {{ argument_fishery_dependency_percentage }} of the world's commercial fisheries would collapse.
 
+To frame seagrass meadows, marine herbivores, and coastal blue carbon in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 And who keeps this underwater prairie healthy? The ocean's gentle lawnmowers: {{ argument_marine_herbivore_species }} and green sea turtles.
 
-Just like grass on a soccer field gets thick and healthy when you mow it regularly, seagrass needs {{ argument_marine_herbivore_species }} to graze down the old, fuzzy leaves covered in algae so fresh, fast-growing green blades can get sunlight. As a {{ argument_marine_herbivore_species }} munches its way across {{ argument_study_lagoon_name }}, eating {{ argument_daily_seagrass_consumption }} of grass a day, it fertilizes the sediment and spreads seagrass seeds for miles.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 Despite doing all this heavy lifting for our climate and our dinner plates, we have lost {{ argument_global_seagrass_loss_percentage }} of the world's seagrass meadows since {{ argument_baseline_loss_year }} -- losing an area the size of two soccer fields every single hour.
 
 In {{ argument_study_lagoon_name }}, the damage comes from two directions. First, fertilizer runoff and untreated sewage from onshore farms and cities wash into the bay, feeding thick blooms of slimy plankton that block the sunlight seagrass needs to breathe.
 
 Second, careless boaters take shortcuts across shallow flats at low tide. Their spinning propellers slice deep trenches right through the underground root mats -- leaving barren propeller scars that can take {{ argument_scar_recovery_years }} to heal and leak ancient stored carbon right back into the water.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 Five years ago, people told us restoring seagrass at scale was impossible. Today, in {{ argument_restoration_site_name }}, our community team of scientists, local fishers, and school kids is proving them wrong.
 

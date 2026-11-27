@@ -1,6 +1,6 @@
 ---
 topic: "Optimal pacing for ultra‑marathon events"
-Category: "Sports"
+category: "Sports"
 duration_min: 10
 ---
 Good morning, coaches and performance analysts. Today we will explore how data‑driven pacing can unlock unprecedented endurance performance.

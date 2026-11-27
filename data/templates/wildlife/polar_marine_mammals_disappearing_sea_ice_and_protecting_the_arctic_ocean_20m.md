@@ -24,11 +24,13 @@ Since satellite records began in {{ argument_satellite_baseline_year }}, we have
 
 What does losing {{ argument_total_ice_free_gain_days }} of sea ice every year actually mean if you are an animal built for the frozen sea?
 
+To frame polar marine mammals, disappearing sea ice, and protecting the arctic ocean in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 Start with the {{ argument_arctic_apex_predator_species }}. Its Latin name literally means "maritime bear," because it spends most of its life at sea on the ice pack hunting {{ argument_primary_seal_prey_species }} -- the only prey with thick enough blubber to give a {{ argument_bear_weight_statistic }} predator the calories it needs to survive.
 
-In open water, a {{ argument_primary_seal_prey_species }} can easily outswim a {{ argument_arctic_apex_predator_species }} nine times out of ten. The bear needs the sea ice platform to ambush seals at their breathing holes. When the ice melts in the summer in {{ argument_bear_subpopulation_region }}, the bears are forced ashore onto bare rock and tundra where there are no seals to eat, living entirely off their stored body fat until the ocean freezes again.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
-Our long-term health monitoring of bears in {{ argument_bear_subpopulation_region }} found a hard biological limit: for every single week earlier that the spring ice breaks up, bears come ashore {{ argument_weight_loss_per_week_kg }} lighter. If the ice-free fasting season stretches past {{ argument_fasting_threshold_days }} days, pregnant females don't have enough fat reserves to nurse their cubs through the winter inside their snow dens, and up to {{ argument_cub_mortality_projection_percentage }} of cubs starve.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
 And look at the {{ argument_primary_seal_prey_species }} and {{ argument_walrus_or_ice_seal_species }} themselves. A mother {{ argument_primary_seal_prey_species }} gives birth inside a protective snow cave dug on top of the sea ice in spring. When premature warm spring rains wash those snow caves away weeks too early, newborn pups -- still covered in fluffy white baby fur that gets waterlogged in freezing water -- are left completely exposed on bare ice to {{ argument_predators_and_elements_list }}.
 
@@ -42,6 +44,8 @@ Second, humans are looking at the melting ice not as a planetary alarm bell, but
 
 For an animal like the {{ argument_vocal_arctic_mammal_species }} or the {{ argument_ancient_arctic_whale_species }} -- which can live for over {{ argument_bowhead_lifespan_years }} years and relies on crystal-clear underwater acoustics to hear the echo of open cracks in the ice miles ahead so it doesn't drown -- underwater ship noise is a matter of life and death.
 
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
+
 In our acoustic tagging studies in {{ argument_sound_study_inlet_name }}, when an icebreaker or ore carrier passed within {{ argument_ship_disturbance_distance_km }} kilometers, {{ argument_vocal_arctic_mammal_species }} froze, stopped feeding at depth, and fled toward shallow water -- burning precious calories in an environment where every meal counts.
 
 When people hear these facts about the Arctic, the most common reaction I get is helplessness: "I live thousands of miles away in {{ argument_audience_region_example }}; the ice is already melting; isn't it too late to save Arctic wildlife?"
@@ -50,7 +54,7 @@ The answer is no -- it is not too late.
 
 First, climate physics tells us that every tenth of a degree of warming we prevent matters directly in square kilometers of sea ice. Unlike a tipped glass of water, sea ice has no tipping point where it cannot refreeze; if we cut global carbon and methane emissions, the Arctic Ocean responds and refreezes within years.
 
-Second, while the world works to decarbonize, we must protect the places where sea ice will hold out the longest. Ocean currents and winds naturally push thick multi-year ice up against the northern islands of {{ argument_last_ice_archipelago_regions }} -- a region of over {{ argument_last_ice_area_size }} that scientists call The Last Ice Area. Even in models where the rest of the Arctic Ocean goes ice-free in August, this sanctuary will retain summer ice for decades to come, acting as the vital seed bank for all ice-dependent life.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 In {{ argument_protection_agreement_year }}, after years of collaborative research and advocacy led by the Inuit communities of {{ argument_inuit_conservation_region }}, the government of {{ argument_arctic_nation_name }} and Inuit leaders signed a historic agreement establishing {{ argument_indigenous_arctic_marine_area_name }} -- banning offshore oil and gas, mining, and commercial bottom trawling across {{ argument_protected_arctic_waters_size }}, and putting management directly in the hands of Inuit Guardians who live on the ice year-round.
 

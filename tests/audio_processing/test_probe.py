@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from src.app.config import max_audio_seconds
 from src.audio_processing import probe as probe_module
 from src.audio_processing.contracts import AudioRejected
 from src.audio_processing.probe import probe
@@ -14,7 +15,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 ALLOWED = frozenset({"wav", "matroska", "webm", "mov", "mp4"})
-LIMITS = dict(max_seconds=1320, max_bytes=100 * 1024 * 1024, allowed_formats=ALLOWED)
+LIMITS = dict(
+    max_seconds=max_audio_seconds,
+    max_bytes=100 * 1024 * 1024,
+    allowed_formats=ALLOWED,
+)
 
 
 def _ffmpeg(*args):
@@ -45,16 +50,33 @@ def ok_wav(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def nodur_webm(tmp_path: Path) -> Path:
-    # Ghi ra pipe (không seek được) để header không có duration, giống MediaRecorder.
+    # Write to a pipe (not seekable) so the header has no duration, like MediaRecorder.
     if not _has_encoder("libopus"):
         pytest.skip("libopus encoder not available")
     out = tmp_path / "nodur.webm"
     with open(out, "wb") as f:
         subprocess.run(
-            ["ffmpeg", "-nostdin", "-v", "error",
-             "-f", "lavfi", "-i", _sine(220, 3, 48000),
-             "-ac", "2", "-c:a", "libopus", "-b:a", "32k", "-f", "webm", "pipe:1"],
-            stdout=f, check=True,
+            [
+                "ffmpeg",
+                "-nostdin",
+                "-v",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                _sine(220, 3, 48000),
+                "-ac",
+                "2",
+                "-c:a",
+                "libopus",
+                "-b:a",
+                "32k",
+                "-f",
+                "webm",
+                "pipe:1",
+            ],
+            stdout=f,
+            check=True,
         )
     return out
 
@@ -70,9 +92,21 @@ def video_only_mp4(tmp_path: Path) -> Path:
 def two_audio_tracks(tmp_path: Path) -> Path:
     out = tmp_path / "two_tracks.mkv"
     _ffmpeg(
-        "-f", "lavfi", "-i", _sine(220, 2, 16000),
-        "-f", "lavfi", "-i", _sine(440, 2, 16000),
-        "-map", "0", "-map", "1", "-c:a", "pcm_s16le", str(out),
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(220, 2, 16000),
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(440, 2, 16000),
+        "-map",
+        "0",
+        "-map",
+        "1",
+        "-c:a",
+        "pcm_s16le",
+        str(out),
     )
     return out
 
@@ -91,7 +125,8 @@ def empty_file(tmp_path: Path) -> Path:
     return out
 
 
-# ---------- trường hợp hợp lệ ----------
+# ---------- valid cases ----------
+
 
 def test_valid_wav_returns_probe(ok_wav):
     result = probe(ok_wav, **LIMITS)
@@ -170,9 +205,19 @@ def test_ffprobe_timeout_is_corrupt(ok_wav, monkeypatch):
 def mp4_with_video(tmp_path: Path) -> Path:
     out = tmp_path / "av.mp4"
     _ffmpeg(
-        "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2",
-        "-f", "lavfi", "-i", _sine(220, 2, 44100),
-        "-c:v", "mpeg4", "-c:a", "aac", str(out),
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=64x64:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(220, 2, 44100),
+        "-c:v",
+        "mpeg4",
+        "-c:a",
+        "aac",
+        str(out),
     )
     return out
 
@@ -181,9 +226,19 @@ def mp4_with_video(tmp_path: Path) -> Path:
 def mkv_with_video(tmp_path: Path) -> Path:
     out = tmp_path / "av.mkv"
     _ffmpeg(
-        "-f", "lavfi", "-i", "color=c=blue:s=64x64:d=2",
-        "-f", "lavfi", "-i", _sine(220, 2, 16000),
-        "-c:v", "mpeg4", "-c:a", "pcm_s16le", str(out),
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=blue:s=64x64:d=2",
+        "-f",
+        "lavfi",
+        "-i",
+        _sine(220, 2, 16000),
+        "-c:v",
+        "mpeg4",
+        "-c:a",
+        "pcm_s16le",
+        str(out),
     )
     return out
 
@@ -195,15 +250,34 @@ def mp3_with_cover_art(tmp_path: Path) -> Path:
     out = tmp_path / "art.mp3"
     _ffmpeg("-f", "lavfi", "-i", _sine(220, 1, 44100), "-c:a", "libmp3lame", str(mp3))
     _ffmpeg("-f", "lavfi", "-i", "color=c=red:s=64x64:d=1", "-frames:v", "1", str(png))
-    _ffmpeg("-i", str(mp3), "-i", str(png), "-map", "0", "-map", "1",
-            "-c", "copy", "-id3v2_version", "3", str(out))
+    _ffmpeg(
+        "-i",
+        str(mp3),
+        "-i",
+        str(png),
+        "-map",
+        "0",
+        "-map",
+        "1",
+        "-c",
+        "copy",
+        "-id3v2_version",
+        "3",
+        str(out),
+    )
     return out
 
 
-@pytest.mark.parametrize("fixture_name", ["mp4_with_video", "mkv_with_video", "mp3_with_cover_art"])
+@pytest.mark.parametrize("fixture_name", ["mp4_with_video", "mkv_with_video"])
 def test_file_with_video_or_image_is_rejected(fixture_name, request):
     path = request.getfixturevalue(fixture_name)
     allowed = ALLOWED | {"mp3"}
     with pytest.raises(AudioRejected) as info:
         probe(path, **{**LIMITS, "allowed_formats": allowed})
     assert _code(info) == "unsupported_format"
+
+
+def test_mp3_with_cover_art_is_accepted(mp3_with_cover_art):
+    # The cover picture is a video stream with disposition.attached_pic = 1, not real video (L1)
+    result = probe(mp3_with_cover_art, **{**LIMITS, "allowed_formats": ALLOWED | {"mp3"}})
+    assert result.duration_s == pytest.approx(1.0, abs=0.2)

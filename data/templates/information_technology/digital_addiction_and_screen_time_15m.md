@@ -1,13 +1,11 @@
 ---
 topic: "Digital Addiction and Screen Time"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 15
 ---
 Hello, everyone, and thank you for coming. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}
 
 Before I start, I'd like to try a small experiment. Please take out your phone, but don't unlock it. Just hold it in your hand, or put it face down in front of you.
-
-[Pause for a few seconds.]
 
 Now, be honest with yourself. How many of you felt a small urge, just now, to check it? To see if there's a new message, a notification, or something new in your feed?
 
@@ -19,7 +17,7 @@ So today, I'd like to explore three questions. Is "digital addiction" real? Why 
 
 Let's start with the first question: is digital addiction real?
 
-The answer is more nuanced than headlines suggest. In medical terms, the World Health Organization included "gaming disorder" in its International Classification of Diseases, ICD-11, adopted in 2019. It's defined by impaired control over gaming, increasing priority given to gaming over other activities, and continuing despite negative consequences, with significant impairment in daily life, usually over at least twelve months. However, "smartphone addiction" or "social media addiction" are not, at least currently, official diagnoses in the same way, and researchers still debate how best to define and measure them.
+The answer is more nuanced than headlines suggest. My own reading is that {{ argument_is_it_really_addiction }}.
 
 But whether or not we use the word "addiction," many people clearly experience problematic use: they use their devices more than they intend, find it hard to stop, and notice negative effects on sleep, concentration, relationships, or mood. For practical purposes, that's what matters. The question isn't "Am I clinically addicted?" It's "Is my use of technology serving my life, or getting in its way?"
 
@@ -27,7 +25,7 @@ It's also important to say that screen time is not one thing. An hour video-call
 
 Now, the second question: why is it so hard to put our phones down?
 
-Part of the answer is that many apps are deliberately designed to capture as much of our attention as possible. In an advertising-based business model, attention is the product. The more time we spend, the more ads can be shown, and the more data can be collected. So product teams measure engagement carefully, and design features to increase it.
+Part of the answer is that many apps are deliberately designed to capture as much of our attention as possible. I would argue that {{ argument_attention_business_model }}.
 
 A few of the most common design techniques, because once you can see them, they lose some of their power over you.
 
@@ -39,7 +37,7 @@ The third is notifications. Each notification is designed to pull you back into 
 
 And the fourth is social validation. Likes, comments, views, and streaks tap into our deep human need for approval and belonging. Waiting to see how many people liked a post can become a powerful habit loop, especially for teenagers, who are particularly sensitive to social feedback.
 
-None of this means that the people who build these apps are villains, or that using them is wrong. Many of these features also provide real value. But it does mean that when you struggle to put your phone down, it isn't simply a lack of willpower. You're facing systems designed by talented teams, specifically to keep you engaged.
+None of this means that the people who build these apps are villains, or that using them is wrong. Even so, I believe {{ argument_design_responsibility_balance }}.
 
 So what are the effects? Research here is active and sometimes contested, so I'll stick to the areas where there's broader agreement.
 
@@ -52,8 +50,6 @@ And mental wellbeing: the relationship between social media use and mental healt
 {{ argument_local_context_note }}
 
 Before we move on to solutions, let's turn this into something personal, with a short exercise.
-
-[Screen time audit, about two minutes. Ask the audience to open their phone's screen time or digital wellbeing report, look at the three apps they used most yesterday, and for each one, silently label it as "nourishing," "neutral," or "draining," based on how they usually feel after using it. Then ask them to lock their phones again.]
 
 If you found at least one "draining" app near the top of your list, you're in very good company. Keep that app in mind for the next part.
 
@@ -79,7 +75,7 @@ For parents and teachers: lead by example, because children notice what we do mo
 
 {{ argument_audience_specific_note }}
 
-And finally, for those of us who build technology, which includes many people in this room. We have a special responsibility. When we design products, we can choose to measure success not only by time spent, but by whether users achieve what they came to do, and whether they'd say the time was well spent. We can design natural stopping points, make notifications respectful, offer users real control over their feeds and their time, and be especially careful with products used by children. A good product isn't one people can't stop using. It's one people are glad they used.
+And finally, for those of us who build technology, which includes many people in this room. My view is that {{ argument_builders_responsibility }}.
 
 Let's bring it all together. Whether or not we call it addiction, problematic technology use is real, and common. It's not simply a matter of weak willpower: many apps are designed, very effectively, to capture our attention. The effects on sleep, attention, and wellbeing are worth taking seriously, even though research is still developing. And there's a lot we can do: as individuals, by making small, deliberate changes; as parents and teachers, by leading by example and talking openly; and as builders of technology, by designing products that respect people's time.
 

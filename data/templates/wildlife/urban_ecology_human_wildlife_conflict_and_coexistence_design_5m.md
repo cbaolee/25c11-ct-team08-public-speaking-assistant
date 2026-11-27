@@ -6,15 +6,15 @@ duration_min: 5
 
 A few months ago, a security camera in downtown {{ argument_metropolis_name }} captured an extraordinary image at two o'clock in the morning. Walking calmly down a deserted sidewalk past {{ argument_urban_landmark_name }} was a full-grown {{ argument_adaptable_wildlife_species }}, wearing a GPS tracking collar we had fitted on it {{ argument_tracking_duration_timeframe }} earlier.
 
-Most people look at that photograph and think, "That animal is lost; it has wandered into the city by mistake." As an urban ecologist, I look at that photograph and see something entirely different: rapid evolutionary adaptation.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
 Wildlife isn't invading our cities; our cities have engulfed their ancestral homes, and they are figuring out how to survive alongside us.
 
 Over the past {{ argument_urban_growth_timeframe }}, the metropolitan area of {{ argument_metropolis_name }} has expanded by {{ argument_urban_expansion_percentage }}, slicing right through the historic migration corridors of {{ argument_regional_wildlife_species_list }}. We built {{ argument_barrier_infrastructure_name }} -- a {{ argument_highway_lane_count_statistic }} superhighway that carries {{ argument_daily_vehicle_count_statistic }} cars every single day.
 
-For the local population of {{ argument_adaptable_wildlife_species }}, that highway became an impenetrable wall. Cut off from mates in adjacent habitats, their genetic diversity plummeted to levels we normally only see in species on the brink of extinction. Every year, dozens of animals were killed trying to cross the asphalt, costing {{ argument_annual_collision_cost_statistic }} in property damage and human injuries.
+For the local population of , that highway became an impenetrable wall. Expanding on this key point for urban ecology, human-wildlife conflict, and coexistence design: {{ argument_key_ecological_mechanism }}.
 
-For generations, our default response to human-wildlife conflict was either lethal removal or higher fences. In {{ argument_project_launch_year }}, our coalition of biologists, civil engineers, and local citizens asked a radical question: what if we designed infrastructure for non-human commuters too?
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 After raising {{ argument_project_funding_statistic }} from public and private donors, we broke ground on the {{ argument_wildlife_crossing_name }} spanning right over {{ argument_barrier_infrastructure_name }}. It isn't just a concrete bridge; it is a living ecosystem carpeted with {{ argument_native_vegetation_list }}, acoustic walls to block traffic noise, and darkened shielding to prevent headlight glare.
 

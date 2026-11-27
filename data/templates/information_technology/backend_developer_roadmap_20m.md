@@ -1,6 +1,6 @@
 ---
 topic: "Backend Developer Roadmap"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 When you order food in a delivery app, you see a menu, a cart, and a "Place order" button. That's the front end. But the moment you press that button, a whole hidden world starts working. Your order is checked and saved in a database. Your payment is sent to a payment provider. The restaurant is notified. A driver is matched to your order. Your location is updated every few seconds. And all of this happens for thousands of other customers at exactly the same time, without mixing anything up and without losing a single order.
@@ -17,7 +17,7 @@ Now, let's go through the roadmap. As with any roadmap, the times are rough esti
 
 Stage one: programming fundamentals and your first language. Roughly two to three months.
 
-First, choose one back-end language and stick with it for a while. There's no single "best" choice, but here are some of the most common, each with a popular framework: Java with Spring Boot, very common in large enterprises and banks; C sharp with ASP dot NET, also widely used in enterprises; Python with Django or FastAPI, popular for its readability and its connection to data and AI; JavaScript or TypeScript with Node.js, which lets you use one language across front end and back end; and Go, known for simplicity and performance, popular in cloud infrastructure.
+First, choose one back-end language and stick with it for a while. My recommendation, and the reasoning behind it, is that {{ argument_backend_language_choice }}.
 
 How do you choose? Look at job postings in the place where you want to work, and pick a language that appears often. Your first language matters less than you think. The concepts transfer.
 
@@ -67,7 +67,7 @@ Once you can build a working API, the next question is: what happens when ten th
 
 Learn the basic building blocks. Load balancers, which distribute traffic across multiple servers. Horizontal scaling, which means adding more servers rather than one bigger server. Database replication, for reliability and read performance. Caching at different levels. And message queues, such as RabbitMQ or Kafka, which let parts of a system communicate asynchronously. For example, after an order is placed, sending the confirmation email can happen in the background, so the customer doesn't have to wait.
 
-Learn the basic trade-offs between a monolith, one application containing everything, and microservices, many smaller services working together. A common piece of advice from experienced engineers is to start with a well-structured monolith and split it only when there's a clear reason. Microservices solve some problems, but they create many others.
+Learn the basic trade-offs between a monolith, one application containing everything, and microservices, many smaller services working together. In my opinion, {{ argument_monolith_first_view }}.
 
 And learn about observability: logs, metrics, and traces, which tell you what your system is doing in production and help you find problems quickly. When something breaks at two in the morning, good observability is the difference between a ten-minute fix and a ten-hour mystery.
 
@@ -95,7 +95,7 @@ The sixth step is testing. You'd write unit tests for each business rule, and an
 
 And the final step is deployment: package it with Docker, set up a pipeline that runs the tests automatically, deploy it to a cloud platform, and add basic logging, so you can see what's happening when real members use it.
 
-Notice that the actual coding is only one part of this process. Clarifying rules, designing data, thinking about concurrency, checking authorization, and testing are what make it a professional piece of work. And when you explain a project like this in an interview, step by step, interviewers can see immediately that you think like a back-end engineer.
+Notice that the actual coding is only one part of this process. That is why I believe {{ argument_coding_is_small_part }}.
 
 In interviews, expect questions on your language and framework, databases and SQL, API design, security basics, and often data structures and algorithms. For more senior roles, expect system design questions, like "How would you design a URL shortener?"
 
@@ -113,7 +113,7 @@ Mistake four: over-engineering. Beginners sometimes build a portfolio project wi
 
 And mistake five: never deploying anything. Code that only runs on your laptop teaches you only half of back-end development.
 
-A quick note on AI tools. AI assistants can generate API endpoints, database queries, and tests very quickly, and they can be excellent learning companions. But in back-end development, mistakes can be expensive: a missing authorization check, an inefficient query that brings down the database, or a subtle security hole. Use AI to move faster, but always understand and review what it produces. Your judgment is the part that can't be automated away.
+A quick note on AI tools. AI assistants can generate API endpoints, database queries, and tests very quickly, and they can be excellent learning companions. My view is that {{ argument_ai_tools_for_backend_learners }}.
 
 Before we finish, two questions that come up very often.
 

@@ -1,6 +1,6 @@
 ---
 topic: "Remote Team Communication Best Practices"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Quick question before we start: how many messages did you send at work yesterday? Twenty? Fifty? And how many of them needed a second message to explain what you meant in the first one? I'm {{ argument_speaker_name }}, and that second message is what today is about: how we communicate as a remote team, and how to get it right the first time.
@@ -9,7 +9,7 @@ You may recognize this small story. Someone sends a message in the team chat: "C
 
 In an office, that wouldn't have happened. You'd see your colleague's face, hear their relaxed tone, and know immediately that it's nothing serious. But when we work remotely, we lose most of those signals: facial expressions, tone of voice, body language, and those quick hallway conversations where problems get solved in thirty seconds.
 
-That doesn't mean remote work can't be just as effective as working in an office. Many excellent teams are fully remote. But it does mean that communication doesn't happen by accident anymore. We have to do it on purpose. So today, I'd like to share seven practices that can make a real difference, and at the end, I'll suggest a few things we can try as a team.
+That doesn't mean remote work can't be just as effective as working in an office. In my view, {{ argument_remote_needs_intentional_communication }}.
 
 Practice number one: write messages that can stand on their own.
 
@@ -25,7 +25,7 @@ There are two types of communication. Synchronous means everyone is present at t
 
 In remote teams, too many meetings can be exhausting, and they break the long, focused blocks of time that developers need to do deep work. That makes for a good default: if it can be handled well in writing, handle it in writing.
 
-But asynchronous isn't always the right choice. The guideline is simple. Use writing for status updates, simple questions, sharing information, and decisions that need careful thought. Switch to a call when a topic is sensitive or emotional, when there's a conflict or misunderstanding, when a discussion has gone back and forth in chat more than three or four times without progress, or when you're brainstorming and need fast creative energy.
+But asynchronous isn't always the right choice. I would argue that {{ argument_async_vs_sync_balance }}.
 
 Practice number three: when you do have meetings, make them count.
 
@@ -57,7 +57,7 @@ Practice number seven: build human connection deliberately.
 
 In an office, relationships grow naturally: coffee breaks, lunches, small talk. Remotely, without effort, we can end up only ever talking about work tasks. And teams that don't know each other as people find it much harder to give honest feedback, ask for help, or handle conflict.
 
-It's worth making space for the human side. A few minutes of casual chat at the start of meetings. A non-work channel for sharing photos, hobbies, or music. Occasional virtual coffee chats with someone you don't usually work with. And, when possible, meeting in person from time to time. These things are not a waste of time. They're what makes the work go more smoothly.
+It's worth making space for the human side. I believe that {{ argument_human_side_of_remote_teams }}.
 
 Seven practices, in short. Write messages that stand on their own, with the bottom line up front. Default to asynchronous, and switch to a call when needed. Run meetings with a purpose, an agenda, and written notes. Make your work and availability visible. Agree on which tool to use for what, and on response times. Assume good intent, and add warmth to your writing. And build human connection on purpose.
 

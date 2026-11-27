@@ -1,13 +1,13 @@
 ---
 topic: "Kickoff Meeting with a New Client"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 15
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome. On behalf of {{ argument_vendor_company_name }}, I'd like to thank the team from {{ argument_client_company_name }} for joining us today. We're excited to be starting this project with you.
 
 My name is {{ argument_speaker_name }}, and I'll be the {{ argument_speaker_role }} for this project. That means I'll be your main point of contact, and I'll be responsible for making sure the project stays on track, that you're always informed about progress, and that any issues are raised and resolved quickly.
 
-The purpose of today's meeting is to make sure that both of our teams start with the same understanding: what we're building, why we're building it, how we'll work together, and what success looks like. A good kickoff can save weeks of confusion later, so thank you for investing this time with us.
+The purpose of today's meeting is to make sure that both of our teams start with the same understanding: what we're building, why we're building it, how we'll work together, and what success looks like. In our view, {{ argument_shared_understanding_value }}.
 
 We've planned about {{ argument_meeting_length }} for today. The agenda has seven parts. First, introductions. Second, a review of the project's goals and scope. Third, the timeline and key milestones. Fourth, how we'll work and communicate together. Fifth, roles and responsibilities on both sides. Sixth, risks and assumptions. And finally, next steps and an open discussion. Please feel free to ask questions at any point. There's no such thing as a question that's too early or too basic in a kickoff meeting.
 
@@ -27,7 +27,7 @@ Based on that, we understand the main objectives of this project to be: {{ argum
 
 And we'd suggest measuring success by {{ argument_success_metrics }}
 
-Before we go further, I'd like to pause and check with you. Does this reflect your understanding? Is there anything we've missed, or anything you'd describe differently? It's much better to correct this now than to discover a difference in understanding three months from now.
+Before we go further, I'd like to pause and check with you. We believe that {{ argument_early_alignment_importance }}.
 
 That's very helpful. We'll update our project documents accordingly.
 
@@ -37,7 +37,7 @@ The scope of this project includes {{ argument_in_scope_items }}
 
 Just as importantly, I'd like to be clear about what is not included in this phase: {{ argument_out_of_scope_items }} These items aren't unimportant. Some of them may be excellent candidates for a later phase. But keeping them out of this phase helps us deliver the core value on time and with high quality.
 
-Of course, during any project, new ideas and needs come up. That's normal and healthy. When that happens, we'll follow a simple change request process. Your team or ours will describe the change, we'll assess its impact on timeline and budget, and we'll agree together whether to include it, swap it with something else, or plan it for later. That way, there are no surprises on either side.
+Of course, during any project, new ideas and needs come up. That's normal and healthy. Our position is that {{ argument_change_process_fairness }}.
 
 As for the timeline, the project is planned to run for {{ argument_project_duration }}, starting {{ argument_project_start_date }}. The key milestones are these. {{ argument_key_milestones }}
 

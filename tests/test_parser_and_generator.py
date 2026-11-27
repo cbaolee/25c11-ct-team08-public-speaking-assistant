@@ -6,6 +6,7 @@ from unittest.mock import MagicMock
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
+from src.app.config import settings
 from src.text_processing import (
     DocumentParserError,
     ScriptGenerator,
@@ -50,7 +51,7 @@ def test_validate_pdf_file_rejects_fake_pdf(tmp_path) -> None:
 
 def test_script_generator_fallback_and_citation_check(monkeypatch) -> None:
     """Verify Groq fallback model chain and citation page verification."""
-    monkeypatch.setenv("GROQ_API_KEY", "dummy_key")
+    monkeypatch.setattr(settings, "groq_api_keys", ["dummy_key"])
     gen = ScriptGenerator()
     mock_client, ok_resp = MagicMock(), MagicMock()
     ok_resp.choices = [
@@ -65,7 +66,33 @@ def test_script_generator_fallback_and_citation_check(monkeypatch) -> None:
     mock_client.chat.completions.create.side_effect = [RuntimeError("429"), ok_resp]
     gen.client = mock_client
     res = gen.generate_script(parse_input_to_chunks(raw_text="# Intro\nPage 1."), topic="AI")
-    assert (
-        res.model_used == gen.model_chain[1]
-        and res.citations == [{"heading": "Intro", "page": 1}]
+    assert res.model_used == gen.model_chain[1] and res.citations == [
+        {"heading": "Intro", "page": 1}
+    ]
+
+
+def test_verify_citations_rejects_whitespace_headings_and_bool_pages(monkeypatch) -> None:
+    """Whitespace headings must be dropped and bool pages must never leak as page numbers."""
+    from src.text_processing.contracts import DocumentChunk
+
+    monkeypatch.setattr(settings, "groq_api_keys", ["dummy_key"])
+    gen = ScriptGenerator()
+    chunks = [
+        DocumentChunk(chunk_id=1, heading="Intro", page=1, content="Opening."),
+        DocumentChunk(chunk_id=2, heading="Methods", page=2, content="Details."),
+    ]
+    verified = gen.verify_citations(
+        [
+            {"heading": "   ", "page": 1},
+            {"heading": None, "page": 2},
+            {"heading": "Intro", "page": True},
+            {"heading": "Unknown", "page": True},
+            {"heading": "Methods", "page": 2},
+        ],
+        chunks,
     )
+    assert verified == [
+        {"heading": "Intro", "page": 1},
+        {"heading": "Methods", "page": 2},
+    ]
+    assert all(type(item["page"]) is int for item in verified)

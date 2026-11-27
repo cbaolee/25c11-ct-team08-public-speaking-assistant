@@ -10,31 +10,33 @@ import parselmouth
 
 from src.audio_processing.alignment import AlignedItem, AlignmentResult
 from src.audio_processing.contracts import (
-    WordTimestamp,
+    BaselineProfile,
     ClassifiedPause,
+    MasterAudio,
     PauseKind,
     SpeechSegment,
-    MasterAudio,
-    BaselineProfile
+    WordTimestamp,
 )
 from src.audio_processing.text_norm import is_filler, split_sentences
 
+
 def clamp(x: float) -> float:
-    """Ép kết quả về khoảng 0.0 - 100.0[cite: 1, 2]."""
+    """Clamp the value to 0.0 - 100.0."""
     return max(0.0, min(100.0, x))
+
 
 def _check_counts(**counts: int) -> None:
     for name, value in counts.items():
         if value < 0:
-            raise ValueError(f"{name} không được âm: {value}")
+            raise ValueError(f"{name} must not be negative: {value}")
 
 
 def score_accuracy(n_ref: int, n_sub: int, n_del: int, n_ins: int) -> float | None:
-    """Điểm A = clamp(100 * (1 - (n_sub + n_del + n_ins) / n_ref)) (ADR-003, scoring_framework §4).
+    """Score A = clamp(100 * (1 - (n_sub + n_del + n_ins) / n_ref)) (ADR-003, scoring_framework §4).
 
-    Nhận số đếm từ align(); near_miss và filler đã được alignment loại khỏi ba số này.
-    n_ref = 0 -> None (phase3_decision #1); cờ "empty_script" do pipeline/accuracy_scores gắn.
-    Số đếm âm -> ValueError (lỗi gọi hàm, không phải dữ liệu).
+    Takes the counts from align(); alignment already keeps near_miss and fillers out of them.
+    n_ref = 0 -> None (phase3_decision #1); pipeline/accuracy_scores sets "empty_script".
+    Negative counts -> ValueError (a calling bug, not bad data).
     """
     _check_counts(n_ref=n_ref, n_sub=n_sub, n_del=n_del, n_ins=n_ins)
     if n_ref == 0:
@@ -43,11 +45,11 @@ def score_accuracy(n_ref: int, n_sub: int, n_del: int, n_ins: int) -> float | No
 
 
 def speech_span(words: Sequence[WordTimestamp]) -> tuple[int, float | None]:
-    """Đo (n_words, span_s) trên các từ KHÔNG phải filler (D4; §5.1, §8).
+    """Measure (n_words, span_s) over the words that are NOT fillers (D4; §5.1, §8).
 
-    span_s = end_s của từ cuối - start_s của từ đầu (đầu vào đã sắp theo start_s).
-    Dùng chung cho WPM và H nên hai chỉ số cùng mẫu số (D3).
-    n_words < 2 hoặc span <= 0 -> span_s = None (mẫu số không xác định, D18).
+    span_s = end_s of the last word - start_s of the first (input already sorted by start_s).
+    Shared by WPM and H so both use the same denominator (D3).
+    n_words < 2 or span <= 0 -> span_s = None (undefined denominator, D18).
     """
     real = [w for w in words if not is_filler(w.word)]
     n_words = len(real)
@@ -67,7 +69,7 @@ def compute_wpm(n_words: int, span_s: float | None) -> float | None:
 
 
 def score_wpm(wpm: float | None) -> float | None:
-    """F_wpm (§5.1): 130..160 -> 100; ngoài khoảng trừ 2.5 điểm/WPM từ biên gần nhất.
+    """F_wpm (§5.1): 130..160 -> 100; outside, minus 2.5 points per WPM from the nearest edge.
 
     None -> None.
     """
@@ -82,10 +84,10 @@ def score_wpm(wpm: float | None) -> float | None:
 def hesitations_per_min(
     classified: Sequence[ClassifiedPause], span_s: float | None
 ) -> tuple[int, int, float | None]:
-    """Trả (hesitation_count, forgot_word_count, H) (§5.2 Bước 4, D3, D17).
+    """Return (hesitation_count, forgot_word_count, H) (§5.2 step 4, D3, D17).
 
-    hesitation_count gồm cả HESITATION và FORGOT_WORD (D17); PUNCTUATION và
-    NATURAL không tính. H = hesitation_count / (span_s / 60); span_s None -> H None.
+    hesitation_count includes both HESITATION and FORGOT_WORD (D17); PUNCTUATION and
+    NATURAL are not counted. H = hesitation_count / (span_s / 60); span_s None -> H None.
     """
     n_forgot = sum(1 for cp in classified if cp.kind is PauseKind.FORGOT_WORD)
     n_hes = n_forgot + sum(1 for cp in classified if cp.kind is PauseKind.HESITATION)
@@ -95,7 +97,7 @@ def hesitations_per_min(
 
 
 def score_hesitation(h: float | None) -> float | None:
-    """F_pause = clamp(100 - 20 * max(0, H - 1)) (§5.2 Bước 4). None -> None."""
+    """F_pause = clamp(100 - 20 * max(0, H - 1)) (§5.2 step 4). None -> None."""
     if h is None:
         return None
     return clamp(100.0 - 20.0 * max(0.0, h - 1.0))
@@ -103,25 +105,26 @@ def score_hesitation(h: float | None) -> float | None:
 
 @dataclass(frozen=True)
 class FillerEvent:
-    """Một filler tìm được; cùng trường với FillerItem trừ after_ref_index (pipeline tính)."""
+    """One filler found; same fields as FillerItem except after_ref_index (set by the pipeline)."""
 
     start_s: float
     end_s: float
     source: Literal["stt", "vad"]
-    text: str | None  # chữ STT trả về; None nếu nguồn là VAD
+    text: str | None  # text returned by STT; None when the source is VAD
 
 
 def find_fillers(
     words: Sequence[WordTimestamp], segments: Sequence[SpeechSegment]
 ) -> list[FillerEvent]:
-    """Liệt kê mọi filler theo thứ tự thời gian (§5.3). Nguồn logic duy nhất cho count_fillers.
+    """List every filler in time order (§5.3). The only logic behind count_fillers.
 
-    source "stt": từ STT là filler (text_norm.is_filler). source "vad": đoạn VAD không chồng lấn
-    thời gian với BẤT KỲ từ STT nào (filler hay từ thường); mỗi đoạn đếm tối đa một lần. Đoạn
-    đã chồng lấn filler STT nên không bị đếm lại.
-    Chồng lấn = seg.start < w.end and w.start < seg.end (chạm mép không tính).
-    GIỚI HẠN (TỰ CHỌN): một đoạn VAD dài vừa chứa từ thật vừa chứa tiếng "ừm"
-    vẫn không được đếm.
+    source "stt": an STT word that is a filler (text_norm.is_filler). source "vad": a VAD
+    segment that does not overlap in time with ANY STT word (filler or not); each segment
+    counts at most once.
+    A segment that overlaps an STT filler is therefore not counted again.
+    Overlap = seg.start < w.end and w.start < seg.end (touching edges do not count).
+    LIMIT (OUR CHOICE): a long VAD segment holding both real words and an "um"
+    is still not counted.
     """
     events = [FillerEvent(w.start_s, w.end_s, "stt", w.word) for w in words if is_filler(w.word)]
     events += [
@@ -135,14 +138,14 @@ def find_fillers(
 def count_fillers(
     words: Sequence[WordTimestamp], segments: Sequence[SpeechSegment]
 ) -> tuple[int, int]:
-    """Trả (n_stt, n_vad) (§5.3), đếm từ find_fillers để không có hai nguồn logic."""
+    """Return (n_stt, n_vad) (§5.3), counted from find_fillers so there is one logic only."""
     events = find_fillers(words, segments)
     n_stt = sum(1 for e in events if e.source == "stt")
     return n_stt, len(events) - n_stt
 
 
 def filler_pct(n_filler: int, n_words: int) -> float | None:
-    """R = n_filler / n_words * 100 (D5); n_words là số từ KHÔNG tính filler. 0 từ -> None."""
+    """R = n_filler / n_words * 100 (D5); n_words does NOT count fillers. 0 words -> None."""
     if n_words == 0:
         return None
     return n_filler / n_words * 100.0
@@ -158,17 +161,18 @@ def score_filler(r_pct: float | None) -> float | None:
 def compute_fluency(
     f_wpm: float | None, f_pause: float | None, f_filler: float | None
 ) -> float | None:
-    """F = trung bình cộng 3 điểm con (§5); thiếu bất kỳ cái nào -> None (D18, §8)."""
+    """F = mean of the 3 sub-scores (§5); any missing -> None (D18, §8)."""
     if f_wpm is None or f_pause is None or f_filler is None:
         return None
     return (f_wpm + f_pause + f_filler) / 3.0
 
+
 def score_clarity(n_near_miss: int, n_ref: int) -> float | None:
     """P_clarity = clamp(100 * (1 - 5 * n_near_miss / n_ref)).
 
-    Nguồn: ADR-005 "Hệ quả", scoring_framework §6.1.
+    Source: ADR-005 "Consequences", scoring_framework §6.1.
 
-    n_ref = 0 -> None. Số đếm âm -> ValueError. Hệ số 5 đã chốt, không đổi.
+    n_ref = 0 -> None. Negative counts -> ValueError. The factor 5 is agreed, do not change it.
     """
     _check_counts(n_near_miss=n_near_miss, n_ref=n_ref)
     if n_ref == 0:
@@ -180,15 +184,15 @@ def score_clarity(n_near_miss: int, n_ref: int) -> float | None:
 class AccuracyScores:
     accuracy: float | None
     clarity: float | None
-    # đủ 7 khoá ADR-004: n_ref, n_sub, n_del, n_ins, n_near_miss, n_homophone, n_oov
+    # all 7 ADR-004 keys: n_ref, n_sub, n_del, n_ins, n_near_miss, n_homophone, n_oov
     accuracy_detail: dict
     flags: list[str]
 
 
 def accuracy_scores(result: AlignmentResult) -> AccuracyScores:
-    """Chấm A và P_clarity từ AlignmentResult; accuracy_detail là bản sao counts.
+    """Score A and P_clarity from an AlignmentResult; accuracy_detail is a copy of the counts.
 
-    flags = bản sao result.flags, thêm "empty_script" khi n_ref == 0 (phase3_decision #1).
+    flags = copy of result.flags, plus "empty_script" when n_ref == 0 (phase3_decision #1).
     """
     c = result.counts
     flags = list(result.flags)
@@ -201,11 +205,12 @@ def accuracy_scores(result: AlignmentResult) -> AccuracyScores:
         flags=flags,
     )
 
-def pitch_score_from_range(r_st: float | None) -> float | None:
-    """Đổi độ rộng cao độ R_st (nửa cung) thành điểm P_pitch (scoring_framework.md §6.2).
 
-    R_st >= 6 -> 100; R_st <= 2 -> 0; ở giữa 25 * (R_st - 2). None -> None
-    (không đo được thì không chấm, §8; không coi là 0).
+def pitch_score_from_range(r_st: float | None) -> float | None:
+    """Turn the pitch range R_st (semitones) into the score P_pitch (docs/adr/ADR-003.md §6.2).
+
+    R_st >= 6 -> 100; R_st <= 2 -> 0; in between 25 * (R_st - 2). None -> None
+    (not measured means not scored, §8; never treated as 0).
     """
     if r_st is None:
         return None
@@ -217,14 +222,14 @@ def pitch_score_from_range(r_st: float | None) -> float | None:
 
 
 def pitch_range_st(f0_hz: Sequence[float], f0_ref_hz: float) -> float | None:
-    """R_st = P90 - P10 của ST = 12 * log2(F0 / F0_ref) (§6.2). Hàm thuần.
+    """R_st = P90 - P10 of ST = 12 * log2(F0 / F0_ref) (§6.2). Pure function.
 
-    Bỏ F0 <= 0 hoặc NaN (Praat trả 0 cho đoạn vô thanh). Không còn mẫu nào, hoặc
-    f0_ref không hợp lệ (None, NaN, <= 0) -> None.
+    Drops F0 <= 0 or NaN (Praat gives 0 for unvoiced frames). No sample left, or
+    an invalid f0_ref (None, NaN, <= 0) -> None.
 
-    GIẢ ĐỊNH (spec không nói): phân vị dùng numpy.percentile mặc định
-    (nội suy linear). Chưa kiểm chứng ảnh hưởng của cách nội suy khác lên điểm.
-    Còn đúng 1 mẫu hữu thanh -> P90 = P10 nên R_st = 0.0 (không phải None).
+    ASSUMPTION (not in the spec): percentiles use the default numpy.percentile
+    (linear interpolation). The effect of another interpolation on the score is not checked.
+    Exactly 1 voiced sample -> P90 = P10, so R_st = 0.0 (not None).
     """
     if f0_ref_hz is None or not math.isfinite(f0_ref_hz) or f0_ref_hz <= 0:
         return None
@@ -247,10 +252,10 @@ class PitchResult:
 
 
 def _extract_f0(master: MasterAudio) -> list[tuple[float, float]]:
-    """Trích F0 hữu thanh từ file bằng Parselmouth: [(time_s, f0_hz)], chỉ khung hz > 0.
+    """Voiced F0 from the file with Parselmouth: [(time_s, f0_hz)], frames with hz > 0 only.
 
-    Giữ nguyên tham số cũ (phase3 #19): Sound(path).to_pitch() mặc định.
-    Tách riêng để test monkeypatch, không cần audio thật.
+    Keeps the old settings (phase3 #19): default Sound(path).to_pitch().
+    Kept separate so tests can monkeypatch it without real audio.
     """
     snd = parselmouth.Sound(str(master.path))
     pitch = snd.to_pitch()
@@ -260,13 +265,15 @@ def _extract_f0(master: MasterAudio) -> list[tuple[float, float]]:
 
 
 def f0_contour_st(
-    track: Sequence[tuple[float, float]], f0_ref_hz: float | None, duration_s: float,
+    track: Sequence[tuple[float, float]],
+    f0_ref_hz: float | None,
+    duration_s: float,
     step_s: float = 0.1,
 ) -> dict | None:
-    """Series đường cong cao độ theo semitone so với f0_ref (ADR-004 D10).
+    """Pitch contour Series in semitones relative to f0_ref (ADR-004 D10).
 
-    Ô i phủ [i*step, (i+1)*step); giá trị = 12*log2(median(hz trong ô) / f0_ref); ô không có
-    khung hữu thanh -> None. Không bao giờ chứa NaN/inf. ref/duration không hợp lệ -> None.
+    Cell i covers [i*step, (i+1)*step); value = 12*log2(median(hz in the cell) / f0_ref); a cell
+    with no voiced frame -> None. Never NaN/inf. Invalid ref/duration -> None.
     """
     if f0_ref_hz is None or not math.isfinite(f0_ref_hz) or f0_ref_hz <= 0:
         return None
@@ -277,7 +284,7 @@ def f0_contour_st(
     for t, hz in track:
         if not (math.isfinite(t) and math.isfinite(hz)) or hz <= 0:
             continue
-        i = math.floor(round(t / step_s, 9))  # cùng kiểu chống sai số float như n
+        i = math.floor(round(t / step_s, 9))  # same float guard as n
         if t >= 0 and i < n:
             cells[i].append(hz)
     values = [
@@ -289,7 +296,7 @@ def f0_contour_st(
 def compute_warnings(
     wpm: float | None, filler_pct: float | None, range_st: float | None
 ) -> list[str]:
-    """Cảnh báo không ảnh hưởng điểm (ADR-004 D7): thứ tự wpm, filler, monotone; None -> bỏ qua."""
+    """Warnings that do not change the score (ADR-004 D7): wpm, filler, monotone; None skipped."""
     out: list[str] = []
     if wpm is not None:
         if wpm < 110:
@@ -304,10 +311,10 @@ def compute_warnings(
 
 
 def score_pitch(master: MasterAudio, baseline: BaselineProfile | None) -> PitchResult:
-    """P_pitch (§6.2): F0_ref từ baseline nếu hợp lệ, không thì median F0 của phiên.
+    """P_pitch (§6.2): F0_ref from the baseline when valid, otherwise the session median F0.
 
-    Không gắn cờ no_baseline ở đây (pipeline gắn). Không có F0 hữu thanh hoặc
-    Praat lỗi -> score None + flags ["no_f0"], không trả 0.0 (§8, ADR-004 D18).
+    The no_baseline flag is not set here (the pipeline sets it). No voiced F0 or
+    a Praat error -> score None + flags ["no_f0"], never 0.0 (§8, ADR-004 D18).
     """
     try:
         track = [(t, v) for t, v in _extract_f0(master) if math.isfinite(v) and v > 0]
@@ -331,24 +338,24 @@ def score_pitch(master: MasterAudio, baseline: BaselineProfile | None) -> PitchR
 
 
 def combine_pronunciation(clarity: float | None, pitch: float | None) -> float | None:
-    """P = 0.5 * P_clarity + 0.5 * P_pitch; thiếu một trong hai -> None (§8)."""
+    """P = 0.5 * P_clarity + 0.5 * P_pitch; either missing -> None (§8)."""
     if clarity is None or pitch is None:
         return None
     return 0.5 * clarity + 0.5 * pitch
 
 
-SEMANTIC_THRESHOLD = 0.82  # ADR-003 §7, không đổi
+SEMANTIC_THRESHOLD = 0.82  # ADR-003 §7, do not change
 
 Encoder = Callable[[list[str]], np.ndarray]
 
 
 @dataclass(frozen=True)
 class SentenceResult:
-    """Một câu kịch bản và kết quả so nghĩa; cùng trường với SentenceItem (ADR-004)."""
+    """One script sentence and its meaning check; same fields as SentenceItem (ADR-004)."""
 
     index: int
     ref_text: str
-    ref_start: int  # nửa mở [ref_start, ref_end)
+    ref_start: int  # half-open [ref_start, ref_end)
     ref_end: int
     hyp_text: str | None
     cosine: float | None
@@ -358,17 +365,17 @@ class SentenceResult:
 def build_sentence_pairs(
     script: str, items: Sequence[AlignedItem]
 ) -> list[tuple[int, int, int, str, str | None]]:
-    """Ghép câu kịch bản với lời nói theo ALIGNMENT, không theo chỉ số (ADR-004 D8, §7).
+    """Pair script sentences with the speech through the ALIGNMENT, not by index (ADR-004 D8, §7).
 
-    Trả [(index, ref_start, ref_end, ref_text, hyp_text)]. hyp_text của câu i = các hyp_word
-    của item có sentence_index == i và status != "del", gồm cả ins (phase3 #2). Mỗi hyp_index
-    chỉ lấy một lần (một từ STT như "it's" có thể được hai item dùng chung), sắp theo
-    hyp_index, nối bằng dấu cách. Rỗng -> None (phase3 #3). Kịch bản rỗng -> [].
+    Returns [(index, ref_start, ref_end, ref_text, hyp_text)]. hyp_text of sentence i = the hyp_word
+    of items with sentence_index == i and status != "del", ins included (phase3 #2). Each hyp_index
+    is taken once (one STT word such as "it's" can be shared by two items), sorted by
+    hyp_index, joined with spaces. Empty -> None (phase3 #3). Empty script -> [].
 
-    Giới hạn đã biết: AlignedItem chỉ lưu hyp_index ĐẦU và hyp_word đã nối của item nhiều
-    từ, nên khi ins xen giữa item đó thứ tự từ bị lệch (script "A 21 b.", STT "a twenty x
-    one b" -> "a twenty one x b"). Ảnh hưởng nhỏ tới cosine; muốn sửa thì AlignedItem cần
-    lưu danh sách hyp_index (không sửa ở đây).
+    Known limit: AlignedItem keeps only the FIRST hyp_index and the joined hyp_word of a multi-word
+    item, so an ins inside that item puts the words out of order (script "A 21 b.", STT "a twenty x
+    one b" -> "a twenty one x b"). Small effect on the cosine; fixing it needs AlignedItem to
+    store a list of hyp_index (not changed here).
     """
     by_sentence: dict[int, dict[int, str]] = {}
     for it in items:
@@ -385,9 +392,9 @@ def build_sentence_pairs(
 
 @lru_cache(maxsize=1)
 def _get_encoder() -> Encoder:
-    """Nạp all-MiniLM-L6-v2 lười, đúng một lần cho cả process (memoization).
+    """Load all-MiniLM-L6-v2 lazily, exactly once per process (memoization).
 
-    TỰ CHỌN: import sentence_transformers nằm trong hàm để `import scoring` không nạp torch.
+    OUR CHOICE: sentence_transformers is imported here so `import scoring` does not load torch.
     """
     from sentence_transformers import SentenceTransformer
 
@@ -402,7 +409,7 @@ def _get_encoder() -> Encoder:
 def _cosine(a: np.ndarray, b: np.ndarray) -> float | None:
     na, nb = float(np.linalg.norm(a)), float(np.linalg.norm(b))
     if na == 0.0 or nb == 0.0:
-        return None  # TỰ CHỌN: vector 0 không có hướng -> không chấm được
+        return None  # OUR CHOICE: a zero vector has no direction -> cannot be scored
     return float(np.dot(a, b) / (na * nb))
 
 
@@ -411,13 +418,13 @@ def score_sentences(
     *,
     encode: Encoder | None = None,
 ) -> list[SentenceResult]:
-    """Tính cosine từng câu và passed = cosine >= 0.82 (§7).
+    """Cosine per sentence and passed = cosine >= 0.82 (§7).
 
-    Chỉ encode các câu có hyp; không có câu nào có hyp thì không gọi encoder (kể cả
-    _get_encoder). SentenceResult.cosine là số thô, không làm tròn (ADR-004 D1).
-    passed = cosine >= 0.82 - 1e-9. Epsilon 1e-9 chỉ hấp thụ nhiễu float64 của phép chia;
-    cosine nằm dưới 0.82 quá 1e-9 vẫn là không đạt (vd 0.8199996 -> False). Đây là TỰ CHỌN.
-    Câu không có hyp (hoặc norm 0): cosine None, passed False, vẫn nằm trong danh sách.
+    Only sentences with a hyp are encoded; when none has one the encoder is not called (not even
+    _get_encoder). SentenceResult.cosine is the raw number, not rounded (ADR-004 D1).
+    passed = cosine >= 0.82 - 1e-9. The 1e-9 epsilon only absorbs float64 noise from the division;
+    a cosine more than 1e-9 below 0.82 still fails (e.g. 0.8199996 -> False). OUR CHOICE.
+    A sentence without hyp (or with norm 0): cosine None, passed False, still in the list.
     """
     with_hyp = [p for p in pairs if p[4] is not None]
     cos_by_index: dict[int, float | None] = {}
@@ -437,7 +444,7 @@ def score_sentences(
 
 
 def score_semantic(sentences: Sequence[SentenceResult]) -> float | None:
-    """S = 100 * (số câu passed) / (tổng số câu kịch bản) (§7). Không có câu -> None (#1)."""
+    """S = 100 * (passed sentences) / (all script sentences) (§7). No sentence -> None (#1)."""
     if not sentences:
         return None
     return 100.0 * sum(1 for s in sentences if s.passed) / len(sentences)
@@ -446,9 +453,9 @@ def score_semantic(sentences: Sequence[SentenceResult]) -> float | None:
 def compute_overall(
     a: float | None, f: float | None, p: float | None, s: float | None
 ) -> float | None:
-    """Điểm tổng 0.4A + 0.3F + 0.2P + 0.1S (§3). Thiếu bất kỳ thành phần -> None.
+    """Overall score 0.4A + 0.3F + 0.2P + 0.1S (§3). Any component missing -> None.
 
-    Không nội suy, không điền 0 (§8, ADR-004 D18).
+    No interpolation, no 0 filled in (§8, ADR-004 D18).
     """
     if a is None or f is None or p is None or s is None:
         return None
@@ -456,21 +463,21 @@ def compute_overall(
 
 
 def display_round(x: float | None) -> Decimal | None:
-    """Làm tròn để HIỂN THỊ: 1 chữ số, half-up (§12, phase3 #15). None -> None.
+    """Round for DISPLAY: 1 decimal, half-up (§12, phase3 #15). None -> None.
 
-    Vì sao không dùng round() hay Decimal(x): float 89.85 thực chất lưu là
-    89.8499999..., nên round(89.85, 1) và Decimal(89.85).quantize(...) đều cho
-    89.8. str(x) (repr Python từ 3.1) trả dạng thập phân NGẮN NHẤT mà khi đọc lại
-    vẫn ra đúng float đó, tức "89.85"; Decimal("89.85") là số thập phân chính xác
-    nên half-up cho 89.9.
-    Nhưng str(x) vẫn mang nhiễu tích luỹ: compute_overall(83.5, 98.5, 70, 80) cho
-    84.94999999999999 (thật ra 84.95) nên half-up ra 84.9 và nhãn "Good" thay vì
-    "Excellent". Vì vậy làm tròn HAI bước: (1) quantize 1e-9 bằng HALF_EVEN để khử
-    nhiễu float (sai số tích luỹ sau vài phép nhân cộng cỡ 1e-14, còn điểm trong
-    [0, 100] không bao giờ cần chính xác 1e-9); (2) quantize 0.1 half-up.
-    Giới hạn: giá trị nằm trong ~1e-9 quanh biên x.x5 bị coi như đúng x.x5.
-    GIẢ ĐỊNH: số cần làm tròn là số "người đọc thấy", tức repr ngắn nhất.
-    ADR-004 D1 giao việc làm tròn cho UI; bản JS cùng quy tắc thuộc Pha 5b.
+    Why not round() or Decimal(x): the float 89.85 is really stored as
+    89.8499999..., so round(89.85, 1) and Decimal(89.85).quantize(...) both give
+    89.8. str(x) (Python repr since 3.1) gives the SHORTEST decimal that reads back
+    as the same float, i.e. "89.85"; Decimal("89.85") is an exact decimal
+    so half-up gives 89.9.
+    But str(x) still carries accumulated noise: compute_overall(83.5, 98.5, 70, 80) gives
+    84.94999999999999 (really 84.95), so half-up gives 84.9 and the label "Good" instead of
+    "Excellent". So rounding takes TWO steps: (1) quantize to 1e-9 with HALF_EVEN to remove
+    float noise (accumulated error after a few multiply-adds is about 1e-14, and scores in
+    [0, 100] never need 1e-9 precision); (2) quantize to 0.1 half-up.
+    Limit: values within ~1e-9 of an x.x5 edge are treated as exactly x.x5.
+    ASSUMPTION: the number to round is the one "the reader sees", i.e. the shortest repr.
+    ADR-004 D1 leaves rounding to the UI; the JS version with the same rule belongs to Phase 5b.
     """
     if x is None:
         return None
@@ -479,7 +486,7 @@ def display_round(x: float | None) -> Decimal | None:
 
 
 def get_label(overall: float | None) -> str | None:
-    """Nhãn xếp loại (§11), tính trên điểm đã display_round (phase3 #14)."""
+    """Grade label (§11), computed on the display_round score (phase3 #14)."""
     r = display_round(overall)
     if r is None:
         return None

@@ -1,6 +1,6 @@
 ---
 topic: "How Large Language Models Work"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 When you type a question into ChatGPT, Claude, or Gemini, and a fluent answer appears word by word, it can feel as if someone is thinking on the other side of the screen. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and today I want to open up that box, which many of us use every day but rarely look inside: large language models.
@@ -27,7 +27,7 @@ At first, its guesses are completely random. But every time it guesses, its answ
 
 What exactly is being adjusted? Inside the model is a huge neural network, a mathematical structure loosely inspired by the brain, made of connections with numerical values called parameters. You can imagine them as tiny knobs. Modern large models have billions, sometimes hundreds of billions, of these knobs. Training is the process of slowly turning all of them until the model becomes very, very good at predicting text.
 
-Something remarkable happens along the way. To predict the next word really well, the model has to learn far more than grammar. To finish a sentence about history, it helps to know facts. To finish a line of code, it helps to understand programming. To finish a joke, it helps to recognize humor. Nobody programmed these skills directly. They emerged from the pressure of prediction.
+Something remarkable happens along the way. My view is that {{ argument_emergent_understanding_debate }}.
 
 How does it keep track of context? With the transformer and attention.
 
@@ -51,7 +51,7 @@ The important part comes next: what language models can't do well.
 
 Understanding how they work also explains their weaknesses.
 
-First, hallucinations. Because the model generates text that is likely, not text that is verified, it can produce answers that sound confident and fluent but are completely wrong, including made-up facts, quotes, or references. It isn't lying on purpose; it simply doesn't have a built-in sense of truth.
+First, hallucinations. I would argue that {{ argument_hallucination_risk_view }}.
 
 Second, knowledge cutoff. The model learns from data collected up to a certain date. Unless it's connected to tools like web search, it doesn't know about events after that.
 
@@ -59,7 +59,7 @@ And third, bias. The model learns from human-written text, and human text contai
 
 So how should we use them wisely?
 
-Treat a language model like a brilliant, very fast assistant who sometimes makes things up. Give it clear instructions and enough context. Use it to draft, brainstorm, explain, and summarize. And always verify anything important: facts, numbers, legal or medical information, and code before you run it in production.
+Treat a language model like a brilliant, very fast assistant who sometimes makes things up. In my opinion, {{ argument_responsible_llm_use }}.
 
 {{ argument_everyday_use_example }}
 

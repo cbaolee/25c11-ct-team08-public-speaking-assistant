@@ -1,6 +1,6 @@
 ---
 topic: "Leadership Speech: Company Tech Strategy for Next Year"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you all for being here.
@@ -27,7 +27,7 @@ On the customer side: {{ argument_customer_insights }}
 
 And on the technology side, three shifts matter for us.
 
-First, AI has moved from experiment to everyday tool. Our competitors are using it, our customers increasingly expect it, and our engineers are already using AI assistants in their daily work. The question is no longer whether we use AI, but where it creates real value for our customers, and how we use it safely and responsibly.
+First, AI has moved from experiment to everyday tool. My view is that {{ argument_ai_strategy_position }}.
 
 Second, security threats are growing in both volume and sophistication. Attackers now use AI to write convincing phishing messages and to find weaknesses faster, and attacks on the software supply chain, through the open-source components we all depend on, have become a serious risk. For a company that handles {{ argument_sensitive_data_type }}, security isn't a technical detail. It's part of our promise to customers.
 
@@ -39,7 +39,7 @@ Principle one: customer outcomes over technical elegance. Every significant tech
 
 Principle two: reliability and security are features. They're not things we add when we have time left. They're part of the definition of done.
 
-Principle three: simplicity is a strategy. Every new technology, service, or tool we add has a long-term cost: someone has to learn it, maintain it, secure it, and pay for it. So we'll prefer fewer, well-understood technologies, and we'll add new ones only when the benefit is clear.
+Principle three: simplicity is a strategy. I would argue that {{ argument_simplicity_as_strategy }}.
 
 Principle four: teams own what they build, end to end. That includes its quality, its reliability, its cost, and its security, in production, not just until it's merged.
 
@@ -71,7 +71,7 @@ Our approach to AI, specifically, because it's an area with a lot of excitement,
 
 We'll use AI in two ways. First, in our products, where it clearly improves the customer experience. {{ argument_ai_product_plans }} Second, in our own work, to help our teams be more productive, through coding assistants, better internal search, and automation of repetitive tasks.
 
-For both, we'll follow a few rules. We start with a real problem, not with the technology. Every AI feature must have a clear way to measure whether it works, tested before launch and monitored after. Customer data is protected: we'll only use approved tools, and we won't send sensitive data to external services without the right agreements and safeguards. A human remains accountable for any AI output that affects customers. And code written with AI help goes through the same review and testing as any other code. The person who submits it owns it.
+For both, we'll follow a few rules. I believe that {{ argument_responsible_ai_adoption_rules }}.
 
 {{ argument_ai_governance_note }}
 
@@ -111,7 +111,7 @@ For our customers: {{ argument_customer_metrics }}
 
 And for our people: {{ argument_people_metrics }}
 
-An important warning about metrics. A metric is a tool for learning, not a target to game. If a team starts optimizing a number in a way that doesn't help customers, for example releasing tiny, meaningless changes just to increase deployment frequency, the metric has stopped being useful. So we'll always look at metrics together with context, and we'll never use these numbers to rank individuals.
+An important warning about metrics. My position is that {{ argument_metrics_for_learning }}.
 
 Now, the main risks to this strategy, and how we plan to handle them. {{ argument_strategy_risks }} We'll review this strategy every quarter, and if the world changes, or if we learn that we were wrong, we'll adjust. A strategy isn't a promise to never change your mind. It's a commitment to change it for good reasons, and to explain why.
 

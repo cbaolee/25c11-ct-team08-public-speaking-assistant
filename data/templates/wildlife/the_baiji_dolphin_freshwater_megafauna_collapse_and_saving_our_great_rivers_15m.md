@@ -20,6 +20,8 @@ We hadn't seen a single fin. We hadn't heard a single click.
 
 For the first time in modern history, humanity had driven an entire evolutionary family of cetaceans -- a whale or dolphin species -- off the face of the planet, not by hunting it, but simply by turning its river into an industrial highway.
 
+To frame the baiji dolphin, freshwater megafauna collapse, and saving our great rivers in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 When we talk about endangered wildlife, almost all our attention goes to the green forests on land and the blue oceans at sea.
 
 We forget the thin silver threads connecting them: Earth's freshwater rivers and lakes.
@@ -34,17 +36,17 @@ Because in the open ocean, if an oil spill or a noisy fleet of ships ruins one b
 
 A river animal lives inside a one-dimensional ribbon of water. It cannot climb up onto the riverbank to walk around a concrete dam, and it cannot swim away when pollution or ship propellers fill its narrow channel from bank to bank.
 
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
+
 The {{ argument_extinct_river_dolphin_species }} wasn't the only giant we lost in the {{ argument_river_name }} during our lifetime.
 
-Just sixteen years after our empty dolphin expedition, in {{ argument_paddlefish_extinction_year }}, the IUCN Red List officially declared the {{ argument_extinct_giant_fish_species }} -- the "King of Freshwater Fish," a silver giant that could grow up to {{ argument_max_fish_length_meters }} meters long, weigh {{ argument_max_fish_weight_kg }} kilograms, and used an electrosensory sword-like snout to hunt fish in murky water since the days of the Late Cretaceous dinosaurs -- 100% Extinct.
+Closer study of behavior and physiology uncovers a striking insight: {{ argument_species_behavior_insight }}.
 
 How did a dolphin that survived twenty million years and a fish that survived the asteroid that killed T. rex both vanish in the same generation?
 
 Look at what happened to the {{ argument_river_name }} between the 1950s and the 2000s:
 
-Deadly fishing gear: Fishermen used "rolling hooks" -- long bottom lines studded with thousands of unbaited razor-sharp hooks that snagged dolphins to death -- alongside illegal electro-fishing, where battery cables dropped into the water electrocuted every living creature in the channel.
-Acoustic blindness: Because river water is dark and muddy, the {{ argument_extinct_river_dolphin_species }} had tiny, nearly blind eyes and relied entirely on echolocation sonar to find fish and navigate. As thousands of roaring diesel cargo barges filled the river, the underwater engine noise blinded their sonar so they swam straight into spinning ship propellers.
-Concrete walls: When massive dams like the {{ argument_major_dam_name }} were built across the main river in {{ argument_dam_construction_year }}, they blocked the {{ argument_extinct_giant_fish_species }} from swimming upstream to the only gravelly rapids in the upper basin where the fish could lay its eggs!
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
 When the {{ argument_extinct_river_dolphin_species }} was declared functionally extinct in {{ argument_expedition_year }}, one species of cetacean still remained alive in that exact same river: the {{ argument_surviving_porpoise_species }} -- a round-headed, chubby freshwater porpoise with a permanent mischievous grin that had dropped down to just {{ argument_lowest_porpoise_count }} individuals and was shrinking by {{ argument_annual_porpoise_decline_rate }} a year.
 
@@ -52,9 +54,11 @@ Everyone said, "In fifteen years, the {{ argument_surviving_porpoise_species }} 
 
 Instead, that painful wakeup call triggered the most sweeping river conservation turnaround in history!
 
-First, scientists realized we couldn't wait while the main river was still dangerous. So we established {{ argument_oxbow_reserve_count }} natural "oxbow lake" reserves -- old curved loops of the river cut off from shipping traffic where water quality is clean and zero cargo ships or fishing nets ever enter -- moving founder groups of {{ argument_surviving_porpoise_species }} into safe waters where they immediately started having {{ argument_annual_oxbow_calves_count }} healthy baby calves a year!
+At the same time, real-world conservation around the baiji dolphin, freshwater megafauna collapse, and saving our great rivers is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
 
-Second, in {{ argument_fishing_ban_year }}, the national government did something many thought was politically impossible: it enacted a complete, ten-year commercial fishing ban across the entire main stem of the {{ argument_river_name }} and {{ argument_protected_tributaries_count }} major lakes and tributaries -- retiring {{ argument_retired_fishing_boats_count }} fishing vessels, helping {{ argument_transitioned_fishermen_count }} former fishermen transition to onshore jobs and river patrol rangers, shutting down polluting riverside chemical plants, and banning rolling hooks and electro-fishing forever!
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
+
+Understanding what drove this decline means confronting the core pressures at work: {{ argument_primary_threat_drivers }}.
 
 Look at what happened just three years after the nets came out of the water: in the {{ argument_recent_census_year }} river-wide survey, for the first time in forty years, the population of {{ argument_surviving_porpoise_species }} stopped falling and jumped upward by {{ argument_population_rebound_percentage }} to {{ argument_current_porpoise_count }} animals -- with mothers and calves now leaping right beneath the city bridges of {{ argument_riverside_city_name }}!
 
@@ -62,9 +66,7 @@ Today, we are taking the hard-won lessons of the {{ argument_river_name }} to sa
 
 In {{ argument_south_asian_or_amazon_river }}, working alongside local fishing communities through the {{ argument_global_river_dolphin_declaration }}:
 
-We are installing cheap, battery-powered acoustic pingers on legal fishing nets that emit a gentle high-pitched beep, warning {{ argument_surviving_river_dolphin_example }} away from nets and cutting entanglement deaths to near zero.
-On gated barrages and irrigation canals along the {{ argument_indus_or_ganges_river }} where dolphins get trapped when water levels drop in the dry season, our Canal Rescue Brigades have safely rescued and returned over {{ argument_canal_rescued_dolphins_count }} stranded river dolphins back into the main river!
-And in the Mekong River, home to the {{ argument_mekong_giant_fish_examples }} -- including a freshwater stingray weighing {{ argument_giant_stingray_weight_kg }} kilograms that our team recently tagged and released -- fishermen who accidentally catch a rare giant now call our 24-hour Fish Rescue Hotline to have the fish weighed, tagged, and released alive in exchange for a fair conservation reward!
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 We cannot bring back the Goddess of the {{ argument_river_name }}. Her silence is the price of waiting too long.
 

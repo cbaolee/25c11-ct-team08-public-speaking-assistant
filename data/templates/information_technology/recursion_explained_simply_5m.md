@@ -1,6 +1,6 @@
 ---
 topic: "Recursion Explained Simply"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Stand between two mirrors, and you'll see your reflection repeated again and again, each copy a little smaller than the last. Hold on to that picture, because it's the easiest way into today's topic.
@@ -21,9 +21,9 @@ When the computer runs factorial of five, it pauses at each step and asks about 
 
 The computer keeps track of all these paused calls on something called the call stack, which explains a famous error you might see: "stack overflow." It happens when there are so many calls, usually because the base case is missing or never reached, that the stack runs out of space.
 
-For factorial, a simple loop works just as well. But some problems are naturally recursive. Their structure is made of smaller copies of themselves. The folders on your computer are a perfect case. A folder can contain files, and also other folders, which contain more folders. If you want to find every file inside, recursion is the most natural way to do it: handle the files here, then do the same thing for each sub-folder.
+For factorial, a simple loop works just as well. But some problems are naturally recursive. In my view, {{ argument_when_recursion_fits }}.
 
-Recursion isn't free, though. Each call uses memory on the stack, so very deep recursion can be slow or even crash. And a careless recursive solution can repeat the same work many times. The Fibonacci sequence is a well-known trap: a naive recursive version recalculates the same values over and over. The fix is a technique called memoization, which simply means remembering answers you've already computed.
+Recursion isn't free, though. I would argue that {{ argument_recursion_costs }}.
 
 How, then, should you approach a recursive problem? A three-step recipe helps. Begin by identifying the smallest case you can solve directly: that's your base case. Then assume your function already works for a slightly smaller input. This is the leap of faith, and it's the hardest part for beginners. Finally, use that smaller answer to build the answer for the current input.
 

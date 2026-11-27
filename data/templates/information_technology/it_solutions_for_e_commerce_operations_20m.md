@@ -1,6 +1,6 @@
 ---
 topic: "IT Solutions for E-commerce Operations"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Every time someone taps "Place order" in a shopping app, a small miracle happens, and almost nobody sees it. Good {{ argument_time_of_day }}, everyone, and welcome to {{ argument_event_name }}. I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }}
@@ -23,7 +23,7 @@ The second is using a hosted e-commerce platform, a ready-made service that lets
 
 The third is a custom-built solution, developed specifically for your business. It gives you complete flexibility, but it costs much more to build and maintain, and you need a capable technical team. A popular modern variant is called headless commerce, where the customer-facing website or app is separated from the back-end commerce engine, and they talk to each other through APIs. This gives a lot of design freedom, especially for brands selling across many channels.
 
-Whatever you choose, two technical factors matter a lot at this stage: speed and mobile experience. Studies by major technology companies have repeatedly shown that slower pages lead to more visitors leaving before they buy. And today, a large majority of e-commerce traffic comes from mobile phones. So images should be optimized, pages should load quickly even on a weak connection, and everything should be easy to use with one thumb.
+Whatever you choose, two technical factors matter a lot at this stage: speed and mobile experience. I would argue that {{ argument_speed_and_mobile_priority }}.
 
 Stop two: product information and search.
 
@@ -43,7 +43,7 @@ So, good checkout design is a mix of user experience and technology. Show the fu
 
 On the technical side, payments are usually handled by a payment gateway: a service that securely connects your store to banks, card networks, and e-wallets. A good gateway supports many payment methods, protects against fraud, and handles the security requirements for you. And in markets like Vietnam, where cash on delivery is still widely used, your system also needs to handle cash orders, including the higher risk that some customers will refuse the parcel at the door.
 
-Security here is non-negotiable. Card payments must follow an international security standard called PCI DSS, the Payment Card Industry Data Security Standard. The simplest and safest approach for most businesses is to let the payment gateway handle card data entirely, so that card numbers never even touch your own servers.
+Security here is non-negotiable. My position is that {{ argument_payment_security_view }}.
 
 Stop four: order management.
 
@@ -97,7 +97,7 @@ Think about how many systems we've mentioned: a storefront, maybe several market
 
 The simplest approach is called point-to-point integration. Each system connects directly to each other system it needs. With three systems, that's manageable. But as you add more, the number of connections grows very quickly, and you end up with what engineers call "spaghetti": a tangle of connections where changing one system breaks three others, and nobody is quite sure which data comes from where.
 
-A more sustainable approach is to have a central hub. In many e-commerce businesses, the order management system plays this role. Everything that concerns orders and stock flows through it, and other systems connect to the hub rather than to each other. Some companies also use dedicated integration platforms, sometimes called middleware, which specialize in moving and transforming data between systems.
+A more sustainable approach is to have a central hub. In my view, {{ argument_central_hub_integration }}.
 
 Technically, most modern integrations use two mechanisms. The first is APIs, which allow one system to ask another for information or tell it to do something, for example: "create a shipment for this order." The second is webhooks, or events, which allow a system to announce that something has happened, for example: "payment confirmed," or "parcel delivered," so that every other interested system can react immediately, without constantly asking.
 
@@ -119,7 +119,7 @@ So, how do you bring all this together and choose the right solutions for your b
 
 First, start from your stage of growth. A small shop doesn't need an enterprise order management system. A hosted platform with a few good add-ons may be perfect. As you grow, you can add more specialized systems.
 
-Second, prioritize integration. The biggest problems in e-commerce operations rarely come from one bad system. They come from systems that don't talk to each other, forcing people to copy data by hand. Before choosing any tool, ask: does it integrate with what we already have? Does it have a good API?
+Second, prioritize integration. I believe that {{ argument_integration_over_tools }}.
 
 Third, fix the biggest pain first. Is it overselling? Then focus on inventory synchronization. Is it wrong items being shipped? Then focus on warehouse processes and barcode scanning. Is it customers constantly asking about their orders? Then focus on tracking notifications.
 

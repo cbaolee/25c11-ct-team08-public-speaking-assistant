@@ -1,0 +1,108 @@
+/* =====================================================================
+   DESIGN TOKENS  (single source of truth: map these 1:1 to tailwind.config)
+   Concept: "annotated manuscript" - a calm light page; marks are the loud part.
+   Serif = the voice of the speech (titles, scripts, transcript).
+   Sans  = the voice of the system (controls, numbers, charts).
+   ===================================================================== */
+:root {
+  --paper: #F7F8FA;        /* page */
+  --surface: #FFFFFF;      /* panels, sheets */
+  --ink: #1B2433;          /* primary text */
+  --muted: #5B6475;        /* secondary text (>= 5:1 on paper) */
+  --line: #E3E7EE;         /* hairlines */
+  --line-strong: #C9D0DB;  /* control borders, neutral marks */
+
+  --accent: #1D4ED8;       /* primary action, links, focus, data */
+  --accent-hover: #1E40AF;
+  --accent-soft: #EAF0FE;
+  --accent-line: #BBD0FB;
+
+  --record: #DC2626;       /* recording only */
+  --record-hover: #B91C1C;
+
+  /* feedback colors: text tokens are >= 4.5:1 on their soft background */
+  --ok: #047857;   --ok-soft: #D1FAE5;
+  --warn: #92400E; --warn-soft: #FEF3C7;
+  --bad: #B91C1C;  --bad-soft: #FEE2E2;
+  --warn-mark: #D97706;    /* strokes/bars only, never text */
+
+  --serif: "EB Garamond", Garamond, Georgia, serif;
+  --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --r-ctl: 10px;           /* controls */
+  --r-panel: 14px;         /* panels, sheets, modals */
+  --r-pill: 999px;         /* chips, pills */
+  --shadow-pop: 0 12px 32px rgba(27, 36, 51, .14);   /* only for things that float */
+  --hh: 64px;              /* header height, synced by JS */
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+/* Always keep room for the vertical scrollbar, so short screens (no scrollbar) and long screens
+   (scrollbar) have the same width and nothing jumps sideways when changing page or opening a modal */
+html { -webkit-text-size-adjust: 100%; scrollbar-gutter: stable; }
+/* Dark scrollbar that matches the dark backdrop.
+   Chrome, Edge, Safari: the track starts under the top bar, and the strip beside the top bar is
+   painted in the top bar's colour, so the bar looks like it runs the full width and the scrollbar
+   only lives below it. (Chrome ignores these ::-webkit-scrollbar rules when scrollbar-color is
+   set, so scrollbar-color is only given to browsers without them, i.e. Firefox.) */
+@supports not selector(::-webkit-scrollbar) { html { scrollbar-color: #3A4256 #0B1020; } }
+/* Short pages must still get a real scrollbar: Chrome paints an empty kept gutter with the plain page
+   colour only (black next to the top bar) and lets nothing draw into it, while a real scrollbar gets the
+   split colours below (ivory beside the top bar). So every app page is at least 1px taller than the screen. */
+body.app-view { min-height: calc(100vh + 1px); min-height: calc(max(100vh, 100dvh) + 1px); }
+html::-webkit-scrollbar { width: 12px; background: #0B1020; }
+html:has(body.app-view)::-webkit-scrollbar { background: linear-gradient(to bottom, #FAF7F0 0, #FAF7F0 var(--hh, 76px), #0B1020 var(--hh, 76px)); }
+html::-webkit-scrollbar-track { background: transparent; }
+html:has(body.app-view)::-webkit-scrollbar-track { margin-top: var(--hh, 76px); }
+html::-webkit-scrollbar-thumb { background: #3A4256; border-radius: 6px; border: 3px solid #0B1020; }
+/* Pages that only overflow by that 1px: no thumb to show, the track stays plain dark (class set by main.js) */
+html.no-scroll::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; }
+/* While a window is open the page is dimmed by its backdrop (rgba(27, 36, 51, .45)), but the scrollbar is
+   outside the page and stays bright: give it the same colours as seen through that backdrop (class set by
+   ui.js). Values are the normal colours mixed 55 / 45 with the backdrop. */
+html.modal-open:has(body.app-view)::-webkit-scrollbar { background: linear-gradient(to bottom, #96989B 0, #96989B var(--hh, 76px), #121929 var(--hh, 76px)); }
+html.modal-open::-webkit-scrollbar-thumb { background: #2C3446; border-color: #121929; }
+html.modal-open::-webkit-scrollbar-thumb:hover { background: #374155; }
+html.modal-open.no-scroll::-webkit-scrollbar-thumb { background: transparent; border-color: transparent; }
+html::-webkit-scrollbar-thumb:hover { background: #4E5870; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.55 var(--sans); min-height: 100vh; }
+img, svg { max-width: 100%; }
+[hidden] { display: none !important; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+h1[tabindex="-1"]:focus, .box:focus { outline: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: 12px; top: -48px; background: var(--ink); color: #fff; padding: 10px 14px; border-radius: var(--r-ctl); z-index: 300; text-decoration: none; }
+.skip:focus { top: 12px; }
+
+/* ---------- type ---------- */
+h1, h2 { font-family: var(--serif); font-weight: 600; color: var(--ink); letter-spacing: -.005em; margin: 0; }
+h1 { font-size: clamp(30px, 4vw, 40px); line-height: 1.12; }
+h2 { font-size: 26px; line-height: 1.2; }
+h3 { font: 600 15px/1.3 var(--sans); margin: 0; color: var(--ink); }
+p { margin: 0; }
+.sub { color: var(--muted); font-size: 16px; margin-top: 6px; max-width: 62ch; }
+.note { font-size: 14px; color: var(--muted); }
+.mute { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- buttons ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 42px; padding: 9px 16px; border-radius: var(--r-ctl); border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); font: 600 15px/1.2 var(--sans); cursor: pointer; transition: background .15s, border-color .15s; text-decoration: none; }
+.btn:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent-line); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-record { background: var(--record); border-color: var(--record); color: #fff; }
+.btn-record:hover:not(:disabled) { background: var(--record-hover); border-color: var(--record-hover); }
+.btn-ghost { border-color: transparent; background: transparent; color: var(--accent); }
+.btn-ghost:hover:not(:disabled) { background: var(--accent-soft); border-color: transparent; }
+.btn-danger-ghost { border-color: transparent; background: transparent; color: var(--bad); }
+.btn-danger-ghost:hover:not(:disabled) { background: var(--bad-soft); border-color: transparent; }
+.btn-sm { min-height: 34px; padding: 5px 12px; font-size: 14px; }
+.btn-lg { min-height: 50px; padding: 12px 24px; font-size: 17px; }
+.btn svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.iconbtn { width: 42px; height: 42px; padding: 0; }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.row.between { justify-content: space-between; }
+.row.end { justify-content: flex-end; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: 600 15px var(--sans); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }

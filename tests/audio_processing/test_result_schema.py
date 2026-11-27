@@ -1,8 +1,8 @@
-"""Test hợp đồng EvaluationResultV2 (ADR-004). Không gọi mạng."""
+"""Tests for the EvaluationResultV2 contract (ADR-004). No network calls."""
 
 import pytest
 
-# Import trong thân test: nếu module chưa có, test đỏ (không đỏ lúc collect).
+# Import inside the test body: if the module is missing, the test fails (not at collect).
 
 
 def _alignment_kwargs(**over):
@@ -22,7 +22,7 @@ def _alignment_kwargs(**over):
 
 def _result_kwargs(**over):
     base = dict(
-        schema_version="2.0",
+        schema_version="2.1",
         status="ok",
         reason=None,
         overall=88.0,
@@ -70,9 +70,7 @@ def test_alignment_del_none_times():
     from src.audio_processing.result_schema import AlignmentItem
 
     item = AlignmentItem(
-        **_alignment_kwargs(
-            status="del", hyp_index=None, hyp_word=None, start_s=None, end_s=None
-        )
+        **_alignment_kwargs(status="del", hyp_index=None, hyp_word=None, start_s=None, end_s=None)
     )
     assert item.start_s is None and item.end_s is None
 
@@ -130,7 +128,7 @@ def test_result_label_literal():
     from src.audio_processing.result_schema import EvaluationResultV2
 
     with pytest.raises(ValidationError):
-        EvaluationResultV2(**_result_kwargs(label="Tốt"))  # nhãn tiếng Việt bị loại
+        EvaluationResultV2(**_result_kwargs(label="Tốt"))  # Vietnamese label is rejected
     assert EvaluationResultV2(**_result_kwargs(label=None, overall=None)).label is None
 
 
@@ -157,7 +155,7 @@ def test_result_missing_reason_rejected():
     from src.audio_processing.result_schema import EvaluationResultV2
 
     kwargs = _result_kwargs()
-    del kwargs["reason"]  # X | None không default => bắt buộc truyền
+    del kwargs["reason"]  # X | None without default => must be passed
     with pytest.raises(ValidationError):
         EvaluationResultV2(**kwargs)
 

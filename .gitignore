@@ -265,3 +265,4 @@ desktop.ini
 
 # Benchmark local
 scripts/
+.test-temp/

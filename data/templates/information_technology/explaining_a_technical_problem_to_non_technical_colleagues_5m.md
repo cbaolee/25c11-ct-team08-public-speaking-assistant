@@ -1,6 +1,6 @@
 ---
 topic: "Explaining a Technical Problem to Non-Technical Colleagues"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Hi everyone, thanks for making time for this. I know most of you are busy, so I'll keep it short and simple, and I'll try to avoid technical jargon. If I do slip into tech-speak at any point, please stop me and ask. There are no silly questions here. I want to explain a technical problem that affects your work too: what it is, what it means for you, and what we're doing about it.
@@ -33,6 +33,6 @@ In four lines. The problem: {{ argument_problem_short_name }}. What you'll notic
 
 I'll send a short written summary of this after the meeting, so you have it for reference. And I'll give you an update by {{ argument_next_update_time }}, or earlier if anything changes.
 
-Is there anything I explained that wasn't clear? Please ask, even if it feels basic. If one person is wondering about something, others usually are too.
+Is there anything I explained that wasn't clear? My honest view is that {{ argument_why_plain_explanations_matter }}.
 
 We know this isn't ideal, and we're doing everything we can to get it sorted out quickly and safely. Thank you for your patience.

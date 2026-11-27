@@ -16,10 +16,10 @@ Farmers had begun using this cheap anti-inflammatory drug to treat aging {{ argu
 
 The disappearance of {{ argument_target_vulture_species }} quickly proved why ecosystems cannot function without obligate scavengers. A flock of vultures can strip a {{ argument_livestock_carcass_weight }} carcass clean to the bone in {{ argument_stripping_duration_minutes }}, and their stomach acid -- which has a pH of {{ argument_stomach_acid_ph_statistic }} -- destroys deadly pathogens like {{ argument_neutralized_pathogens_list }}.
 
-With the vultures gone, rotting carcasses remained in the sun around villages in {{ argument_affected_region_name }}, contaminating water supplies. Taking advantage of the free meat, the population of feral {{ argument_secondary_scavenger_species }} exploded by {{ argument_feral_population_increase_statistic }}. Unlike vultures, these mammals carry {{ argument_zoonotic_disease_name }}, leading to {{ argument_human_health_impact_statistic }} and billions of dollars in public health costs.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
 
-Solving this crisis required bridging wildlife biology with veterinary policy. After presenting our findings, the governments of {{ argument_banning_countries_list }} banned the veterinary use of {{ argument_toxic_pharmaceutical_name }} in {{ argument_ban_year }} and promoted a vulture-safe alternative called {{ argument_safe_alternative_drug_name }}.
+Solving this crisis required bridging wildlife biology with veterinary policy. Expanding on this key point for avian scavenger collapse, veterinary pharmaceuticals, and carcass sanitizers: {{ argument_habitat_dynamics_analysis }}.
 
-Today, we are establishing Vulture Safe Zones spanning {{ argument_safe_zone_radius_statistic }} around remaining nesting colonies in {{ argument_sanctuary_region_name }}, where pharmacies are audited and captive-bred {{ argument_target_vulture_species }} are being released back into the thermals.
+Field surveys and long-term observations provide compelling evidence: {{ argument_empirical_field_evidence }}.
 
 Conservation isn't just about saving the animals we find beautiful; it is about protecting the species that keep our world clean and whole. Thank you.

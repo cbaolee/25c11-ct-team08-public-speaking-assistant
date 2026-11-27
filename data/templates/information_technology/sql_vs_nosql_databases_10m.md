@@ -1,11 +1,11 @@
 ---
 topic: "SQL vs NoSQL Databases"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Here's a decision that takes ten minutes to make at the start of a project, and can take ten months to undo later. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and the decision I mean is this one: should we use a SQL database or a NoSQL database?
 
-You'll find plenty of strong opinions online. Some people say SQL is old-fashioned. Others say NoSQL is just a trend. My aim today is to cut through that noise and give you a clear, balanced way to think about the choice. And I'll tell you my conclusion up front: neither one is better in general. Each one is better for certain kinds of problems.
+You'll find plenty of strong opinions online. Some people say SQL is old-fashioned. My view is that {{ argument_sql_nosql_not_a_war }}.
 
 SQL databases, also known as relational databases, come first.
 
@@ -39,7 +39,7 @@ First, flexibility. Most NoSQL databases don't force a fixed schema. You can add
 
 Second, horizontal scaling. Instead of buying one bigger and more expensive server, which we call scaling up, many NoSQL systems are designed to spread data across many ordinary servers, which we call scaling out. Need more capacity? Add more machines.
 
-But there's a trade-off. In a system spread across many servers, it's very hard to guarantee perfect consistency and constant availability at the same time, especially when part of the network fails. So many NoSQL databases choose to stay available and accept that different servers may briefly disagree, catching up a moment later. This is called eventual consistency. For a social media "like" counter, that's perfectly fine. For a bank balance, it might not be.
+But there's a trade-off. I would argue that {{ argument_consistency_tradeoff_view }}.
 
 Three common myths deserve clearing up.
 
@@ -61,7 +61,7 @@ Do you expect enormous volumes of simple reads and writes, spread around the wor
 
 And finally, what does your team already know? This is often underestimated. A well-understood tool used well is better than a fashionable tool used badly.
 
-In the real world, many systems use both. This is called polyglot persistence. An online store might keep orders and payments in PostgreSQL, use Redis to cache popular pages and shopping carts, and use a search engine for product search. Each tool does the job it's best at.
+In the real world, many systems use both. In my opinion, {{ argument_polyglot_persistence_view }}.
 
 A common mistake shows why the questions matter. A team building an online shop picks a document database because it feels faster to start with: no schema, no migrations. For the first few months, it is faster. Then the business asks for reports that combine customers, orders, products, and refunds, and for guarantees that stock and payments never get out of sync. The team ends up writing a lot of application code to do joins and consistency checks that a relational database would have handled for them. The reverse mistake happens too, when a team forces rapidly changing, loosely structured data into rigid tables. The lesson isn't that one choice is wrong. It's that the shape of your data and your consistency needs should drive the decision, not what feels quickest on day one.
 

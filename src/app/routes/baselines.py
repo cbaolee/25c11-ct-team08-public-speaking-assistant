@@ -1,0 +1,185 @@
+"""Baseline endpoints: analyse a voice sample, keep it as the user's current baseline."""
+
+import logging
+import tempfile
+from pathlib import Path
+from typing import Annotated
+from uuid import uuid4
+
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.concurrency import run_in_threadpool
+from fastapi.responses import JSONResponse
+
+from src.app.config import max_upload_bytes, settings
+from src.app.db.factory import Repos, get_repos
+from src.app.db.models import BaselineRow, NewBaseline, StorageError, build_object_path
+from src.app.db.session_helpers import AudioEncodingError, encode_opus
+from src.app.deps import CurrentUser, get_current_user, require_recording_consent
+from src.app.uploads import safe_upload_path, save_upload_limited
+from src.audio_processing.contracts import BaselineProfile, InsufficientAudio, VadParams
+from src.audio_processing.pipeline import analyze_baseline
+from src.audio_processing.result_schema import BaselineResponse
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api")
+
+
+def to_baseline_profile(row: BaselineRow) -> BaselineProfile:
+    """Convert a stored baseline row into the profile the Evaluate Pipeline expects."""
+    return BaselineProfile(
+        median_pause_s=row.median_pause_s,
+        hesitation_threshold_s=row.hesitation_threshold_s,
+        median_f0_hz=row.median_f0_hz,
+        mean_loudness_db=row.mean_loudness_db,
+        flags=list(row.flags),
+    )
+
+
+def _save_baseline(
+    repos: Repos, user: CurrentUser, profile: dict, source_path: Path, work_dir: Path
+) -> None:
+    """Upload the Opus audio, then make the new baseline current and drop the old audio."""
+    baseline_id = uuid4()
+    object_path = build_object_path(user.id, baseline_id, ".webm")
+    # Own file name: the upload may already be baseline.webm, FFmpeg refuses to overwrite input
+    opus_path = work_dir / f"{baseline_id}.webm"
+    encode_opus(source_path, opus_path)
+    repos.files.upload_file(
+        user.id, settings.baselines_bucket, object_path, opus_path.read_bytes(), "audio/webm"
+    )
+    try:
+        _, previous = repos.baselines.replace_current_baseline(
+            user.id, NewBaseline(id=baseline_id, audio_path=object_path, **profile)
+        )
+    except StorageError:
+        repos.files.delete_files(user.id, settings.baselines_bucket, [object_path])
+        raise
+    if previous is not None and previous.audio_path:
+        try:
+            repos.files.delete_files(user.id, settings.baselines_bucket, [previous.audio_path])
+        except StorageError:
+            logger.warning("Could not delete old baseline audio for baseline %s", previous.id)
+
+
+@router.post("/baseline")
+async def create_baseline(
+    audio: Annotated[UploadFile, File()],
+    user: Annotated[CurrentUser, Depends(require_recording_consent)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Analyse a baseline recording; when the status is ok, store it as the current baseline."""
+    with tempfile.TemporaryDirectory() as temp_dir:
+        work_dir = Path(temp_dir)
+        audio_path = safe_upload_path(work_dir, audio.filename, stem="baseline")
+        await run_in_threadpool(save_upload_limited, audio, audio_path, max_bytes=max_upload_bytes)
+
+        try:
+            # D12: one JSON shape {schema_version, status, reason, profile, flags}
+            # Heavy work (FFmpeg, VAD, Parselmouth) off the event loop.
+            payload = await run_in_threadpool(
+                analyze_baseline, audio_path=audio_path, vad_params=VadParams()
+            )
+        except InsufficientAudio:
+            payload = {
+                "schema_version": "2.0",
+                "status": "insufficient_audio",
+                "reason": "low_voiced_ratio",
+                "profile": None,
+                "flags": [],
+            }
+        response = BaselineResponse(**payload)
+
+        if response.status == "ok" and response.profile is not None:
+            try:
+                await run_in_threadpool(
+                    _save_baseline, repos, user, response.profile, audio_path, work_dir
+                )
+            except (StorageError, AudioEncodingError):
+                logger.exception("Could not save baseline")
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "error_code": "baseline_not_saved",
+                        "message": "Baseline was analysed but could not be saved",
+                    },
+                )
+    return response.model_dump(mode="json")
+
+
+@router.get("/baseline")
+async def get_baseline(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Return the caller's current baseline, or null when there is none.
+
+    The bucket path stays on the server (`audio_path` is internal), like `user_id`.
+    503 `baseline_unavailable` when the database cannot be read, so the UI does not
+    mistake an outage for "no baseline yet" and ask for a new recording.
+    """
+    try:
+        row = await run_in_threadpool(repos.baselines.get_current_baseline, user.id)
+    except StorageError:
+        logger.exception("Could not load baseline")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "error_code": "baseline_unavailable",
+                "message": "Could not load the current baseline",
+            },
+        )
+    if row is None:
+        return None
+    return row.model_dump(mode="json", exclude={"user_id", "audio_path"})
+
+
+def _audio_unavailable() -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error_code": "baseline_audio_unavailable",
+            "message": "Could not load the baseline recording",
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/baseline/audio")
+async def get_baseline_audio(
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    """Return a short-lived signed URL for the caller's current baseline recording.
+
+    The baseline is looked up by the authenticated user id only, so one user can never
+    ask for another user's file. `audio_path` and `user_id` never appear in the body.
+    404 `baseline_not_found`: no baseline, or no audio stored for it.
+    503 `baseline_audio_unavailable`: database or storage could not be reached.
+    `Cache-Control: no-store` keeps the URL out of browser/proxy caches.
+    """
+    try:
+        row = await run_in_threadpool(repos.baselines.get_current_baseline, user.id)
+        if row is None or not row.audio_path:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error_code": "baseline_not_found",
+                    "message": "No baseline recording found",
+                },
+                headers={"Cache-Control": "no-store"},
+            )
+        url = await run_in_threadpool(
+            repos.files.create_signed_url,
+            user.id,
+            settings.baselines_bucket,
+            row.audio_path,
+            settings.signed_url_ttl_s,
+        )
+    except StorageError:
+        logger.exception("Could not create baseline audio URL")
+        return _audio_unavailable()
+    return JSONResponse(
+        content={"url": url, "expires_in": settings.signed_url_ttl_s},
+        headers={"Cache-Control": "no-store"},
+    )

@@ -1,6 +1,6 @@
 ---
 topic: "Farewell Speech for a Leaving Team Member"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Okay, everyone, can I have your attention for a few minutes? Thank you.
@@ -17,13 +17,11 @@ But what I think we'll miss most is how {{ argument_colleague_name }} worked wit
 
 I also want to share a moment that, for me, says a lot about who they are. {{ argument_memorable_story }}
 
-[Optional: invite one or two teammates to add a short memory, about one minute in total.]
-
 {{ argument_colleague_name }}, on behalf of the whole team, thank you. Thank you for the code you've written and the problems you've solved, of course. But also thank you for the questions you asked that made us think, the reviews that made us better engineers, the help you gave without being asked, and the good mood you brought into the room, even on the days when production was on fire.
 
 You're leaving behind a team that's stronger because you were part of it. And you're taking with you skills and experience that your new team is very lucky to get.
 
-The tech world is small, and I'm sure our paths will cross again, maybe at a conference, maybe on an open-source project, maybe even as colleagues again one day. Please stay in touch. Our door, and our team chat, will always be open to you.
+The tech world is small, and I'm sure our paths will cross again, maybe at a conference, maybe on an open-source project, maybe even as colleagues again one day. I truly believe that {{ argument_paths_will_cross_again }}.
 
 {{ argument_farewell_gift_note }}
 

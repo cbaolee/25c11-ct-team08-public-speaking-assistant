@@ -1,6 +1,6 @@
 ---
 topic: "Core Data Structures Workshop: Arrays, Lists, Stacks, Queues and Hash Tables"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 20
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome to {{ argument_workshop_name }}. I'm {{ argument_speaker_name }}, and for the next twenty minutes, we're going to explore the core data structures that almost every program relies on: arrays, linked lists, stacks, queues, and hash tables.
@@ -9,7 +9,7 @@ To set the scene: one hundred thousand books piled randomly on the floor. Or the
 
 A word on how this workshop will work. This is not a lecture where I talk and you listen. Every few minutes, I'll give you a small challenge to think about with the person next to you. There are no wrong answers in these moments. Data structures are much easier to understand when you reason about them yourself, rather than just memorizing definitions.
 
-Why do data structures matter at all? Go back to those two libraries. Both contain exactly the same information. The difference is entirely in how that information is organized. And that is what a data structure is: a way of organizing data so that certain operations become efficient.
+Why do data structures matter at all? Go back to those two libraries. My view is that {{ argument_why_data_structures_matter }}.
 
 In programming, the operations we care about are usually accessing an item, searching for an item, inserting a new item, and deleting an item. Different data structures make different operations fast, and others slow. There's no perfect structure that's best at everything. Choosing one is always about trade-offs, and learning to see those trade-offs is the real skill we're building today.
 
@@ -23,13 +23,11 @@ But arrays have a weakness, and our first quick exercise will find it.
 
 Take a row of ten lockers, all full, holding names in alphabetical order. A new student arrives, and their name needs to go in position zero, at the very beginning, to keep the order. What has to happen to the other nine names? Take thirty seconds and discuss it with your neighbor.
 
-[Pair discussion, about thirty seconds.]
-
 All right, what did you come up with? Exactly. Every single item has to shift one position to the right to make room. With ten items, that's fine. With ten million items, that's ten million moves. Inserting or deleting at the beginning or in the middle of an array is O of n.
 
 Searching is another thing to think about. If the array isn't sorted, you have to check each locker one by one: O of n. But if it's sorted, you can use binary search: open the middle locker, decide whether your name comes before or after it, and throw away half of the lockers each time. That's O of log n. Even with a million items, you need only about twenty checks.
 
-Most modern languages also give us dynamic arrays, like lists in Python, ArrayList in Java, or vectors in C plus plus. When they run out of space, they quietly create a bigger array, usually about double the size, and copy everything over. Because that happens rarely, adding to the end is still fast on average.
+Most modern languages also give us dynamic arrays, like lists in Python, ArrayList in Java, or vectors in C plus plus. I would argue that {{ argument_dynamic_array_tradeoff }}.
 
 Arrays, in one line: excellent for fast access by position, but slow for inserting and deleting in the middle.
 
@@ -51,8 +49,6 @@ A stack follows one simple rule: last in, first out. A stack of plates in a cafe
 
 Time for another quick exercise: in the next thirty seconds, with your neighbor, try to name one feature you use every day that behaves like a stack.
 
-[Pair discussion, about thirty seconds.]
-
 Great, who wants to share? Yes, the undo button is a perfect example. Every action you take is pushed onto a stack, and when you press undo, the most recent action is popped off and reversed. The back button in your browser is another one. And when a program calls functions inside other functions, the computer keeps track of them using a call stack. If you've ever seen a "stack overflow" error, that's what happened: the call stack ran out of space.
 
 A queue is the opposite: first in, first out, exactly like a line at a coffee shop. New people join at the back, and people leave from the front. Enqueue adds an item to the back, and dequeue removes one from the front, both in O of one. Queues appear whenever we need fairness, or need to process things in the order they arrived: documents waiting to be printed, messages waiting for a server, customers waiting in an online ticket system.
@@ -65,11 +61,9 @@ A hash table stores data as key-value pairs. The key could be a student ID, and 
 
 There's a catch, though, and one more thinking exercise will expose it. We have one hundred mailboxes, and we want to store records for one hundred and fifty students. What problem is guaranteed to happen? Take thirty seconds.
 
-[Pair discussion, about thirty seconds.]
-
 Exactly: at least two students will end up with the same mailbox number. This is called a collision, and it can happen long before the table is full, just by chance. One common fix is chaining: each mailbox holds a small list, so if two records land in the same place, we keep both. With a good hash function, and a table that grows when it gets too full, collisions stay rare and operations stay fast on average.
 
-What are hash tables bad at? They don't keep items in any meaningful order. If you need your data sorted, a hash table won't help you much. But you've almost certainly used them already: in Python they're called dictionaries and sets, in Java HashMap and HashSet, and in JavaScript objects and Map.
+What are hash tables bad at? In my opinion, {{ argument_hash_table_limits }}.
 
 All right. Time to put everything together. This is the main exercise of today's workshop.
 
@@ -85,8 +79,6 @@ Problem four: a music player keeps a playlist where songs are constantly inserte
 
 Problem five: a game stores the scores of exactly twelve players, and frequently needs to read the score of player number seven.
 
-[Group exercise, about four minutes.]
-
 Okay, let's bring it back together and check the answers.
 
 Problem one, undo: a stack. The most recent action is always the first one to be undone.
@@ -101,7 +93,7 @@ And problem five, twelve players accessed by number: a simple array. The size is
 
 How did you do? If you got most of these, congratulations. You're already thinking like a software engineer. And if some of them surprised you, that's perfectly normal. This kind of judgment grows with practice.
 
-Three takeaways to carry out of this room. First, a data structure is a way of organizing data so that certain operations become efficient. Second, there's no perfect structure, only trade-offs: arrays for fast access, linked lists for fast insertion, stacks for last in first out, queues for first in first out, and hash tables for near-instant lookups without order. And third, the right question is never "which data structure is the best?" It's "which operations does my problem need most, and which structure makes them fast?"
+Three takeaways to carry out of this room. Above all, I believe {{ argument_choosing_structures_by_operations }}.
 
 {{ argument_hands_on_lab_instructions }}
 

@@ -1,6 +1,6 @@
 ---
 topic: "Git and Version Control Basics"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Hi everyone, I'm {{ argument_speaker_name }}, and today's topic is Git: a tool you'll use almost every day as a developer, and one that will probably save you from disaster more than once.
@@ -9,7 +9,7 @@ Picture a folder on your desktop. Inside it, there's a file called "report." Nex
 
 If that folder looks familiar, you're in the right room. We laugh at it, but it's a real problem. Which version is the latest? What changed between them? What if two people edited the same file at the same time? And what if you break something and need to go back to yesterday's version?
 
-That's the problem version control solves. A version control system records changes to your files over time, so you can see who changed what, when, and why, go back to any earlier version, and let many people work on the same project without overwriting each other's work.
+That's the problem version control solves. In my view, {{ argument_why_version_control_essential }}.
 
 Git is by far the most popular version control system in the world. It was created in two thousand and five by Linus Torvalds, the creator of Linux, to manage the development of the Linux kernel, one of the largest collaborative software projects ever. Today, it's used by almost every software company, from tiny startups to the largest tech companies.
 
@@ -25,7 +25,7 @@ This is the part that confuses many beginners: Git has three areas.
 
 The working directory is where you actually edit your files. The staging area is like a waiting room, where you put the changes you want to include in your next commit. And the repository is where commits are permanently stored.
 
-Why do we need the staging area? Because it lets you choose exactly what goes into each commit. Imagine you fixed a bug and also changed some styling. Those are two separate ideas, so you can stage and commit the bug fix first, and the styling change separately. That makes your history much clearer.
+Why do we need the staging area? I would argue that {{ argument_staging_area_discipline }}.
 
 In practice, the basic cycle looks like this. You edit your files. You run git status to see what has changed. You run git add to move the changes you want into the staging area. And you run git commit with a message to save the snapshot. Edit, add, commit. You'll repeat this cycle many times a day.
 
@@ -33,7 +33,7 @@ The third key idea is branches. A branch is an independent line of development. 
 
 This is what allows a team of developers to work on ten different features at the same time without getting in each other's way.
 
-Sometimes, when you merge, Git finds that two people changed the same lines of the same file in different ways. Git can't guess which version is correct, so it asks you to decide. This is called a merge conflict. It sounds scary the first time, but it's actually quite simple: Git marks the conflicting parts in the file, you choose what the final version should be, and then you commit the result. The best way to avoid painful conflicts is to commit and merge small changes often, instead of working alone on a branch for weeks.
+Sometimes, when you merge, Git finds that two people changed the same lines of the same file in different ways. My position is that {{ argument_merge_conflicts_are_normal }}.
 
 The fourth key idea is remotes. So far, everything has happened on your own computer. A remote is a copy of the repository hosted somewhere else, usually on a platform like GitHub, GitLab, or Bitbucket.
 

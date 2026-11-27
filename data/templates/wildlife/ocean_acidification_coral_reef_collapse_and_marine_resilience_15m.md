@@ -16,6 +16,8 @@ At the same time, the ocean is absorbing roughly {{ argument_carbon_absorption_p
 
 For communities in {{ argument_coastal_region_name }}, this isn't an abstract ecological tragedy. Over {{ argument_dependent_human_population_statistic }} people rely directly on these reefs for coastal storm protection, protein, and {{ argument_local_economic_sector }} livelihoods.
 
+To frame ocean acidification, coral reef collapse, and marine resilience in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 After the {{ argument_bleaching_event_year }} die-off, it was easy to fall into despair. Colleagues of mine openly wondered if we were simply writing the obituary for {{ argument_marine_sanctuary_name }}.
 
 But on a survey dive in {{ argument_discovery_location_name }} -- a shallow, naturally super-heated lagoon where temperatures regularly hit {{ argument_extreme_lagoon_temperature_statistic }} -- my team noticed something extraordinary. Right in the middle of a graveyard of dead skeletons were vibrant, thriving colonies of {{ argument_resilient_species_strain }}.
@@ -23,6 +25,8 @@ But on a survey dive in {{ argument_discovery_location_name }} -- a shallow, nat
 Nature had already been running its own climate change survival experiment for thousands of years, and these survivors held the genetic blueprint for resilience.
 
 We realized we couldn't just put ropes around marine parks and hope for the best anymore; we had to move from passive protection to active ecological intervention.
+
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
 
 In our lab at {{ argument_research_institute_name }}, working alongside indigenous sea rangers from {{ argument_local_indigenous_group }}, we began practicing what we call assisted gene flow and micro-fragmentation. When you cut a {{ argument_target_marine_organism }} into tiny fragments, it triggers a healing response that causes it to grow {{ argument_accelerated_growth_factor }} faster than normal.
 

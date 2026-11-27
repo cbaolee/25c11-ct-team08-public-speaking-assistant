@@ -1,6 +1,6 @@
 ---
 topic: "Presenting a Project Proposal to a Client"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 Good {{ argument_time_of_day }}, everyone. Thank you for inviting us here today, and for the time your team spent with us over the past few weeks sharing your challenges and goals. My name is {{ argument_speaker_name }}, {{ argument_speaker_role }} at {{ argument_vendor_company_name }}, and with me today is {{ argument_colleagues_present }}.
@@ -33,7 +33,7 @@ First, we propose to deliver this in phases, rather than all at once. The first 
 
 Second, we've designed the solution to work with the systems you already have, specifically {{ argument_existing_systems }}, so your team doesn't have to change everything at once, and your existing investments are protected.
 
-And third, we've focused on simplicity for the people who'll use it every day. The best system in the world fails if people don't want to use it. So we'll involve your users from the very beginning, with regular demos and feedback sessions.
+And third, we've focused on simplicity for the people who'll use it every day. The best system in the world fails if people don't want to use it. We believe that {{ argument_simplicity_drives_adoption }}.
 
 How will we deliver it?
 
@@ -47,7 +47,7 @@ You may be asking: why us?
 
 {{ argument_relevant_experience }}
 
-But more than our experience, I hope what you've seen during our conversations is how we work: we listen carefully, we ask difficult questions early, and we speak plainly about risks and trade-offs. That's the kind of partnership we'd like to build with you.
+But more than our experience, I hope what you've seen during our conversations is how we work: we listen carefully, we ask difficult questions early, and we speak plainly about risks and trade-offs. In our view, {{ argument_how_we_work_matters }}.
 
 Speaking of risks, let me be transparent about the main ones we see, and how we plan to manage them. {{ argument_key_risks_and_mitigation }}
 

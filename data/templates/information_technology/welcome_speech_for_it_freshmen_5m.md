@@ -1,6 +1,6 @@
 ---
 topic: "Welcome Speech for IT Freshmen"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 5
 ---
 Good {{ argument_time_of_day }}, everyone, and welcome!
@@ -17,13 +17,13 @@ Over the next few years, you'll learn programming, algorithms, data structures, 
 
 Three pieces of advice for your first year.
 
-First, take the fundamentals seriously. Technologies change every few years, but the foundations, such as how to think logically, how to break a problem into parts, and how computers actually work, will serve you for your whole career. Courses that seem theoretical now are often the ones that matter most later.
+First, take the fundamentals seriously. In my view, {{ argument_fundamentals_outlast_technologies }}.
 
 Second, build things. Don't only study for exams. Write small programs for fun, solve problems that interest you, and join projects, clubs, and competitions. You learn programming by programming, and the mistakes you make on your own projects will teach you more than any lecture.
 
 And third, don't do it alone. Make friends, form study groups, and help each other. Talk to your lecturers and teaching assistants. We're here to help you, and we're happy when you come to us with questions. {{ argument_support_resources }}
 
-And one more thing, about artificial intelligence tools. Use them to help you understand, not to avoid understanding. If an AI writes your assignment, it learns nothing, and neither do you. Your goal here isn't to submit answers. It's to become someone who can solve problems.
+And one more thing, about artificial intelligence tools. I would argue that {{ argument_ai_tools_for_freshmen }}.
 
 {{ argument_personal_message }}
 

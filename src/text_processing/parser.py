@@ -2,10 +2,22 @@
 
 import os
 import re
+import unicodedata
 import warnings
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any
+
+from src.app.config import (
+    composer_max_words,
+    max_pdf_pages,
+    max_pdf_size_bytes,
+    max_text_file_bytes,
+    max_text_file_words,
+    max_turn_text_chars,
+    min_pdf_size_bytes,
+)
 
 try:
     with warnings.catch_warnings():
@@ -27,7 +39,19 @@ except ImportError:
     maybe_recover_page_text = None
 
 PDF_MAGIC_BYTES = b"%PDF-"
-MIN_PDF_SIZE_BYTES, MAX_PDF_SIZE_BYTES, MAX_POC_PAGES = 1024, 25 * 1024 * 1024, 10
+MIN_PDF_SIZE_BYTES = min_pdf_size_bytes
+MAX_PDF_SIZE_BYTES = max_pdf_size_bytes
+MAX_POC_PAGES = max_pdf_pages
+MAX_TEXT_FILE_BYTES = max_text_file_bytes
+MAX_TEXT_FILE_WORDS = max_text_file_words
+MAX_TURN_TEXT_CHARS = max_turn_text_chars
+MAX_TURN_TEXT_WORDS = composer_max_words
+ALLOWED_DOC_EXTENSIONS = frozenset({".pdf", ".md", ".txt"})
+FILE_SIZE_LIMITS_BYTES: dict[str, int] = {
+    ".pdf": MAX_PDF_SIZE_BYTES,
+    ".md": MAX_TEXT_FILE_BYTES,
+    ".txt": MAX_TEXT_FILE_BYTES,
+}
 HEADING_PATTERN = re.compile(r"^(#{1,4})\s+(.+)$")
 
 
@@ -135,10 +159,107 @@ def _extract_pdf_pages(
     else:
         reader = pypdf.PdfReader(pdf_path)
         pages = [
-            {"page": i + 1, "text": p.extract_text() or ""}
-            for i, p in enumerate(reader.pages)
+            {"page": i + 1, "text": p.extract_text() or ""} for i, p in enumerate(reader.pages)
         ]
     if maybe_recover_page_text is not None:
         for item in pages:
             item["text"] = maybe_recover_page_text(pdf_path, item["page"], item["text"], ocr_runner)
+    if not any(ch.isalnum() for item in pages for ch in (item["text"] or "")):
+        raise DocumentParserError("no_text_layer", "PDF has no extractable text (scanned?).")
     return pages
+
+
+def validate_text_file(
+    file_path: str,
+    max_bytes: int = MAX_TEXT_FILE_BYTES,
+    max_words: int = MAX_TEXT_FILE_WORDS,
+) -> str:
+    """Validate an uploaded .md/.txt file (size, non-binary, UTF-8, word cap) and return text."""
+    if not file_path or not os.path.exists(file_path):
+        raise DocumentParserError("file_not_found", f"File not found: {file_path}")
+    size_bytes = os.path.getsize(file_path)
+    if size_bytes <= 0:
+        raise DocumentParserError("file_too_small", "Text file is empty.")
+    if size_bytes > max_bytes:
+        raise DocumentParserError(
+            "file_too_large", f"Size ({size_bytes}B) exceeds {max_bytes} bytes."
+        )
+    raw_bytes = Path(file_path).read_bytes()
+    if b"\x00" in raw_bytes:
+        raise DocumentParserError("invalid_text_file", "Binary content is not allowed.")
+    try:
+        text = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise DocumentParserError(
+            "invalid_text_encoding", "Text file must be valid UTF-8."
+        ) from exc
+    if not any(ch.isalnum() for ch in text):
+        raise DocumentParserError("empty_document", "Document contains no extractable text.")
+    word_count = len(text.split())
+    if word_count > max_words:
+        raise DocumentParserError(
+            "text_too_long", f"Document has {word_count} words (limit: {max_words})."
+        )
+    return text
+
+
+def validate_and_parse_document(
+    file_path: str,
+    filename: str,
+    ocr_runner: Callable[[bytes, int], str] | None = None,
+) -> list[DocumentChunk]:
+    """Validate and parse an uploaded .pdf, .md, or .txt document into heading chunks."""
+    ext = Path(filename or file_path).suffix.lower()
+    if ext not in ALLOWED_DOC_EXTENSIONS:
+        raise DocumentParserError(
+            "unsupported_file_type",
+            f"Unsupported file type '{ext}'. Allowed: .pdf, .md, .txt.",
+        )
+    if ext == ".pdf":
+        validate_pdf_file(file_path)
+        return parse_input_to_chunks(pdf_path=file_path, ocr_runner=ocr_runner)
+    text = validate_text_file(file_path)
+    chunks = parse_input_to_chunks(raw_text=text)
+    fallback_heading = Path(filename or file_path).stem or "Document"
+    if not chunks:
+        chunks = [DocumentChunk(1, fallback_heading, 1, text.strip())]
+    else:
+        for chunk in chunks:
+            if chunk.heading == f"Page {chunk.page} Overview":
+                chunk.heading = fallback_heading
+    return chunks
+
+
+def max_bytes_for_extension(filename: str) -> int:
+    """Return the per-type byte ceiling for `.pdf`, `.md`, or `.txt` uploads."""
+    ext = Path(filename or "").suffix.lower()
+    if ext not in FILE_SIZE_LIMITS_BYTES:
+        raise DocumentParserError(
+            "unsupported_file_type",
+            f"Unsupported file format '{ext}'. Only .pdf, .md, and .txt files are supported.",
+        )
+    return FILE_SIZE_LIMITS_BYTES[ext]
+
+
+def validate_turn_text_length(
+    text: str,
+    *,
+    max_chars: int = MAX_TURN_TEXT_CHARS,
+    max_words: int = MAX_TURN_TEXT_WORDS,
+) -> None:
+    """Enforce per-turn NFC character and word limits before moderation or LLM calls."""
+    if not text:
+        return
+    normalized = unicodedata.normalize("NFC", text)
+    char_count = len(normalized)
+    if char_count > max_chars:
+        raise DocumentParserError(
+            "text_too_long",
+            f"Message is too long ({char_count} characters; maximum {max_chars}).",
+        )
+    word_count = len(normalized.split())
+    if word_count > max_words:
+        raise DocumentParserError(
+            "text_too_long",
+            f"Message has too many words ({word_count} words; maximum {max_words}).",
+        )

@@ -1,13 +1,13 @@
 ---
 topic: "Cybersecurity Basics for Everyone"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 15
 ---
 A short text message arrives on your phone: "Your parcel could not be delivered. Please confirm your address within 24 hours using this link." Would you click it? Every day, somewhere in the world, people do, and some of them lose their savings because of it. Good {{ argument_time_of_day }}, everyone. I'm {{ argument_speaker_name }}, and today we're going to talk about cybersecurity. But don't worry: this isn't a talk for hackers or IT experts. This is a talk for everyone who has a phone, an email address, a bank account, or a social media profile. In other words, all of us.
 
 A show of hands, please. How many of you think that hackers would never bother attacking you, because you're not rich, famous, or important enough?
 
-That's one of the most common, and most dangerous, beliefs about cybersecurity. Here's the reality: most attacks today are not targeted at one special person. They're automated. Criminals send millions of fake emails and messages, and try millions of stolen passwords, using software that runs day and night. They're not looking for you specifically. They're looking for anyone who makes a mistake. Your email account, your social media profile, your bank app, and even your contact list all have value to them.
+That's one of the most common, and most dangerous, beliefs about cybersecurity. Here's the reality: most attacks today are not targeted at one special person. In my view, {{ argument_everyone_is_a_target }}.
 
 The good news is that you don't need to be a technical expert to protect yourself. A handful of simple habits can block the vast majority of attacks. Today, I'll share six of them, and by the end, I hope you'll go home and put at least two or three into practice.
 
@@ -17,7 +17,7 @@ Every year, security companies publish lists of the most common passwords, and e
 
 What makes a strong password? The most important factor is length. A long password is far harder to crack than a short, complicated one. One easy method is to use a passphrase: several random words strung together, like "purple tiger drinks coffee on Mondays." It's long, easy for you to remember, and very hard for a computer to guess.
 
-But strength is only half the story. The other half is uniqueness. And this is where most people go wrong. Say you use the same password for a small online shop, your email, and your bank. One day, that small shop gets hacked, and its list of passwords is leaked. Criminals will immediately try that email and password combination on email services, banks, and social networks. This attack is called credential stuffing, and it's extremely common. If you reuse passwords, one leak can open every door you have.
+But strength is only half the story. The other half is uniqueness. I would argue that {{ argument_password_reuse_risk }}.
 
 "But I can't remember fifty different passwords!" you might say. And you're right, nobody can. A password manager solves exactly this. A password manager is an app that creates strong, unique passwords for every account and remembers them for you. You only need to remember one strong master password. Many browsers and phones now have a password manager built in, and there are also dedicated, well-known ones.
 
@@ -51,7 +51,7 @@ One version has become very common: {{ argument_local_scam_example }}
 
 What should you do when you receive a suspicious message? Pause. Don't click the link. Instead, contact the organization directly, using a phone number or app you already know is real, not the contact details in the message. If the message seems to come from a friend asking for money, call them to check. It takes thirty seconds, and it can save you a lot of money and stress.
 
-A newer twist: criminals are now using artificial intelligence to write more convincing messages, and even to imitate people's voices in phone calls. We can no longer rely only on bad grammar to spot a scam. The habit of pausing and verifying through another channel is more important than ever.
+A newer twist: criminals are now using artificial intelligence to write more convincing messages, and even to imitate people's voices in phone calls. My concern is that {{ argument_ai_powered_scams }}.
 
 The same applies to phone calls. A common scam starts with a call from someone claiming to be from your bank, the police, or a delivery company. They sound professional, they may already know your name and part of your ID number, and they create urgency: your account is being used for a crime, or your parcel is stuck at customs. Then they ask you to install an app, transfer money to a "safe account," or read out a code. No legitimate organization works this way. Hang up, look up the official number yourself, and call back. If it was real, they'll still be there.
 
@@ -69,7 +69,7 @@ Imagine your laptop is stolen tomorrow, or your phone falls into a river, or a t
 
 Backups are your safety net. A simple, widely recommended approach is the three-two-one rule: keep three copies of your important data, on two different types of storage, with one copy kept somewhere else, for example in the cloud. And remember to check once in a while that your backup actually works. A backup you've never tested is just a hope.
 
-And if ransomware ever does lock your files, a good backup changes everything. Instead of facing a terrible choice between paying criminals and losing your data, you can wipe the device, restore your files, and move on. Paying, by the way, is never a guarantee that you'll get your files back.
+And if ransomware ever does lock your files, a good backup changes everything. That is why I believe {{ argument_backups_as_safety_net }}.
 
 Habit number six: be careful about what you share, and where you connect.
 

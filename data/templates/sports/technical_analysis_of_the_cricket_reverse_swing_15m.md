@@ -1,6 +1,6 @@
 ---
 topic: "Technical analysis of the cricket reverse swing"
-Category: "Sports"
+category: "Sports"
 duration_min: 15
 ---
 Hello everyone, and welcome to today's tactical breakdown. We will explore how reverse swing reshapes decision‑making under pressure.

@@ -14,6 +14,8 @@ Before the commercial fur trade of the {{ argument_fur_trade_century }} wiped ou
 
 Because {{ argument_keystone_engineer_species }} were eradicated long before modern hydrology became a science, generations of biologists grew up looking at fast, single-channel, eroded streams and assuming that was what a natural river was supposed to look like. Ecologists call this shifting baseline syndrome.
 
+To frame keystone semiaquatic mammals, wetland hydrology, and drought resilience in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
+
 When you remove {{ argument_keystone_engineer_species }} from a watershed, the stream speeds up. Fast water scours away rich silt, drops the underground water table by meters, and drains the surrounding wetlands into the sea.
 
 Why does a {{ argument_keystone_engineer_species }} build dams? Because on land, it is slow, awkward, and vulnerable to predators like {{ argument_terrestrial_predator_list }}. In water, however, it is a torpedo. It builds dams out of {{ argument_dam_building_materials_list }} simply to create a deep moat around its lodge and float its food branches closer to home.
@@ -22,6 +24,8 @@ Yet the side effects of that selfish behavior transform the entire landscape. Wh
 
 As the dams slowed the water down, the creek spread out across its historic floodplain. Tons of suspended sediment settled behind the dams, raising the streambed back up to the meadow level. Most importantly, the ponded water pushed downward and sideways into the earth, recharging the alluvial aquifer like a giant underground sponge.
 
+Recent field research and ecological monitoring add concrete empirical weight to this story, showing what happens on the ground: {{ argument_field_evidence_study }}.
+
 For every one unit of water you see sitting in a {{ argument_keystone_engineer_species }} pond on the surface, between {{ argument_groundwater_storage_multiplier }} units of cold water are stored underground in the surrounding soil.
 
 Within {{ argument_watershed_recovery_timeframe }} of the {{ argument_keystone_engineer_species }} returning to {{ argument_degraded_creek_name }}, the stream stopped running dry in {{ argument_dry_month_name }} and flowed year-round for the first time in {{ argument_perennial_flow_return_years }}.
@@ -29,6 +33,8 @@ Within {{ argument_watershed_recovery_timeframe }} of the {{ argument_keystone_e
 Riparian vegetation exploded by {{ argument_vegetation_increase_percentage }}. And in drylands where green wetlands make up less than {{ argument_wetland_land_area_percentage }} of the landscape, roughly {{ argument_wildlife_wetland_dependency_percentage }} of all terrestrial wildlife depends on them to survive. Our camera traps and acoustic monitors recorded a dramatic surge in {{ argument_returning_terrestrial_wildlife_list }}.
 
 Then came the summer of {{ argument_wildfire_test_year }}, when the {{ argument_major_wildfire_name }} tore across {{ argument_burned_watershed_area }} of surrounding rangeland. Every dry, incised creek valley burned down to mineral ash.
+
+At the same time, real-world conservation around keystone semiaquatic mammals, wetland hydrology, and drought resilience is never without tension; scientists and local communities must navigate genuine tradeoffs and limitations: {{ argument_conservation_tradeoff_challenge }}.
 
 When the satellite images came back after the smoke cleared, a vivid green ribbon was still glowing right through the center of the black burn scar: the wet meadow complex engineered by our {{ argument_keystone_engineer_species }}.
 

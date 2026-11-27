@@ -1,13 +1,13 @@
 ---
 topic: "Data-Driven Decision Making for Managers"
-Category: "Information Technology"
+category: "Information Technology"
 duration_min: 10
 ---
 I'm {{ argument_speaker_name }}, and {{ argument_speaker_background }} Today, we're going to talk about how we, as managers, can make better decisions with data. And we'll begin with an animal that lives in a surprising number of meeting rooms.
 
 It's called the "HiPPO," which stands for the "highest paid person's opinion." In many organizations, when a big decision needs to be made, the discussion goes around the table, and in the end, the decision follows whatever the most senior person in the room believes.
 
-Experience and intuition are valuable, but they can also mislead us. Markets change, customers change, and what worked five years ago may not work today. And when decisions are based only on opinion, it's very hard to know whether we were right, or to learn from it when we were wrong.
+Experience and intuition are valuable, but they can also mislead us. In my view, {{ argument_limits_of_intuition }}.
 
 Data-driven decision making is about changing that. It doesn't mean replacing judgment with spreadsheets. It means using evidence to inform our judgment, test our assumptions, and learn faster.
 
@@ -27,7 +27,7 @@ Once you have a question, decide how you'll measure the answer. Here, two ideas 
 
 The first is the difference between leading and lagging indicators. Lagging indicators tell you what has already happened, like revenue last quarter or customer churn last month. They're important, but by the time you see them, it's too late to change them. Leading indicators give you an early signal of what's likely to happen, like the number of sales meetings booked this week, the time it takes to answer customer complaints, or how many users try a new feature in their first week. Good managers watch both.
 
-The second is avoiding vanity metrics. These are numbers that look impressive but don't help you make decisions. Total app downloads, page views, or social media followers can grow while the business is actually getting worse. A better metric is one that's directly connected to value and that you can act on: for example, how many users are still active after thirty days, or what percentage of customers buy again.
+The second is avoiding vanity metrics. I would argue that {{ argument_vanity_metrics_danger }}.
 
 The third move: check the data before you trust it.
 
@@ -55,7 +55,7 @@ Trap one: confusing correlation with causation. Just because two things happen t
 
 Trap two: survivorship bias. During the Second World War, analysts studied bombers that returned from missions and looked at where they had bullet holes, with the idea of adding armor there. The statistician Abraham Wald pointed out the problem: they were only looking at planes that survived. The places without holes were probably where the planes that didn't return had been hit. In business, if you only study successful projects or only listen to current customers, you can miss the most important lessons, which often come from failures and from the customers who left.
 
-And trap three: forgetting the human context. Numbers tell you what is happening, but often not why. When customer satisfaction drops, the dashboard shows you the drop. Talking to a few customers tells you the reason. The best decisions combine numbers with stories.
+And trap three: forgetting the human context. Numbers tell you what is happening, but often not why. My position is that {{ argument_human_context_in_data }}.
 
 So, how do we build a data-informed culture in our teams?
 

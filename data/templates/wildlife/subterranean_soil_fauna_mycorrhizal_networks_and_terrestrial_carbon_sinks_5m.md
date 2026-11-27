@@ -12,11 +12,13 @@ The greatest concentration of wildlife on land isn't roaming the plains or flyin
 
 Far from being inert dirt, soil is a bustling metropolis engineered by {{ argument_subterranean_fauna_list }}, woven together by vast mycorrhizal fungal networks. Stretching for {{ argument_fungal_mycelium_length_statistic }} inside a single cubic meter of earth, these microscopic fungal threads fuse with tree roots in an ancient evolutionary trade deal.
 
-The trees photosynthesize sunlight and pump liquid carbon sugars down into the roots to feed the fungi. In return, the fungi and soil arthropods mine the rock and decaying leaf litter for {{ argument_essential_soil_nutrients_list }} and deliver them back to the trees. Meanwhile, {{ argument_burrowing_invertebrate_species }} act as subterranean plumbers, aerating the earth so rainwater can soak in rather than causing flash floods.
+Looking closely at the underlying biology shows that {{ argument_key_ecological_mechanism }}.
+
+To frame subterranean soil fauna, mycorrhizal networks, and terrestrial carbon sinks in its wider ecological setting, it helps to examine the deeper biological context behind these dynamics: {{ argument_ecological_context_foundation }}.
 
 This underground wildlife community is also our planet's largest terrestrial carbon vault, storing more carbon than the atmosphere and all above-ground plants combined.
 
-Yet across {{ argument_degraded_agricultural_region }}, deep mechanical tillage, synthetic fertilizers, and fungicides are tearing these underground webs to shreds. When we kill soil fauna and sever fungal networks, the soil loses its structure, turns to dust, and releases {{ argument_carbon_release_statistic }} into the atmosphere while washing {{ argument_topsoil_loss_statistic }} of topsoil into our rivers every year.
+Across the broader habitat, these environmental dynamics reveal that {{ argument_habitat_dynamics_analysis }}.
 
 To save above-ground wildlife and stabilize our climate, we must first rewild the soil. In {{ argument_restoration_site_name }}, our team has been inoculating degraded land with native soil plugs taken from intact {{ argument_reference_ecosystem_name }} and transitioning farms to no-till polyculture.
 

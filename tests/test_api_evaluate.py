@@ -1,151 +1,423 @@
-"""Test kiểm đầu vào baseline_profile của POST /api/evaluate (CLAUDE.md 1.9.2 #23).
+"""Test POST /api/evaluate: baseline comes from the DB per user, the session is saved.
 
-evaluate_session bị monkeypatch: chỉ kiểm lớp parse/validate ở main.py.
-Mọi số trong test là số tự chọn để chạm biên (không phải số đo).
+evaluate_session is monkeypatched: the real Evaluate Pipeline does not run.
+All numbers in these tests are chosen by hand (not measured).
 """
 
 import json
-from dataclasses import asdict
+from pathlib import Path
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 import src.app.main as main
-from src.audio_processing.baseline import compute_baseline_pause_profile
-from src.audio_processing.contracts import BaselineProfile, Pause
+from src.app.config import settings
+from src.app.db.factory import build_memory_repos, get_repos
+from src.app.db.models import NewBaseline, StorageError
+from src.app.deps import CurrentUser, get_current_user
+from src.audio_processing.contracts import BaselineProfile
 from src.audio_processing.result_schema import EvaluationResultV2
+
+FIXTURES = Path(__file__).parent / "fixtures"
+USER_A = uuid4()
+USER_B = uuid4()
+
+
+def _store_baseline(repos, user_id, threshold: float = 0.9):
+    row, _ = repos.baselines.replace_current_baseline(
+        user_id,
+        NewBaseline(
+            id=uuid4(),
+            hesitation_threshold_s=threshold,
+            median_pause_s=0.45,
+            median_f0_hz=110.0,
+            mean_loudness_db=62.0,
+            flags=["no_f0"],
+        ),
+    )
+    return row
+
+
+@pytest.fixture
+def current():
+    return {"id": USER_A}  # a test switches user with current["id"] = ...
+
+
+@pytest.fixture
+def repos(current):
+    return build_memory_repos()
+
+
+@pytest.fixture(autouse=True)
+def _signed_in_user(repos, current):
+    """USER_A is signed in and has a baseline (the baseline is required)."""
+    _store_baseline(repos, USER_A)
+    main.app.dependency_overrides[get_current_user] = lambda: CurrentUser(id=current["id"])
+    main.app.dependency_overrides[get_repos] = lambda: repos
+    yield
+    main.app.dependency_overrides.clear()
 
 
 def _minimal_result() -> EvaluationResultV2:
     return EvaluationResultV2(
-        schema_version="2.0", status="insufficient_audio", reason="low_voiced_ratio",
-        overall=None, label=None, components={}, subscores={}, accuracy_detail={},
-        fluency_detail={}, pitch_detail={}, audio={"duration_s": 1.0, "voiced_ratio": 0.0},
-        baseline=None, alignment=[], pauses=[], fillers=[], sentences=[], stt=None,
-        flags=["no_baseline"], warnings=[],
+        schema_version="2.1",
+        status="insufficient_audio",
+        reason="low_voiced_ratio",
+        overall=None,
+        label=None,
+        components={},
+        subscores={},
+        accuracy_detail={},
+        fluency_detail={},
+        pitch_detail={},
+        audio={"duration_s": 1.0, "voiced_ratio": 0.0},
+        baseline=None,
+        alignment=[],
+        pauses=[],
+        fillers=[],
+        sentences=[],
+        stt=None,
+        flags=["no_baseline"],
+        warnings=[],
         display_only={"loudness_db": None, "loudness_ref_db": None},
     )
 
 
-def _post(monkeypatch, raw: str, captured: dict | None = None):
-    def fake(audio_path, script, baseline, *, vad_params):
+def post_and_wait(client, *args, **kwargs):
+    response = client.post(*args, **kwargs)
+    if response.status_code != 202:
+        return response
+    job = client.get(f"/api/evaluate/{response.json()['job_id']}")
+    assert job.status_code == 200
+    assert job.json()["status"] == "done"
+    import httpx
+    return httpx.Response(200, json=job.json()["result"])
+
+
+def _post(
+    monkeypatch,
+    raw: str,
+    captured: dict | None = None,
+    *,
+    save_handler=None,
+):
+    def fake(audio_path, script, baseline, *, vad_params, on_stage=None, should_cancel=None):
         if captured is not None:
             captured["baseline"] = baseline
         return _minimal_result()
 
     monkeypatch.setattr(main, "evaluate_session", fake)
-    return TestClient(main.app).post(
+    if save_handler is not None:
+        monkeypatch.setattr(main, "_save_result_to_history", save_handler)
+    return post_and_wait(
+        TestClient(main.app),
         "/api/evaluate",
         files={"audio": ("a.wav", b"x", "audio/wav")},
         data={"script": "Hello.", "baseline_profile": raw},
     )
 
 
-def _body(**over) -> str:
-    base = {"median_pause_s": 0.5, "hesitation_threshold_s": 1.0, "median_f0_hz": 120.0,
-            "mean_loudness_db": 60.0, "flags": []}
-    base.update(over)
-    return json.dumps(base)
+def test_evaluate_uses_stored_baseline(monkeypatch):
+    cap: dict = {}
+    assert _post(monkeypatch, "", cap).status_code == 200
+    assert cap["baseline"] == BaselineProfile(
+        median_pause_s=0.45,
+        hesitation_threshold_s=0.9,
+        median_f0_hz=110.0,
+        mean_loudness_db=62.0,
+        flags=["no_f0"],
+    )
 
 
-def _assert_invalid(r):
+def test_evaluate_ignores_client_baseline_profile(monkeypatch):
+    fake_profile = json.dumps(
+        {
+            "median_pause_s": 0.5,
+            "hesitation_threshold_s": 1.2,
+            "median_f0_hz": 300.0,
+            "mean_loudness_db": 99.0,
+            "flags": [],
+        }
+    )
+    cap: dict = {}
+    assert _post(monkeypatch, fake_profile, cap).status_code == 200
+    assert cap["baseline"].hesitation_threshold_s == 0.9
+    assert _post(monkeypatch, "not json", cap).status_code == 200
+
+
+def test_evaluate_without_baseline_returns_409(monkeypatch, current):
+    current["id"] = USER_B  # USER_B has no baseline
+    cap: dict = {}
+    r = _post(monkeypatch, "", cap)
+    assert r.status_code == 409
+    assert r.json()["error_code"] == "baseline_required"
+    assert cap == {}  # Evaluate Pipeline is not called
+
+
+def test_evaluate_without_baseline_allowed_when_not_required(monkeypatch, current):
+    monkeypatch.setattr(settings, "baseline_required", False)
+    current["id"] = USER_B
+    cap: dict = {}
+    assert _post(monkeypatch, "", cap).status_code == 200
+    assert cap["baseline"] is None
+
+
+def test_evaluate_other_users_baseline_not_used(monkeypatch, repos, current):
+    _store_baseline(repos, USER_B, threshold=1.1)
+    cap: dict = {}
+    _post(monkeypatch, "", cap)
+    assert cap["baseline"].hesitation_threshold_s == 0.9  # USER_A's baseline, not USER_B's
+
+
+def test_evaluate_baseline_storage_error_returns_503(monkeypatch, repos):
+    def broken(user_id):
+        raise StorageError("down")
+
+    monkeypatch.setattr(repos.baselines, "get_current_baseline", broken)
+    r = _post(monkeypatch, "")
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "baseline_unavailable"
+
+
+def test_evaluate_saves_current_baseline_id(monkeypatch, repos):
+    saved: dict = {}
+
+    def fake_save(**kwargs):
+        saved.update(kwargs)
+        return str(uuid4())
+
+    _post(monkeypatch, "", save_handler=fake_save)
+    assert saved["baseline_id"] == repos.baselines.get_current_baseline(USER_A).id
+
+
+def test_evaluate_returns_saved_session_id(monkeypatch):
+    session_id = uuid4()
+    saved: dict = {}
+
+    def fake_save(**kwargs):
+        saved.update(kwargs)
+        return str(session_id)
+
+    response = _post(
+        monkeypatch,
+        "",
+        save_handler=fake_save,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["saved"] is True
+    assert response.json()["session_id"] == str(session_id)
+    assert saved["script"] == "Hello."
+
+
+def test_evaluate_save_failure_keeps_result_and_logs_without_script(monkeypatch, caplog):
+    script = "Private practice script"
+
+    def fail_save(**kwargs):
+        raise RuntimeError("storage unavailable")
+
+    monkeypatch.setattr(
+        main,
+        "evaluate_session",
+        lambda audio_path, script, baseline, *, vad_params, **callbacks: _minimal_result(),
+    )
+    monkeypatch.setattr(main, "_save_result_to_history", fail_save)
+
+    response = post_and_wait(
+        TestClient(main.app),
+        "/api/evaluate",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
+        data={"script": script},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "insufficient_audio"
+    assert response.json()["saved"] is False
+    assert response.json()["session_id"] is None
+    assert "Failed to save evaluation result to session history" in caplog.text
+    assert script not in caplog.text
+
+
+def _ok_result() -> EvaluationResultV2:
+    return EvaluationResultV2.model_validate_json(
+        (FIXTURES / "evaluation_ok.json").read_text(encoding="utf-8")
+    )
+
+
+def _fake_encode(source, out):
+    assert source != out  # FFmpeg refuses to overwrite its own input
+    out.write_bytes(b"opus")
+
+
+def test_save_webm_upload_stores_audio_and_series(monkeypatch, tmp_path):
+    repos = build_memory_repos()
+    monkeypatch.setattr(main, "encode_opus", _fake_encode)
+    upload = tmp_path / "recording.webm"
+    upload.write_bytes(b"raw")
+    user_id = uuid4()
+
+    session_id = main._save_result_to_history(
+        repos=repos, user_id=user_id, script="Hello.", result=_ok_result(), source_audio_path=upload
+    )
+
+    row = repos.sessions.get_session(user_id, UUID(session_id))
+    assert row.audio_path == f"{user_id}/{session_id}.webm"
+    assert row.series_path == f"{user_id}/{session_id}.series.json"
+    assert row.result["pitch_detail"]["contour_st"] is None
+    assert repos.profiles._state.files[("audio", row.audio_path)] == b"opus"
+
+
+def test_save_insufficient_audio_stores_row_without_files(monkeypatch):
+    repos = build_memory_repos()
+    user_id = uuid4()
+
+    session_id = main._save_result_to_history(
+        repos=repos,
+        user_id=user_id,
+        script="Hello.",
+        result=_minimal_result(),
+        source_audio_path=None,
+    )
+
+    row = repos.sessions.get_session(user_id, UUID(session_id))
+    assert row.status == "insufficient_audio"
+    assert row.audio_path is None and row.series_path is None
+    assert repos.profiles._state.files == {}
+
+
+def test_save_insert_failure_removes_uploaded_files(monkeypatch, tmp_path):
+    repos = build_memory_repos()
+    monkeypatch.setattr(main, "encode_opus", _fake_encode)
+
+    def fail_insert(*args, **kwargs):
+        raise RuntimeError("insert failed")
+
+    monkeypatch.setattr(repos.sessions, "create_session", fail_insert)
+    upload = tmp_path / "recording.webm"
+    upload.write_bytes(b"raw")
+
+    with pytest.raises(RuntimeError):
+        main._save_result_to_history(
+            repos=repos,
+            user_id=uuid4(),
+            script="Hello.",
+            result=_ok_result(),
+            source_audio_path=upload,
+        )
+    assert repos.profiles._state.files == {}
+
+
+# ---------- C2: script_id, topic and accent are saved with the session ----------
+
+
+def _post_with(monkeypatch, data: dict, saved: dict):
+    def fake_save(**kwargs):
+        saved.update(kwargs)
+        return str(uuid4())
+
+    def fake(audio_path, script, baseline, *, vad_params, on_stage=None, should_cancel=None):
+        return _minimal_result()
+
+    monkeypatch.setattr(main, "evaluate_session", fake)
+    monkeypatch.setattr(main, "_save_result_to_history", fake_save)
+    return post_and_wait(
+        TestClient(main.app),
+        "/api/evaluate",
+        files={"audio": ("a.wav", b"x", "audio/wav")},
+        data={"script": "Hello.", **data},
+    )
+
+
+def _store_script(repos, user_id, topic: str | None = "Keystone species"):
+    from src.app.db.models import NewScript
+
+    return repos.scripts.create_script(
+        user_id,
+        NewScript(
+            title="T",
+            body="Hello.",
+            content_hash=f"h-{uuid4()}",
+            topic=topic,
+        ),
+    )
+
+
+def _store_profile(repos, user_id, accent: str = "British"):
+    from src.app.db.models import ProfileUpsert
+
+    repos.profiles.upsert_profile(user_id, ProfileUpsert(target_accent=accent))
+
+
+def test_evaluate_saves_own_script_id_and_its_topic(monkeypatch, repos):
+    script = _store_script(repos, USER_A)
+    saved: dict = {}
+    r = _post_with(monkeypatch, {"script_id": str(script.id)}, saved)
+    assert r.status_code == 200
+    assert saved["script_id"] == script.id
+    assert saved["topic"] == "T"  # from the saved script title when no topic is sent
+
+
+def test_evaluate_topic_from_form_wins(monkeypatch, repos):
+    script = _store_script(repos, USER_A)
+    saved: dict = {}
+    _post_with(monkeypatch, {"script_id": str(script.id), "topic": "  My title  "}, saved)
+    assert saved["topic"] == "My title"
+
+
+def test_evaluate_without_script_id_saves_null_script(monkeypatch):
+    saved: dict = {}
+    _post_with(monkeypatch, {"topic": "Free text"}, saved)
+    assert saved["script_id"] is None
+    assert saved["topic"] == "Free text"
+
+
+def test_evaluate_other_users_script_returns_404_and_does_not_score(monkeypatch, repos):
+    other_script = _store_script(repos, USER_B)
+    saved: dict = {}
+    r = _post_with(monkeypatch, {"script_id": str(other_script.id)}, saved)
+    assert r.status_code == 404
+    assert r.json()["error_code"] == "script_not_found"
+    assert saved == {}
+
+
+def test_evaluate_invalid_script_id_returns_422(monkeypatch):
+    saved: dict = {}
+    r = _post_with(monkeypatch, {"script_id": "not-a-uuid"}, saved)
     assert r.status_code == 422
-    assert r.json()["error_code"] == "invalid_baseline"
+    assert r.json()["error_code"] == "invalid_script_id"
 
 
-# ---- Việc 1: số nguyên khổng lồ -> OverflowError phải thành 422, không phải 500 ----
-
-@pytest.mark.parametrize("field", ["hesitation_threshold_s", "median_pause_s", "median_f0_hz",
-                                   "mean_loudness_db"])
-def test_huge_integer_is_422_not_500(monkeypatch, field):
-    raw = _body(**{field: 123456789}).replace("123456789", "9" * 400)
-    assert "9" * 400 in raw
-    _assert_invalid(_post(monkeypatch, raw))
+def test_evaluate_saves_accent_from_profile(monkeypatch, repos):
+    _store_profile(repos, USER_A, accent="British")
+    saved: dict = {}
+    _post_with(monkeypatch, {}, saved)
+    assert saved["accent"] == "British"
 
 
-# ---- Việc 2: miền giá trị ----
+def test_evaluate_profile_read_error_still_saves_without_accent(monkeypatch, repos):
+    def broken(user_id):
+        raise StorageError("down")
 
-@pytest.mark.parametrize("bad", [0.69, 1.21, 0.0, -1.0])
-def test_threshold_out_of_range_rejected(monkeypatch, bad):
-    _assert_invalid(_post(monkeypatch, _body(hesitation_threshold_s=bad)))
-
-
-@pytest.mark.parametrize("ok", [0.7, 1.2])
-def test_threshold_at_bounds_accepted(monkeypatch, ok):
-    cap: dict = {}
-    r = _post(monkeypatch, _body(hesitation_threshold_s=ok), cap)
+    monkeypatch.setattr(repos.profiles, "get_profile", broken)
+    saved: dict = {}
+    r = _post_with(monkeypatch, {}, saved)
     assert r.status_code == 200
-    assert cap["baseline"].hesitation_threshold_s == ok
+    assert saved["accent"] is None
 
 
-def test_threshold_float_noise_below_0_7_accepted(monkeypatch):
-    # 0.6999999999999997 = 2 * 0.34999999999999987 (nhiễu float); round(.,6) -> 0.7 -> hợp lệ
-    assert _post(monkeypatch, _body(hesitation_threshold_s=0.6999999999999997)).status_code == 200
-
-
-@pytest.mark.parametrize("bad", [0.34, 0.0, -0.5])
-def test_median_pause_below_min_pause_rejected(monkeypatch, bad):
-    _assert_invalid(_post(monkeypatch, _body(median_pause_s=bad)))
-
-
-def test_median_pause_null_and_boundary_accepted(monkeypatch):
-    assert _post(monkeypatch, _body(median_pause_s=None)).status_code == 200
-    assert _post(monkeypatch, _body(median_pause_s=0.35)).status_code == 200
-    # 0.34999999999999987 -> round 6 -> 0.35
-    assert _post(monkeypatch, _body(median_pause_s=0.34999999999999987)).status_code == 200
-
-
-@pytest.mark.parametrize("bad", [0.0, -100.0])
-def test_median_f0_not_positive_rejected(monkeypatch, bad):
-    _assert_invalid(_post(monkeypatch, _body(median_f0_hz=bad)))
-
-
-def test_median_f0_null_accepted(monkeypatch):
-    assert _post(monkeypatch, _body(median_f0_hz=None)).status_code == 200
-
-
-def test_loudness_any_finite_or_null_accepted(monkeypatch):
-    assert _post(monkeypatch, _body(mean_loudness_db=-20.0)).status_code == 200
-    assert _post(monkeypatch, _body(mean_loudness_db=None)).status_code == 200
-
-
-@pytest.mark.parametrize("bad", ['"x"', "true", "NaN", "Infinity"])
-def test_loudness_not_finite_number_rejected(monkeypatch, bad):
-    raw = _body().replace("60.0", bad)
-    _assert_invalid(_post(monkeypatch, raw))
-
-
-@pytest.mark.parametrize("flags", [["no_baseline"], ["bogus"], ["no_f0", "filler_from_vad_only"]])
-def test_unknown_flag_rejected(monkeypatch, flags):
-    _assert_invalid(_post(monkeypatch, _body(flags=flags)))
-
-
-def test_allowed_flags_accepted(monkeypatch):
-    r = _post(monkeypatch, _body(flags=["baseline_pause_unreliable", "no_f0"]))
-    assert r.status_code == 200
-
-
-# ---- round-trip: profile đúng dạng analyze_baseline sinh ra phải được nhận lại ----
-
-def test_round_trip_profile_from_analyze_baseline_shape(monkeypatch):
-    pauses = [Pause(start_s=0.0, end_s=0.4)] * 5  # median 0.4 -> ngưỡng 0.8, flags []
-    pp = compute_baseline_pause_profile(pauses)
-    profile = BaselineProfile(
-        median_pause_s=pp["median_pause_s"], hesitation_threshold_s=pp["hesitation_threshold_s"],
-        median_f0_hz=118.5, mean_loudness_db=61.0, flags=pp["flags"],
+def test_save_result_stores_script_topic_and_accent_on_row(monkeypatch, repos):
+    script = _store_script(repos, USER_A)
+    result = _minimal_result()
+    session_id = main._save_result_to_history(
+        repos=repos,
+        user_id=USER_A,
+        script="Hello.",
+        result=result,
+        source_audio_path=None,
+        script_id=script.id,
+        topic="Keystone species",
+        accent="British",
     )
-    cap: dict = {}
-    r = _post(monkeypatch, json.dumps(asdict(profile)), cap)
-    assert r.status_code == 200
-    assert cap["baseline"] == profile
-
-
-def test_round_trip_profile_with_nulls_and_flags(monkeypatch):
-    pp = compute_baseline_pause_profile([])  # median None, ngưỡng 0.7, unreliable
-    profile = BaselineProfile(
-        median_pause_s=pp["median_pause_s"], hesitation_threshold_s=pp["hesitation_threshold_s"],
-        median_f0_hz=None, mean_loudness_db=None, flags=pp["flags"] + ["no_f0"],
-    )
-    cap: dict = {}
-    assert _post(monkeypatch, json.dumps(asdict(profile)), cap).status_code == 200
-    assert cap["baseline"] == profile
+    row = repos.sessions.get_session(USER_A, UUID(session_id))
+    assert (row.script_id, row.topic, row.accent) == (script.id, "Keystone species", "British")
