@@ -26,6 +26,8 @@
   --bad: #B91C1C;  --bad-soft: #FEE2E2;
   --warn-mark: #D97706;    /* strokes/bars only, never text */
   --event-lime: #84CC16;   /* default practice session colour (Schedule); dark text only */
+  --tag-length: #6D28D9;
+  --tag-category: #BE185D;
 
   --serif: "EB Garamond", Garamond, Georgia, serif;
   --sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
