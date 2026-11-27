@@ -7,7 +7,7 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, slotStartTime, slotTarget, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
@@ -161,6 +161,12 @@ function monthChip(status, label, color) {
 function renderWeek(now) {
   const root = $('schWeek'), keys = weekDays(dayKey(month)), today = dayKey(now), oldScroll = root.querySelector('.sch-week-scroll')?.scrollTop, focusKey = root.contains(document.activeElement) ? document.activeElement.dataset.occKey : null;
   const focusDay = root.contains(document.activeElement) ? document.activeElement.dataset.schDay : null;
+  const focusHour = document.activeElement?.classList.contains('sch-slot') ? document.activeElement.dataset.schHour : null;
+  const isOpen = (d, h) => slotStartTime(keys[d], h, now) !== null;
+  const todayIndex = keys.indexOf(today), preferredHour = new Date(now).getHours();
+  let initialSlot = focusHour !== null && keys.includes(focusDay) && isOpen(keys.indexOf(focusDay), Number(focusHour)) ? { dayIndex: keys.indexOf(focusDay), hour: Number(focusHour) } : null;
+  if (!initialSlot && todayIndex >= 0 && isOpen(todayIndex, preferredHour)) initialSlot = { dayIndex: todayIndex, hour: preferredHour };
+  if (!initialSlot) { const d = keys.findIndex((_, i) => Array.from({ length: 24 }, (_, h) => isOpen(i, h)).some(Boolean)); if (d >= 0) initialSlot = { dayIndex: d, hour: isOpen(d, 9) ? 9 : Array.from({ length: 24 }, (_, h) => h).find(h => isOpen(d, h)) }; }
   const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[6]), 1));
   root.replaceChildren();
   const wide = node('div', null, 'sch-week-wide'), headers = node('div', null, 'sch-week-row sch-week-headers'), all = node('div', null, 'sch-week-row sch-week-all');
@@ -170,15 +176,25 @@ function renderWeek(now) {
   const axis = node('div', null, 'sch-week-hours'); axis.setAttribute('role', 'presentation'); axis.setAttribute('aria-hidden', 'true');
   for (let h = 0; h < 24; h++) { const label = node('span', fmt(new Date(2000, 0, 1, h), { hour: 'numeric' })); label.style.top = (h * WEEK_HOUR_PX) + 'px'; axis.append(label); }
   body.append(axis);
-  keys.forEach(key => {
+  keys.forEach((key, dayIndex) => {
     const date = fullDate(parseDay(key)), header = node('div', null, 'sch-week-header sch-cell');
     const day = button(fmt(parseDay(key), { weekday: 'short', day: 'numeric' }), () => openDay(key), 'sch-week-day'); day.dataset.schDay = key; day.setAttribute('aria-label', date);
     if (key === today) day.classList.add('sch-week-today'); header.append(day);
-    if (key >= today) { const add = button('+', () => openEvent(key), 'sch-add'); add.dataset.schDay = key; add.setAttribute('aria-label', T('schedule.addPracticeOn', { date })); header.append(add); }
     headers.append(header);
     const allCell = node('div', null, 'sch-week-all-cell');
     occs.filter(o => o.day === key && o.all_day).forEach(o => { const status = occurrenceStatus(o, now), b = button('', () => openDay(key, o.key), 'sch-week-all-button'); b.dataset.occKey = o.key; b.setAttribute('aria-label', [date, T('schedule.allDay'), lengthLabel(o.duration_min, labelWords()), T('schedule.' + status)].join(', ')); b.append(monthChip(status, T('schedule.allDay'), o.color)); allCell.append(b); }); all.append(allCell);
     const column = node('div', null, 'sch-week-column'); column.setAttribute('role', 'listitem'); column.setAttribute('aria-label', date);
+    for (let h = 0; h < 24; h++) {
+      const start = slotStartTime(key, h, now); if (start === null) continue;
+      const slot = button('', () => { const fresh = slotStartTime(key, h, Date.now()); if (fresh === null) renderWeek(Date.now()); else openEvent(key, null, null, fresh); }, 'sch-slot');
+      slot.dataset.schDay = key; slot.dataset.schHour = String(h); slot.style.top = (h * WEEK_HOUR_PX) + 'px'; slot.style.height = WEEK_HOUR_PX + 'px';
+      slot.tabIndex = initialSlot?.dayIndex === dayIndex && initialSlot.hour === h ? 0 : -1;
+      slot.setAttribute('aria-label', T('schedule.addPracticeAt', { date, time: time(new Date(key + 'T' + start)) }));
+      const plus = node('span', '+', 'sch-slot-plus'); plus.setAttribute('aria-hidden', 'true'); slot.append(plus);
+      slot.addEventListener('focus', () => { root.querySelectorAll('.sch-slot').forEach(el => { el.tabIndex = el === slot ? 0 : -1; }); slot.scrollIntoView({ block: 'nearest' }); });
+      slot.addEventListener('keydown', e => { if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return; e.preventDefault(); const target = slotTarget(dayIndex, h, e.key, (d, hour) => !!root.querySelector(`.sch-slot[data-sch-day="${keys[d]}"][data-sch-hour="${hour}"]`)); if (target) root.querySelector(`.sch-slot[data-sch-day="${keys[target.dayIndex]}"][data-sch-hour="${target.hour}"]`)?.focus(); });
+      column.append(slot);
+    }
     const items = occs.filter(o => o.day === key && !o.all_day).map(o => { const d = new Date(o.start), startMin = d.getHours() * 60 + d.getMinutes(); return { key: o.key, startMin, endMin: Math.min(1440, startMin + Math.max(WEEK_MIN_BLOCK_MIN, o.duration_min || 0)), occ: o }; });
     layoutDayBlocks(items).forEach(item => { const o = item.occ, status = occurrenceStatus(o, now), length = lengthLabel(o.duration_min, labelWords()), geom = blockGeometry(item.startMin, o.duration_min, WEEK_HOUR_PX);
       const b = button('', () => openDay(key, o.key), 'sch-week-block'); b.dataset.occKey = o.key; b.setAttribute('aria-label', [date, time(o.start), length, T('schedule.' + status)].join(', ')); applyEventStyle(b, status, o.color);
@@ -190,7 +206,8 @@ function renderWeek(now) {
   scroll.append(body); wide.append(headers, all, scroll); root.append(wide);
   wide.style.setProperty('--sch-scrollbar-width', (scroll.offsetWidth - scroll.clientWidth) + 'px');
   const newKey = keys[0]; scroll.scrollTop = newKey === weekScrollKey && oldScroll != null ? oldScroll : Math.max(0, initialScrollHour(keys, today, new Date(now).getHours()) * WEEK_HOUR_PX - 8); weekScrollKey = newKey;
-  if (focusKey) [...root.querySelectorAll('[data-occ-key]')].find(el => el.dataset.occKey === focusKey)?.focus();
+  if (focusHour !== null) root.querySelector(`.sch-slot[data-sch-day="${focusDay}"][data-sch-hour="${focusHour}"]`)?.focus();
+  else if (focusKey) [...root.querySelectorAll('[data-occ-key]')].find(el => el.dataset.occKey === focusKey)?.focus();
   else if (focusDay) [...root.querySelectorAll('[data-sch-day]')].find(el => el.dataset.schDay === focusDay)?.focus();
 }
 function render() {
@@ -221,6 +238,7 @@ function render() {
     b.append(node('span', String(new Date(parseDay(key)).getDate()), 'sch-day-number'));
     const cell = node('div', null, 'sch-cell'); cell.append(b);
     if (key >= dayKey(now)) {
+      cell.classList.add('sch-can-add');
       const add = button('+', () => { selectedDay = key; openEvent(key); }, 'sch-add');
       add.dataset.schDay = key; add.setAttribute('aria-label', T('schedule.addPracticeOn', { date })); cell.append(add);
     }
@@ -353,12 +371,12 @@ function applyScheduleLock() {
   $('schLockNote').hidden = !locked;
   $('schLockNote').textContent = T('schedule.scheduleLocked');
 }
-function openEvent(key, occ = null, event = null) {
+function openEvent(key, occ = null, event = null, presetTime = null) {
   if (openPopover) openPopover(false);
   editing = occ ? { occ, event } : null; savedRequest++; savedItems = []; savedSelection = event?.script?.kind === 'saved' ? { id: event.script.script_id, title: event.script.title } : null;
   const form = $('schForm'); form.reset(); setSegment('schLength', 'any'); setSegment('schCategory', 'any'); setSegment('schScript', event?.script?.kind || 'free'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never'); $('schAllDay').setAttribute('aria-checked', 'false'); $('schCount').value = '1'; $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   const minimum = dayKey(Date.now()), chosen = key && key >= minimum ? key : minimum;
-  datePicker.set(chosen, minimum); timePicker.set(defaultTime(Date.now(), chosen));
+  datePicker.set(chosen, minimum); timePicker.set(!occ && /^([01]\d|2[0-3]):[0-5]\d$/.test(presetTime || '') && MINUTE_STEPS.includes(Number(presetTime.slice(3))) && new Date(chosen + 'T' + presetTime).getTime() > Date.now() ? presetTime : defaultTime(Date.now(), chosen));
   untilPicker.set('', chosen); $('schDays').hidden = true;
   ['Start', 'Length', 'Category', 'Script', 'Color', 'Note', 'Repeat', 'Days', 'Until', 'Count'].forEach(k => { $('sch' + k + 'Error').textContent = ''; $('sch' + k + 'Error').classList.remove('show'); });
   ['schDate', 'schTime', 'schLength', 'schNote', 'schRepeat', 'schUntil'].forEach(id => $(id).removeAttribute('aria-invalid'));

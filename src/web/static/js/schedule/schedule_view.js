@@ -95,6 +95,30 @@ export function chipsThatFit(cellInnerHeight, headerHeight, chipHeight, moreHeig
 export const WEEK_MIN_BLOCK_MIN = 30;
 const localKey = d => `${String(d.getFullYear()).padStart(4, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 const localDate = key => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); };
+export function slotStartTime(dayKey, hour, now, stepMin = 5) {
+  const start = localDate(dayKey); start.setHours(hour, 0, 0, 0);
+  const end = localDate(dayKey); end.setHours(hour + 1, 0, 0, 0);
+  if (end.getTime() <= now) return null;
+  if (start.getTime() > now) return `${String(hour).padStart(2, '0')}:00`;
+  const current = new Date(now), minutes = current.getHours() * 60 + (Math.floor(current.getMinutes() / stepMin) + 1) * stepMin;
+  return minutes >= 1440 ? null : `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+export function slotTarget(dayIndex, hour, key, isOpen) {
+  if (key === 'Home' || key === 'End') {
+    const start = key === 'Home' ? 0 : 23, step = key === 'Home' ? 1 : -1;
+    for (let h = start; h >= 0 && h < 24; h += step) if (isOpen(dayIndex, h)) return { dayIndex, hour: h };
+  } else if (key === 'ArrowUp' || key === 'ArrowDown') {
+    const step = key === 'ArrowUp' ? -1 : 1;
+    for (let h = hour + step; h >= 0 && h < 24; h += step) if (isOpen(dayIndex, h)) return { dayIndex, hour: h };
+  } else if (key === 'ArrowLeft' || key === 'ArrowRight') {
+    const step = key === 'ArrowLeft' ? -1 : 1;
+    for (let d = dayIndex + step; d >= 0 && d < 7; d += step) {
+      if (isOpen(d, hour)) return { dayIndex: d, hour };
+      for (let h = 0; h < 24; h++) if (isOpen(d, h)) return { dayIndex: d, hour: h };
+    }
+  }
+  return null;
+}
 export function weekDays(key) {
   const date = localDate(key); date.setDate(date.getDate() - (date.getDay() + 6) % 7);
   return Array.from({ length: 7 }, (_, i) => localKey(new Date(date.getFullYear(), date.getMonth(), date.getDate() + i)));
