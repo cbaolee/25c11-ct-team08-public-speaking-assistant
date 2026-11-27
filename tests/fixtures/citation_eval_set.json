@@ -1,0 +1,525 @@
+{
+  "description": "Labelled benchmark dataset (60 end-to-end citation cases across 6 categories) for measuring citation precision, recall, F1, casual/instruction false-citation rate, paraphrase recall, contradiction leakage, and multi-source recall.",
+  "cases": [
+    {
+      "id": "casual_01",
+      "category": "casual_leakage",
+      "user_notes": ["I'm so happy today because my family is coming to watch my speech!"],
+      "raw_doc": "",
+      "script_paragraph": "Sharing a happy moment with family is a truly happy thing that brings communities together today.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_02",
+      "category": "casual_leakage",
+      "user_notes": ["I feel really nervous about speaking on stage in front of a big crowd tomorrow."],
+      "raw_doc": "",
+      "script_paragraph": "Feeling nervous before speaking on stage in front of a big crowd is a universal human experience.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_03",
+      "category": "casual_leakage",
+      "user_notes": ["Thank you so much for helping me prepare for my presentation this morning!"],
+      "raw_doc": "",
+      "script_paragraph": "Preparing carefully for a presentation helps speakers communicate their vision with clarity.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_04",
+      "category": "casual_leakage",
+      "user_notes": ["I am really excited about clean energy and solar panels on rooftops!"],
+      "raw_doc": "",
+      "script_paragraph": "Many homeowners are excited about clean energy and installing solar panels on rooftops.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_05",
+      "category": "casual_leakage",
+      "user_notes": ["I love talking about wildlife conservation with my classmates every week."],
+      "raw_doc": "",
+      "script_paragraph": "Talking about wildlife conservation with classmates inspires young people to care about nature.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_06",
+      "category": "casual_leakage",
+      "user_notes": ["I'm happy", "thanks", "that sounds really good to me!"],
+      "raw_doc": "",
+      "script_paragraph": "It is a happy thing when a solution sounds really good to everyone in the room.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_07",
+      "category": "casual_leakage",
+      "user_notes": ["I am a bit tired tonight, can you help me finish practicing this talk?"],
+      "raw_doc": "",
+      "script_paragraph": "Even when we feel tired tonight, practicing consistently builds lasting confidence.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_08",
+      "category": "casual_leakage",
+      "user_notes": ["Awesome job, I really like how friendly and warm this sounds right now!"],
+      "raw_doc": "",
+      "script_paragraph": "A friendly and warm community welcomes newcomers and fosters mutual trust.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_09",
+      "category": "casual_leakage",
+      "user_notes": ["I don't know what to say next about artificial intelligence in schools."],
+      "raw_doc": "",
+      "script_paragraph": "Educators often debate what to say next about artificial intelligence in schools.",
+      "expected_cited": false
+    },
+    {
+      "id": "casual_10",
+      "category": "casual_leakage",
+      "user_notes": ["I feel proud of my team for working hard on this project together."],
+      "raw_doc": "",
+      "script_paragraph": "Every leader should feel proud of their team for working hard on a project together.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_01",
+      "category": "instruction_leakage",
+      "user_notes": ["Make the opening dramatic and highlight extreme temperature gradients in the deep ocean."],
+      "raw_doc": "",
+      "script_paragraph": "Picture the extreme temperature gradients in the deep ocean where scalding vents meet freezing water.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_02",
+      "category": "instruction_leakage",
+      "user_notes": ["Please make it shorter and focus more on university students in the audience."],
+      "raw_doc": "",
+      "script_paragraph": "University students in the audience today face a rapidly shifting job market.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_03",
+      "category": "instruction_leakage",
+      "user_notes": ["Add a rhetorical question about artificial intelligence ethics in modern hospitals."],
+      "raw_doc": "",
+      "script_paragraph": "How should we govern artificial intelligence ethics in modern hospitals when lives are at stake?",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_04",
+      "category": "instruction_leakage",
+      "user_notes": ["Use a more formal academic style suitable for an international climate conference."],
+      "raw_doc": "",
+      "script_paragraph": "Delegates at this international climate conference must confront urgent policy trade-offs.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_05",
+      "category": "instruction_leakage",
+      "user_notes": ["Rewrite the second paragraph so it flows smoothly without technical medical jargon."],
+      "raw_doc": "",
+      "script_paragraph": "Clear communication without technical medical jargon helps patients understand treatment options.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_06",
+      "category": "instruction_leakage",
+      "user_notes": ["Focus on urban microgrid deployment and community solar ownership models."],
+      "raw_doc": "",
+      "script_paragraph": "Urban microgrid deployment and community solar ownership models empower local neighborhoods.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_07",
+      "category": "instruction_leakage",
+      "user_notes": ["Keep sentences brief and add a memorable call to action at the conclusion."],
+      "raw_doc": "",
+      "script_paragraph": "Let me leave you with a memorable call to action as we reach our conclusion.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_08",
+      "category": "instruction_leakage",
+      "user_notes": ["Change the tone to sound warmer and talk more about teamwork in youth sports."],
+      "raw_doc": "",
+      "script_paragraph": "Teamwork in youth sports teaches resilience, empathy, and shared responsibility.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_09",
+      "category": "instruction_leakage",
+      "user_notes": ["Remove repetitive transitions and emphasize practical cybersecurity habits for small businesses."],
+      "raw_doc": "",
+      "script_paragraph": "Practical cybersecurity habits for small businesses start with multi-factor authentication.",
+      "expected_cited": false
+    },
+    {
+      "id": "instr_10",
+      "category": "instruction_leakage",
+      "user_notes": ["Make the introduction punchier and speak directly to first-generation college students."],
+      "raw_doc": "",
+      "script_paragraph": "First-generation college students bring extraordinary grit and perspective to campus life.",
+      "expected_cited": false
+    },
+    {
+      "id": "source_01",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["According to the 2023 WHO report, clinical depression affects approximately 5% of adults worldwide."],
+      "raw_doc": "",
+      "script_paragraph": "Global health data from the 2023 WHO report shows that clinical depression affects roughly 5% of adults worldwide.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_02",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["Thanks! Make it shorter. Also mention that the Saola was discovered in May 1992 in Vu Quang Nature Reserve in Vietnam."],
+      "raw_doc": "",
+      "script_paragraph": "Scientists first discovered the elusive Saola in May 1992 inside Vietnam's Vu Quang Nature Reserve.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_03",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["Overview\nThe Tasmanian tiger was a carnivorous marsupial distinguished by dark transverse stripes, a stiff tail, and an 80-degree jaw gape."],
+      "raw_doc": "",
+      "script_paragraph": "The Tasmanian tiger was a carnivorous marsupial featuring dark stripes across its back, a stiff tail, and an 80-degree jaw gape.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_04",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["Make the tone inspiring, and include that Copenhagen reduced cyclist injuries by 28% after building 150 km of protected bike lanes."],
+      "raw_doc": "",
+      "script_paragraph": "When Copenhagen built 150 km of protected bike lanes, cyclist injuries dropped by 28%.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_05",
+      "category": "direct_and_mixed_source",
+      "user_notes": [],
+      "raw_doc": "# Ocean Floor Report\nDeep-sea exploration requires specialized titanium submersibles engineered to withstand crushing hydrostatic pressure across abyssal plains. Modern remotely operated vehicles carry high-definition optical cameras, robotic manipulator arms, and chemical mass spectrometers for sediment core sampling. Expedition vessels coordinate acoustic transponder beacons across wide survey grids during multi-week voyages in international waters. Marine geologists map basaltic ridges, fracture zones, and tectonic spreading centers along the mid-ocean mountain chains. Surface teams monitor telemetry streams continuously through fiber-optic tethers connected to shipboard control rooms. Calibration protocols ensure pressure sensors maintain sub-millimeter precision throughout extreme thermal shocks. Navigation sonar arrays avoid steep volcanic talus slopes during low-visibility descents into unexplored trenches. Standardised logging procedures archive video transects for global oceanographic repositories and open-access biodiversity atlases. Autonomous benthic landers remain anchored on the seabed for twelve months recording current velocities and dissolved oxygen levels. Long-term acoustic hydrophones capture low-frequency seismic tremors associated with subsea magma migration. Beyond geological mapping, biological surveys revealed that giant tube worms Riftia pachyptila lack a digestive tract and rely entirely on symbiotic sulfur-oxidizing bacteria for nutrition at 2,500 meters depth.",
+      "script_paragraph": "At 2,500 meters depth, giant tube worms have no digestive tract at all and depend completely on symbiotic sulfur-oxidizing bacteria to survive.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_06",
+      "category": "direct_and_mixed_source",
+      "user_notes": [],
+      "raw_doc": "# Grid Reliability\n Microgrid field trials across 18 rural clinics in Kenya cut power outages by 74% between 2020 and 2022.",
+      "script_paragraph": "Consider our healthcare infrastructure. In rural Kenya, microgrid deployments across 18 clinics slashed power outages by 74% between 2020 and 2022. That reliability saves lives every single night.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_07",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["A 2021 Stanford sleep study of 28 college basketball players showed extending sleep to 10 hours improved free-throw accuracy by 9%."],
+      "raw_doc": "",
+      "script_paragraph": "In a Stanford sleep study tracking 28 collegiate basketball players, extending nightly sleep to 10 hours boosted free-throw accuracy by 9%.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_08",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["Historically found across:\nTasmania\nMainland Australia\nPapua New Guinea\nThe thylacine survived longest in Tasmania due to isolation from dingoes."],
+      "raw_doc": "",
+      "script_paragraph": "Historically the species inhabited Tasmania, Mainland Australia, and Papua New Guinea, surviving longest in Tasmania because it was isolated from dingoes.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_09",
+      "category": "direct_and_mixed_source",
+      "user_notes": [],
+      "raw_doc": "# Cinema Acoustics\nDolby Atmos object-based surround sound debuted theatrically in June 2012 with Pixar's animated film Brave, supporting up to 128 simultaneous audio tracks.",
+      "script_paragraph": "Object-based cinema audio took a leap forward in June 2012 when Dolby Atmos debuted with Pixar's Brave, supporting up to 128 audio tracks at once.",
+      "expected_cited": true
+    },
+    {
+      "id": "source_10",
+      "category": "direct_and_mixed_source",
+      "user_notes": ["Please shorten the intro. Note that global e-waste reached 62 million tonnes in 2022, with only 22.3% formally recycled."],
+      "raw_doc": "",
+      "script_paragraph": "Global electronic waste hit 62 million tonnes in 2022, yet only 22.3% was formally collected and recycled.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_01",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Biodiversity Assessment\nMonitored tropical amphibian populations experienced a 68% decline between 1970 and 2020 due to chytrid fungus and deforestation.",
+      "script_paragraph": "Over the half-century after 1970, more than two-thirds of tracked rainforest frog and salamander populations disappeared because of fungal disease and forest clearing.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_02",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Pediatric Nutrition\nInfants who received early peanut introduction prior to eleven months of age exhibited an 81% lower incidence of peanut allergy at age five.",
+      "script_paragraph": "Giving babies small amounts of peanut before they turn one year old cuts their risk of developing a peanut allergy by roughly four-fifths by kindergarten.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_03",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Urban Forestry\nStreet trees along residential blocks lower summer asphalt surface temperatures by 11 to 19 degrees Celsius through canopy shading and evapotranspiration.",
+      "script_paragraph": "Leafy neighborhood tree canopies cool down hot summer pavement by more than ten degrees Celsius simply by casting shade and releasing moisture into the air.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_04",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Aviation Emissions\nCommercial passenger aviation accounts for roughly 2.5% of global carbon dioxide emissions, yet contrail cirrus clouds double its short-term radiative warming.",
+      "script_paragraph": "Although passenger flights release only about one-fortieth of the world's CO2, the high-altitude vapor trails they leave behind trap twice as much heat in the short run.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_05",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Cognitive Psychology\nStudents who practiced active recall testing retained 50% more material after one week compared to peers who repeatedly reread the textbook.",
+      "script_paragraph": "Quizzing yourself from memory helps you remember significantly more a week later than passively reading the same chapter over and over.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_06",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Coral Restoration\nMicro-fragmentation accelerates stony coral growth rates to twenty-five times their natural pace by triggering rapid tissue fusion across cut polyps.",
+      "script_paragraph": "By slicing reef-building corals into tiny pieces, scientists stimulate tissue healing that makes them grow over twenty times faster than they do in the wild.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_07",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Workplace Ergonomics\nFour-day workweek trials across 61 British firms saw employee burnout fall by 71% while company revenue remained stable.",
+      "script_paragraph": "When dozens of UK companies switched to a shorter four-day schedule, staff exhaustion plummeted without hurting business earnings.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_08",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Glacial Hydrology\nHimalayan glaciers supply meltwater during dry pre-monsoon months to river basins supporting nearly two billion residents across South and East Asia.",
+      "script_paragraph": "Roughly a quarter of humanity living along major Asian rivers relies on seasonal ice melt from the Himalayas before the summer rains arrive.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_09",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Antibiotic Resistance\nBacteriophage therapy uses naturally occurring viruses that infect and lyse multidrug-resistant pathogenic bacteria without harming human cells.",
+      "script_paragraph": "Doctors can deploy harmless targeted viruses that hunt down and burst superbugs while leaving the patient's own body tissues untouched.",
+      "expected_cited": true
+    },
+    {
+      "id": "para_10",
+      "category": "paraphrased_grounding",
+      "user_notes": [],
+      "raw_doc": "# Maritime Shipping\nReducing container vessel cruising speed by 20% cuts bunker fuel consumption and greenhouse gas output by nearly 34%.",
+      "script_paragraph": "Simply slowing cargo ships down by a fifth trims their fuel burn and carbon footprint by roughly one-third.",
+      "expected_cited": true
+    },
+    {
+      "id": "contra_01",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Biodiversity Assessment\nSevere decline of 40% observed in amphibian populations across tropical regions between 1995 and 2015.",
+      "script_paragraph": "Field surveys documented a dramatic 80% increase in amphibian populations across tropical regions between 1995 and 2015.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_02",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Biodiversity Assessment\nSevere decline of 40% observed in amphibian populations across tropical regions between 1995 and 2015.",
+      "script_paragraph": "Fortunately, there was no decline observed in amphibian populations across tropical regions between 1995 and 2015.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_03",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Saola Expedition\nCamera traps in Vu Quang Nature Reserve captured photographs of the rare Saola in October 1998, confirming its survival in the wild.",
+      "script_paragraph": "Camera traps in Vu Quang Nature Reserve failed to capture any photographs of the rare Saola in October 1998, proving its extinction in the wild.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_04",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Workplace Ergonomics\nFour-day workweek trials across 61 British firms reduced employee turnover by 57% while increasing revenue by 1.4%.",
+      "script_paragraph": "Four-day workweek trials across 61 British firms caused employee turnover to surge by 57% while slashing company revenue by 35%.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_05",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Cognitive Psychology\nStudents who practiced active recall testing retained 50% more material after one week than students who passively reread notes.",
+      "script_paragraph": "Students who passively reread notes retained 50% more material after one week than students who practiced active recall testing.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_06",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Tasmanian Tiger Overview\nThe Tasmanian tiger was a shy nocturnal marsupial with dark stripes across its back and a stiff tail.",
+      "script_paragraph": "In September 1936 the Tasmanian government passed legislation protecting the Tasmanian tiger just 59 days before the last captive specimen died in Hobart.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_07",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Solar Microgrids\nRural solar microgrids in Kenya lowered clinic electricity costs by 45% in 2021 without requiring diesel backup generators.",
+      "script_paragraph": "Rural solar microgrids in Kenya doubled clinic electricity costs by 95% in 2021 and depended entirely on diesel backup generators.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_08",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Pediatric Nutrition\nEarly peanut introduction before 11 months reduced peanut allergy prevalence by 81% at age five.",
+      "script_paragraph": "Early peanut introduction before 11 months increased peanut allergy prevalence by 81% at age five.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_09",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Maritime Shipping\nSlowing container vessel cruising speed by 20% reduces bunker fuel consumption and carbon dioxide output by 34%.",
+      "script_paragraph": "Slowing container vessel cruising speed by 20% has zero effect on bunker fuel consumption or carbon dioxide output.",
+      "expected_cited": false
+    },
+    {
+      "id": "contra_10",
+      "category": "contradiction_and_altered_numbers",
+      "user_notes": [],
+      "raw_doc": "# Cinema Acoustics\nDolby Atmos debuted theatrically in 2012 with Pixar's Brave and supports up to 128 discrete audio objects.",
+      "script_paragraph": "Dolby Atmos debuted theatrically in 1994 with The Lion King and supports up to 1,024 discrete audio objects.",
+      "expected_cited": false
+    },
+    {
+      "id": "multi_01",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Expedition Log", "page": 1, "content": "During the May 1992 survey in Vietnam's Vu Quang forest, biologists collected three unusual long-horned skulls from local hunters."},
+        {"chunk_id": 2, "heading": "DNA Taxonomy", "page": 4, "content": "Phylogenetic sequencing of the three skulls collected in Vu Quang established a brand-new bovid genus named Pseudoryx."}
+      ],
+      "script_paragraph": "The three long-horned skulls gathered during the May 1992 Vu Quang forest survey were genetically proven to belong to a brand-new bovid genus called Pseudoryx.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_02",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Field Results", "page": 2, "content": "Tropical amphibian populations declined by 68% across monitored rainforest reserves since 1970."},
+        {"chunk_id": 2, "heading": "Policy Recommendations", "page": 6, "content": "Strict wetland buffer zones and captive assurance colonies are required to halt further amphibian extinctions."}
+      ],
+      "script_paragraph": "Monitored rainforest frog populations have dropped by 68% since 1970, while strict wetland buffer zones and captive breeding colonies are needed to stop further extinctions.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_03",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Battery Supply", "page": 2, "content": "Lithium brine extraction in the Atacama desert consumes roughly 2 million liters of water per tonne of lithium produced."},
+        {"chunk_id": 2, "heading": "Recycling Tech", "page": 5, "content": "Hydrometallurgical battery recycling recovers 95% of battery-grade lithium and cobalt from retired electric vehicle packs."}
+      ],
+      "script_paragraph": "Brine mining in the Atacama uses 2 million liters of water per tonne of lithium; however, hydrometallurgical recycling can recover 95% of lithium from retired EV batteries.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_04",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Patient Cohort", "page": 1, "content": "Trial protocol ALFA-9 enrolled 420 cardiac surgery patients across six teaching hospitals in 2022."},
+        {"chunk_id": 2, "heading": "Clinical Outcomes", "page": 3, "content": "Post-operative infection rates in protocol ALFA-9 fell by 44% compared to standard ward care."}
+      ],
+      "script_paragraph": "Across the 420 cardiac surgery patients enrolled at six teaching hospitals in 2022, the ALFA-9 protocol cut post-operative infections by 44%.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_05",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Solar Generation", "page": 2, "content": "Rooftop photovoltaic arrays on campus dormitories generate 3.8 megawatts at midday peak."},
+        {"chunk_id": 2, "heading": "Thermal Storage", "page": 4, "content": "Molten-salt and chilled-water tanks shift excess midday campus electricity to cover evening laboratory cooling loads."}
+      ],
+      "script_paragraph": "Dormitory rooftop solar generates 3.8 megawatts at noon, whereas thermal storage tanks shift that midday surplus to cool campus laboratories in the evening.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_06",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Historical Range", "page": 1, "content": "Fossil evidence shows the thylacine vanished from mainland Australia roughly 3,200 years ago following the arrival of dingoes."},
+        {"chunk_id": 2, "heading": "Island Extinction", "page": 3, "content": "On dingo-free Tasmania, government bounties paid for 2,184 thylacine pelts between 1888 and 1909 accelerated its final extinction."}
+      ],
+      "script_paragraph": "The thylacine disappeared from mainland Australia around 3,200 years ago after dingoes arrived, while state bounties on 2,184 pelts between 1888 and 1909 drove the remaining Tasmanian population toward extinction.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_07",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Acoustic Tagging", "page": 2, "content": "Researchers attached satellite pop-up tags to 32 whale sharks off Ningaloo Reef in 2019."},
+        {"chunk_id": 2, "heading": "Dive Profiles", "page": 5, "content": "Telemetry recovered from the Ningaloo tags recorded whale shark dives reaching 1,890 meters into the bathypelagic zone."}
+      ],
+      "script_paragraph": "Satellite tags placed on 32 whale sharks at Ningaloo Reef in 2019 revealed dives plunging 1,890 meters into the deep ocean.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_08",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Soil Microbiome", "page": 1, "content": "No-till cover cropping increased topsoil organic carbon by 18% over five growing seasons."},
+        {"chunk_id": 2, "heading": "Drought Yield", "page": 4, "content": "Fields with higher topsoil organic carbon retained 30% more root-zone moisture during the 2022 summer drought."}
+      ],
+      "script_paragraph": "Cover cropping without tillage boosted topsoil carbon by 18% in five years, and those carbon-rich fields held 30% more moisture during the 2022 drought.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_09",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": "Sensor Deployment", "page": 2, "content": "Project Borealis installed 64 low-cost PM2.5 air sensors near elementary schools in Jakarta."},
+        {"chunk_id": 2, "heading": "Traffic Intervention", "page": 3, "content": "Data from the Project Borealis school sensors prompted morning diesel truck bans that cut curbside PM2.5 by 31%."}
+      ],
+      "script_paragraph": "Measurements from the 64 air sensors installed near Jakarta elementary schools led to morning diesel truck bans that lowered curbside PM2.5 pollution by 31%.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    },
+    {
+      "id": "multi_10",
+      "category": "multihop_and_multisource",
+      "user_notes": [],
+      "chunks": [
+        {"chunk_id": 1, "heading": " Urban Heat", "page": 1, "content": "Unshaded downtown parking lots in Phoenix reach surface temperatures of 62 degrees Celsius in July."},
+        {"chunk_id": 2, "heading": "Cool Pavement", "page": 3, "content": "Reflective solar-coating trials lowered peak asphalt surface temperatures by 6.5 degrees Celsius."}
+      ],
+      "script_paragraph": "Unshaded Phoenix parking lots hit 62 degrees Celsius in July; however, reflective pavement coatings cut peak surface temperatures by 6.5 degrees Celsius.",
+      "expected_cited": true,
+      "expected_min_sources": 2
+    }
+  ]
+}

@@ -35,8 +35,11 @@ MAX_PDF_SIZE_BYTES = CONSTANTS["script"]["max_pdf_size_bytes"]
 MAX_POC_PAGES = CONSTANTS["script"]["max_pdf_pages"]
 MAX_TEXT_FILE_BYTES = CONSTANTS["script"]["max_text_file_bytes"]
 MAX_TEXT_FILE_WORDS = CONSTANTS["script"]["max_text_file_words"]
+CHUNK_MAX_WORDS = int(CONSTANTS["script"].get("chunk_max_words", 180))
+CHUNK_OVERLAP_WORDS = int(CONSTANTS["script"].get("chunk_overlap_words", 30))
 ALLOWED_DOC_EXTENSIONS = frozenset({".pdf", ".md", ".txt"})
 HEADING_PATTERN = re.compile(r"^(#{1,4})\s+(.+)$")
+_SENTENCE_BOUNDARY_RE = re.compile(r"(?<=[.!?])\s+")
 
 
 class DocumentParserError(Exception):
@@ -101,12 +104,96 @@ def _get_pdf_page_count(pdf_path: str) -> int:
     return len(reader.pages)
 
 
+def _split_long_chunk_text(
+    text: str,
+    max_words: int = CHUNK_MAX_WORDS,
+    overlap_words: int = CHUNK_OVERLAP_WORDS,
+) -> list[str]:
+    """Split oversized section text into sentence-aligned sub-chunks with word overlap.
+
+    Keeps each chunk within ``all-MiniLM-L6-v2`` (256 wordpieces) and NLI (512 tokens)
+    limits so facts in the second half of a long PDF page are never truncated away.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return []
+    words = stripped.split()
+    if max_words <= 0 or len(words) <= max_words:
+        return [stripped]
+
+    eff_overlap = max(0, min(overlap_words, max_words // 2))
+    # Split into sentence-like units while respecting line breaks
+    units: list[str] = []
+    for raw_line in stripped.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        for sent in _SENTENCE_BOUNDARY_RE.split(line):
+            sent = sent.strip()
+            if not sent:
+                continue
+            sent_words = sent.split()
+            if len(sent_words) <= max_words:
+                units.append(sent)
+            else:
+                # Hard-wrap unpunctuated OCR/table blocks by word window
+                step = max(1, max_words - eff_overlap)
+                for start in range(0, len(sent_words), step):
+                    piece = " ".join(sent_words[start : start + max_words])
+                    if piece:
+                        units.append(piece)
+                    if start + max_words >= len(sent_words):
+                        break
+
+    if not units:
+        return [stripped]
+
+    sub_chunks: list[str] = []
+    current: list[str] = []
+    current_words = 0
+
+    for unit in units:
+        u_words = len(unit.split())
+        if current and current_words + u_words > max_words:
+            sub_chunks.append(" ".join(current))
+            # Seed next window with trailing overlap sentences
+            overlap_buf: list[str] = []
+            overlap_count = 0
+            for prev_unit in reversed(current):
+                pw = len(prev_unit.split())
+                if overlap_count + pw > eff_overlap and overlap_buf:
+                    break
+                if pw <= max(eff_overlap, max_words // 2):
+                    overlap_buf.append(prev_unit)
+                    overlap_count += pw
+                if overlap_count >= eff_overlap:
+                    break
+            current = list(reversed(overlap_buf))
+            current_words = sum(len(x.split()) for x in current)
+            if current_words + u_words > max_words:
+                current = []
+                current_words = 0
+
+        current.append(unit)
+        current_words += u_words
+
+    if current:
+        last_chunk = " ".join(current)
+        if not sub_chunks or last_chunk != sub_chunks[-1]:
+            sub_chunks.append(last_chunk)
+
+    return sub_chunks
+
+
 def parse_input_to_chunks(
     pdf_path: str | None = None,
     raw_text: str | None = None,
     ocr_runner: Callable[[bytes, int], str] | None = None,
+    *,
+    max_chunk_words: int = CHUNK_MAX_WORDS,
+    chunk_overlap_words: int = CHUNK_OVERLAP_WORDS,
 ) -> list[DocumentChunk]:
-    """Parse Digital/Hybrid PDF or pasted raw text into heading chunks."""
+    """Parse Digital/Hybrid PDF or pasted raw text into size-bounded heading chunks."""
     if raw_text and not pdf_path:
         pages = [{"page": 1, "text": raw_text}]
     elif pdf_path:
@@ -114,19 +201,27 @@ def parse_input_to_chunks(
     else:
         raise DocumentParserError("missing_input", "Provide pdf_path or raw_text.")
     chunks: list[DocumentChunk] = []
+
+    def _emit_buffer(buf_lines: list[str], sec_heading: str, sec_page: int) -> None:
+        raw_block = "\n".join(buf_lines)
+        for part in _split_long_chunk_text(
+            raw_block, max_words=max_chunk_words, overlap_words=chunk_overlap_words
+        ):
+            chunks.append(DocumentChunk(len(chunks) + 1, sec_heading, sec_page, part))
+
     for item in pages:
         page_num, heading, buf = item["page"], f"Page {item['page']} Overview", []
         for line in item["text"].splitlines():
             s, m = line.strip(), HEADING_PATTERN.match(line.strip())
             if m:
                 if buf:
-                    chunks.append(DocumentChunk(len(chunks) + 1, heading, page_num, "\n".join(buf)))
+                    _emit_buffer(buf, heading, page_num)
                     buf = []
                 heading = re.sub(r"[*_`#]+", "", m.group(2)).strip()
             elif s:
                 buf.append(s)
         if buf:
-            chunks.append(DocumentChunk(len(chunks) + 1, heading, page_num, "\n".join(buf)))
+            _emit_buffer(buf, heading, page_num)
     return chunks
 
 
