@@ -140,13 +140,18 @@
 .sch-carousel-viewport.sch-fade-left { mask-image: linear-gradient(to right, transparent, black 6%); }
 .sch-carousel-viewport.sch-fade-left.sch-fade-right { mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent); }
 .sch-carousel-track { display: flex; gap: 16px; transition: transform 300ms ease-out; }
-.sch-card { position: relative; flex: 0 0 calc((100% - 32px) / 3.15); min-width: 0; height: 210px; display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-left: 4px solid var(--sch-ev-border); border-radius: var(--r-panel); background: var(--surface); }
+.sch-card { position: relative; flex: 0 0 calc((100% - 32px) / 3.15); min-width: 0; height: 210px; display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--line); border-left: 4px solid var(--sch-ev-border); border-radius: var(--r-panel); background: var(--surface); }
 .sch-card-open { position: static; padding: 0; border: 0; background: none; }
 .sch-card-open::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-panel); cursor: pointer; }
 .sch-card-open:focus-visible { outline: none; }
 .sch-card-open:focus-visible::after { outline: 3px solid var(--accent); outline-offset: -3px; }
 .sch-card-top { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
 .sch-card-top .sch-chip { margin-left: auto; }
+.sch-card-tags { display: flex; flex-wrap: wrap; gap: 6px; min-height: 22px; position: relative; z-index: 1; pointer-events: none; }
+.sch-tag { display: inline-flex; align-items: center; padding: 0 8px; height: 20px; border: 1px solid currentColor; border-radius: var(--r-pill); background: #FFFFFF; font: 600 12px/18px var(--sans); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.sch-tag-length { color: var(--tag-length); }
+.sch-tag-category { color: var(--tag-category); }
+.sch-tag-any { color: var(--muted); }
 .sch-card-length, .sch-card-helper { color: var(--muted); font-size: 13px; }
 .sch-card-note { min-height: 1.5em; position: relative; z-index: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-style: italic; }
 .sch-card-status { font-size: 14px; }

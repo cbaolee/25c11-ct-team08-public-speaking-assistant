@@ -83,6 +83,14 @@ export function styleVars(style) {
 }
 export function sessionTimeLabel(occ, fmtTime, words) { return occ.all_day ? words.allDay : fmtTime(occ.start); }
 export function lengthLabel(min, words) { return min == null ? words.anyLength : words.minutes.replace('{n}', String(min)); }
+export function cardTags(durationMin, category, words) {
+  const anyCategory = category === 'any' || !category;
+  return [{ kind: 'length', tone: durationMin == null ? 'any' : 'length', text: lengthLabel(durationMin, words) }, { kind: 'category', tone: anyCategory ? 'any' : 'category', text: anyCategory ? words.anyCategory : words.categoryName(category) }];
+}
+export function cardScriptLine(script, words) {
+  const text = script?.kind === 'saved' ? (script.title ? words.saved.replace('{title}', script.title) : words.savedNoTitle) : script?.kind === 'ai' ? words.ai : words.free;
+  return { text, title: text };
+}
 
 export function chipsThatFit(cellInnerHeight, headerHeight, chipHeight, moreHeight, gap, total) {
   const count = Math.max(0, Math.floor(total));

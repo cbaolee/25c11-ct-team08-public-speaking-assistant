@@ -481,6 +481,10 @@ TEXT.schedule = {
 };
 TEXT.schedule.todayPanel = {
   heading: "Today's practice",
+  scriptFree: 'Free choice script',
+  scriptSaved: 'Saved script: {title}',
+  scriptSavedNoTitle: 'Saved script',
+  scriptAi: 'AI generated script',
   previousPractices: 'Previous practices',
   nextPractices: 'Next practices',
   showing: 'Showing practices {start} to {end} of {total}',

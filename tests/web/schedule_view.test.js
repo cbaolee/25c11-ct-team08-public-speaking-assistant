@@ -243,3 +243,20 @@ test('practice event choices use labelled selects with field errors', () => {
     assert.match(html, new RegExp(`<label for="sch${field}"[^>]*></label><select id="sch${field}" aria-describedby="sch${field}Error"></select><div class="ferr" id="sch${field}Error" role="alert"></div>`));
   }
 });
+
+
+test('card tags always show length and category in order', async () => {
+  const { cardTags } = await view;
+  const words = { anyLength: 'Any length', anyCategory: 'Any category', minutes: '{n} min', categoryName: key => ({ sports: 'Sports' })[key] };
+  assert.deepEqual(cardTags(null, 'any', words), [{ kind: 'length', tone: 'any', text: 'Any length' }, { kind: 'category', tone: 'any', text: 'Any category' }]);
+  assert.deepEqual(cardTags(10, 'sports', words), [{ kind: 'length', tone: 'length', text: '10 min' }, { kind: 'category', tone: 'category', text: 'Sports' }]);
+  assert.equal(cardTags(null, '', words)[1].tone, 'any');
+  assert.equal(cardTags(null, '', words)[1].text, 'Any category');
+});
+test('card script line retains the complete text in its title', async () => {
+  const { cardScriptLine } = await view;
+  const words = { free: 'Free choice script', saved: 'Saved script: {title}', savedNoTitle: 'Saved script', ai: 'AI generated script' };
+  for (const [script, text] of [[{ kind: 'free' }, words.free], [undefined, words.free], [{ kind: 'saved', title: 'A very long saved script title that should remain complete' }, 'Saved script: A very long saved script title that should remain complete'], [{ kind: 'saved' }, words.savedNoTitle], [{ kind: 'ai' }, words.ai]]) {
+    assert.deepEqual(cardScriptLine(script, words), { text, title: text });
+  }
+});

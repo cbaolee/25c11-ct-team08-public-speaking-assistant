@@ -7,7 +7,7 @@ import { openModal, closeModal, toast, enhanceSelect } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, slotStartTime, slotTarget, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, cardTags, cardScriptLine, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, slotStartTime, slotTarget, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
@@ -629,16 +629,19 @@ export function renderTodayPanel() {
       const status = occurrenceStatus(item, now), card = node('article', null, 'sch-card');
       applyEventStyle(card, status, item.color);
       card.dataset.todayKey = item.key;
-      const itemTime = sessionTimeLabel(item, time, labelWords()), itemLength = lengthLabel(item.duration_min, labelWords()), category = categoryLabel(item);
+      const itemTime = sessionTimeLabel(item, time, labelWords());
+      const tags = cardTags(item.duration_min, item.category, { anyLength: T('schedule.anyLength'), anyCategory: T('schedule.anyCategory'), minutes: T('schedule.minutes'), categoryName: key => TOPICS[key] });
+      const script = cardScriptLine(item.script, { free: T('schedule.todayPanel.scriptFree'), saved: T('schedule.todayPanel.scriptSaved'), savedNoTitle: T('schedule.todayPanel.scriptSavedNoTitle'), ai: T('schedule.todayPanel.scriptAi') });
       const open = todayButton('', 'sch-card-open', () => { go('schedule'); openDay(item.day, item.key); });
       open.dataset.todayRole = 'open';
-      open.setAttribute('aria-label', T('schedule.todayPanel.details', { time: itemTime, length: itemLength }) + (category ? ', ' + category : ''));
+      open.setAttribute('aria-label', T('schedule.todayPanel.details', { time: itemTime, length: tags[0].text }) + ', ' + tags[1].text);
       card.addEventListener('focusin', () => { const before = todayCarouselIndex, visible = visibleCount(); if (index < todayCarouselIndex) todayCarouselIndex = index; else if (index >= todayCarouselIndex + visible) todayCarouselIndex = index - visible + 1; if (before !== todayCarouselIndex) update(!restoringFocus); });
       const top = node('div', null, 'sch-card-top');
-      top.append(node('strong', itemTime), node('span', itemLength, 'sch-card-length'));
-      if (category) top.append(node('span', category, 'sch-card-length'));
+      top.append(node('strong', itemTime));
       if (status === 'done' || status === 'missed') top.append(chip(status, null, false, item.color));
-      const note = node('p', item.note, 'sch-card-note'); if (item.note) note.title = item.note; else note.setAttribute('aria-hidden', 'true');
+      const tagRow = node('div', null, 'sch-card-tags');
+      tags.forEach(tag => tagRow.append(node('span', tag.text, 'sch-tag sch-tag-' + tag.tone)));
+      const scriptLine = node('p', script.text, 'sch-card-note sch-card-script'); scriptLine.title = script.title;
       const statusLine = node('p', null, 'sch-card-status');
       if (status === 'active') {
         const remaining = windowClosesAt(item) - now; statusLine.classList.add('sch-tone-' + closesTone(remaining));
@@ -655,7 +658,7 @@ export function renderTodayPanel() {
         if (id) { const result = todayButton(T('schedule.viewResult'), 'btn', null); result.dataset.open = id; result.dataset.todayRole = 'result'; actions.append(result); }
         else actions.append(node('span', T('schedule.resultUnavailable'), 'sch-card-helper'));
       }
-      card.append(open, top, node('p', scriptLabel(item), 'sch-card-note'), note, statusLine, actions); track.append(card);
+      card.append(open, top, tagRow, scriptLine, statusLine, actions); track.append(card);
     });
     viewport.append(track); body.append(carousel, live);
     function visibleCount() { return window.matchMedia('(max-width: 720px)').matches ? 1 : 3; }
