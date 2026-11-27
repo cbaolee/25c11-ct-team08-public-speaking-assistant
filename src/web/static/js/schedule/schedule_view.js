@@ -127,10 +127,11 @@ export function weekRangeLabel(key, fmt) {
 export const WHEEL_STEP = { threshold: 50, cooldownMs: 400, idleMs: 200 };
 export function wheelStep(state, deltaY, deltaMode, now, opts = { ...WHEEL_STEP, lineHeight: 16, pageHeight: 800 }) {
   const { threshold, cooldownMs, idleMs, lineHeight, pageHeight } = opts;
-  const next = { ...state, lastWheel: now };
-  if (now - state.lastStep < cooldownMs) return { step: 0, state: { ...next, acc: 0 } };
-  next.acc = (now - state.lastWheel > idleMs ? 0 : state.acc) + deltaY * (deltaMode === 1 ? lineHeight : deltaMode === 2 ? pageHeight : 1);
+  const idle = now - state.lastWheel > idleMs;
+  const next = { ...state, lastWheel: now, armed: idle ? true : (state.armed ?? true) };
+  if (!next.armed || now - state.lastStep < cooldownMs) return { step: 0, state: { ...next, acc: 0 } };
+  next.acc = (idle ? 0 : state.acc) + deltaY * (deltaMode === 1 ? lineHeight : deltaMode === 2 ? pageHeight : 1);
   const step = Math.abs(next.acc) >= threshold ? Math.sign(next.acc) : 0;
-  if (step) { next.acc = 0; next.lastStep = now; }
+  if (step) { next.acc = 0; next.lastStep = now; next.armed = false; }
   return { step, state: next };
 }

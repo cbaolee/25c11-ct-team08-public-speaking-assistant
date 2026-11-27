@@ -161,6 +161,7 @@ function renderWeek(now) {
   const root = $('schWeek'), keys = weekDays(dayKey(month)), today = dayKey(now);
   const focused = root.contains(document.activeElement) ? document.activeElement : null;
   const focusDay = focused?.dataset.schDay, focusAdd = focused?.classList.contains('sch-add');
+  const focusIndex = focusDay ? [...root.querySelectorAll('.sch-day')].findIndex(day => day.dataset.schDay === focusDay) : -1;
   const occs = occurrencesBetween(parseDay(keys[0]), addDays(parseDay(keys[6]), 1)), cells = [];
   root.replaceChildren();
   keys.forEach(key => {
@@ -189,7 +190,11 @@ function renderWeek(now) {
     list.slice(0, fit.shown).forEach(o => b.append(makeItem(o)));
     if (fit.more) b.append(node('span', T('schedule.more', { n: fit.more }), 'sch-more'));
   });
-  if (focusDay) root.querySelector(`[data-sch-day="${focusDay}"].${focusAdd ? 'sch-add' : 'sch-day'}`)?.focus();
+  if (focusDay) {
+    const same = root.querySelector(`[data-sch-day="${focusDay}"].${focusAdd ? 'sch-add' : 'sch-day'}`);
+    const cell = focusIndex >= 0 ? root.children[focusIndex] : null;
+    (same || cell?.querySelector(focusAdd ? '.sch-add' : '.sch-day') || cell?.querySelector('.sch-day'))?.focus();
+  }
 }
 function render() {
   loadView();
@@ -523,7 +528,7 @@ function init() {
   const shiftPeriod = dir => { month = view === 'week' ? new Date(addDays(month, dir * 7)) : new Date(month.getFullYear(), month.getMonth() + dir, 1); render(); };
   $('schPrev').onclick = () => shiftPeriod(-1);
   $('schNext').onclick = () => shiftPeriod(1);
-  let wheelState = { acc: 0, lastWheel: -Infinity, lastStep: -Infinity };
+  let wheelState = { acc: 0, lastWheel: -Infinity, lastStep: -Infinity, armed: true };
   $('schGrid').closest('.sch-panel').addEventListener('wheel', e => {
     if (matchMedia('(max-width: 720px)').matches || e.ctrlKey || Math.abs(e.deltaX) > Math.abs(e.deltaY) || S.modal.length || !picker.hidden || picker.contains(e.target) || openPopover) return;
     e.preventDefault(); const result = wheelStep(wheelState, e.deltaY, e.deltaMode, Date.now()); wheelState = result.state;
