@@ -185,8 +185,11 @@
 #screenSchedule .sch-day .sch-chip-time { grid-column: auto; grid-row: auto; }
 .sch-cell { position: relative; min-width: 0; min-height: 0; }
 .sch-day { width: 100%; height: 100%; box-sizing: border-box; overflow: hidden; }
-.sch-add { position: absolute; top: 6px; right: 6px; z-index: 2; width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); background: var(--surface); color: var(--ink); font: 600 20px/1 var(--sans); cursor: pointer; opacity: 0; }
-.sch-cell:hover .sch-add, .sch-cell:focus-within .sch-add { opacity: 1; }
+.sch-add { position: absolute; top: 6px; right: 6px; z-index: 2; width: 30px; height: 30px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); background: var(--surface); color: var(--ink); font: 600 20px/1 var(--sans); cursor: pointer; opacity: 0; transform: scale(.6); transition: transform 180ms ease-out, opacity 180ms ease-out; }
+.sch-cell:hover .sch-add, .sch-cell:focus-within .sch-add { opacity: 1; transform: scale(1); }
+.sch-can-add .sch-day::before, .sch-slot::before { content: ""; position: absolute; inset: 3px; border-radius: var(--r-ctl); background: var(--accent-soft); transform: scale(.92); opacity: 0; transition: transform 180ms ease-out, opacity 180ms ease-out; }
+.sch-can-add:hover .sch-day::before, .sch-can-add:focus-within .sch-day::before, .sch-slot:hover::before, .sch-slot:focus-visible::before { transform: scale(1); opacity: 1; }
+.sch-can-add .sch-day > :not(.sr-only) { position: relative; z-index: 1; }
 .sch-add:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
 @media (hover: none) { .sch-add { display: none; } }
 @media (min-width: 721px) {
@@ -224,8 +227,8 @@
 .sch-week-row { display: grid; grid-template-columns: 55px repeat(7, minmax(0, 1fr)); }
 .sch-week-headers, .sch-week-all { flex: none; padding-right: var(--sch-scrollbar-width, 0px); }
 .sch-week-header { text-align: center; border-bottom: 1px solid var(--line); }
-.sch-week-day { border: 0; background: transparent; color: var(--ink); padding: 8px; font: 600 14px var(--sans); cursor: pointer; }
-.sch-week-today { background: var(--accent); color: white; border-radius: var(--r-pill); }
+.sch-week-day { border: 0; background: transparent; color: var(--ink); padding: 6px 8px; margin: 6px 0; font: 600 14px var(--sans); cursor: pointer; }
+.sch-week-today { background: var(--accent); color: white; border-radius: var(--r-ctl); }
 .sch-week-axis { font-size: 12px; padding: 6px 2px; }
 .sch-week-all-cell { border-left: 1px solid var(--line); padding: 3px; min-width: 0; }
 .sch-week-all-button { display: block; max-width: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
@@ -235,6 +238,13 @@
 .sch-week-hours span { position: absolute; right: 5px; font-size: 11px; transform: translateY(-50%); }
 .sch-week-hours span:first-child { transform: none; }
 .sch-week-column { border-left: 1px solid var(--line); background: repeating-linear-gradient(to bottom, var(--line) 0 1px, transparent 1px 60px); }
+.sch-slot { position: absolute; left: 0; right: 0; z-index: 0; display: grid; place-items: center; overflow: hidden; padding: 0; border: 0; background: transparent; cursor: pointer; }
+.sch-slot::before { inset: 2px; }
+.sch-slot-plus { position: relative; z-index: 1; display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line-strong); border-radius: var(--r-ctl); background: var(--surface); color: var(--ink); font: 600 20px/1 var(--sans); opacity: 0; transform: scale(.6); transition: transform 180ms ease-out, opacity 180ms ease-out; }
+.sch-slot:hover .sch-slot-plus, .sch-slot:focus-visible .sch-slot-plus { opacity: 1; transform: scale(1); }
+.sch-slot:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+@media (hover: none) { .sch-slot { display: none; } }
+@media (prefers-reduced-motion: reduce) { .sch-can-add .sch-day::before, .sch-slot::before { transition: none !important; } }
 .sch-week-block { position: absolute; z-index: 1; overflow: hidden; display: flex; align-items: center; gap: 4px; padding: 0 2px; border: 1px var(--sch-ev-border-style) var(--sch-ev-border); border-radius: 3px; background: var(--sch-ev-fill); color: var(--sch-ev-text); box-shadow: 0 0 0 2px var(--sch-ev-ring); font: 600 11px/13px var(--sans); text-align: left; cursor: pointer; }
 .sch-week-block-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sch-week-all-cell .sch-chip-time { display: inline; }

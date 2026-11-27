@@ -206,3 +206,32 @@ test('week overlap clusters use reusable columns and treat touching blocks as se
   assert.deepEqual(layout([[0,10],[1,11],[2,12]]), [[0,3],[1,3],[2,3]]);
   assert.deepEqual(layout([[0,10],[5,15],[10,20]]), [[0,2],[1,2],[0,2]]);
 });
+
+
+test('slot start chooses the next valid local five minute time', async () => {
+  const { slotStartTime } = await view, key = '2026-11-27';
+  const now = (h, m, sec = 0) => new Date(2026, 10, 27, h, m, sec).getTime();
+  assert.equal(slotStartTime(key, 16, now(15, 20)), '16:00');
+  assert.equal(slotStartTime(key, 14, now(15, 20)), null);
+  assert.equal(slotStartTime(key, 15, now(15, 20, 30)), '15:25');
+  assert.equal(slotStartTime(key, 15, now(15, 55)), '16:00');
+  assert.equal(slotStartTime(key, 23, now(23, 57)), null);
+  assert.equal(slotStartTime('2026-11-28', 0, now(15, 0)), '00:00');
+  assert.equal(slotStartTime('2026-11-26', 23, now(0, 0)), null);
+  assert.equal(slotStartTime(key, 0, now(0, 0)), '00:05');
+});
+test('slot navigation skips closed positions and respects boundaries', async () => {
+  const { slotTarget } = await view;
+  const open = (d, h) => d >= 1 && d <= 5 && (d !== 2 || h >= 12) && h !== 14;
+  assert.deepEqual(slotTarget(3, 13, 'ArrowDown', open), { dayIndex: 3, hour: 15 });
+  assert.deepEqual(slotTarget(3, 15, 'ArrowUp', open), { dayIndex: 3, hour: 13 });
+  assert.deepEqual(slotTarget(3, 13, 'ArrowRight', open), { dayIndex: 4, hour: 13 });
+  assert.deepEqual(slotTarget(3, 9, 'ArrowLeft', open), { dayIndex: 2, hour: 12 });
+  assert.deepEqual(slotTarget(1, 9, 'ArrowRight', open), { dayIndex: 2, hour: 12 });
+  assert.deepEqual(slotTarget(2, 15, 'Home', open), { dayIndex: 2, hour: 12 });
+  assert.deepEqual(slotTarget(2, 15, 'End', open), { dayIndex: 2, hour: 23 });
+  assert.equal(slotTarget(1, 0, 'ArrowUp', open), null);
+  assert.equal(slotTarget(5, 23, 'ArrowDown', open), null);
+  assert.equal(slotTarget(5, 9, 'ArrowRight', open), null);
+  assert.equal(slotTarget(1, 9, 'ArrowLeft', open), null);
+});
