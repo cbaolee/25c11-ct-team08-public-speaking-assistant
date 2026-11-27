@@ -1,5 +1,5 @@
 export const STORAGE_PREFIX = 'psa.schedule.v1.';
-export const STORE_VERSION = 2;
+export const STORE_VERSION = 3;
 // Build the per-user storage key.
 export function storageKey(userId) { return STORAGE_PREFIX + userId; }
 const date = v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -31,7 +31,7 @@ function isValidEvent(e) {
     (e.all_day ? e.time === null : typeof e.time === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(e.time)) &&
     (e.duration_min === null || [5,10,15,20].includes(e.duration_min)) &&
     ['any','cinematography','gender_studies','information_technology','learning_experiences','sports','wildlife'].includes(e.category) &&
-    ['blue','green','amber','brown','red','slate','gray','sky'].includes(e.color) &&
+    ['lime','blue','green','amber','brown','red','slate','gray','sky'].includes(e.color) &&
     !!script && ['free','saved','ai'].includes(script.kind) &&
     (script.kind !== 'saved' || (typeof script.script_id === 'string' && !!script.script_id.trim() && typeof script.title === 'string')) &&
     (script.kind !== 'ai' || (e.duration_min !== null && e.category !== 'any')) &&
@@ -58,14 +58,30 @@ export function isValidState(x) {
     plain(x.done) &&
     Object.values(x.done).every(isValidDone);
 }
-export function migrateState(x) {
+export function migrateV1(x) {
   if (!x || x.version !== 1 || !Array.isArray(x.events) || !x.events.every(isValidV1Event) || !plain(x.done) || !Object.values(x.done).every(isValidDone)) return null;
   const result = { version: 2, events: x.events.map(e => {
     const { until, ...recurrence } = e.recurrence;
     return { ...e, all_day: false, category: 'any', color: 'blue', script: { kind: 'free' }, details_edited_at: null,
       recurrence: { ...recurrence, end: until ? { kind: 'until', until } : { kind: 'never' } } };
   }), done: x.done };
+  return isValidV2State(result) ? result : null;
+}
+function isValidV2State(x) {
+  return !!x && x.version === 2 && Array.isArray(x.events) &&
+    x.events.every(e => isValidEvent(e) && e.color !== 'lime') &&
+    plain(x.done) && Object.values(x.done).every(isValidDone);
+}
+export function migrateV2(x) {
+  if (!isValidV2State(x)) return null;
+  // V2 cannot distinguish an explicitly selected blue from the old default.
+  const result = { ...x, version: STORE_VERSION, events: x.events.map(e => ({ ...e, color: e.color === 'blue' ? 'lime' : e.color })) };
   return isValidState(result) ? result : null;
+}
+export function migrateState(x) {
+  if (x?.version === 1) return migrateV2(migrateV1(x));
+  if (x?.version === 2) return migrateV2(x);
+  return null;
 }
 // Save a schedule when storage is available.
 export function saveSchedule(userId, state, storage) {
