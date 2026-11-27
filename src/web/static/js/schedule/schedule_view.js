@@ -55,7 +55,8 @@ export function carouselStep(index, total, visible, step) { return Math.max(0, M
 export function edgeFades(index, total, visible) { return { left: index > 0, right: index + visible < total }; }
 
 // Kept local because this pure module is also loaded from a data URL in tests.
-const STYLE_COLORS = { blue: '#1D4ED8', green: '#047857', amber: '#D97706', brown: '#92400E', red: '#B91C1C', slate: '#1B2433', gray: '#5B6475', sky: '#BBD0FB' };
+// Keep in sync with --event-lime and SCHEDULE_COLORS.
+const STYLE_COLORS = { lime: '#84CC16', blue: '#1D4ED8', green: '#047857', amber: '#D97706', brown: '#92400E', red: '#B91C1C', slate: '#1B2433', gray: '#5B6475', sky: '#BBD0FB' };
 export const DONE_FILL_OPACITY = 0.5;
 export const MISSED_BORDER_OPACITY = 0.6;
 const channels = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
@@ -69,7 +70,7 @@ export function contrastRatio(hexA, hexB) {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 export function occurrenceStyle(status, colorKey) {
-  const color = STYLE_COLORS[colorKey] || STYLE_COLORS.blue;
+  const color = STYLE_COLORS[colorKey] || STYLE_COLORS.lime;
   const missed = status === 'missed', opacity = status === 'done' ? DONE_FILL_OPACITY : 1;
   const background = missed ? '#FFFFFF' : blendOver(color, opacity, '#FFFFFF');
   const text = contrastRatio('#FFFFFF', background) > contrastRatio('#1B2433', background) ? '#FFFFFF' : '#1B2433';

@@ -150,11 +150,12 @@ test('occurrence styles use palette colors, status and accessible text', async (
       assert.equal(style.fillOpacity, status === 'missed' ? 0 : status === 'done' ? DONE_FILL_OPACITY : 1);
     }
   }
+  assert.equal(occurrenceStyle('upcoming', 'lime').text, '#1B2433');
   assert.equal(occurrenceStyle('active', 'sky').text, '#1B2433');
   assert.equal(occurrenceStyle('active', 'blue').text, '#FFFFFF');
   assert.equal(occurrenceStyle('active', 'slate').text, '#FFFFFF');
-  assert.deepEqual(occurrenceStyle('done', 'unknown'), occurrenceStyle('done', 'blue'));
-  for (const color of ['blue', 'green', 'amber', 'brown', 'red', 'slate', 'gray', 'sky']) {
+  assert.deepEqual(occurrenceStyle('done', 'unknown'), occurrenceStyle('done', 'lime'));
+  for (const color of ['lime', 'blue', 'green', 'amber', 'brown', 'red', 'slate', 'gray', 'sky']) {
     for (const status of ['active', 'upcoming', 'done']) {
       const style = occurrenceStyle(status, color);
       const background = blendOver(style.fill, style.fillOpacity, '#FFFFFF');

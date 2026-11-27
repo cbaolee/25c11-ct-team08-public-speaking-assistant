@@ -473,7 +473,7 @@ TEXT.schedule = {
   noSessionsSummary: '0 sessions.',
   noEndDate: 'No end date',
   anyLength: 'Any length', anyLengthLower: 'any length', subjectAllDay: 'Subject: Practice today (all day): {length}', subjectWithLength: 'Subject: Practice in {lead} minutes: {length} at {time}', whenAllDay: 'When: {date}, all day', emailLengthLabel: 'Length: {length}.',
-  allDay: 'All day', reminderAllDay: 'Reminder: {hour}:00 AM on the day (fixed in this demo)', allDayToday: 'An all-day session must be on a later day.', any: 'Any', category: 'Category', colour: 'Colour', ends: 'Ends', endNever: 'No end', endUntil: 'Until date', endCount: 'After N sessions', numberSessions: 'Number of sessions', countHelp: 'Counts the first session', invalidCount: 'Enter a whole number from 1 to 99.', invalidCategory: 'Choose a category.', invalidColor: 'Choose a colour.', colors: { blue: 'Blue', green: 'Green', amber: 'Amber', brown: 'Brown', red: 'Red', slate: 'Slate', gray: 'Gray', sky: 'Sky' },
+  allDay: 'All day', reminderAllDay: 'Reminder: {hour}:00 AM on the day (fixed in this demo)', allDayToday: 'An all-day session must be on a later day.', any: 'Any', category: 'Category', colour: 'Colour', ends: 'Ends', endNever: 'No end', endUntil: 'Until date', endCount: 'After N sessions', numberSessions: 'Number of sessions', countHelp: 'Counts the first session', invalidCount: 'Enter a whole number from 1 to 99.', invalidCategory: 'Choose a category.', invalidColor: 'Choose a colour.', colors: { lime: 'Lime', blue: 'Blue', green: 'Green', amber: 'Amber', brown: 'Brown', red: 'Red', slate: 'Slate', gray: 'Gray', sky: 'Sky' },
   noEndSummary: 'Repeats with no end date.',
   sessionsSummary: '{n} sessions, last on {date}.',
   sessionMarker: 'session',

@@ -1,8 +1,8 @@
 export const ALL_DAY_REMINDER_HOUR = 8;
 export const COUNT_MIN = 1, COUNT_MAX = 99;
 export const SCHEDULE_CATEGORIES = ['cinematography', 'gender_studies', 'information_technology', 'learning_experiences', 'sports', 'wildlife'];
-export const SCHEDULE_COLORS = [{key:'blue',hex:'#1D4ED8'},{key:'green',hex:'#047857'},{key:'amber',hex:'#D97706'},{key:'brown',hex:'#92400E'},{key:'red',hex:'#B91C1C'},{key:'slate',hex:'#1B2433'},{key:'gray',hex:'#5B6475'},{key:'sky',hex:'#BBD0FB'}];
-export const DEFAULT_COLOR = 'blue';
+export const SCHEDULE_COLORS = [{key:'lime',hex:'#84CC16'},{key:'blue',hex:'#1D4ED8'},{key:'green',hex:'#047857'},{key:'amber',hex:'#D97706'},{key:'brown',hex:'#92400E'},{key:'red',hex:'#B91C1C'},{key:'slate',hex:'#1B2433'},{key:'gray',hex:'#5B6475'},{key:'sky',hex:'#BBD0FB'}];
+export const DEFAULT_COLOR = 'lime';
 export const CHECKIN_WINDOW_H = 6;
 export const REMINDER_LEAD_MIN = 30;
 export const NOTE_MAX_CHARS = 200;

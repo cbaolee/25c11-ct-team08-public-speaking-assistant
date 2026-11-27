@@ -13,6 +13,15 @@ const occ = (start, checkin_at = null, key = 'x', done_at = checkin_at) => ({
   checkin_at, done_at, key,
 });
 
+test('default color and view palette match', async () => {
+  const m = await model;
+  const viewSource = fs.readFileSync(path.join(__dirname, '../../src/web/static/js/schedule/schedule_view.js'), 'utf8');
+  const view = await import('data:text/javascript;base64,' + Buffer.from(viewSource).toString('base64'));
+  assert.equal(m.DEFAULT_COLOR, 'lime');
+  assert.deepEqual(m.SCHEDULE_COLORS[0], { key: 'lime', hex: '#84CC16' });
+  for (const color of m.SCHEDULE_COLORS) assert.equal(view.occurrenceStyle('upcoming', color.key).fill, color.hex);
+});
+
 test('status and completion use inclusive start and exclusive six hour end', async () => {
   const m = await model, start = t(25, 15), o = occ(start);
   for (const [at, status] of [[start - 1, 'upcoming'], [start, 'active'], [start + 21600000 - 1, 'active'], [start + 21600000, 'missed']]) assert.equal(m.occurrenceStatus(o, at), status);
