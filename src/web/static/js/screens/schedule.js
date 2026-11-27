@@ -3,7 +3,7 @@ import { readAiCache, writeAiCache, pruneAiCache } from '../schedule/schedule_sc
 import { T, TOPICS } from '../i18n.js';
 import { go } from '../nav.js';
 import { S, RENDER } from '../state.js';
-import { openModal, closeModal, toast } from '../ui.js';
+import { openModal, closeModal, toast, enhanceSelect } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
@@ -297,6 +297,11 @@ function openDay(key, highlightKey = null) {
   if (!$('schDayDrawer').classList.contains('show')) openModal('schDayDrawer');
   if (highlightKey) { const highlighted = list.querySelector('.sch-entry-highlight'); highlighted?.scrollIntoView({ block: 'nearest' }); if (highlighted) setTimeout(() => highlighted.classList.remove('sch-entry-highlight'), 2000); }
 }
+function setChoice(id, value) { $(id).value = String(value); }
+function markInvalid(id, invalid) {
+  $(id).setAttribute('aria-invalid', String(invalid));
+  $(id + 'Btn')?.setAttribute('aria-invalid', String(invalid));
+}
 function setSegment(id, value) {
   const group = $(id); group.value = String(value);
   group.querySelectorAll('[role="radio"]').forEach(b => { const selected = b.value === group.value; b.setAttribute('aria-checked', String(selected)); b.tabIndex = selected ? 0 : -1; });
@@ -321,7 +326,7 @@ function updateScriptErrors() {
     const show = errors[key] === (key === 'category' ? 'ai_needs_category' : 'ai_needs_length');
     $('sch' + field + 'Error').textContent = show ? T('schedule.' + message) : '';
     $('sch' + field + 'Error').classList.toggle('show', show);
-    $( 'sch' + field).setAttribute('aria-invalid', String(show));
+    markInvalid('sch' + field, show);
   });
 }
 function updateScript() {
@@ -374,7 +379,7 @@ function applyScheduleLock() {
 function openEvent(key, occ = null, event = null, presetTime = null) {
   if (openPopover) openPopover(false);
   editing = occ ? { occ, event } : null; savedRequest++; savedItems = []; savedSelection = event?.script?.kind === 'saved' ? { id: event.script.script_id, title: event.script.title } : null;
-  const form = $('schForm'); form.reset(); setSegment('schLength', 'any'); setSegment('schCategory', 'any'); setSegment('schScript', event?.script?.kind || 'free'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never'); $('schAllDay').setAttribute('aria-checked', 'false'); $('schCount').value = '1'; $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+  const form = $('schForm'); form.reset(); setChoice('schLength', 'any'); setChoice('schCategory', 'any'); setSegment('schScript', event?.script?.kind || 'free'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never'); $('schAllDay').setAttribute('aria-checked', 'false'); $('schCount').value = '1'; $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
   const minimum = dayKey(Date.now()), chosen = key && key >= minimum ? key : minimum;
   datePicker.set(chosen, minimum); timePicker.set(!occ && /^([01]\d|2[0-3]):[0-5]\d$/.test(presetTime || '') && MINUTE_STEPS.includes(Number(presetTime.slice(3))) && new Date(chosen + 'T' + presetTime).getTime() > Date.now() ? presetTime : defaultTime(Date.now(), chosen));
   untilPicker.set('', chosen); $('schDays').hidden = true;
@@ -386,8 +391,8 @@ function openEvent(key, occ = null, event = null, presetTime = null) {
   applyScheduleLock();
   $('schEditRepeat').hidden = !editing || event.recurrence.kind === 'none';
   if (editing) {
-    datePicker.set(occ.day, event.recurrence.kind !== 'none' ? occ.day : minimum); timePicker.set(event.time || defaultTime(Date.now(), occ.day)); setSegment('schLength', event.duration_min ?? 'any');
-    $('schAllDay').setAttribute('aria-checked', String(event.all_day)); setSegment('schCategory', event.category); setSegment('schColor', event.color); setSegment('schEnds', event.recurrence.end.kind); $('schCount').value = remainingCount(event, occ.day) ?? 1;
+    datePicker.set(occ.day, event.recurrence.kind !== 'none' ? occ.day : minimum); timePicker.set(event.time || defaultTime(Date.now(), occ.day)); setChoice('schLength', event.duration_min ?? 'any');
+    $('schAllDay').setAttribute('aria-checked', String(event.all_day)); setChoice('schCategory', event.category); setSegment('schColor', event.color); setSegment('schEnds', event.recurrence.end.kind); $('schCount').value = remainingCount(event, occ.day) ?? 1;
     $('schNote').value = event.note; setSegment('schRepeat', event.recurrence.kind);
     untilPicker.set((event.recurrence.end.kind === 'until' ? event.recurrence.end.until : null) || '', occ.day);
     $('schDayChecks').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(event.recurrence.days.includes(Number(b.value)))));
@@ -434,8 +439,11 @@ function init() {
   requestAnimationFrame(() => $('schViewToggle').classList.remove('sch-still'));
   T('schedule.weekdays').forEach((name, i) => { $('schWeekdays').append(node('span', name)); const b = button(name, () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); updateRecurrence(); }, 'sch-day-toggle'); b.value = i + 1; b.setAttribute('aria-pressed', 'false'); $('schDayChecks').append(b); });
   ['upcoming', 'active', 'done', 'missed'].forEach(status => { const c = chip(status, null, false, DEFAULT_COLOR); if (status === 'active') c.lastChild.textContent = T('schedule.activeLegend'); $('schLegend').append(c); });
-  makeSegments('schLength', ['any', ...DURATIONS_MIN], n => n === 'any' ? T('schedule.any') : T('schedule.minutes', { n }), () => { updateRecurrence(); updateScriptErrors(); });
-  makeSegments('schCategory', ['any', ...SCHEDULE_CATEGORIES], k => k === 'any' ? T('schedule.any') : TOPICS[k], () => { updateRecurrence(); updateScriptErrors(); });
+  [['schLength', ['any', ...DURATIONS_MIN], n => n === 'any' ? T('schedule.anyLength') : T('schedule.minutes', { n })], ['schCategory', ['any', ...SCHEDULE_CATEGORIES], k => k === 'any' ? T('schedule.anyCategory') : TOPICS[k]]].forEach(([id, values, label]) => {
+    values.forEach(value => { const option = document.createElement('option'); option.value = String(value); option.textContent = label(value); $(id).append(option); });
+    $(id).onchange = () => { updateRecurrence(); updateScriptErrors(); };
+    enhanceSelect($(id));
+  });
   makeSegments('schScript', ['free', 'saved', 'ai'], k => T('schedule.' + ({ free: 'scriptFree', saved: 'scriptSaved', ai: 'scriptAi' }[k])), () => { updateScript(); if ($('schScript').value === 'saved') fetchSavedScripts(); });
   $('schSavedRetry').onclick = fetchSavedScripts;
   $('schSavedSelect').onchange = () => { savedSelection = savedItems.find(item => item.id === $('schSavedSelect').value) || (savedSelection?.id === $('schSavedSelect').value ? savedSelection : null); $('schScriptError').textContent = ''; $('schScriptError').classList.remove('show'); };
@@ -445,7 +453,7 @@ function init() {
   $('schAllDay').onclick = () => { $('schAllDay').setAttribute('aria-checked', String($('schAllDay').getAttribute('aria-checked') !== 'true')); updateRecurrence(); };
   $('schCount').oninput = updateRecurrence;
   makeSegments('schRepeat', ['none', 'daily', 'weekly', 'custom'], k => T('schedule.' + (k === 'custom' ? 'customOption' : k)), updateRecurrence);
-  setSegment('schLength', 'any'); setSegment('schCategory', 'any'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never');
+  setChoice('schLength', 'any'); setChoice('schCategory', 'any'); setSegment('schColor', DEFAULT_COLOR); setSegment('schRepeat', 'none'); setSegment('schEnds', 'never');
   $('schNote').maxLength = NOTE_MAX_CHARS; $('schNote').oninput = () => { $('schNoteCount').textContent = T('schedule.count', { n: $('schNote').value.length, max: NOTE_MAX_CHARS }); };
   datePicker = makeDatePicker($('schDatePicker'), { min: dayKey(Date.now()), value: dayKey(Date.now()), onChange: value => { const until = $('schUntil').value; untilPicker.set(until && until >= value ? until : '', value); const current = $('schTime').value, now = Date.now(); if (!/^\d{2}:\d{2}$/.test(current) || Number(current.slice(0, 2)) > 23 || Number(current.slice(3)) > 59 || new Date(value + 'T' + current).getTime() <= now) timePicker.set(defaultTime(now, value)); updateRecurrence(); } });
   timePicker = makeTimePicker($('schTimePicker'), () => $('schDate').value, updateRecurrence);
@@ -540,9 +548,9 @@ function init() {
     if (editing && !canEditDetails(editing.occ, Date.now())) errors.start = 'too_late';
     else if (editing && !canEditSchedule(editing.occ, Date.now()) && (input.date !== editing.occ.day || input.time !== editing.event.time || input.all_day !== editing.event.all_day || recurrenceChanged)) errors.start = 'locked';
     const fields = [['start', 'Start', errors.start === 'locked' ? 'scheduleLockedError' : errors.start === 'too_late' ? 'editTooLate' : errors.start === 'past' ? 'past' : errors.start === 'all_day_today' ? 'allDayToday' : 'invalid', 'schTime'], ['duration_min', 'Length', errors.duration_min === 'ai_needs_length' ? 'aiNeedsLength' : 'invalidLength', 'schLength'], ['category', 'Category', errors.category === 'ai_needs_category' ? 'aiNeedsCategory' : 'invalidCategory', 'schCategory'], ['script', 'Script', 'savedMissing', 'schScript'], ['color', 'Color', 'invalidColor', 'schColor'], ['count', 'Count', 'invalidCount', 'schCount'], ['note', 'Note', 'invalidNote', 'schNote'], ['recurrence', 'Repeat', 'invalidRepeat', 'schRepeat'], ['days', 'Days', 'invalidDays', 'schDayChecks'], ['until', 'Until', 'invalidUntil', 'schUntil']];
-    fields.forEach(([key, target, message, id]) => { $('sch' + target + 'Error').textContent = errors[key] ? T('schedule.' + message) : ''; $('sch' + target + 'Error').classList.toggle('show', !!errors[key]); if (id) $(id).setAttribute('aria-invalid', String(!!errors[key])); });
+    fields.forEach(([key, target, message, id]) => { $('sch' + target + 'Error').textContent = errors[key] ? T('schedule.' + message) : ''; $('sch' + target + 'Error').classList.toggle('show', !!errors[key]); if (id) { if (['schLength', 'schCategory'].includes(id)) markInvalid(id, !!errors[key]); else $(id).setAttribute('aria-invalid', String(!!errors[key])); } });
     $('schDate').setAttribute('aria-invalid', String(!!errors.start));
-    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[0] === 'start' && !$('schDate').disabled) $('schDate').focus(); else if (['schLength', 'schRepeat', 'schCategory', 'schColor', 'schScript'].includes(first[3])) $(first[3]).querySelector('[aria-checked="true"]').focus(); else if (first[3] === 'schDayChecks') $('schDayChecks').querySelector('button').focus(); else if (first[3]) $(first[3]).focus(); return; }
+    if (Object.keys(errors).length) { const first = fields.find(([key]) => errors[key]); if (first[0] === 'start' && !$('schDate').disabled) $('schDate').focus(); else if (['schRepeat', 'schColor', 'schScript'].includes(first[3])) $(first[3]).querySelector('[aria-checked="true"]').focus(); else if (first[3] === 'schDayChecks') $('schDayChecks').querySelector('button').focus(); else if (first[3]) $(first[3]).focus(); return; }
     if (editing && editing.event.recurrence.kind !== 'none') { if (input.date === editing.occ.day) delete input.date; if (!recurrenceChanged) delete input.recurrence; }
     const wasEditing = !!editing;
     saveScheduleState(editing ? editOccurrence(getSchedule(), editing.event.id, editing.occ.day, input, { now: Date.now(), newId: newEventId() }) : addEvent(getSchedule(), { ...input, id: newEventId(), created_at: Date.now(), details_edited_at: null, sample: false })); if (openPopover) openPopover(false); closeModal('schEventModal'); render(); if (S.modal.includes('schDayDrawer')) openDay(selectedDay); toast(T(wasEditing ? 'schedule.updated' : 'schedule.created'));

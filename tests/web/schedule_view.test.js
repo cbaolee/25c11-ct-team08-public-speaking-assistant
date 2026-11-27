@@ -236,3 +236,10 @@ test('slot navigation skips closed positions and respects boundaries', async () 
   assert.equal(slotTarget(5, 9, 'ArrowRight', open), null);
   assert.equal(slotTarget(1, 9, 'ArrowLeft', open), null);
 });
+
+test('practice event choices use labelled selects with field errors', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../../src/web/templates/index.html'), 'utf8');
+  for (const field of ['Length', 'Category']) {
+    assert.match(html, new RegExp(`<label for="sch${field}"[^>]*></label><select id="sch${field}" aria-describedby="sch${field}Error"></select><div class="ferr" id="sch${field}Error" role="alert"></div>`));
+  }
+});
