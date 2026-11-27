@@ -325,13 +325,14 @@ test('normalizeTelemetrySteps and computeBufferedRemainingS handle +10s buffer, 
   assert.equal(computeBufferedRemainingS({ stage: 'failed', estimated_remaining_s: 10.0 }, 0), 0);
 });
 
-test('parseRestoredChatSession restores a fresh generated session and rejects expired or malformed entries', async () => {
+test('parseRestoredChatSession restores picking_topic, gathering (Turn 1 / Turn 2+), and generated sessions within TTL', async () => {
   const { parseRestoredChatSession } = await mod;
   const now = 1_700_000_000_000;
-  const valid = {
+  const validGenerated = {
     chatSessionId: 'sess-123',
     chatHasScript: true,
     chatRegenCount: 2,
+    assistantTurn: 3,
     selectedTemplate: { template_id: 'wildlife/keystone_5m', topic: 'Keystone Species' },
     sessionFiles: ['notes.pdf', '', 42],
     chatSeed: { prompt: 'Keystone species', fileName: 'notes.pdf' },
@@ -339,11 +340,14 @@ test('parseRestoredChatSession restores a fresh generated session and rejects ex
     duration_min: 10,
     savedAt: now - 5 * 60 * 1000,
   };
-  assert.deepEqual(parseRestoredChatSession(valid, now), {
+  // Backward compatible when chatStage is omitted on a generated session
+  assert.deepEqual(parseRestoredChatSession(validGenerated, now), {
     chatSessionId: 'sess-123',
     chatStage: 'generated',
     chatHasScript: true,
     chatRegenCount: 2,
+    assistantTurn: 3,
+    canGenerateNow: true,
     selectedTemplate: { template_id: 'wildlife/keystone_5m', topic: 'Keystone Species' },
     sessionFiles: ['notes.pdf'],
     chatSeed: { prompt: 'Keystone species', fileName: 'notes.pdf' },
@@ -351,11 +355,72 @@ test('parseRestoredChatSession restores a fresh generated session and rejects ex
     duration_min: 10,
   });
 
+  // picking_topic stage keeps topic cards active and disables generation
+  assert.deepEqual(
+    parseRestoredChatSession({
+      chatSessionId: 'sess-pick',
+      chatStage: 'picking_topic',
+      chatHasScript: false,
+      assistantTurn: 0,
+      canGenerateNow: true,
+      sessionFiles: ['outline.md'],
+      chatSeed: { prompt: 'Ocean plastic', fileName: 'outline.md' },
+      category: 'environment',
+      duration_min: 5,
+      savedAt: now - 60_000,
+    }, now),
+    {
+      chatSessionId: 'sess-pick',
+      chatStage: 'picking_topic',
+      chatHasScript: false,
+      chatRegenCount: 0,
+      assistantTurn: 0,
+      canGenerateNow: false,
+      selectedTemplate: null,
+      sessionFiles: ['outline.md'],
+      chatSeed: { prompt: 'Ocean plastic', fileName: 'outline.md' },
+      category: 'environment',
+      duration_min: 5,
+    }
+  );
+
+  // gathering Turn 1 always enforces canGenerateNow = false (Turn 1 hard rule)
+  const turn1 = parseRestoredChatSession({
+    chatSessionId: 'sess-g1',
+    chatStage: 'gathering',
+    assistantTurn: 1,
+    canGenerateNow: true,
+    selectedTemplate: { template_id: null, topic: null },
+    category: 'technology',
+    duration_min: 15,
+    savedAt: now - 60_000,
+  }, now);
+  assert.equal(turn1.chatStage, 'gathering');
+  assert.equal(turn1.chatHasScript, false);
+  assert.equal(turn1.assistantTurn, 1);
+  assert.equal(turn1.canGenerateNow, false);
+
+  // gathering Turn 2+ restores canGenerateNow = true
+  const turn2 = parseRestoredChatSession({
+    chatSessionId: 'sess-g2',
+    chatStage: 'gathering',
+    assistantTurn: 2,
+    canGenerateNow: true,
+    category: 'technology',
+    duration_min: 15,
+    savedAt: now - 60_000,
+  }, now);
+  assert.equal(turn2.chatStage, 'gathering');
+  assert.equal(turn2.assistantTurn, 2);
+  assert.equal(turn2.canGenerateNow, true);
+
   // Expired (> 30 min TTL) -> null
-  assert.equal(parseRestoredChatSession({ ...valid, savedAt: now - 31 * 60 * 1000 }, now), null);
-  // Missing script flag or session id -> null
-  assert.equal(parseRestoredChatSession({ ...valid, chatHasScript: false }, now), null);
-  assert.equal(parseRestoredChatSession({ ...valid, chatSessionId: '   ' }, now), null);
+  assert.equal(parseRestoredChatSession({ ...validGenerated, savedAt: now - 31 * 60 * 1000 }, now), null);
+  // Inconsistent or unknown stage / missing session id -> null
+  assert.equal(parseRestoredChatSession({ ...validGenerated, chatStage: 'generated', chatHasScript: false }, now), null);
+  assert.equal(parseRestoredChatSession({ ...validGenerated, chatStage: 'idle', chatHasScript: false }, now), null);
+  assert.equal(parseRestoredChatSession({ ...validGenerated, chatHasScript: false }, now), null);
+  assert.equal(parseRestoredChatSession({ ...validGenerated, chatSessionId: '   ' }, now), null);
   // Non-object / null -> null
   for (const bad of [null, undefined, 'x', 123, {}]) {
     assert.equal(parseRestoredChatSession(bad, now), null);

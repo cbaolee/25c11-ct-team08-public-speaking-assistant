@@ -136,16 +136,36 @@ export function computeBufferedRemainingS(telemetry, elapsedSinceSyncS = 0, fall
   return Math.max(1, Math.ceil(base - elapsed));
 }
 
-/* Validate and normalize a saved generated-script chat session from localStorage so F5 reload
-   keeps Regenerate mode alive while the backend session is within its 30-minute sliding TTL. */
+const VALID_RESTORABLE_STAGES = new Set(['picking_topic', 'gathering', 'generated']);
+
+/* Validate and normalize a saved chat session from localStorage so F5 reload preserves the current
+   stage (`picking_topic`, `gathering`, or `generated`) while the backend session stays within its
+   30-minute sliding TTL. */
 export function parseRestoredChatSession(raw, nowMs = Date.now(), ttlMs = DEFAULT_CHAT_SESSION_TTL_MS) {
   if (!raw || typeof raw !== 'object') return null;
-  if (raw.chatHasScript !== true) return null;
   if (typeof raw.chatSessionId !== 'string' || !raw.chatSessionId.trim()) return null;
+  let stage = null;
+  if (typeof raw.chatStage === 'string' && VALID_RESTORABLE_STAGES.has(raw.chatStage)) {
+    stage = raw.chatStage;
+  } else if (raw.chatStage === undefined && raw.chatHasScript === true) {
+    stage = 'generated';
+  }
+  if (!stage) return null;
+  if (stage === 'generated' && raw.chatHasScript !== true) return null;
   const effTtl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : DEFAULT_CHAT_SESSION_TTL_MS;
   const savedAt = Number(raw.savedAt);
   if (!Number.isFinite(savedAt) || (nowMs - savedAt) > effTtl || (savedAt - nowMs) > 60_000) return null;
-  const regenCount = Number.isInteger(raw.chatRegenCount) && raw.chatRegenCount >= 0 ? raw.chatRegenCount : 0;
+  const chatHasScript = stage === 'generated';
+  const regenCount = chatHasScript && Number.isInteger(raw.chatRegenCount) && raw.chatRegenCount >= 0 ? raw.chatRegenCount : 0;
+  let assistantTurn = 0;
+  let canGenerateNow = false;
+  if (stage === 'gathering') {
+    assistantTurn = Number.isInteger(raw.assistantTurn) && raw.assistantTurn >= 1 ? raw.assistantTurn : 1;
+    canGenerateNow = assistantTurn >= 2 && raw.canGenerateNow !== false;
+  } else if (stage === 'generated') {
+    assistantTurn = Number.isInteger(raw.assistantTurn) && raw.assistantTurn >= 0 ? raw.assistantTurn : 0;
+    canGenerateNow = true;
+  }
   const sel = raw.selectedTemplate && typeof raw.selectedTemplate === 'object'
     ? {
         template_id: typeof raw.selectedTemplate.template_id === 'string' && raw.selectedTemplate.template_id ? raw.selectedTemplate.template_id : null,
@@ -166,9 +186,11 @@ export function parseRestoredChatSession(raw, nowMs = Date.now(), ttlMs = DEFAUL
   const duration_min = [5, 10, 15, 20].includes(dur) ? dur : 5;
   return {
     chatSessionId: raw.chatSessionId.trim(),
-    chatStage: 'generated',
-    chatHasScript: true,
+    chatStage: stage,
+    chatHasScript,
     chatRegenCount: regenCount,
+    assistantTurn,
+    canGenerateNow,
     selectedTemplate: sel,
     sessionFiles,
     chatSeed: seed,

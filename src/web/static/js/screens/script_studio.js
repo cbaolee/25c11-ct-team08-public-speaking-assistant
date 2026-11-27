@@ -62,15 +62,16 @@ const fileLimits = () => {
   };
 };
 
-/* ---------- Chat state: the session state below lives in memory only, gone on reload ----------
-   (The visible conversation, i.e. the user's messages and the finished scripts, is also kept in localStorage per user:
-   see persistChat / restoreChat. A restored chat has no server session, so it starts again at 'idle'.)
+/* ---------- Chat state: in-memory session state, mirrored to localStorage per user ----------
+   The visible conversation (user messages, topic cards, gathering replies, blocked notices, finished scripts) is kept in
+   `psa.chat.<userId>` and active session metadata (`picking_topic`, `gathering`, `generated`) in `psa.chatSession.<userId>`
+   so F5 reload preserves the current chat state while the backend session is within its 30-minute sliding TTL.
    chatStage: 'idle' | 'picking_topic' | 'gathering' | 'generated'. chatEpoch grows on every New chat so that answers
    of an older turn can tell they are stale. chatAbort / chatPollTimer belong to the turn that is running.
    chatSeed = {prompt, fileName} of the first request (names a free-topic script); chatCards = the bubble holding the topic cards.
    assistantTurn = 1 on opening question (no Generate), >= 2 on gathering follow-ups (every Turn 2+ reply keeps its Generate button in chatGenBtns). */
-/* chatHasScript = this session already produced a script (stays true while chatting on afterwards); a script restored
-   from localStorage does not count. While it is true the Composer's action button is Regenerate (see syncComposerAction). Part of NO_SESSION, so New chat / expired session / other account reset it.
+/* chatHasScript = this active session already produced a script (stays true while chatting on afterwards; restored on F5
+   only while the saved session is still within TTL). While it is true the Composer's action button is Regenerate (see syncComposerAction). Part of NO_SESSION, so New chat / expired session / other account reset it.
    chatRegenCount = Regenerate runs started in this session (see startGenerate). */
 const NO_SESSION = { chatSessionId: null, chatStage: 'idle', chatHasScript: false, chatRegenCount: 0, assistantTurn: 0, canGenerateNow: false, chatGenBtns: [], selectedTemplate: null, sessionFiles: [], chatSeed: null, chatCards: null };
 const activeLoadingBubbles = new Set();
@@ -233,8 +234,9 @@ export function renderBlockedBubble(ai) {
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
 /* The latest Script Studio chat, kept in localStorage per user so two accounts on one browser never see each other's chat.
-   Generated-script session metadata lives in a companion key (`psa.chatSession.<userId>`) so F5 reload preserves Regenerate mode
-   while the backend session stays within its 30-minute TTL, without altering the `psa.chat.<userId>` array format. */
+   Active session metadata lives in a companion key (`psa.chatSession.<userId>`) so F5 reload preserves topic selection,
+   pre-generation Q&A, and Regenerate mode while the backend session stays within its 30-minute TTL, without breaking the
+   `psa.chat.<userId>` array format. */
 const chatHistoryKey = userId => 'psa.chat.' + userId;
 const chatSessionKey = userId => 'psa.chatSession.' + userId;
 function clearChatSession(userId) {
@@ -242,14 +244,17 @@ function clearChatSession(userId) {
   try { localStorage.removeItem(chatSessionKey(userId)); } catch (e) { /* storage may be unavailable */ }
 }
 function persistChatSession() {
-  if (!S.user || !S.user.id || !S.chatSessionId || S.chatHasScript !== true) return;
+  if (!S.user || !S.user.id || !S.chatSessionId) return;
+  if (S.chatStage !== 'picking_topic' && S.chatStage !== 'gathering' && S.chatStage !== 'generated') return;
   try {
     const topicSel = $('#composerTopic'), durSel = $('#composerDuration');
     localStorage.setItem(chatSessionKey(S.user.id), JSON.stringify({
       chatSessionId: S.chatSessionId,
-      chatStage: 'generated',
-      chatHasScript: true,
+      chatStage: S.chatStage,
+      chatHasScript: S.chatHasScript === true,
       chatRegenCount: S.chatRegenCount || 0,
+      assistantTurn: S.assistantTurn || 0,
+      canGenerateNow: S.canGenerateNow === true,
       selectedTemplate: S.selectedTemplate ? { template_id: S.selectedTemplate.template_id || null, topic: S.selectedTemplate.topic || null } : null,
       sessionFiles: Array.isArray(S.sessionFiles) ? S.sessionFiles.slice() : [],
       chatSeed: S.chatSeed ? { prompt: S.chatSeed.prompt || '', fileName: S.chatSeed.fileName || '' } : null,
@@ -281,6 +286,38 @@ function persistedMessage(message) {
     };
   }
   if (message.blocked) return { role: 'ai', blocked: true };
+  if (message.topics) {
+    const t = message.topics;
+    return {
+      role: 'ai',
+      topics: {
+        suggestions: Array.isArray(t.suggestions)
+          ? t.suggestions
+              .filter(s => s && typeof s.template_id === 'string' && typeof s.topic === 'string')
+              .map(s => ({
+                template_id: s.template_id,
+                topic: s.topic,
+                duration_min: Number.isFinite(Number(s.duration_min)) ? Number(s.duration_min) : 0,
+              }))
+          : [],
+        recommend_free_topic: t.recommend_free_topic === true,
+        picked: t.picked === true,
+        picked_template_id: typeof t.picked_template_id === 'string' ? t.picked_template_id : null,
+      },
+    };
+  }
+  if (message.gather) {
+    const g = message.gather;
+    return {
+      role: 'ai',
+      gather: {
+        reply_message: typeof g.reply_message === 'string' ? g.reply_message : '',
+        assistant_turn: Number.isInteger(g.assistant_turn) && g.assistant_turn >= 0 ? g.assistant_turn : 0,
+        can_generate: g.can_generate === true,
+        ready_to_generate: g.ready_to_generate === true,
+      },
+    };
+  }
   const sc = message.script;
   return {
     role: 'ai',
@@ -368,12 +405,57 @@ export function restoreChat() {
   try { saved = JSON.parse(localStorage.getItem(chatHistoryKey(S.user.id)) || 'null'); } catch (e) { return false; }
   if (!Array.isArray(saved)) return false;
   const history = saved.filter(item =>
-    item && (item.role === 'me' && typeof item.text === 'string'
-      || item.role === 'ai' && (item.blocked === true || item.script && typeof item.script.text === 'string'))
+    item && (
+      (item.role === 'me' && typeof item.text === 'string')
+      || (item.role === 'ai' && (
+        item.blocked === true
+        || (item.topics && Array.isArray(item.topics.suggestions))
+        || (item.gather && typeof item.gather.reply_message === 'string')
+        || (item.script && typeof item.script.text === 'string')
+      ))
+    )
   ).slice(-chatMaxMessages());
-  if (!history.length) return false;
+  if (!history.length) {
+    clearChatSession(S.user.id);
+    return false;
+  }
+  S.chatGenBtns = [];
+  S.chatCards = null;
+  let rawSess = null;
+  try { rawSess = JSON.parse(localStorage.getItem(chatSessionKey(S.user.id)) || 'null'); } catch (e) { rawSess = null; }
+  let sess = parseRestoredChatSession(rawSess);
+  let lastTopicsIdx = -1;
+  history.forEach((item, idx) => { if (item.role === 'ai' && item.topics) lastTopicsIdx = idx; });
+  if (sess) {
+    const validForHistory =
+      (sess.chatStage === 'generated' && history.some(item => item.role === 'ai' && item.script))
+      || (sess.chatStage === 'picking_topic' && lastTopicsIdx >= 0 && history[lastTopicsIdx].topics.picked !== true)
+      || sess.chatStage === 'gathering';
+    if (!validForHistory) {
+      sess = null;
+      clearChatSession(S.user.id);
+    }
+  } else if (rawSess !== null) {
+    clearChatSession(S.user.id);
+  }
+  if (sess) {
+    S.chatSessionId = sess.chatSessionId;
+    S.chatStage = sess.chatStage;
+    S.chatHasScript = sess.chatHasScript;
+    S.chatRegenCount = sess.chatRegenCount;
+    S.assistantTurn = sess.assistantTurn;
+    S.canGenerateNow = sess.canGenerateNow;
+    S.selectedTemplate = sess.selectedTemplate;
+    S.chatSeed = sess.chatSeed;
+    const topicSel = $('#composerTopic'), durSel = $('#composerDuration');
+    if (topicSel && sess.category && [...topicSel.options].some(o => o.value === sess.category)) topicSel.value = sess.category;
+    if (durSel && sess.duration_min) durSel.value = String(sess.duration_min);
+    setSessionFiles(sess.sessionFiles);
+    lockSetup(true);
+    syncComposerAction();
+  }
   S.chatHistory = history;
-  history.forEach(item => {
+  history.forEach((item, idx) => {
     if (item.role === 'me') {
       item.bubble = renderUserMessage(item);
       return;
@@ -381,6 +463,31 @@ export function restoreChat() {
     if (item.blocked) {
       const bubble = addBubble('ai', '', false);
       renderBlockedBubble(bubble);
+      item.bubble = bubble;
+      return;
+    }
+    if (item.topics) {
+      const t = item.topics;
+      const list = Array.isArray(t.suggestions)
+        ? t.suggestions.filter(s => s && typeof s.template_id === 'string' && typeof s.topic === 'string')
+        : [];
+      const activeCards = !!(sess && S.chatStage === 'picking_topic' && t.picked !== true && idx === lastTopicsIdx);
+      const bubble = addBubble('ai', '', false);
+      renderTopicCards(bubble, list, t.recommend_free_topic === true, {
+        animate: false,
+        disabled: !activeCards,
+        picked: t.picked === true,
+        pickedTemplateId: t.picked_template_id ?? null,
+      });
+      if (activeCards) S.chatCards = bubble;
+      item.bubble = bubble;
+      return;
+    }
+    if (item.gather) {
+      const g = item.gather;
+      const bubble = addBubble('ai', '', false);
+      const allowButton = Boolean(sess && S.chatStage === 'gathering' && S.canGenerateNow === true && !S.chatHasScript && idx > lastTopicsIdx);
+      renderGatherBubble(bubble, g, { animate: false, record: false, allowButton });
       item.bubble = bubble;
       return;
     }
@@ -401,29 +508,6 @@ export function restoreChat() {
     fillScriptBubble(bubble, sc);
     item.bubble = bubble;
   });
-  const hasRestoredScript = history.some(item => item.role === 'ai' && item.script);
-  if (hasRestoredScript) {
-    let rawSess = null;
-    try { rawSess = JSON.parse(localStorage.getItem(chatSessionKey(S.user.id)) || 'null'); } catch (e) { rawSess = null; }
-    const sess = parseRestoredChatSession(rawSess);
-    if (sess) {
-      S.chatSessionId = sess.chatSessionId;
-      S.chatStage = sess.chatStage;
-      S.chatHasScript = true;
-      S.chatRegenCount = sess.chatRegenCount;
-      S.canGenerateNow = true;
-      S.selectedTemplate = sess.selectedTemplate;
-      S.chatSeed = sess.chatSeed;
-      const topicSel = $('#composerTopic'), durSel = $('#composerDuration');
-      if (topicSel && sess.category && [...topicSel.options].some(o => o.value === sess.category)) topicSel.value = sess.category;
-      if (durSel && sess.duration_min) durSel.value = String(sess.duration_min);
-      setSessionFiles(sess.sessionFiles);
-      lockSetup(true);
-      syncComposerAction();
-    } else if (rawSess !== null) {
-      clearChatSession(S.user.id);
-    }
-  }
   return true;
 }
 /* Error bubble; the text is set with textContent (it may come from the server). Only a failed script turn
@@ -703,8 +787,28 @@ function sendSuggest(txt, file) {
     S.chatSessionId = j.session_id; S.chatStage = 'picking_topic'; S.assistantTurn = 0; S.canGenerateNow = false;
     lockSetup(true); setSessionFiles(j.files_loaded);
     S.chatSeed = { prompt: txt || old.prompt || '', fileName: file ? file.name : old.fileName || '' };
-    if (S.chatCards) S.chatCards.remove();
-    S.chatCards = ai; renderTopicCards(ai, list, j.recommend_free_topic === true);
+    if (S.chatCards) {
+      const oldCards = S.chatCards;
+      S.chatHistory = S.chatHistory.filter(m => m.bubble !== oldCards);
+      oldCards.remove();
+    }
+    S.chatCards = ai;
+    renderTopicCards(ai, list, j.recommend_free_topic === true);
+    recordChatMessage({
+      role: 'ai',
+      topics: {
+        suggestions: list.map(t => ({
+          template_id: t.template_id,
+          topic: t.topic,
+          duration_min: Number.isFinite(Number(t.duration_min)) ? Number(t.duration_min) : 0,
+        })),
+        recommend_free_topic: j.recommend_free_topic === true,
+        picked: false,
+        picked_template_id: null,
+      },
+      bubble: ai,
+    });
+    persistChatSession();
   }, unlock);
 }
 function topicButton(tpl, title, meta, primary) {
@@ -715,35 +819,56 @@ function topicButton(tpl, title, meta, primary) {
   return b;
 }
 /* One button per suggestion (as many as the server sent) plus Write freely, which is the primary button when recommended */
-function renderTopicCards(ai, list, recommendFree) {
+function renderTopicCards(ai, list, recommendFree, opts = {}) {
+  const { animate = true, disabled = false, picked = false, pickedTemplateId = null } = opts;
   stopLoadingTicker(ai);
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p><div class="tcards"></div>';
   $('.note', ai).textContent = T(list.length ? 'script.pickTopic' : 'script.noTopics');
   const box = $('.tcards', ai);
   list.forEach(t => box.appendChild(topicButton({ template_id: t.template_id, topic: t.topic }, t.topic, t.duration_min ? t.duration_min + ' ' + T('script.min') : '')));
   box.appendChild(topicButton({ template_id: null, topic: null }, T('script.writeFreely'), '', recommendFree));
-  revealBubble(ai);
+  if (disabled || picked) {
+    $$('[data-a=topic]', box).forEach(b => {
+      b.disabled = true;
+      if (picked && (b._tpl.template_id || null) === (pickedTemplateId || null)) {
+        b.classList.add('picked');
+        b.setAttribute('aria-pressed', 'true');
+      }
+    });
+  }
+  if (animate) revealBubble(ai);
 }
 /* Step 2: the clicked card locks every card at once (no double click, no second pick); a failed call unlocks them again. */
 function pickTopic(btn) {
   if (S.chatBusy || S.chatStage !== 'picking_topic') return;
+  const cardsBubble = btn.closest('.bubble');
   const all = $$('[data-a=topic]', btn.closest('.tcards')), tpl = btn._tpl, ai = loadingBubble(T('script.thinking'), '', null, STEPS_SELECT, false);
   all.forEach(x => { x.disabled = true; }); btn.classList.add('picked'); btn.setAttribute('aria-pressed', 'true');
   chatTurn(URL_SELECT, { method: 'POST', json: { session_id: S.chatSessionId, template_id: tpl.template_id } }, ai, j => {
-    S.selectedTemplate = tpl; S.chatStage = 'gathering'; renderGatherBubble(ai, j);
+    const topicItem = S.chatHistory.find(m => m.topics && (m.bubble === cardsBubble || m.bubble === S.chatCards));
+    if (topicItem) {
+      topicItem.topics.picked = true;
+      topicItem.topics.picked_template_id = tpl.template_id;
+    }
+    S.selectedTemplate = tpl; S.chatStage = 'gathering'; renderGatherBubble(ai, j); persistChatSession();
   }, () => { all.forEach(x => { x.disabled = false; }); btn.classList.remove('picked'); btn.removeAttribute('aria-pressed'); });
 }
 /* Turn 1 (`assistant_turn === 1`, `can_generate === false`) shows only the highlighted question (no Generate button).
    From Turn 2 onward, every gathering reply renders its own "Generate now if you do not want to provide more information"
    button (kept across later Turn 2+ replies until the first script finishes). */
-function renderGatherBubble(ai, j) {
+function renderGatherBubble(ai, j, opts = {}) {
+  const { animate = true, record = true, allowButton = true } = opts;
   stopLoadingTicker(ai);
-  if (Number.isFinite(Number(j.assistant_turn))) S.assistantTurn = Number(j.assistant_turn);
-  if (typeof j.can_generate === 'boolean') S.canGenerateNow = j.can_generate;
-  else if (S.assistantTurn >= 2) S.canGenerateNow = true;
-  const withBtn = shouldShowGenerateButton({
+  let turn = Number(j.assistant_turn);
+  if (record) {
+    if (Number.isFinite(turn)) S.assistantTurn = turn;
+    if (typeof j.can_generate === 'boolean') S.canGenerateNow = j.can_generate;
+    else if (S.assistantTurn >= 2) S.canGenerateNow = true;
+    turn = S.assistantTurn;
+  }
+  const withBtn = allowButton && shouldShowGenerateButton({
     hasScript: S.chatHasScript,
-    assistantTurn: S.assistantTurn,
+    assistantTurn: turn,
     canGenerate: j.can_generate,
   });
   ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="reply"></p>' +
@@ -756,7 +881,19 @@ function renderGatherBubble(ai, j) {
     g.disabled = S.chatBusy === true;
     S.chatGenBtns.push(g);
   }
-  revealBubble(ai);
+  if (record) {
+    recordChatMessage({
+      role: 'ai',
+      gather: {
+        reply_message: j.reply_message || '',
+        assistant_turn: S.assistantTurn,
+        can_generate: S.canGenerateNow,
+        ready_to_generate: j.ready_to_generate === true,
+      },
+      bubble: ai,
+    });
+  }
+  if (animate) revealBubble(ai);
 }
 /* Step 3: Turn 2+ message turn. Normal gathering turns submit an async step-tracked job (`POST /api/script-chat/message/jobs`)
    and poll `GET /api/script-chat/jobs/{id}` so live steps (including `compacting_context`) and +10s-buffered ETA update smoothly.
@@ -789,6 +926,7 @@ function sendMessage(txt, file, regenFeedback) {
     setSessionFiles(res.files_loaded);
     setComposerBusy(false);
     renderGatherBubble(ai, res);
+    persistChatSession();
   };
   let tries = 0, netRetries = 0;
   const poll = id => {
