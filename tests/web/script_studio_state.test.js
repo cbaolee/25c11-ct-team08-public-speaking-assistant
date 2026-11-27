@@ -212,3 +212,115 @@ test('composerActionState returns exactly the keys mode and disabled', async () 
   const { composerActionState } = await mod;
   assert.deepEqual(Object.keys(composerActionState({ busy: true, hasScript: true, stage: 'generated', extra: 1 })).sort(), ['disabled', 'mode']);
 });
+
+test('formatReplyMarkup wraps **bold** spans in <strong class="key-req"> and preserves newlines', async () => {
+  const { formatReplyMarkup } = await mod;
+  assert.equal(
+    formatReplyMarkup('Share your **target audience** and **key examples**.\n- Optional: **tone**'),
+    'Share your <strong class="key-req">target audience</strong> and <strong class="key-req">key examples</strong>.\n- Optional: <strong class="key-req">tone</strong>'
+  );
+});
+
+test('formatReplyMarkup escapes HTML before formatting so untrusted text cannot inject tags', async () => {
+  const { formatReplyMarkup } = await mod;
+  assert.equal(
+    formatReplyMarkup('<script>alert("x")</script> **<img src=x onerror=\'pwn()\'> & more**'),
+    '&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; <strong class="key-req">&lt;img src=x onerror=&#39;pwn()&#39;&gt; &amp; more</strong>'
+  );
+});
+
+test('formatReplyMarkup leaves unmatched, empty, whitespace-only, or multi-line ** literal and handles non-strings', async () => {
+  const { formatReplyMarkup } = await mod;
+  assert.equal(formatReplyMarkup('single *star* and **** and **   ** and **across\nlines**'), 'single *star* and **** and **   ** and **across\nlines**');
+  for (const bad of [null, undefined, 0, 42, false, {}, []]) {
+    assert.equal(formatReplyMarkup(bad), '');
+  }
+});
+
+test('shouldShowGenerateButton hides button on Turn 1 and after a script exists, shows from Turn 2 onward', async () => {
+  const { shouldShowGenerateButton } = await mod;
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 1, canGenerate: false }), false);
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 1, canGenerate: true }), false);
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 2, canGenerate: false }), false);
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 2, canGenerate: true }), true);
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 4 }), true);
+  assert.equal(shouldShowGenerateButton({ hasScript: true, assistantTurn: 3, canGenerate: true }), false);
+  assert.equal(shouldShowGenerateButton(), false);
+});
+
+test('canTriggerGenerateKeyword blocks Turn 1, file attachments, and post-script state; allows Turn 2+ keywords', async () => {
+  const { canTriggerGenerateKeyword } = await mod;
+  assert.equal(canTriggerGenerateKeyword({ stage: 'gathering', hasScript: false, canGenerateNow: false, hasFile: false, text: 'generate' }), false);
+  assert.equal(canTriggerGenerateKeyword({ stage: 'picking_topic', hasScript: false, canGenerateNow: true, hasFile: false, text: 'done' }), false);
+  assert.equal(canTriggerGenerateKeyword({ stage: 'gathering', hasScript: false, canGenerateNow: true, hasFile: true, text: 'generate' }), false);
+  assert.equal(canTriggerGenerateKeyword({ stage: 'gathering', hasScript: true, canGenerateNow: true, hasFile: false, text: 'generate' }), false);
+  for (const kw of ['generate', '  DONE ', 'Xong', 'tạo'.normalize('NFD')]) {
+    assert.equal(canTriggerGenerateKeyword({ stage: 'gathering', hasScript: false, canGenerateNow: true, hasFile: false, text: kw }), true, kw);
+  }
+  assert.equal(canTriggerGenerateKeyword({ stage: 'gathering', hasScript: false, canGenerateNow: true, hasFile: false, text: 'please generate now' }), false);
+});
+
+test('validateTurnText enforces NFC code-point and word ceilings consistently with backend', async () => {
+  const { validateTurnText } = await mod;
+  assert.deepEqual(validateTurnText(''), { ok: true, chars: 0, words: 0 });
+  assert.deepEqual(validateTurnText(null), { ok: true, chars: 0, words: 0 });
+
+  const nfd = 'ệ'.normalize('NFD');
+  assert.equal(validateTurnText(nfd.repeat(10), { maxChars: 10, maxWords: 100 }).ok, true);
+  const overChars = validateTurnText(nfd.repeat(11), { maxChars: 10, maxWords: 100 });
+  assert.deepEqual(overChars, { ok: false, reason: 'chars', limit: 10, chars: 11, words: 1 });
+
+  assert.equal(validateTurnText('😀'.repeat(10), { maxChars: 10, maxWords: 100 }).ok, true);
+  assert.equal(validateTurnText('😀'.repeat(11), { maxChars: 10, maxWords: 100 }).reason, 'chars');
+
+  assert.equal(validateTurnText('word '.repeat(5).trim(), { maxChars: 100, maxWords: 5 }).ok, true);
+  const overWords = validateTurnText('word '.repeat(6).trim(), { maxChars: 100, maxWords: 5 });
+  assert.equal(overWords.ok, false);
+  assert.equal(overWords.reason, 'words');
+  assert.equal(overWords.limit, 5);
+
+  // Default word cap is 2,000 words when limits are omitted
+  assert.equal(validateTurnText('w '.repeat(2000).trim()).ok, true);
+  assert.deepEqual(validateTurnText('w '.repeat(2001).trim()), {
+    ok: false,
+    reason: 'words',
+    limit: 2000,
+    chars: 4001,
+    words: 2001,
+  });
+});
+
+test('normalizeTelemetrySteps and computeBufferedRemainingS handle +10s buffer, countdown, skipped, and completion', async () => {
+  const { normalizeTelemetrySteps, computeBufferedRemainingS } = await mod;
+  const fallback = normalizeTelemetrySteps(null, ['validating_input', 'moderating', 'analyzing_with_llm']);
+  assert.deepEqual(fallback, [
+    { key: 'validating_input', state: 'running' },
+    { key: 'moderating', state: 'pending' },
+    { key: 'analyzing_with_llm', state: 'pending' },
+  ]);
+
+  const durs = { validating_input: 0.5, moderating: 1.0, compacting_context: 2.5, analyzing_with_llm: 3.5 };
+  // Fallback estimate: running (1.0) + pending (3.5) + 10s buffer = 14.5 -> ceil = 15s (skipped compacting_context ignored)
+  const est = computeBufferedRemainingS(
+    {
+      stage: 'moderating',
+      eta_buffer_s: 10,
+      steps: [
+        { key: 'validating_input', state: 'done' },
+        { key: 'moderating', state: 'running' },
+        { key: 'compacting_context', state: 'skipped' },
+        { key: 'analyzing_with_llm', state: 'pending' },
+      ],
+    },
+    0,
+    durs,
+    10
+  );
+  assert.equal(est, 15);
+
+  // Server estimated_remaining_s counts down smoothly and clamps at 1s until completed/failed
+  assert.equal(computeBufferedRemainingS({ status: 'running', estimated_remaining_s: 14.2 }, 3.0), 12);
+  assert.equal(computeBufferedRemainingS({ status: 'running', estimated_remaining_s: 4.0 }, 25.0), 1);
+  assert.equal(computeBufferedRemainingS({ status: 'completed', estimated_remaining_s: 10.0 }, 0), 0);
+  assert.equal(computeBufferedRemainingS({ stage: 'failed', estimated_remaining_s: 10.0 }, 0), 0);
+});

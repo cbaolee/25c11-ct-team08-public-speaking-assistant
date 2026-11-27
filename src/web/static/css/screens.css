@@ -442,6 +442,20 @@ body:has(#screenScriptStudio.active) main { padding-top: 0; padding-bottom: 0; }
 #screenScriptStudio .tcard .tc-m { flex: none; font-weight: 500; font-size: 14px; opacity: .8; }
 #screenScriptStudio .tcard.picked, #screenScriptStudio .tcard.picked:disabled { opacity: 1; border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 #screenScriptStudio .bubble .reply { white-space: pre-line; }   /* reply_message may hold a short checklist on several lines */
+#screenScriptStudio .bubble .reply .key-req { font-weight: 700; color: #1E40AF; background: rgba(29, 78, 216, .11); padding: 1px 5px; border-radius: 5px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+#screenScriptStudio .bubble .gen-now-btn { white-space: normal; text-align: left; line-height: 1.35; height: auto; padding-top: 7px; padding-bottom: 7px; }
+#screenScriptStudio .turn-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+#screenScriptStudio .turn-head .turn-status { margin: 0; font-weight: 600; color: var(--ink); }
+#screenScriptStudio .turn-eta { font-size: 12px; font-weight: 600; white-space: nowrap; }
+#screenScriptStudio .turn-steps { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font: 500 13px/1.4 var(--sans); }
+#screenScriptStudio .turn-step { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+#screenScriptStudio .turn-step .st-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: rgba(15, 23, 42, .22); }
+#screenScriptStudio .turn-step.is-done { color: var(--ink); opacity: .82; }
+#screenScriptStudio .turn-step.is-done .st-dot { background: #16A34A; }
+#screenScriptStudio .turn-step.is-running { color: #1D4ED8; font-weight: 600; }
+#screenScriptStudio .turn-step.is-running .st-dot { background: #1D4ED8; box-shadow: 0 0 0 3px rgba(29, 78, 216, .18); animation: stepPulse 1.2s ease-in-out infinite; }
+@keyframes stepPulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(.86); } }
+@media (prefers-reduced-motion: reduce) { #screenScriptStudio .turn-step.is-running .st-dot { animation: none; } }
 #screenScriptStudio .sfiles { display: flex; flex-wrap: wrap; gap: 6px; }   /* chips of the files kept in the session, view only */
 #screenScriptStudio .fchip.ro { padding-right: 12px; max-width: 100%; overflow-wrap: anywhere; }
 

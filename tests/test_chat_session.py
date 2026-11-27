@@ -367,6 +367,29 @@ class TestAnalyzeSlotCoverage:
         assert GROUP_MAIN in missing_groups
         assert GROUP_EVIDENCE in missing_groups
 
+    def test_analyze_slot_coverage_tracks_chat_notes_without_uploaded_chunks(
+        self,
+        sample_template: TemplateDocument,
+    ) -> None:
+        retriever = SemanticRetriever()
+        cov_ratio, missing_entities, missing_groups = analyze_slot_coverage(
+            template_document=sample_template,
+            chunks=[],
+            chunk_embeddings=None,
+            retriever=retriever,
+            prompt="Speech addressed to college student audience type.",
+            user_notes=[
+                "Core mechanism and physiological foundation of marathon pacing.",
+                "Case evidence and real world empirical data from elite marathon runners.",
+                "In conclusion, synthesizing these dimensions shows synthesis of pacing.",
+            ],
+        )
+        assert cov_ratio >= 0.75
+        assert "entity_audience_type" not in missing_entities
+        assert GROUP_MAIN not in missing_groups
+        assert GROUP_EVIDENCE not in missing_groups
+        assert GROUP_COUNTER in missing_groups
+
 
 class Test3LayerStopRule:
     def test_layer_1_sufficient_coverage(self) -> None:
@@ -915,6 +938,62 @@ class TestContinuousGroqQA:
         sent_user = mock_client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
         assert "city planners" in sent_user
         assert "[Turn 1 | chat]" in sent_user
+
+        # Verify previous question memory & non-checklist template coaching hints
+        evaluate_and_build_followup(
+            topic="Tasmanian Tiger",
+            is_free_topic=False,
+            context_entries=[
+                ContextEntry(
+                    turn=1,
+                    source="chat",
+                    text="I want a deep tone focusing on extinction.",
+                )
+            ],
+            latest_user_answer="I want a deep tone focusing on extinction.",
+            last_question="Who is your **target audience** for this talk?",
+            missing_entities=["entity_audience_type"],
+            missing_groups=[GROUP_MAIN, GROUP_EVIDENCE, GROUP_COUNTER],
+            coverage_ratio=0.0,
+            client=mock_client,
+            limiter=TokenBucketLimiter(),
+        )
+        sent_sys = mock_client.chat.completions.create.call_args.kwargs["messages"][0]["content"]
+        sent_tpl_user = mock_client.chat.completions.create.call_args.kwargs["messages"][1][
+            "content"
+        ]
+        assert "Your previous question (do not repeat):" in sent_tpl_user
+        assert "Who is your **target audience** for this talk?" in sent_tpl_user
+        assert "Template slot coverage: 0%" not in sent_tpl_user
+        assert GROUP_COUNTER not in sent_tpl_user  # capped at <=2 optional hints, never all 3
+        assert "acknowledging" in sent_sys.lower()
+
+        # Verify latest_user_answer is not duplicated when already in context_window,
+        # and an 18,000-char paste stays well inside the 8,000 TPM budget
+        session = ChatSessionState(
+            session_id="s-big",
+            user_id="u1",
+            category="free",
+            duration_min=5,
+            topic="Deep Sea Vent Ecosystems",
+        )
+        huge_msg = ("Hydrothermal vent sulfur bacteria sustain giant tube worms. " * 290).strip()
+        assert len(huge_msg) > 15_000
+        append_to_context_window(session, huge_msg, turn=2, source="chat")
+
+        big_decision = evaluate_and_build_followup(
+            topic="Deep Sea Vent Ecosystems",
+            is_free_topic=True,
+            compacted_summary=session.compacted_summary,
+            context_entries=session.context_window,
+            latest_user_answer=huge_msg,
+            client=mock_client,
+            limiter=TokenBucketLimiter(),
+        )
+        assert big_decision.used_llm is True
+        big_prompt = mock_client.chat.completions.create.call_args.kwargs["messages"][1]["content"]
+        assert "(see [Turn 2 | chat] above)" in big_prompt
+        assert len(big_prompt) < 5_200  # bounded (~1,500 tok), never 18,000+ raw chars
 
         # Malformed JSON falls back deterministically without raising
         bad_client = MagicMock()
