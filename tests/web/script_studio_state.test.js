@@ -324,3 +324,40 @@ test('normalizeTelemetrySteps and computeBufferedRemainingS handle +10s buffer, 
   assert.equal(computeBufferedRemainingS({ status: 'completed', estimated_remaining_s: 10.0 }, 0), 0);
   assert.equal(computeBufferedRemainingS({ stage: 'failed', estimated_remaining_s: 10.0 }, 0), 0);
 });
+
+test('parseRestoredChatSession restores a fresh generated session and rejects expired or malformed entries', async () => {
+  const { parseRestoredChatSession } = await mod;
+  const now = 1_700_000_000_000;
+  const valid = {
+    chatSessionId: 'sess-123',
+    chatHasScript: true,
+    chatRegenCount: 2,
+    selectedTemplate: { template_id: 'wildlife/keystone_5m', topic: 'Keystone Species' },
+    sessionFiles: ['notes.pdf', '', 42],
+    chatSeed: { prompt: 'Keystone species', fileName: 'notes.pdf' },
+    category: 'wildlife',
+    duration_min: 10,
+    savedAt: now - 5 * 60 * 1000,
+  };
+  assert.deepEqual(parseRestoredChatSession(valid, now), {
+    chatSessionId: 'sess-123',
+    chatStage: 'generated',
+    chatHasScript: true,
+    chatRegenCount: 2,
+    selectedTemplate: { template_id: 'wildlife/keystone_5m', topic: 'Keystone Species' },
+    sessionFiles: ['notes.pdf'],
+    chatSeed: { prompt: 'Keystone species', fileName: 'notes.pdf' },
+    category: 'wildlife',
+    duration_min: 10,
+  });
+
+  // Expired (> 30 min TTL) -> null
+  assert.equal(parseRestoredChatSession({ ...valid, savedAt: now - 31 * 60 * 1000 }, now), null);
+  // Missing script flag or session id -> null
+  assert.equal(parseRestoredChatSession({ ...valid, chatHasScript: false }, now), null);
+  assert.equal(parseRestoredChatSession({ ...valid, chatSessionId: '   ' }, now), null);
+  // Non-object / null -> null
+  for (const bad of [null, undefined, 'x', 123, {}]) {
+    assert.equal(parseRestoredChatSession(bad, now), null);
+  }
+});

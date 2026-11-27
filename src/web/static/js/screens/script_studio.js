@@ -9,6 +9,7 @@ import {
   computeBufferedRemainingS,
   formatReplyMarkup,
   normalizeTelemetrySteps,
+  parseRestoredChatSession,
   pickScriptTitle,
   regenerateFeedback,
   shouldShowGenerateButton,
@@ -135,6 +136,7 @@ function renderSessionFiles() {
    button) the stored conversation is cleared too. */
 export function startNewChat(opts = {}) {
   S.chatEpoch += 1;
+  S.chatFileCheck = null;
   clearTimeout(S.chatPollTimer); S.chatPollTimer = null;
   stopAllLoadingTickers();
   if (S.chatAbort) { S.chatAbort.abort(); S.chatAbort = null; }
@@ -230,11 +232,37 @@ export function renderBlockedBubble(ai) {
     '<p>' + esc(T('script.blockedHarm')) + '</p>' +
     '<p class="note" style="margin-top:8px">' + esc(T('script.blockedNext')) + '</p>';
 }
-/* The latest Script Studio chat, kept in localStorage per user so two accounts on one browser never see each other's chat. */
+/* The latest Script Studio chat, kept in localStorage per user so two accounts on one browser never see each other's chat.
+   Generated-script session metadata lives in a companion key (`psa.chatSession.<userId>`) so F5 reload preserves Regenerate mode
+   while the backend session stays within its 30-minute TTL, without altering the `psa.chat.<userId>` array format. */
 const chatHistoryKey = userId => 'psa.chat.' + userId;
+const chatSessionKey = userId => 'psa.chatSession.' + userId;
+function clearChatSession(userId) {
+  if (!userId) return;
+  try { localStorage.removeItem(chatSessionKey(userId)); } catch (e) { /* storage may be unavailable */ }
+}
+function persistChatSession() {
+  if (!S.user || !S.user.id || !S.chatSessionId || S.chatHasScript !== true) return;
+  try {
+    const topicSel = $('#composerTopic'), durSel = $('#composerDuration');
+    localStorage.setItem(chatSessionKey(S.user.id), JSON.stringify({
+      chatSessionId: S.chatSessionId,
+      chatStage: 'generated',
+      chatHasScript: true,
+      chatRegenCount: S.chatRegenCount || 0,
+      selectedTemplate: S.selectedTemplate ? { template_id: S.selectedTemplate.template_id || null, topic: S.selectedTemplate.topic || null } : null,
+      sessionFiles: Array.isArray(S.sessionFiles) ? S.sessionFiles.slice() : [],
+      chatSeed: S.chatSeed ? { prompt: S.chatSeed.prompt || '', fileName: S.chatSeed.fileName || '' } : null,
+      category: topicSel ? topicSel.value : '',
+      duration_min: durSel ? (Number(durSel.value) || 5) : 5,
+      savedAt: Date.now(),
+    }));
+  } catch (e) { /* storage may be unavailable or full */ }
+}
 export function clearChatHistory(userId) {        // on New chat, Log out and Delete account, not on session expiry
   if (!userId) return;
   try { localStorage.removeItem(chatHistoryKey(userId)); } catch (e) { /* storage may be unavailable */ }
+  clearChatSession(userId);
 }
 function chatMaxMessages() {
   return Math.max(1, Number(CONFIG.CHAT_HISTORY_MAX_MESSAGES) || 1);   // default lives in CONFIG; 1 only guards a broken value
@@ -373,6 +401,29 @@ export function restoreChat() {
     fillScriptBubble(bubble, sc);
     item.bubble = bubble;
   });
+  const hasRestoredScript = history.some(item => item.role === 'ai' && item.script);
+  if (hasRestoredScript) {
+    let rawSess = null;
+    try { rawSess = JSON.parse(localStorage.getItem(chatSessionKey(S.user.id)) || 'null'); } catch (e) { rawSess = null; }
+    const sess = parseRestoredChatSession(rawSess);
+    if (sess) {
+      S.chatSessionId = sess.chatSessionId;
+      S.chatStage = sess.chatStage;
+      S.chatHasScript = true;
+      S.chatRegenCount = sess.chatRegenCount;
+      S.canGenerateNow = true;
+      S.selectedTemplate = sess.selectedTemplate;
+      S.chatSeed = sess.chatSeed;
+      const topicSel = $('#composerTopic'), durSel = $('#composerDuration');
+      if (topicSel && sess.category && [...topicSel.options].some(o => o.value === sess.category)) topicSel.value = sess.category;
+      if (durSel && sess.duration_min) durSel.value = String(sess.duration_min);
+      setSessionFiles(sess.sessionFiles);
+      lockSetup(true);
+      syncComposerAction();
+    } else if (rawSess !== null) {
+      clearChatSession(S.user.id);
+    }
+  }
   return true;
 }
 /* Error bubble; the text is set with textContent (it may come from the server). Only a failed script turn
@@ -410,6 +461,7 @@ export function handleChatError(ai, code, message, status) {
     /* A Regenerate turn (its script run or its file step): the feedback already sits in the Chat Feed and the reset session is back to Send,
        so giving it back would make the next Send use "make it shorter" as a topic prompt. Only the toast tells the person. */
     const regen = ai._regen === true || !!(ai._script && ai._script.again === true);
+    clearChatSession(S.user && S.user.id);
     toast(T('script.errSession'), true); startNewChat({ restore: true });   // the finished scripts stay on screen
     input.value = draft.trim() ? draft : (regen ? '' : (sent || '')); fitComposer();   // keep the draft, else the request that was just sent
     if (ai._file && !regen) { S.chatFile = ai._file; renderChatFile(); }   // startNewChat dropped the attachment: give it back too
@@ -555,7 +607,7 @@ export function generateScript(req, again) {
       template_id: res.template_id || null, models_used: res.models_used || [], citations: res.citations || [], warnings: res.warnings || [], req };
     fillScriptBubble(ai, ai._script);
     recordChatMessage({ role: 'ai', script: ai._script, bubble: ai });
-    S.chatHasScript = true; S.chatStage = 'generated'; dropGenerateButton(); setComposerBusy(false); revealBubble(ai);   // setComposerBusy syncs the button: Send becomes Regenerate here. A failed run never reaches here, so it keeps the earlier stage
+    S.chatHasScript = true; S.chatStage = 'generated'; dropGenerateButton(); setComposerBusy(false); persistChatSession(); revealBubble(ai);   // setComposerBusy syncs the button: Send becomes Regenerate here. A failed run never reaches here, so it keeps the earlier stage
     }).catch(() => fail('net', null));
   };
   api('/api/generate-script', { method: 'POST', body: fd, signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
@@ -719,6 +771,7 @@ function sendMessage(txt, file, regenFeedback) {
     if (file) fd.append('file', file.raw, file.name);
     chatTurn(URL_MESSAGE, { method: 'POST', body: fd }, ai, j => {
       setSessionFiles(j.files_loaded);
+      persistChatSession();
       ai.remove();
     }, null, () => startGenerate(regenFeedback));
     return;
@@ -783,6 +836,7 @@ function startGenerate(feedback) {
   const req = buildGenerateReq();
   if (S.chatHasScript !== true) { generateScript(req, false); return; }
   S.chatRegenCount += 1;
+  persistChatSession();
   generateScript(Object.assign(req, { feedback: typeof feedback === 'string' ? feedback.trim() : '', attempt: S.chatRegenCount }), true);
 }
 /* Regenerate once the session has a script (sendChat routes here: button and Ctrl/Cmd+Enter): the Composer text is the feedback,

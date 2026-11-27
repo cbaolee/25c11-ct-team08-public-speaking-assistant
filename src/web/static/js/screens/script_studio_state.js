@@ -48,6 +48,7 @@ export function composerActionState(input) {
 const DEFAULT_MAX_TURN_WORDS = 2000;
 const DEFAULT_MAX_TURN_CHARS = 18000;
 const DEFAULT_ETA_BUFFER_S = 10;
+const DEFAULT_CHAT_SESSION_TTL_MS = 30 * 60 * 1000;
 const VALID_STEP_STATES = new Set(['pending', 'running', 'done', 'skipped']);
 const GENERATE_KEYWORD_SET = new Set(['generate', 'done', 'tạo', 'xong']);
 const HTML_ESC_MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
@@ -133,4 +134,45 @@ export function computeBufferedRemainingS(telemetry, elapsedSinceSyncS = 0, fall
   }
   if (base === null) return 0;
   return Math.max(1, Math.ceil(base - elapsed));
+}
+
+/* Validate and normalize a saved generated-script chat session from localStorage so F5 reload
+   keeps Regenerate mode alive while the backend session is within its 30-minute sliding TTL. */
+export function parseRestoredChatSession(raw, nowMs = Date.now(), ttlMs = DEFAULT_CHAT_SESSION_TTL_MS) {
+  if (!raw || typeof raw !== 'object') return null;
+  if (raw.chatHasScript !== true) return null;
+  if (typeof raw.chatSessionId !== 'string' || !raw.chatSessionId.trim()) return null;
+  const effTtl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : DEFAULT_CHAT_SESSION_TTL_MS;
+  const savedAt = Number(raw.savedAt);
+  if (!Number.isFinite(savedAt) || (nowMs - savedAt) > effTtl || (savedAt - nowMs) > 60_000) return null;
+  const regenCount = Number.isInteger(raw.chatRegenCount) && raw.chatRegenCount >= 0 ? raw.chatRegenCount : 0;
+  const sel = raw.selectedTemplate && typeof raw.selectedTemplate === 'object'
+    ? {
+        template_id: typeof raw.selectedTemplate.template_id === 'string' && raw.selectedTemplate.template_id ? raw.selectedTemplate.template_id : null,
+        topic: typeof raw.selectedTemplate.topic === 'string' && raw.selectedTemplate.topic ? raw.selectedTemplate.topic : null,
+      }
+    : null;
+  const seed = raw.chatSeed && typeof raw.chatSeed === 'object'
+    ? {
+        prompt: typeof raw.chatSeed.prompt === 'string' ? raw.chatSeed.prompt : '',
+        fileName: typeof raw.chatSeed.fileName === 'string' ? raw.chatSeed.fileName : '',
+      }
+    : null;
+  const sessionFiles = Array.isArray(raw.sessionFiles)
+    ? raw.sessionFiles.filter(f => typeof f === 'string' && f.trim())
+    : [];
+  const category = typeof raw.category === 'string' ? raw.category : '';
+  const dur = Number(raw.duration_min);
+  const duration_min = [5, 10, 15, 20].includes(dur) ? dur : 5;
+  return {
+    chatSessionId: raw.chatSessionId.trim(),
+    chatStage: 'generated',
+    chatHasScript: true,
+    chatRegenCount: regenCount,
+    selectedTemplate: sel,
+    sessionFiles,
+    chatSeed: seed,
+    category,
+    duration_min,
+  };
 }
