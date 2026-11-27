@@ -204,10 +204,30 @@ test('wheel step accumulates, resets, normalizes and respects cooldown without m
   assert.deepEqual(initial, { acc: 0, lastWheel: -Infinity, lastStep: -Infinity });
   let r = wheelStep(initial, 25, 0, 0); r = wheelStep(r.state, 25, 0, 100); assert.equal(r.step, 1);
   r = wheelStep(initial, 30, 0, 0); r = wheelStep(r.state, 30, 0, 201); assert.equal(r.step, 0); assert.equal(r.state.acc, 30);
-  r = wheelStep(initial, 50, 0, 0); r = wheelStep(r.state, 100, 0, 399); assert.equal(r.step, 0); assert.equal(r.state.acc, 0);
-  r = wheelStep(r.state, 50, 0, 400); assert.equal(r.step, 1);
+  r = wheelStep(initial, 50, 0, 0); r = wheelStep(r.state, 100, 0, 199); assert.equal(r.step, 0); assert.equal(r.state.acc, 0);
+  r = wheelStep(r.state, 100, 0, 399); assert.equal(r.step, 0);
+  r = wheelStep(r.state, 50, 0, 400); assert.equal(r.step, 0);
+  r = wheelStep(r.state, 50, 0, 701); assert.equal(r.step, 1);
   assert.equal(wheelStep(initial, 4, 1, 0).step, 1);
   assert.equal(wheelStep(initial, -1, 2, 0).step, -1);
+});
+
+test('wheel step permits one step per gesture', async () => {
+  const { wheelStep } = await view;
+  const initial = { acc: 0, lastWheel: -Infinity, lastStep: -Infinity, armed: true };
+  let state = initial, steps = 0;
+  for (let now = 0; now <= 1200; now += 16) {
+    const result = wheelStep(state, 40 * (1 - now / 1216), 0, now);
+    state = result.state; steps += Math.abs(result.step);
+  }
+  assert.equal(steps, 1);
+  state = initial; steps = 0;
+  for (const now of [0, 16, 120, 420, 436]) {
+    const result = wheelStep(state, 30, 0, now);
+    state = result.state; steps += Math.abs(result.step);
+  }
+  assert.equal(steps, 2);
+  assert.equal(wheelStep(initial, 30, 0, 0).step, 0);
 });
 
 test('practice event choices use labelled selects with field errors', () => {
