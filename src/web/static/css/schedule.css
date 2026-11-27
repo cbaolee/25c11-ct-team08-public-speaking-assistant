@@ -139,8 +139,8 @@
 .sch-carousel-viewport.sch-fade-right { mask-image: linear-gradient(to right, black 94%, transparent); }
 .sch-carousel-viewport.sch-fade-left { mask-image: linear-gradient(to right, transparent, black 6%); }
 .sch-carousel-viewport.sch-fade-left.sch-fade-right { mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent); }
-.sch-carousel-track { display: flex; gap: 16px; transition: transform 300ms ease-out; }
-.sch-card { position: relative; flex: 0 0 calc((100% - 32px) / 3.15); min-width: 0; height: 210px; display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--line); border-left: 4px solid var(--sch-ev-border); border-radius: var(--r-panel); background: var(--surface); }
+.sch-carousel-track { display: flex; align-items: stretch; gap: 16px; transition: transform 300ms ease-out; }
+.sch-card { position: relative; flex: 0 0 calc((100% - 32px) / 3.15); min-width: 0; min-height: 210px; display: flex; flex-direction: column; gap: 8px; padding: 16px; border: 1px solid var(--line); border-left: 4px solid var(--sch-ev-border); border-radius: var(--r-panel); background: var(--surface); }
 .sch-card-open { position: static; padding: 0; border: 0; background: none; }
 .sch-card-open::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-panel); cursor: pointer; }
 .sch-card-open:focus-visible { outline: none; }
@@ -258,7 +258,9 @@
 .sch-now-line::before { content: ''; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 @media (max-width: 720px) {
   #screenSchedule .sch-view-toggle { grid-column: 1; grid-row: auto; }
-  #screenSchedule #schMonth { width: 17em; font-size: 16px; }
+  #screenSchedule .sch-month-nav { grid-template-columns: auto minmax(0, 1fr) auto; max-width: 100%; width: 100%; }
+  #screenSchedule .sch-month-wrap { min-width: 0; }
+  #screenSchedule #schMonth { width: 100%; min-width: 0; font-size: 16px; overflow: hidden; text-overflow: ellipsis; }
   .sch-week { overflow-x: auto; }
   .sch-week-wide { min-width: 671px; height: 650px; }
 }

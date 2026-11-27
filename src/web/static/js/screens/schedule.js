@@ -443,6 +443,7 @@ function init() {
     values.forEach(value => { const option = document.createElement('option'); option.value = String(value); option.textContent = label(value); $(id).append(option); });
     $(id).onchange = () => { updateRecurrence(); updateScriptErrors(); };
     enhanceSelect($(id));
+    $(id + 'Btn')?.setAttribute('aria-describedby', $(id).getAttribute('aria-describedby'));
   });
   makeSegments('schScript', ['free', 'saved', 'ai'], k => T('schedule.' + ({ free: 'scriptFree', saved: 'scriptSaved', ai: 'scriptAi' }[k])), () => { updateScript(); if ($('schScript').value === 'saved') fetchSavedScripts(); });
   $('schSavedRetry').onclick = fetchSavedScripts;
@@ -562,14 +563,16 @@ RENDER.schedule = () => {
   if (!initialized) {
     init(); initialized = true;
     gridObserver = new ResizeObserver(() => {
+      if (viewAnimations.length > 0) return;
       cancelAnimationFrame(gridFrame);
-      gridFrame = requestAnimationFrame(() => { if (S.screen === 'schedule') render(); });
+      gridFrame = requestAnimationFrame(() => { if (S.screen === 'schedule' && !viewAnimations.length) render(); });
     });
     new MutationObserver(() => {
       if (!$('screenSchedule').classList.contains('active')) { gridObserver.disconnect(); cancelAnimationFrame(gridFrame); }
     }).observe($('screenSchedule'), { attributes: true, attributeFilter: ['class'] });
     window.addEventListener('resize', () => {
-      if (S.screen === 'schedule') { cancelAnimationFrame(gridFrame); gridFrame = requestAnimationFrame(render); }
+      if (viewAnimations.length > 0) return;
+      if (S.screen === 'schedule') { cancelAnimationFrame(gridFrame); gridFrame = requestAnimationFrame(() => { if (!viewAnimations.length) render(); }); }
     });
   }
   weekScrollKey = ''; render(); gridObserver.observe($('schGrid'));
