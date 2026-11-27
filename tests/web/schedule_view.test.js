@@ -4,6 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../src/web/static/js/schedule/schedule_view.js'), 'utf8');
 const view = import('data:text/javascript;base64,' + Buffer.from(source).toString('base64'));
+test('other view toggles month and week and defaults to month', async () => {
+  const { otherView } = await view;
+  assert.equal(otherView('month'), 'week');
+  assert.equal(otherView('week'), 'month');
+  for (const value of ['', 'day', undefined]) assert.equal(otherView(value), 'month');
+});
 test('month to week selects today in the current month and otherwise the first day', async () => {
   const { weekForMonthView } = await view;
   const now = new Date(2026, 10, 27, 12).getTime();

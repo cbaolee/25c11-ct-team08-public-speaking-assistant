@@ -7,7 +7,7 @@ import { openModal, closeModal, toast } from '../ui.js';
 import { openConfirmDialog } from '../modals/confirm.js';
 import { dayKey, parseDay, addDays, expandOccurrences, occurrenceStatus, validateEvent, normalizeRecurrence, seedSchedule, reminderState, reminderAt, REMINDER_LEAD_MIN, NOTE_MAX_CHARS, DURATIONS_MIN, previewOccurrenceDays, seriesSummary, ALL_DAY_REMINDER_HOUR, SCHEDULE_CATEGORIES, SCHEDULE_COLORS, DEFAULT_COLOR } from '../schedule/schedule_model.js';
 import { loadSchedule, saveSchedule, resetSchedule, addEvent, editOccurrence, deleteFromOccurrence, newEventId, remainingCount } from '../schedule/schedule_store.js';
-import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
+import { monthGrid, formatDurationWords, closesTone, carouselStep, edgeFades, streakLabel, to12h, to24h, MINUTE_STEPS, moveDay, defaultTime, sessionsSummary, resultLink, wrapWheel, clampWheel, wheelWindow, occurrenceStyle, styleVars, sessionTimeLabel, lengthLabel, chipsThatFit, weekDays, weekForMonthView, monthForWeekView, otherView, weekRangeLabel, layoutDayBlocks, blockGeometry, initialScrollHour, WEEK_MIN_BLOCK_MIN } from '../schedule/schedule_view.js';
 import { startCheckIn, configureCheckIn } from '../schedule/schedule_checkin.js';
 import { canCheckIn, canEditSchedule, canEditDetails } from '../schedule/schedule_model.js';
 import { startOfWeek, todaySummary, motivationKey, windowClosesAt } from '../schedule/schedule_model.js';
@@ -16,6 +16,32 @@ const $ = id => document.getElementById(id);
 let cachedUser, cachedState, month = new Date(), selectedDay, editing = null, datePicker, timePicker, untilPicker;
 let openPopover = null, gridObserver, gridFrame = 0, view = 'month', viewUser, weekScrollKey = '';
 const WEEK_HOUR_PX = 60;
+const VIEW_EXIT_MS = 120, VIEW_ENTER_MS = 180;
+let viewAnimations = [], viewTransition = 0;
+function cancelViewAnimations() {
+  viewTransition++;
+  viewAnimations.forEach(animation => animation.cancel()); viewAnimations = [];
+  const panel = $('schGrid').closest('.sch-panel'); panel.style.height = ''; panel.style.overflow = '';
+}
+function animateView(elements, frames, duration, easing) {
+  const animations = elements.map(element => element.animate(frames, { duration, easing }));
+  viewAnimations.push(...animations);
+  return Promise.all(animations.map(animation => animation.finished.catch(() => {})));
+}
+async function changeView(visible) {
+  const token = viewTransition, panel = $('schGrid').closest('.sch-panel'), oldHeight = panel.offsetHeight;
+  await animateView(visible, [{ opacity: 1, transform: 'scale(1)', transformOrigin: 'top center' }, { opacity: 0, transform: 'scale(.985)', transformOrigin: 'top center' }], VIEW_EXIT_MS, 'ease-in');
+  if (token !== viewTransition) return;
+  render();
+  const newHeight = panel.offsetHeight, incoming = view === 'week' ? [$('schWeek')] : [$('schWeekdays'), $('schGrid')];
+  if (oldHeight !== newHeight) {
+    panel.style.overflow = 'hidden';
+    const heightAnimation = panel.animate([{ height: oldHeight + 'px' }, { height: newHeight + 'px' }], { duration: VIEW_ENTER_MS, easing: 'ease-out' });
+    viewAnimations.push(heightAnimation);
+  }
+  await animateView(incoming, [{ opacity: 0, transform: 'scale(.985)', transformOrigin: 'top center' }, { opacity: 1, transform: 'scale(1)', transformOrigin: 'top center' }], VIEW_ENTER_MS, 'ease-out');
+  if (token === viewTransition) { panel.style.height = ''; panel.style.overflow = ''; viewAnimations = []; }
+}
 function loadView() { if (viewUser !== S.user?.id) { viewUser = S.user?.id; try { view = storage()?.getItem('psa.schedule.view.v1.' + viewUser) === 'week' ? 'week' : 'month'; } catch (_) { view = 'month'; } weekScrollKey = ''; } }
 const storage = () => { try { return window.localStorage; } catch (_) { return null; } };
 const options = () => ({ storage: storage(), seed: seedSchedule, now: Date.now() });
@@ -171,6 +197,7 @@ function render() {
   loadView();
   const panel = $('schGrid').closest('.sch-panel'); panel.style.setProperty('--sch-panel-top', (panel.getBoundingClientRect().top + window.scrollY) + 'px');
   $('schWeek').hidden = view !== 'week'; $('schGrid').hidden = view === 'week'; $('schWeekdays').hidden = view === 'week';
+  $('schViewToggle').dataset.view = view;
   $('schViewToggle').querySelectorAll('button').forEach(b => { const selected = b.value === view; b.setAttribute('aria-checked', String(selected)); b.tabIndex = selected ? 0 : -1; });
   $('schPrev').setAttribute('aria-label', T(view === 'week' ? 'schedule.previousWeek' : 'schedule.previous')); $('schNext').setAttribute('aria-label', T(view === 'week' ? 'schedule.nextWeek' : 'schedule.nextMonth'));
   if (view === 'week') { $('schMonth').textContent = weekRangeLabel(dayKey(month), fmt); $('schMonthLive').textContent = $('schMonth').textContent; $('schEmpty').hidden = true; renderWeek(Date.now()); return; }
@@ -368,10 +395,25 @@ function init() {
   makeSegments('schViewToggle', ['month', 'week'], value => T('schedule.' + value + 'View'), () => {
     const value = $('schViewToggle').value;
     if (value === view) return;
+    cancelViewAnimations();
+    render();
+    const visible = view === 'week' ? [$('schWeek')] : [$('schWeekdays'), $('schGrid')];
     if (value === 'week') month = new Date(parseDay(weekForMonthView(dayKey(month).slice(0, 7), Date.now())));
     else { const [y, m] = monthForWeekView(dayKey(month), Date.now()).split('-').map(Number); month = new Date(y, m - 1, 1); }
-    view = value; weekScrollKey = ''; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {} render();
+    view = value; weekScrollKey = ''; try { storage()?.setItem('psa.schedule.view.v1.' + S.user?.id, value); } catch (_) {}
+    $('schViewToggle').dataset.view = view;
+    $('schViewToggle').querySelectorAll('[role="radio"]').forEach(b => { b.setAttribute('aria-checked', String(b.value === view)); b.tabIndex = b.value === view ? 0 : -1; });
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) render(); else changeView(visible);
   });
+  $('schViewToggle').addEventListener('keydown', e => {
+    if ((e.key === ' ' || e.key === 'Enter') && e.target.getAttribute('role') === 'radio' && e.target.value === $('schViewToggle').value) {
+      e.preventDefault();
+      const next = [...$('schViewToggle').querySelectorAll('[role="radio"]')].find(b => b.value === otherView(e.target.value));
+      next.click(); next.focus();
+    }
+  });
+  $('schViewToggle').addEventListener('keyup', e => { if (e.key === ' ') e.preventDefault(); });
+  requestAnimationFrame(() => $('schViewToggle').classList.remove('sch-still'));
   T('schedule.weekdays').forEach((name, i) => { $('schWeekdays').append(node('span', name)); const b = button(name, () => { b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); updateRecurrence(); }, 'sch-day-toggle'); b.value = i + 1; b.setAttribute('aria-pressed', 'false'); $('schDayChecks').append(b); });
   ['upcoming', 'active', 'done', 'missed'].forEach(status => { const c = chip(status, null, false, DEFAULT_COLOR); if (status === 'active') c.lastChild.textContent = T('schedule.activeLegend'); $('schLegend').append(c); });
   makeSegments('schLength', ['any', ...DURATIONS_MIN], n => n === 'any' ? T('schedule.any') : T('schedule.minutes', { n }), () => { updateRecurrence(); updateScriptErrors(); });
