@@ -140,6 +140,125 @@ test('pickScriptTitle works without String.prototype.isWellFormed', async () => 
   });
 });
 
+test('composerActionState: a running cooldown disables Regenerate only', async () => {
+  const { composerActionState } = await mod;
+  for (const cooldownLeftS of [1, 0.2, 600]) {
+    assert.deepEqual(composerActionState({ hasScript: true, cooldownLeftS }), { mode: 'regenerate', disabled: true }, String(cooldownLeftS));
+    for (const hasScript of [false, undefined, 'true', 1]) {
+      assert.deepEqual(composerActionState({ hasScript, cooldownLeftS }), { mode: 'send', disabled: false }, String(hasScript));
+    }
+  }
+});
+
+test('composerActionState: a finished or broken cooldown does not disable, busy still does', async () => {
+  const { composerActionState } = await mod;
+  for (const cooldownLeftS of [0, -1, NaN, Infinity, '5', null, undefined, true, {}, [5]]) {
+    assert.deepEqual(composerActionState({ hasScript: true, cooldownLeftS }), { mode: 'regenerate', disabled: false }, String(cooldownLeftS));
+    assert.equal(composerActionState({ busy: true, hasScript: true, cooldownLeftS }).disabled, true);
+  }
+  assert.deepEqual(Object.keys(composerActionState({ hasScript: true, cooldownLeftS: 9 })).sort(), ['disabled', 'mode']);
+});
+
+test('parseRetryAfterS prefers retry_after_s of the body over the header', async () => {
+  const { parseRetryAfterS } = await mod;
+  assert.equal(parseRetryAfterS({ retry_after_s: 15 }, '99'), 15);
+  assert.equal(parseRetryAfterS({ retry_after_s: 15 }, null), 15);
+  assert.equal(parseRetryAfterS({ retry_after_s: 1.2 }, '99'), 2);
+});
+
+test('parseRetryAfterS falls back to a header given in seconds and rounds up', async () => {
+  const { parseRetryAfterS } = await mod;
+  for (const body of [null, undefined, {}, 'x', 5, { retry_after_s: null }]) assert.equal(parseRetryAfterS(body, '30'), 30);
+  assert.equal(parseRetryAfterS(null, '1.2'), 2);
+  assert.equal(parseRetryAfterS(null, ' 7 '), 7);
+  for (const retry_after_s of [0, -3, NaN, Infinity, '5', true, {}, []]) {
+    assert.equal(parseRetryAfterS({ retry_after_s }, '8'), 8, String(retry_after_s));
+  }
+});
+
+test('parseRetryAfterS returns 0 when neither value is usable', async () => {
+  const { parseRetryAfterS } = await mod;
+  const headers = [null, undefined, '', '   ', '0', '-5', 'NaN', 'Infinity', 'soon', '5s', '1e3', '0x10', '1.', '.5', '9'.repeat(400), 'Wed, 21 Oct 2026 07:28:00 GMT', 30];
+  for (const header of headers) {
+    assert.equal(parseRetryAfterS(null, header), 0, String(header));
+    assert.equal(parseRetryAfterS({ retry_after_s: -1 }, header), 0, String(header));
+  }
+  assert.equal(parseRetryAfterS(), 0);
+});
+
+test('formatRetryWait writes minutes and seconds, and nothing for no wait', async () => {
+  const { formatRetryWait } = await mod;
+  const cases = [[1, '1s'], [5, '5s'], [59, '59s'], [60, '1m'], [61, '1m 1s'], [90, '1m 30s'], [525, '8m 45s'], [600, '10m'], [4.2, '5s'], [59.5, '1m']];
+  for (const [seconds, text] of cases) assert.equal(formatRetryWait(seconds), text, String(seconds));
+  for (const bad of [0, -1, NaN, Infinity, '5', null, undefined, {}]) assert.equal(formatRetryWait(bad), '', String(bad));
+});
+
+test('secondsLeft rounds up and never goes below 0', async () => {
+  const { secondsLeft } = await mod;
+  assert.equal(secondsLeft(16000, 1000), 15);
+  assert.equal(secondsLeft(16000, 1001), 15);
+  assert.equal(secondsLeft(16000, 15999), 1);
+  assert.equal(secondsLeft(16000, 16000), 0);
+  assert.equal(secondsLeft(16000, 99000), 0);
+  for (const bad of [NaN, undefined, null, 'x', {}]) assert.equal(secondsLeft(bad, 1000), 0, String(bad));
+  assert.equal(secondsLeft(16000, undefined), 0);
+});
+
+test('rateLimitScope: each known reason has a fixed scope', async () => {
+  const { rateLimitScope } = await mod;
+  for (const again of [true, false]) {
+    assert.equal(rateLimitScope('cooldown', again), 'regenerate');
+    assert.equal(rateLimitScope('regenerate_quota', again), 'regenerate');
+    assert.equal(rateLimitScope('generate_quota', again), 'all');
+    assert.equal(rateLimitScope('job_running', again), 'all');
+  }
+});
+
+test('rateLimitScope: an unknown or missing reason holds the kind of run that was refused', async () => {
+  const { rateLimitScope } = await mod;
+  for (const reason of [undefined, null, '', 'other', 'toString', '__proto__', 7, {}]) {
+    assert.equal(rateLimitScope(reason, true), 'regenerate', String(reason));
+    assert.equal(rateLimitScope(reason, false), 'all', String(reason));
+  }
+});
+
+test('rateLimitTextKey names a message per reason and a general one otherwise', async () => {
+  const { rateLimitTextKey } = await mod;
+  assert.equal(rateLimitTextKey('cooldown'), 'script.errRateCooldown');
+  assert.equal(rateLimitTextKey('regenerate_quota'), 'script.errRateRegen');
+  assert.equal(rateLimitTextKey('generate_quota'), 'script.errRateGenerate');
+  assert.equal(rateLimitTextKey('job_running'), 'script.errRateBusy');
+  for (const reason of [undefined, null, '', 'other', 'constructor', 7]) {
+    assert.equal(rateLimitTextKey(reason), 'script.errRateWait', String(reason));
+  }
+});
+
+// i18n.js imports only the DOM helper of applyText (not called here), so that line is dropped to load it the same way.
+const i18nSource = fs.readFileSync(path.join(__dirname, '../../src/web/static/js/i18n.js'), 'utf8').replace(/^import .*$/m, '');
+const i18n = import('data:text/javascript;base64,' + Buffer.from(i18nSource).toString('base64'));
+
+test('every rate limit message and wait hint exists in TEXT.script and takes {wait}', async () => {
+  const { rateLimitTextKey } = await mod;
+  const { TEXT } = await i18n;
+  const keys = ['cooldown', 'regenerate_quota', 'generate_quota', 'job_running', undefined].map(rateLimitTextKey)
+    .concat('script.regenWaitHint', 'script.generateWaitHint');
+  for (const key of keys) {
+    const [group, name] = key.split('.');
+    assert.equal(group, 'script', key);
+    assert.match(String(TEXT.script[name]), /\{wait\}/, key);
+  }
+});
+
+test('a wait hint with a long wait is no longer than the hint it replaces', async () => {
+  const { formatRetryWait } = await mod;
+  const { TEXT } = await i18n;
+  const wait = formatRetryWait(599);
+  assert.equal(wait, '9m 59s');
+  for (const [waiting, usual] of [['regenWaitHint', 'regenHint'], ['generateWaitHint', 'fileHint']]) {
+    assert.ok(TEXT.script[waiting].replace('{wait}', wait).length <= TEXT.script[usual].length, waiting);
+  }
+});
+
 test('regenerateFeedback returns typed text trimmed, whatever the attempt', async () => {
   const { regenerateFeedback } = await mod;
   assert.equal(regenerateFeedback('  make it shorter  ', 1), 'make it shorter');
@@ -425,4 +544,46 @@ test('parseRestoredChatSession restores picking_topic, gathering (Turn 1 / Turn 
   for (const bad of [null, undefined, 'x', 123, {}]) {
     assert.equal(parseRestoredChatSession(bad, now), null);
   }
+});
+
+test('classifyRegenerateInput rejects empty or punctuation-only text without a file, allows real feedback or file', async () => {
+  const { classifyRegenerateInput } = await mod;
+  assert.deepEqual(classifyRegenerateInput({ text: '', hasFile: false }), { ok: false, reason: 'empty' });
+  assert.deepEqual(classifyRegenerateInput({ text: '   \n\t ', hasFile: false }), { ok: false, reason: 'empty' });
+  assert.deepEqual(classifyRegenerateInput({ text: '??? ... !!!', hasFile: false }), { ok: false, reason: 'no_request' });
+  assert.deepEqual(classifyRegenerateInput({ text: '', hasFile: true }), { ok: true, reason: null });
+  assert.deepEqual(classifyRegenerateInput({ text: 'Make the opening shorter', hasFile: false }), { ok: true, reason: null });
+  assert.deepEqual(classifyRegenerateInput({ text: 'Ngắn hơn 30 giây', hasFile: false }), { ok: true, reason: null });
+});
+
+test('pickCooldownReply rotates across all 15 TEXT.script.regenCooldownReplies without immediate repeats', async () => {
+  const { pickCooldownReply } = await mod;
+  const { TEXT } = await i18n;
+  const replies = TEXT.script.regenCooldownReplies;
+  assert.equal(Array.isArray(replies), true);
+  assert.equal(replies.length, 15);
+  assert.equal(new Set(replies).size, 15);
+  for (const tpl of replies) {
+    assert.match(tpl, /\{wait\}/, tpl);
+  }
+  for (const key of [
+    'regenRefuseEmpty',
+    'regenRefuseNoRequest',
+    'regenRefuseTooLongWords',
+    'regenRefuseTooLongChars',
+    'regenRefuseQuota',
+    'regenRefuseGenerateQuota',
+    'regenRefuseBusy',
+  ]) {
+    assert.equal(typeof TEXT.script[key], 'string', key);
+    assert.ok(TEXT.script[key].trim().length > 0, key);
+  }
+  // Never repeats lastIndex even when randFn returns the exact same value
+  const first = pickCooldownReply(replies, '12s', -1, () => 0);
+  assert.equal(first.index, 0);
+  assert.match(first.text, /12s/);
+  const second = pickCooldownReply(replies, '9s', first.index, () => 0);
+  assert.notEqual(second.index, first.index);
+  assert.match(second.text, /9s/);
+  assert.deepEqual(pickCooldownReply([], '5s'), { text: '', index: -1 });
 });

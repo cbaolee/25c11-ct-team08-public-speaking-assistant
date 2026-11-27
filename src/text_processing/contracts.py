@@ -176,6 +176,7 @@ class ParagraphCitation:
     page: int | None
     status: CitationStatus
     chunk_id: int | None = None
+    sources: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -5,6 +5,8 @@ filters by the owner itself (`id` for profiles, `user_id` for other tables).
 All functions are sync; async endpoints call them via run_in_threadpool.
 """
 
+import math
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -409,11 +411,16 @@ class SupabaseSessionRepo:
         return len(resp.data or [])
 
 
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 class SupabaseRateLimitRepo:
     """public.hit_rate_limit() on the core project (db/migration_main/0011_auth_rate_limits.sql)."""
 
-    def __init__(self, client: Client) -> None:
+    def __init__(self, client: Client, now: Callable[[], datetime] = _utc_now) -> None:
         self._client = client
+        self._now = now
 
     def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool:
         params = {"p_bucket": bucket, "p_key": key, "p_max": max_hits, "p_window_s": window_s}
@@ -425,6 +432,20 @@ class SupabaseRateLimitRepo:
         if not isinstance(data, bool):
             raise StorageError("hit_rate_limit returned no answer")
         return data
+
+    def retry_after_s(self, bucket: str, key: str, window_s: int) -> int:
+        query = self._client.table("auth_rate_limits").select("window_start")
+        row = _first(_execute(query.eq("bucket", bucket).eq("key", key).limit(1)).data)
+        try:
+            start = datetime.fromisoformat(row["window_start"])
+        except (KeyError, TypeError, ValueError):  # no row, no field or not a timestamp
+            return window_s
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=UTC)
+        elapsed_s = (self._now() - start).total_seconds()
+        # +1 s for clock skew between this server and Postgres (heuristic, not measured)
+        left_s = math.ceil(window_s - elapsed_s) + 1
+        return min(max(left_s, 1), window_s)
 
 
 class SupabaseAccountRepo:

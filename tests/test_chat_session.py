@@ -862,6 +862,121 @@ class TestBoundedContextAndCompaction:
         finally:
             pipeline.session_store.delete("s-pipe", user_id="u1")
 
+    def test_dual_track_compaction_keeps_raw_citable_facts_and_never_cites_summary(self) -> None:
+        """Track 1 compacts context_window into compacted_summary; Track 2 keeps verbatim
+        raw user_notes for source_classifier/NLI chunks and excludes compacted_summary."""
+        from src.text_processing.contracts import GeneratedScript, ScriptGenerationRequest
+        from src.text_processing.pipeline import ScriptGenerationPipeline
+
+        mock_llm = MagicMock()
+        mock_llm.retriever = None
+        mock_llm.generate_free_topic_script.return_value = GeneratedScript(
+            script=" ".join(["word"] * 650),
+            word_count=650,
+            duration_min=5,
+            source="llm",
+            template_id=None,
+            models_used=["mock"],
+        )
+        mock_tpl_engine = MagicMock()
+        mock_tpl_engine.retriever = None
+        mock_mod = MagicMock(unsafe=True)
+        pipeline = ScriptGenerationPipeline(
+            moderator=mock_mod,
+            template_engine=mock_tpl_engine,
+            llm_generator=mock_llm,
+        )
+        sess = ChatSessionState(
+            session_id="s-dual-track",
+            user_id="u-dual",
+            category="wildlife",
+            duration_min=5,
+            initial_prompt="Coral Reef Recovery",
+            selected_template_id=None,
+        )
+        early_fact = (
+            "According to a 2023 NOAA marine survey, coral reef cover in the protected "
+            "atoll recovered by 42 percent between 2018 and 2023."
+        )
+        append_to_context_window(
+            sess,
+            early_fact,
+            turn=1,
+            source="chat",
+            max_chars=520,
+            max_entries=3,
+            keep_recent=1,
+            max_summary_chars=220,
+        )
+        append_to_context_window(
+            sess,
+            "Uploaded reference file: field_notes.pdf",
+            turn=2,
+            source="file_summary",
+            max_chars=520,
+            max_entries=3,
+            keep_recent=1,
+            max_summary_chars=220,
+        )
+        append_to_context_window(
+            sess,
+            "Please make the opening more energetic and keep transitions concise for students.",
+            turn=3,
+            source="chat",
+            max_chars=520,
+            max_entries=3,
+            keep_recent=1,
+            max_summary_chars=220,
+        )
+        append_to_context_window(
+            sess,
+            (
+                "Researchers at James Cook University recorded 180 native fish species returning "
+                "within 24 months after nursery restoration began in 2021."
+            ),
+            turn=4,
+            source="chat",
+            max_chars=520,
+            max_entries=3,
+            keep_recent=1,
+            max_summary_chars=220,
+        )
+        assert sess.compaction_count >= 1
+        assert sess.compacted_summary
+        # Track 2 keeps verbatim chat notes (excluding file_summary)
+        assert any("42 percent" in n for n in sess.user_notes)
+        assert all("Uploaded reference file:" not in n for n in sess.user_notes)
+
+        # Mutate compacted_summary to a distinctive marker to prove it never enters citation chunks
+        sess.compacted_summary = (
+            "- COMPACTED_SUMMARY_MARKER_2025: 99 percent summary paraphrase for prompt only"
+        )
+        pipeline.session_store.put(sess)
+        try:
+            pipeline.run(
+                ScriptGenerationRequest(
+                    topic="Coral Reef Recovery",
+                    category="free",
+                    duration_min=5,
+                    session_id="s-dual-track",
+                    user_id="u-dual",
+                )
+            )
+            kwargs = mock_llm.generate_free_topic_script.call_args.kwargs
+            # Track 1: LLM chat_context receives the bounded summary + recent context window
+            assert "[Session Summary]" in kwargs["chat_context"]
+            assert "COMPACTED_SUMMARY_MARKER_2025" in kwargs["chat_context"]
+            # Track 2: citation chunks contain both raw verbatim facts, never summary or instruction
+            passed_chunks = kwargs["chunks"] or []
+            chunk_blob = "\n".join(c.content for c in passed_chunks)
+            assert "42 percent" in chunk_blob
+            assert "180 native fish species" in chunk_blob
+            assert "COMPACTED_SUMMARY_MARKER_2025" not in chunk_blob
+            assert "more energetic" not in chunk_blob
+            assert "Uploaded reference file:" not in chunk_blob
+        finally:
+            pipeline.session_store.delete("s-dual-track", user_id="u-dual")
+
 
 class TestContinuousGroqQA:
     def test_turn1_question_uses_groq_and_fallback_with_bold_keys(self) -> None:

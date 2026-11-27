@@ -732,6 +732,13 @@ def append_to_context_window(
     if entry is None:
         return None, False
 
+    # Dual-Track (Track 2): keep verbatim user chat/feedback notes in `session.user_notes`
+    # untouched by context-window compaction so source_classifier and NLI citation verification
+    # always ground against exact user-provided facts, never LLM-compacted summaries.
+    if source in ("chat", "feedback"):
+        if not session.user_notes or session.user_notes[-1] != cleaned:
+            session.user_notes.append(cleaned)
+
     session.context_window.append(entry)
 
     active_chars = sum(e.char_count for e in session.context_window)

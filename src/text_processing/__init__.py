@@ -80,8 +80,19 @@ from .parser import (
     validate_turn_text_length,
 )
 from .pipeline import ScriptGenerationPipeline
-from .retrieval import SemanticRetriever, verify_paragraph_citation
+from .retrieval import (
+    NLIVerifier,
+    SemanticRetriever,
+    align_script_citations,
+    verify_paragraph_citation,
+)
 from .sanitizer import sanitize_chunks, sanitize_text
+from .source_classifier import (
+    SourceCategory,
+    SourceClassification,
+    classify_user_message,
+    extract_citable_source_text,
+)
 from .template_engine import (
     TemplateEngine,
     TokenBucketLimiter,
@@ -130,6 +141,7 @@ __all__ = [
     "MAX_TURN_TEXT_CHARS",
     "MAX_TURN_TEXT_WORDS",
     "ModerationDecision",
+    "NLIVerifier",
     "ParagraphCitation",
     "QA_LIMITER_MAX_WAIT_S",
     "QA_MAX_MISSING_ITEMS_DISPLAY",
@@ -143,6 +155,8 @@ __all__ = [
     "ScriptJobState",
     "ScriptResult",
     "SemanticRetriever",
+    "SourceCategory",
+    "SourceClassification",
     "TURN1_MAX_TOKENS",
     "TURN1_TEMPERATURE",
     "TemplateDocument",
@@ -153,6 +167,7 @@ __all__ = [
     "TopicMetadata",
     "TurnStepTracker",
     "VALID_DURATIONS",
+    "align_script_citations",
     "analyze_slot_coverage",
     "append_to_context_window",
     "assemble_template",
@@ -161,9 +176,11 @@ __all__ = [
     "chat_session_store",
     "check_ready_to_generate",
     "classify_argument_slot",
+    "classify_user_message",
     "compact_context_entries",
     "deterministic_compact_summary",
     "evaluate_and_build_followup",
+    "extract_citable_source_text",
     "format_checklist_fallback",
     "group_uncovered_slots",
     "ingest_upload_file",

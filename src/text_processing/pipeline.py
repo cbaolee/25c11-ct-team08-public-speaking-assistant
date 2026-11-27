@@ -6,6 +6,7 @@ Saved scripts live in the `scripts` table (`/api/scripts*` in src/app/main.py), 
 import hashlib
 import logging
 import re
+import time
 import uuid
 from collections import OrderedDict
 from copy import deepcopy
@@ -19,6 +20,7 @@ from src.app.config import (
     pipeline_cache_max_size,
     script_jobs_max_capacity,
 )
+from src.app.constants import CONSTANTS
 
 from .chat_session import ChatSessionStore, append_to_context_window, chat_session_store
 from .contracts import (
@@ -35,9 +37,15 @@ from .contracts import (
 )
 from .generator import ScriptGenerator
 from .moderation import ContentModerator
-from .parser import DocumentParserError, parse_input_to_chunks, validate_pdf_file
-from .retrieval import align_script_citations
+from .parser import (
+    DocumentParserError,
+    _split_long_chunk_text,
+    parse_input_to_chunks,
+    validate_pdf_file,
+)
+from .retrieval import SemanticRetriever, align_script_citations
 from .sanitizer import sanitize_chunks, sanitize_text
+from .source_classifier import extract_citable_source_text
 from .template_engine import (
     TemplateEngine,
     polish_script_paragraphs,
@@ -58,30 +66,46 @@ _AUTO_REGEN_FEEDBACK_PREFIX = "write a fresh variation of this speech"
 def _build_chat_note_chunks(
     notes: list[str],
     start_chunk_id: int = 1,
-    min_words: int = _CITABLE_NOTE_MIN_WORDS,
+    min_words: int = 4,
+    *,
+    retriever: SemanticRetriever | None = None,
 ) -> list[DocumentChunk]:
-    """Turn substantive user chat notes into in-memory citable chunks (`page=0`)."""
+    """Turn citable ``source_material`` user notes into in-memory chunks (``page=0``).
+
+    Casual chat ("I'm happy", "thanks") and editing instructions ("make it shorter")
+    are filtered out by ``extract_citable_source_text`` so they can never be cited,
+    while mixed messages have non-source sentences stripped before chunking.
+    """
     note_chunks: list[DocumentChunk] = []
+    seen_notes: set[str] = set()
     note_num = 0
     for raw_note in notes:
         cleaned = sanitize_text(raw_note).strip()
-        if len(cleaned.split()) < min_words:
+        if not cleaned:
             continue
+        source_only = extract_citable_source_text(cleaned, retriever=retriever)
+        if not source_only or len(source_only.split()) < min_words:
+            continue
+        dedup_key = re.sub(r"\s+", " ", source_only).strip().lower()
+        if dedup_key in seen_notes:
+            continue
+        seen_notes.add(dedup_key)
         note_num += 1
-        lines = [ln.strip() for ln in cleaned.splitlines() if ln.strip()]
+        lines = [ln.strip() for ln in source_only.splitlines() if ln.strip()]
         label = f"Chat note #{note_num}"
         if len(lines) > 1:
             first_line = re.sub(r"^[#*\-\s]+|[:.\s]+$", "", lines[0]).strip()
             if 1 <= len(first_line.split()) <= 5 and len(first_line) <= 36:
                 label = f"Chat note #{note_num} · {first_line}"
-        note_chunks.append(
-            DocumentChunk(
-                chunk_id=start_chunk_id + len(note_chunks),
-                heading=label,
-                page=0,
-                content=cleaned,
+        for part in _split_long_chunk_text(source_only):
+            note_chunks.append(
+                DocumentChunk(
+                    chunk_id=start_chunk_id + len(note_chunks),
+                    heading=label,
+                    page=0,
+                    content=part,
+                )
             )
-        )
     return note_chunks
 
 
@@ -116,6 +140,7 @@ class ScriptGenerationPipeline:
         self.max_cache_size = max_cache_size
         self.max_jobs_capacity = DEFAULT_SCRIPT_JOBS_CAPACITY
         self._jobs: OrderedDict[str, ScriptJobState] = OrderedDict()
+        self._active_since: dict[str, float] = {}  # job_id -> created or first seen active
         self._cache: OrderedDict[str, GeneratedScript] = OrderedDict()
 
     def _evict_jobs_if_needed(self) -> None:
@@ -146,6 +171,7 @@ class ScriptGenerationPipeline:
             estimated_remaining_s=total_s,
         )
         self._jobs[job_id] = job
+        self._active_since[job_id] = time.monotonic()
         self._evict_jobs_if_needed()
         return job
 
@@ -241,26 +267,38 @@ class ScriptGenerationPipeline:
                     cleaned_prompt = sanitize_text(sess.initial_prompt).strip()
                     if cleaned_prompt:
                         chat_parts.append(cleaned_prompt)
-                        if len(cleaned_prompt.split()) >= _FREE_TOPIC_THESIS_MIN_WORDS:
-                            citable_notes.append(cleaned_prompt)
+                        citable_notes.append(cleaned_prompt)
+                # Dual-Track storage separation:
+                # Track 1 (chat_parts -> effective_chat_context): bounded context_window +
+                # compacted_summary for LLM prompting within token limits.
                 if getattr(sess, "compacted_summary", "") and sess.compacted_summary.strip():
                     cleaned_summary = sanitize_text(sess.compacted_summary).strip()
                     if cleaned_summary:
                         chat_parts.append(f"[Session Summary]\n{cleaned_summary}")
-                        if len(cleaned_summary.split()) >= _CITABLE_NOTE_MIN_WORDS:
-                            citable_notes.append(cleaned_summary)
                 if getattr(sess, "context_window", None):
                     for entry in sess.context_window:
                         cleaned_entry = sanitize_text(entry.text).strip()
                         if cleaned_entry:
                             chat_parts.append(cleaned_entry)
-                            citable_notes.append(cleaned_entry)
                 elif sess.user_notes:
                     for note in sess.user_notes:
                         cleaned_note = sanitize_text(note).strip()
                         if cleaned_note:
                             chat_parts.append(cleaned_note)
+                # Track 2 (citable_notes -> source_classifier -> NLI chunks): verbatim raw
+                # user_notes only; compacted_summary and file_summary entries never enter here.
+                if sess.user_notes:
+                    for note in sess.user_notes:
+                        cleaned_note = sanitize_text(note).strip()
+                        if cleaned_note:
                             citable_notes.append(cleaned_note)
+                elif getattr(sess, "context_window", None):
+                    for entry in sess.context_window:
+                        if getattr(entry, "source", "chat") == "file_summary":
+                            continue
+                        cleaned_entry = sanitize_text(entry.text).strip()
+                        if cleaned_entry:
+                            citable_notes.append(cleaned_entry)
         if request.user_feedback and request.user_feedback.strip():
             cleaned_fb = sanitize_text(request.user_feedback).strip()
             is_auto_regen = cleaned_fb.lower().startswith(_AUTO_REGEN_FEEDBACK_PREFIX)
@@ -306,9 +344,13 @@ class ScriptGenerationPipeline:
                 ) from exc
 
         if citable_notes:
+            active_retriever = getattr(self.template_engine, "retriever", None) or getattr(
+                self.llm_generator, "retriever", None
+            )
             note_chunks = _build_chat_note_chunks(
                 citable_notes,
                 start_chunk_id=len(chunks) + 1,
+                retriever=active_retriever,
             )
             chunks.extend(note_chunks)
 
@@ -513,3 +555,24 @@ class ScriptGenerationPipeline:
             if cleanup_pdf and request.pdf_path:
                 Path(request.pdf_path).unlink(missing_ok=True)
         return job
+
+    def has_active_job(self, user_id: str, *, now: float | None = None) -> bool:
+        """True while `user_id` has a queued or running job in this process.
+
+        A job created `active_job_stale_s` or more ago is ignored as stuck. A job without a
+        creation time (not made by `create_job`) is timed from the first call that sees it.
+        """
+        now = time.monotonic() if now is None else now
+        stale_s = CONSTANTS["script_limits"]["active_job_stale_s"]
+        # `_jobs` has no lock and worker threads change job states, so read a snapshot. The
+        # answer can be out of date at once and knows nothing about other processes.
+        active = {
+            job.job_id: job.user_id
+            for job in tuple(self._jobs.values())
+            if job.status in ("queued", "extracting", "moderating", "generating")
+        }
+        self._active_since = {jid: self._active_since.get(jid, now) for jid in active}
+        return any(
+            owner == user_id and now - self._active_since[jid] < stale_s
+            for jid, owner in active.items()
+        )

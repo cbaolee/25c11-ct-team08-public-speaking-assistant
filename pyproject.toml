@@ -40,3 +40,6 @@ dependencies = [
 pythonpath = ["."]
 markers = ["integration: needs the real Supabase projects (psc-main, shards)"]
 addopts = "-m 'not integration'"
+filterwarnings = [
+    "ignore:`torch.jit.script` is deprecated:FutureWarning",
+]

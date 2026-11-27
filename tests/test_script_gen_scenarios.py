@@ -790,9 +790,7 @@ class TestScenario5FreeTopicAndRegenerateWithFeedback:
         call_kwargs = mock_llm.generate_free_topic_script.call_args.kwargs
         assert call_kwargs["user_feedback"] == feedback_text
         assert feedback_text in call_kwargs["chat_context"]
-        assert call_kwargs["chunks"] is not None
-        assert call_kwargs["chunks"][0].heading == "Chat note #1"
-        assert call_kwargs["chunks"][0].page == 0
+        assert call_kwargs["chunks"] is None
 
         # Subsequent blank regenerate keeps the earlier feedback in session context
         # without persisting the auto-generated variation placeholder as a note.
@@ -830,8 +828,8 @@ class TestScenario5FreeTopicAndRegenerateWithFeedback:
             user_notes=[
                 "ok go ahead",
                 (
-                    "Overview\nInclude a detailed story about our varsity volleyball team "
-                    "comeback in the third set using aggressive jump serving strategy."
+                    "Overview\nOur varsity volleyball team made a comeback in the third set "
+                    "in 2025, scoring 12 points with aggressive jump serving."
                 ),
             ],
         )

@@ -5,13 +5,20 @@ import { saveScriptAs } from '../screens/saved_scripts.js';
 import { openReader, runScriptAction } from '../screens/script_reader.js';
 import {
   canTriggerGenerateKeyword,
+  classifyRegenerateInput,
   composerActionState,
   computeBufferedRemainingS,
   formatReplyMarkup,
+  formatRetryWait,
   normalizeTelemetrySteps,
   parseRestoredChatSession,
+  parseRetryAfterS,
+  pickCooldownReply,
   pickScriptTitle,
+  rateLimitScope,
+  rateLimitTextKey,
   regenerateFeedback,
+  secondsLeft,
   shouldShowGenerateButton,
   validateTurnText,
 } from '../screens/script_studio_state.js';
@@ -74,34 +81,47 @@ const fileLimits = () => {
    only while the saved session is still within TTL). While it is true the Composer's action button is Regenerate (see syncComposerAction). Part of NO_SESSION, so New chat / expired session / other account reset it.
    chatRegenCount = Regenerate runs started in this session (see startGenerate). */
 const NO_SESSION = { chatSessionId: null, chatStage: 'idle', chatHasScript: false, chatRegenCount: 0, assistantTurn: 0, canGenerateNow: false, chatGenBtns: [], selectedTemplate: null, sessionFiles: [], chatSeed: null, chatCards: null };
+/* Rate limit waits (see activeBlock). Not part of NO_SESSION: New chat must not lift them. */
+const NO_BLOCK = { chatRegenBlock: null, chatAllBlock: null, chatBlockOwner: null, chatBlockTimer: null, chatBlockError: null };
+const BLOCK_TICK_MS = 1000;
 const activeLoadingBubbles = new Set();
 export function initChatState() {
-  Object.assign(S, NO_SESSION, { chatGenBtns: [], chatEpoch: 0, chatPollTimer: null, chatAbort: null, chatOwner: null });
+  Object.assign(S, NO_SESSION, NO_BLOCK, { chatGenBtns: [], lastCooldownReplyIdx: -1, chatEpoch: 0, chatPollTimer: null, chatAbort: null, chatOwner: null });
 }
 initChatState();
 function syncGenerateButtons() {
   S.chatGenBtns = (S.chatGenBtns || []).filter(b => b && b.isConnected);
-  S.chatGenBtns.forEach(b => { b.disabled = !!S.chatBusy; });
+  const locked = !!S.chatBusy || !!activeBlock(false);
+  S.chatGenBtns.forEach(b => { b.disabled = locked; });
 }
 const setComposerBusy = on => {
   S.chatBusy = on; syncComposerAction(); syncGenerateButtons();
 };
 /* #composerSend is Send until the session has a script, then Regenerate in the same place (the text box is the feedback).
-   Compares with the last state kept on the button first, so a repeat call touches nothing; only a mode change rewrites the
-   label, placeholder and file hint (static text from T(), never user text) and refits the text box once. Called from
-   setComposerBusy and wherever chatHasScript changes (startNewChat reaches it through setComposerBusy(false)). */
+   Compares with the last state kept on the button first: only a mode change rewrites the label and placeholder (static text
+   from T(), never user text) and refits the text box once. The disabled flag and the hint line also follow a rate limit wait.
+   Called from setComposerBusy, paintBlocks and wherever chatHasScript changes (startNewChat reaches it through setComposerBusy(false)). */
 function syncComposerAction() {
-  const btn = $('#composerSend'), prev = btn._state || { mode: 'send', disabled: false };
-  const next = composerActionState({ busy: S.chatBusy, hasScript: S.chatHasScript });
+  const btn = $('#composerSend'), prev = btn._state || { mode: 'send', disabled: false }, block = activeBlock(true);
+  const next = composerActionState({ busy: S.chatBusy, hasScript: S.chatHasScript, cooldownLeftS: block ? block.left : 0 });
   if (next.mode !== prev.mode) {
-    const regen = next.mode === 'regenerate', label = T(regen ? 'script.regenerate' : 'script.send'), hint = $('#composerFileHint'), input = $('#composerInput');
+    const regen = next.mode === 'regenerate', label = T(regen ? 'script.regenerate' : 'script.send'), input = $('#composerInput');
     btn.classList.toggle('is-regen', regen);
     btn.setAttribute('aria-label', label); btn.title = label;
     input.setAttribute('placeholder', T(regen ? 'script.placeholderRegen' : input.getAttribute('data-t-ph')));
-    hint.textContent = T(regen ? 'script.regenHint' : hint.getAttribute('data-t'));
     fitComposer();
   }
   btn._state = next; btn.disabled = next.disabled;
+  syncComposerHint(next.mode === 'regenerate');
+}
+/* The line under the Composer: a countdown while the next run of this mode is blocked, else the mode's own hint.
+   It has no live region, so a screen reader does not read it every second. */
+function syncComposerHint(regen) {
+  const hint = $('#composerFileHint'), block = activeBlock(regen);
+  const text = block ? waitText(regen ? 'script.regenWaitHint' : 'script.generateWaitHint', block)
+    : T(regen ? 'script.regenHint' : hint.getAttribute('data-t'));
+  hint.style.minHeight = block ? hint.offsetHeight + 'px' : '';   // measured before the new text: the line never shrinks during a countdown
+  if (hint.textContent !== text) hint.textContent = text;
 }
 /* Removes all Turn 2+ Generate action buttons once the first script of the session finishes (Composer is now Regenerate). */
 function dropGenerateButton() {
@@ -510,15 +530,44 @@ export function restoreChat() {
   });
   return true;
 }
-/* Error bubble; the text is set with textContent (it may come from the server). Only a failed script turn
-   (ai._script.req) gets the Try again button; a failed chat turn gives the typed text back (picking a topic is retried by clicking the card again). */
-function renderErrorBubble(ai, text) {
+/* Error bubble; plain text uses textContent (may come from server), while rich coach replies use XSS-safe formatReplyMarkup.
+   Only a failed script turn (ai._script.req) gets the Try again button; a failed chat turn gives the typed text back. */
+function renderErrorBubble(ai, text, opts = {}) {
+  const { rich = false } = opts;
   stopLoadingTicker(ai);
   const retry = ai._script && ai._script.req;
-  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div><p class="note"></p>' + (retry ? '<div class="acts"><button class="btn btn-sm" type="button" data-a="retry"></button></div>' : '');
-  $('.note', ai).textContent = text;
+  ai.innerHTML = '<div class="who">' + IC.ai + '<span>' + esc(T('script.assistant')) + '</span></div>' +
+    (rich ? '<p class="reply"></p>' : '<p class="note"></p>') +
+    (retry ? '<div class="acts"><button class="btn btn-sm" type="button" data-a="retry"></button></div>' : '');
+  if (rich) $('.reply', ai).innerHTML = formatReplyMarkup(text);
+  else $('.note', ai).textContent = text;
   if (retry) $('[data-a=retry]', ai).textContent = T('script.tryAgain');
+  if (retry) $('[data-a=retry]', ai).disabled = !!activeBlock(ai._script.again === true);
   revealBubble(ai);
+}
+/* Conversational assistant bubble explaining why a Regenerate request could not run (empty input,
+   missing change instructions, over-limit text, or active cooldown/rate limit). */
+function renderCoachNoticeBubble(text) {
+  const ai = addBubble('ai', '<p class="reply"></p>', true);
+  $('.reply', ai).innerHTML = formatReplyMarkup(text);
+  return ai;
+}
+function cooldownReplyText(wait) {
+  const templates = T('script.regenCooldownReplies');
+  const picked = pickCooldownReply(templates, wait, S.lastCooldownReplyIdx);
+  if (picked.text) {
+    S.lastCooldownReplyIdx = picked.index;
+    return picked.text;
+  }
+  return T('script.errRateCooldown', { wait });
+}
+function rateLimitChatReply(limit) {
+  const wait = formatRetryWait(limit.left);
+  if (limit.reason === 'cooldown') return cooldownReplyText(wait);
+  if (limit.reason === 'regenerate_quota') return T('script.regenRefuseQuota', { wait });
+  if (limit.reason === 'generate_quota') return T('script.regenRefuseGenerateQuota', { wait });
+  if (limit.reason === 'job_running') return T('script.regenRefuseBusy', { wait });
+  return waitText(rateLimitTextKey(limit.reason), limit);
 }
 /* Which message group an error belongs to: error_code first, HTTP status only when there is no known code. */
 export function chatErrorKind(code, status) {
@@ -526,8 +575,9 @@ export function chatErrorKind(code, status) {
   return status === 429 ? 'rate' : status === 503 ? 'generation' : 'other';
 }
 /* One place for every chat error. `ai` is the loading bubble of the failed turn (ai._script.req and .again are kept for Try again).
-   Each error group has its own message. A session error starts a new chat but keeps the user's text (except in a Regenerate turn, see below). */
-export function handleChatError(ai, code, message, status) {
+   Each error group has its own message. A session error starts a new chat but keeps the user's text (except in a Regenerate turn, see below).
+   limit ({left, reason}, optional) = the wait of a script run refused by the rate limit; its message replaces the plain "rate" one. */
+export function handleChatError(ai, code, message, status, limit) {
   stopLoadingTicker(ai);
   const kind = chatErrorKind(code, status);
   if (kind === 'file') {   // own message per error code (a server message is only the fallback); the typed text comes back
@@ -552,11 +602,16 @@ export function handleChatError(ai, code, message, status) {
     return;
   }
   const scriptTurn = !!(ai._script && ai._script.req);
-  if (!scriptTurn) giveBackDraft(ai);   // chat turn only: a script turn keeps its own Retry button
+  /* A chat turn gets its draft back (a script turn keeps its own Retry button). So does a Regenerate refused by the rate limit:
+     the typed feedback only, never a file that /message already took. */
+  if (!scriptTurn || (limit && ai._script.again)) giveBackDraft(ai);
   /* The fallback says "writing your script" only for a script turn; a chat turn (topics, message) gets a neutral line */
-  const text = Object.hasOwn(ERR_TEXT, kind) ? T(ERR_TEXT[kind]) : (message || T(scriptTurn ? 'script.errGeneric' : 'script.errChat'));   // fail-closed moderation never opens safetyAlert
-  toast(text, true);
-  renderErrorBubble(ai, text);
+  const isRateWithLimit = kind === 'rate' && limit;
+  const bubbleText = isRateWithLimit ? rateLimitChatReply(limit)
+    : Object.hasOwn(ERR_TEXT, kind) ? T(ERR_TEXT[kind]) : (message || T(scriptTurn ? 'script.errGeneric' : 'script.errChat'));   // fail-closed moderation never opens safetyAlert
+  const toastText = isRateWithLimit ? waitText(rateLimitTextKey(limit.reason), limit) : bubbleText;
+  toast(toastText, true);
+  renderErrorBubble(ai, bubbleText, { rich: Boolean(isRateWithLimit) });
 }
 function stepLabel(key) {
   const map = T('script.steps');
@@ -668,7 +723,7 @@ export function generateScript(req, again) {
   const feedback = again ? regenerateFeedback(req.feedback, req.attempt) : '';   // req.attempt stays fixed, so Retry sends the same text
   if (feedback) fd.append('user_feedback', feedback);
   /* A stale turn (New chat / other account) stays silent: no render, no busy flag. */
-  const fail = (code, msg, httpStatus) => { if (!stale()) { setComposerBusy(false); handleChatError(ai, code, msg, httpStatus); } };
+  const fail = (code, msg, httpStatus, limit) => { if (!stale()) { setComposerBusy(false); handleChatError(ai, code, msg, httpStatus, limit); } };
   const failFrom = (j, httpStatus) => fail(errCode(j), j && j.message, httpStatus);
   let tries = 0;
   const poll = id => {
@@ -694,8 +749,15 @@ export function generateScript(req, again) {
     S.chatHasScript = true; S.chatStage = 'generated'; dropGenerateButton(); setComposerBusy(false); persistChatSession(); revealBubble(ai);   // setComposerBusy syncs the button: Send becomes Regenerate here. A failed run never reaches here, so it keeps the earlier stage
     }).catch(() => fail('net', null));
   };
-  api('/api/generate-script', { method: 'POST', body: fd, signal: ctl.signal }).then(readJson).then(({ ok, status: httpStatus, j }) => {
+  api('/api/generate-script', { method: 'POST', body: fd, signal: ctl.signal }).then(readJson).then(({ res, ok, status: httpStatus, j }) => {
     if (stale()) return;
+    const waitS = httpStatus === 429 ? parseRetryAfterS(j, res.headers && res.headers.get('Retry-After')) : 0;
+    if (waitS > 0) {
+      const limit = { left: waitS, reason: j && j.reason };
+      startBlock(limit.reason, waitS, again === true);   // before fail(), so the new Try again button is drawn locked
+      fail(errCode(j), j && j.message, httpStatus, limit);
+      return;
+    }
     if (!ok || !j || !j.job_id) { failFrom(j, httpStatus); return; }
     updateLoadingBubble(ai, j);
     poll(j.job_id);
@@ -878,7 +940,7 @@ function renderGatherBubble(ai, j, opts = {}) {
     const g = $('[data-a=generate]', ai);
     g.textContent = T('script.generateNow');
     g.classList.toggle('btn-primary', j.ready_to_generate === true);
-    g.disabled = S.chatBusy === true;
+    g.disabled = S.chatBusy === true || !!activeBlock(false);
     S.chatGenBtns.push(g);
   }
   if (record) {
@@ -980,11 +1042,19 @@ function startGenerate(feedback) {
 /* Regenerate once the session has a script (sendChat routes here: button and Ctrl/Cmd+Enter): the Composer text is the feedback,
    every word included ('done', 'generate'... are not keywords any more). Nothing runs (and nothing is cleared) when the text is too long.
    Typed text and/or a File Chip show as ONE user bubble like any sent message; a blank box with no file just rewrites.
-   With a File Chip the file goes to /message first (sendMessage), then the Regenerate runs by itself. */
+   With a File Chip the file goes to /message first (sendMessage), then the Regenerate runs by itself.
+   Rate limit waits are checked here and by the other callers, not in startGenerate: after the file step an early return there
+   would leave the Composer disabled. */
 function regenerateFromComposer() {
-  if (!canGenerate()) return;
+  if (!canGenerate() || rejectBlocked(true)) return;
   const input = $('#composerInput'), err = $('#composerError'), txt = input.value.trim(), file = S.chatFile;
-  if (rejectLong(txt, err)) return;
+  const inputCheck = classifyRegenerateInput({ text: txt, hasFile: !!file });
+  if (!inputCheck.ok) {
+    const reply = T(inputCheck.reason === 'no_request' ? 'script.regenRefuseNoRequest' : 'script.regenRefuseEmpty');
+    renderCoachNoticeBubble(reply);
+    return;
+  }
+  if (rejectLong(txt, err, { asCoachReply: true })) return;
   clearErr(err);
   if (txt || file) {
     const message = { role: 'me', text: txt, topic: $('#composerTopic').value, duration_min: +$('#composerDuration').value || 5, file_name: file ? file.name : null };
@@ -995,11 +1065,16 @@ function regenerateFromComposer() {
   if (file) sendMessage('', file, txt); else startGenerate(txt);
 }
 /* Shows the too-long error (NFC character limit or word limit) and returns true without clearing the user's draft. */
-function rejectLong(txt, err) {
+function rejectLong(txt, err, opts = {}) {
   const check = validateTurnText(txt, { maxWords: CONFIG.COMPOSER_MAX_WORDS, maxChars: CONFIG.MAX_TURN_TEXT_CHARS });
   if (check.ok) return false;
+  const maxStr = check.limit.toLocaleString('en-US');
   const key = check.reason === 'chars' ? 'script.errLongChars' : 'script.errLong';
-  showErr(err, T(key, { max: check.limit.toLocaleString('en-US') }));
+  showErr(err, T(key, { max: maxStr }));
+  if (opts.asCoachReply) {
+    const replyKey = check.reason === 'chars' ? 'script.regenRefuseTooLongChars' : 'script.regenRefuseTooLongWords';
+    renderCoachNoticeBubble(T(replyKey, { max: maxStr }));
+  }
   return true;
 }
 export function sendChat() {
@@ -1008,14 +1083,16 @@ export function sendChat() {
   const txt = $('#composerInput').value.trim(), err = $('#composerError'), file = S.chatFile;
   if (!txt && !file) return;
   if (rejectLong(txt, err)) return;
+  const talking = S.chatStage === 'gathering' || S.chatStage === 'generated';
+  const keyword = canTriggerGenerateKeyword({ stage: S.chatStage, hasScript: S.chatHasScript, canGenerateNow: S.canGenerateNow, hasFile: !!file, text: txt });
+  if (keyword && rejectBlocked(false)) return;
   clearErr(err);
   const message = { role: 'me', text: txt, topic: $('#composerTopic').value, duration_min: +$('#composerDuration').value || 5, file_name: file ? file.name : null };
   message.bubble = renderUserMessage(message, true);
   recordChatMessage(message);
   $('#composerInput').value = ''; S.chatFile = null; renderChatFile();
   S.composerFolded = false; fitComposer();   // back to one short line
-  const talking = S.chatStage === 'gathering' || S.chatStage === 'generated';
-  if (canTriggerGenerateKeyword({ stage: S.chatStage, hasScript: S.chatHasScript, canGenerateNow: S.canGenerateNow, hasFile: !!file, text: txt })) startGenerate();
+  if (keyword) startGenerate();
   else if (talking) sendMessage(txt, file);
   else sendSuggest(txt, file);   // idle, or picking_topic (asks again, see sendSuggest)
 }
@@ -1035,20 +1112,84 @@ export function onChatAction(e) {
   if (!b) return;
   const a = b.getAttribute('data-a');
   if (a === 'topic') { pickTopic(b); return; }
-  if (a === 'generate') { if (S.chatHasScript !== true) startGenerate(); return; }   // before the _script check: a gathering bubble has none
+  if (a === 'generate') { if (S.chatHasScript !== true && !rejectBlocked(false)) startGenerate(); return; }   // before the _script check: a gathering bubble has none
   const sc = b.closest('.bubble')._script;
   if (!sc) return;
   if (a === 'view') {
     b.focus();   // some browsers do not focus a button on click; openModal stores document.activeElement as the opener to return to
     openReader(sc);
   } else if (a === 'retry') {
-    if (S.chatBusy || !sc.req) return;
+    if (S.chatBusy || !sc.req || rejectBlocked(sc.again === true)) return;
+    const input = $('#composerInput');
+    /* A draft given back by a refused Regenerate leaves the box when it is sent unchanged; edited text or a new File Chip keeps it */
+    if (sc.again === true && sc.req.feedback && !S.chatFile && input.value.trim() === sc.req.feedback) { input.value = ''; fitComposer(); }
     generateScript(sc.req, sc.again === true);   // same mode as the failed turn: a first run stays a first run
   } else runScriptAction(sc, a);   // practice, save, copy, download (shared with the reader menu)
+}
+/* ---------- Rate limit waits of Generate Script and Regenerate (Issue #121) ----------
+   After a 429 the browser holds the refused runs until the wait is over; the server stays the judge. Two slots (Regenerate only,
+   every script run), so a short job_running wait never shortens a long Regenerate one. Memory only: gone on reload. */
+/* The wait holding a run of this mode ({left, reason}), or null. A Regenerate is held by the slot that ends last. */
+function activeBlock(again) {
+  const slots = again ? [S.chatRegenBlock, S.chatAllBlock] : [S.chatAllBlock];
+  const last = slots.filter(Boolean).sort((a, b) => b.until - a.until)[0];
+  const left = last ? secondsLeft(last.until, Date.now()) : 0;
+  return left > 0 ? { left, reason: last.reason } : null;
+}
+function waitText(key, block) {
+  return T(key, { wait: formatRetryWait(block.left) });
+}
+function startBlock(reason, seconds, again) {
+  if (S.chatBlockOwner !== S.user) clearBlocks();
+  const slot = rateLimitScope(reason, again) === 'all' ? 'chatAllBlock' : 'chatRegenBlock';
+  const until = Date.now() + seconds * 1000;
+  if (!S[slot] || until > S[slot].until) S[slot] = { until, reason };
+  S.chatBlockOwner = S.user;
+  if (S.chatBlockTimer === null) S.chatBlockTimer = setInterval(tickBlocks, BLOCK_TICK_MS);
+  paintBlocks();
+}
+function clearBlocks() {
+  clearInterval(S.chatBlockTimer);
+  Object.assign(S, NO_BLOCK);
+}
+/* Time left comes from the timestamps, so a throttled background tab catches up on its next tick. */
+function tickBlocks() {
+  if (S.chatBlockOwner !== S.user) clearBlocks();   // logged out or another account
+  dropBlockError();
+  if (!activeBlock(true)) clearBlocks();   // true looks at both slots
+  paintBlocks();
+}
+/* Every control a wait holds: the Composer's button and hint line, all Generate Buttons and each Try again button. */
+function paintBlocks() {
+  syncComposerAction();
+  syncGenerateButtons();
+  $$('[data-a=retry]', $('#chatFeed')).forEach(b => { b.disabled = !!activeBlock(b.closest('.bubble')._script.again === true); });
+}
+/* True, with the wait shown under the Composer (and as a coach reply bubble on Regenerate refusal), when a run of this mode is held.
+   Callers stop before anything is cleared or sent. */
+function rejectBlocked(again) {
+  const block = activeBlock(again);
+  if (!block) return false;
+  const text = waitText(rateLimitTextKey(block.reason), block);
+  showErr($('#composerError'), text);
+  S.chatBlockError = { text, again };
+  if (again) renderCoachNoticeBubble(rateLimitChatReply(block));
+  return true;
+}
+/* Removes the message of rejectBlocked once its wait is over; any other Composer error stays. */
+function dropBlockError() {
+  const shown = S.chatBlockError;
+  if (!shown || activeBlock(shown.again)) return;
+  const err = $('#composerError');
+  if (err.textContent === shown.text) clearErr(err);
+  S.chatBlockError = null;
 }
 RENDER.scriptStudio = function () {
   fillTopicSelect();
   $('#chatResetBtn').onclick = () => startNewChat();   // property, not addEventListener: running RENDER again never stacks handlers
-  if (S.user && S.user !== S.chatOwner) { S.chatOwner = S.user; startNewChat({ restore: true }); }   // new login (any account): no session carry-over, the stored chat of THIS user comes back
+  if (S.user && S.user !== S.chatOwner) {   // new login (any account): no session carry-over, the stored chat of THIS user comes back
+    if (S.chatBlockOwner !== S.user) clearBlocks();
+    S.chatOwner = S.user; startNewChat({ restore: true });
+  }
   fitComposer();   // the screen is visible now (nav.js activates it before RENDER): match the box height to the text again
 };

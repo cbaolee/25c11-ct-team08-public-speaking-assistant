@@ -11,8 +11,11 @@ import numpy as np
 import pytest
 
 from src.text_processing.contracts import DocumentChunk
+from src.text_processing.parser import parse_input_to_chunks
 from src.text_processing.retrieval import (
+    NLIVerifier,
     SemanticRetriever,
+    _is_verbatim_inline_fact,
     align_script_citations,
     verify_paragraph_citation,
 )
@@ -57,9 +60,13 @@ def mock_sentence_transformers(monkeypatch: pytest.MonkeyPatch) -> MockSentenceT
 
     SemanticRetriever._shared_model = None
     SemanticRetriever._load_attempted = False
+    NLIVerifier._shared_model = None
+    NLIVerifier._load_attempted = False
     yield mock_instance
     SemanticRetriever._shared_model = None
     SemanticRetriever._load_attempted = False
+    NLIVerifier._shared_model = None
+    NLIVerifier._load_attempted = False
 
 
 @pytest.fixture()
@@ -360,3 +367,261 @@ class TestVerifyParagraphCitation:
         assert citations[1].heading == "Chat note #2 · Historically found across"
         assert citations[1].page is None
         assert citations[2].status == "uncited"
+
+
+class _FakeBinaryNLIModel:
+    """2-class NLI mock mimicking MoritzLaurer/DeBERTa-v3-xsmall-mnli-fever-anli-ling-binary."""
+
+    def __init__(self, scorer) -> None:
+        self._scorer = scorer
+        self.config = types.SimpleNamespace(id2label={0: "entailment", 1: "not_entailment"})
+
+    def predict(self, pairs: list[tuple[str, str]], **_: object) -> np.ndarray:
+        rows = []
+        for premise, hypothesis in pairs:
+            p_ent = float(self._scorer(premise, hypothesis))
+            # Convert probability into logits [log(p), log(1-p)]
+            p_clamped = min(max(p_ent, 1e-4), 1.0 - 1e-4)
+            rows.append([np.log(p_clamped), np.log(1.0 - p_clamped)])
+        return np.array(rows, dtype=np.float32)
+
+
+class _FakeThreeClassNLIModel:
+    """3-class NLI mock mimicking cross-encoder/nli-deberta-v3-xsmall."""
+
+    def __init__(self, scorer) -> None:
+        self._scorer = scorer
+        self.config = types.SimpleNamespace(
+            id2label={0: "contradiction", 1: "entailment", 2: "neutral"}
+        )
+
+    def predict(self, pairs: list[tuple[str, str]], **_: object) -> np.ndarray:
+        return np.array([self._scorer(p, h) for p, h in pairs], dtype=np.float32)
+
+
+class TestNLICitationAndMultiHop:
+    """Tests for sentence-level NLI, paraphrase acceptance, contradiction guard, and multi-hop."""
+
+    def test_nli_accepts_paraphrase_without_lexical_overlap_and_rejects_contradiction(
+        self, sample_chunks: list[DocumentChunk], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _scorer(premise: str, hypothesis: str) -> float:
+            if "vanishing rapidly across equatorial" in hypothesis and "amphibian" in premise:
+                return 0.92  # Paraphrase entailed
+            if "booming rapidly" in hypothesis or "increased by 80%" in hypothesis:
+                return 0.03  # Contradiction / fabricated stat rejected
+            return 0.05
+
+        fake_nli = NLIVerifier("mock-binary")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        # Paraphrase with near-zero lexical overlap passes via NLI semantic inference
+        paraphrased = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks,
+            paragraph_text=(
+                "Let us look closely at the ecological crisis. "
+                "Frogs and toads are vanishing rapidly across equatorial rainforests."
+            ),
+            nli_verifier=fake_nli,
+        )
+        assert paraphrased.status == "cited"
+        assert paraphrased.chunk_id == 2
+        assert paraphrased.page == 3
+        assert paraphrased.sources == [{"chunk_id": 2, "heading": "Results", "page": 3}]
+
+        # Contradiction sharing exact lexical words is rejected by NLI
+        contradicted = verify_paragraph_citation(
+            paragraph_index=2,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks,
+            paragraph_text="Amphibian populations across tropical regions increased by 80%.",
+            nli_verifier=fake_nli,
+        )
+        assert contradicted.status == "uncited"
+        assert contradicted.sources == []
+
+    def test_three_class_nli_blocks_high_contradiction_even_if_another_sentence_entails(
+        self, sample_chunks: list[DocumentChunk], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _scorer(_premise: str, hypothesis: str) -> list[float]:
+            if "declined" in hypothesis:
+                return [0.02, 0.88, 0.10]  # [contradiction, entailment, neutral]
+            return [0.85, 0.05, 0.10]  # Strong contradiction in 2nd sentence
+
+        fake_nli = NLIVerifier("mock-3class")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeThreeClassNLIModel(_scorer)),
+        )
+
+        mixed_contradiction = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[2],
+            retrieved_chunks=sample_chunks,
+            paragraph_text=(
+                "Amphibian populations declined in tropical areas. "
+                "However, the exact same survey proved amphibian populations doubled there."
+            ),
+            nli_verifier=fake_nli,
+        )
+        assert mixed_contradiction.status == "uncited"
+
+    def test_clause_splitting_records_multiple_sources_in_one_paragraph(
+        self, sample_chunks: list[DocumentChunk], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _scorer(premise: str, hypothesis: str) -> float:
+            low_h = hypothesis.lower()
+            # Whole compound sentence isn't entailed by either single chunk alone
+            if "while" in low_h:
+                return 0.30
+            if "amphibian populations" in low_h and "Results:" in premise:
+                return 0.91
+            if "urgent conservation policy" in low_h and "Conclusion:" in premise:
+                return 0.89
+            return 0.05
+
+        fake_nli = NLIVerifier("mock-clause")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[2, 4],
+            retrieved_chunks=sample_chunks,
+            paragraph_text=(
+                "Amphibian populations suffered severe declines in tropical zones, "
+                "while urgent conservation policy reforms are required to reverse the trend."
+            ),
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "cited"
+        assert citation.chunk_id == 2
+        assert len(citation.sources) == 2
+        assert {s["page"] for s in citation.sources} == {3, 5}
+
+    def test_combined_top2_premise_resolves_true_multihop_synthesis(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Expedition Log",
+                page=1,
+                content=(
+                    "The Vu Quang biological survey team collected rare bovid "
+                    "specimens in May 1992."
+                ),
+            ),
+            DocumentChunk(
+                chunk_id=2,
+                heading="Genetic Analysis",
+                page=4,
+                content=(
+                    "DNA sequencing of the collected Vu Quang bovid specimens "
+                    "confirmed a new genus, Pseudoryx."
+                ),
+            ),
+        ]
+
+        def _scorer(premise: str, _hypothesis: str) -> float:
+            # Only entails when BOTH chunks are combined in the premise
+            if "Expedition Log:" in premise and "Genetic Analysis:" in premise:
+                return 0.88
+            return 0.32
+
+        fake_nli = NLIVerifier("mock-multihop")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1, 2],
+            retrieved_chunks=chunks,
+            paragraph_text=(
+                "Specimens gathered during the May 1992 Vu Quang survey were genetically "
+                "confirmed as an entirely new bovid genus called Pseudoryx."
+            ),
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "cited"
+        assert len(citation.sources) == 2
+        assert [s["page"] for s in citation.sources] == [1, 4]
+
+    def test_parser_subchunking_and_inline_fact_proximity(self) -> None:
+        long_section = "# Field Results\n" + " ".join(
+            [
+                f"Sentence {i} documents important camera trap wildlife observations in the valley."
+                for i in range(40)
+            ]
+        )
+        sub_chunks = parse_input_to_chunks(
+            raw_text=long_section, max_chunk_words=180, chunk_overlap_words=30
+        )
+        assert len(sub_chunks) >= 3
+        assert all(c.heading == "Field Results" and c.page == 1 for c in sub_chunks)
+        assert all(len(c.content.split()) <= 180 for c in sub_chunks)
+
+        # Contiguous inline fact passes; scattered words or long repetition fails
+        chunk_str = (
+            "Results: Severe decline observed in amphibian populations "
+            "across tropical regions in 2019."
+        )
+        assert _is_verbatim_inline_fact("tropical regions", chunk_str) is True
+        assert _is_verbatim_inline_fact("2019", chunk_str) is True
+        assert _is_verbatim_inline_fact("severe regions", chunk_str) is False
+        assert _is_verbatim_inline_fact(" ".join(["tropical"] * 30), chunk_str) is False
+
+    def test_binary_nli_clause_split_blocks_half_fabricated_numeric_clause(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Cinema Acoustics",
+                page=2,
+                content=(
+                    "Dolby Atmos debuted in 2012 with Pixar's Brave and supports "
+                    "up to 128 discrete audio objects."
+                ),
+            )
+        ]
+
+        def _scorer(_premise: str, hypothesis: str) -> float:
+            # Whole sentence fails because of fabricated 10,000; first clause alone entails
+            if "10,000" in hypothesis:
+                return 0.01
+            if "debuted in 2012" in hypothesis:
+                return 0.94
+            return 0.02
+
+        fake_nli = NLIVerifier("mock-half-contra")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1],
+            retrieved_chunks=chunks,
+            paragraph_text=(
+                "Dolby Atmos debuted in 2012 with Pixar's Brave "
+                "and supports 10,000 discrete audio objects."
+            ),
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "uncited"

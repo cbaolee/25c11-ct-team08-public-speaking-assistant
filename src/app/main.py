@@ -82,6 +82,12 @@ from src.app.deps import (
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
+from src.app.script_limits import (
+    check_generate_limits,
+    job_running_block,
+    rate_limited_response,
+    validate_generate_input,
+)
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
@@ -780,10 +786,11 @@ async def list_topics_endpoint(category: str | None = None) -> dict[str, Any]:
     return {"topics": topics, "categories": CATEGORY_SLUG_MAP}
 
 
-@app.post("/api/generate-script", status_code=202)
+@app.post("/api/generate-script", status_code=202, response_model=None)
 async def generate_script_endpoint(
     user: Annotated[CurrentUser, Depends(get_current_user)],
     background_tasks: BackgroundTasks,
+    repos: Annotated[Repos, Depends(get_repos)],
     topic: Annotated[str, Form()] = "",
     category: Annotated[str, Form()] = "",
     duration_min: Annotated[int, Form()] = 5,
@@ -792,8 +799,11 @@ async def generate_script_endpoint(
     pdf: Annotated[UploadFile | None, File()] = None,
     session_id: Annotated[str, Form()] = "",
     user_feedback: Annotated[str, Form()] = "",
-) -> dict[str, Any]:
-    """Queue a background script generation job and return `202 {job_id, status}` (Brief §5.5)."""
+) -> dict[str, Any] | JSONResponse:
+    """Queue a background script generation job and return `202 {job_id, status}` (Brief §5.5).
+
+    Invalid input answers 422; a running job or a full limit answers 429 (ADR-015).
+    """
     pipeline = get_script_pipeline()
     user_id = str(user.id)
 
@@ -802,6 +812,36 @@ async def generate_script_endpoint(
     _validate_turn_text(raw_text)
 
     pdf_path: str | None = None
+    clean_topic = topic.strip()
+    clean_session_id = session_id.strip() or None
+    clean_feedback = user_feedback.strip() or None
+
+    store = getattr(pipeline, "session_store", chat_session_store)
+    if clean_session_id:
+        sess = store.get(clean_session_id, user_id=user_id)
+        if sess:
+            if not clean_topic:
+                clean_topic = getattr(sess, "topic", None) or sess.initial_prompt or ""
+            if not category and sess.category:
+                category = sess.category
+            if duration_min == 5 and sess.duration_min:
+                duration_min = sess.duration_min
+
+    # Order matters (ADR-015): bad input and a busy user are refused before anything is counted,
+    # and the limits are counted before an upload is written to disk.
+    validate_generate_input(clean_topic, duration_min, clean_feedback)
+    if pipeline.has_active_job(user_id):
+        return rate_limited_response(job_running_block())
+    block = await run_in_threadpool(
+        check_generate_limits,
+        repos.rate_limits,
+        user_id,
+        is_regenerate=clean_feedback is not None,
+        duration_min=duration_min,
+    )
+    if block is not None:
+        return rate_limited_response(block)
+
     if pdf is not None and pdf.filename:
         # Fixed ".pdf" suffix; enforce the 25 MB PDF ceiling (not the 100 MB audio ceiling).
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
@@ -825,21 +865,6 @@ async def generate_script_endpoint(
             Path(pdf_path).unlink(missing_ok=True)
             raise
 
-    clean_topic = topic.strip()
-    clean_session_id = session_id.strip() or None
-    clean_feedback = user_feedback.strip() or None
-
-    store = getattr(pipeline, "session_store", chat_session_store)
-    if clean_session_id:
-        sess = store.get(clean_session_id, user_id=user_id)
-        if sess:
-            if not clean_topic:
-                clean_topic = getattr(sess, "topic", None) or sess.initial_prompt or ""
-            if not category and sess.category:
-                category = sess.category
-            if duration_min == 5 and sess.duration_min:
-                duration_min = sess.duration_min
-
     req = ScriptGenerationRequest(
         topic=clean_topic,
         category=category or None,
@@ -851,6 +876,12 @@ async def generate_script_endpoint(
         session_id=clean_session_id,
         user_feedback=clean_feedback,
     )
+    # Checked again: another request of this user may have created a job during the awaits above.
+    # Nothing is awaited between this check and create_job, so two requests cannot both pass.
+    if pipeline.has_active_job(user_id):
+        if pdf_path:
+            Path(pdf_path).unlink(missing_ok=True)
+        return rate_limited_response(job_running_block())
     job = pipeline.create_job(user_id=user_id, duration_min=duration_min)
     background_tasks.add_task(pipeline.run_job, job.job_id, req, True)
     return {

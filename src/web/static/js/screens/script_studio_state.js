@@ -26,6 +26,79 @@ export function pickScriptTitle(result, fallback, maxChars) {
   return title;
 }
 
+/* Retry-After as plain seconds; its other form (an HTTP date) is not read. */
+const DELAY_SECONDS = /^\d+(\.\d+)?$/;
+/* `reason` of a 429 from POST /api/generate-script: which runs it holds and the message that names it. */
+const RATE_REASONS = {
+  cooldown: { scope: 'regenerate', textKey: 'script.errRateCooldown' },
+  regenerate_quota: { scope: 'regenerate', textKey: 'script.errRateRegen' },
+  generate_quota: { scope: 'all', textKey: 'script.errRateGenerate' },
+  job_running: { scope: 'all', textKey: 'script.errRateBusy' },
+};
+/* A positive wait rounded up to whole seconds; anything else is 0. */
+const wholeSeconds = value => (Number.isFinite(value) && value > 0 ? Math.ceil(value) : 0);
+
+/* Seconds a 429 asks to wait: `body.retry_after_s`, else the Retry-After header; 0 when neither is usable. */
+export function parseRetryAfterS(body, headerValue) {
+  const fromBody = wholeSeconds(body && body.retry_after_s);
+  if (fromBody) return fromBody;
+  const header = typeof headerValue === 'string' ? headerValue.trim() : '';
+  return DELAY_SECONDS.test(header) ? wholeSeconds(Number(header)) : 0;
+}
+
+/* "5s", "1m", "1m 30s"; '' when there is nothing to wait for. */
+export function formatRetryWait(seconds) {
+  const total = wholeSeconds(seconds), m = Math.floor(total / 60), s = total % 60;
+  return [m ? m + 'm' : '', s ? s + 's' : ''].filter(Boolean).join(' ');
+}
+
+/* Whole seconds from `nowMs` until `untilMs`, never negative. */
+export function secondsLeft(untilMs, nowMs) {
+  return wholeSeconds((untilMs - nowMs) / 1000);
+}
+
+/* 'regenerate' or 'all' runs. Without a known reason, only the kind of run that was refused is held. */
+export function rateLimitScope(reason, again) {
+  if (Object.hasOwn(RATE_REASONS, reason)) return RATE_REASONS[reason].scope;
+  return again ? 'regenerate' : 'all';
+}
+
+export function rateLimitTextKey(reason) {
+  return Object.hasOwn(RATE_REASONS, reason) ? RATE_REASONS[reason].textKey : 'script.errRateWait';
+}
+
+/* Validate Regenerate input before sending a request: requires either an attached file or a message
+   with visible letters/digits (prevents blank or punctuation-only Regenerate spam). */
+export function classifyRegenerateInput(input) {
+  const { text, hasFile } = input || {};
+  if (hasFile) return { ok: true, reason: null };
+  const trimmed = typeof text === 'string' ? text.normalize('NFC').trim() : '';
+  if (!trimmed) return { ok: false, reason: 'empty' };
+  if (!/[\p{L}\p{N}]/u.test(trimmed)) return { ok: false, reason: 'no_request' };
+  return { ok: true, reason: null };
+}
+
+/* Pick one varied cooldown refusal template, avoiding an immediate repeat of `lastIndex` when
+   multiple templates are available, and interpolate `{wait}`. */
+export function pickCooldownReply(templates, waitText, lastIndex = -1, randFn = Math.random) {
+  const list = Array.isArray(templates) ? templates.filter(t => typeof t === 'string' && t.trim()) : [];
+  const wait = typeof waitText === 'string' ? waitText : '';
+  if (!list.length) return { text: '', index: -1 };
+  let idx = 0;
+  if (list.length > 1) {
+    const raw = typeof randFn === 'function' ? Number(randFn()) : 0;
+    const clamped = Number.isFinite(raw) ? Math.min(0.999999999, Math.max(0, raw)) : 0;
+    const prev = Number.isInteger(lastIndex) && lastIndex >= 0 && lastIndex < list.length ? lastIndex : -1;
+    if (prev >= 0) {
+      idx = Math.floor(clamped * (list.length - 1));
+      if (idx >= prev) idx += 1;
+    } else {
+      idx = Math.floor(clamped * list.length);
+    }
+  }
+  return { text: list[idx].replace(/\{wait\}/g, wait), index: idx };
+}
+
 /* Feedback sent with a Regenerate. Typed text is returned as typed (trimmed, never cut: the length limit is the caller's job).
    A blank one becomes a fixed request for a new version; `attempt` (1 for the first Regenerate of a chat session) is added from
    the second one on, because the backend caches by the feedback text and would otherwise hand back the old script.
@@ -39,10 +112,12 @@ export function regenerateFeedback(text, attempt) {
 
 /* What the Composer's action button (#composerSend) is for. Once the chat session has a script (`hasScript` exactly true) it
    is the Regenerate button and the Composer text is the feedback; before that it is Send. `busy` (any truthy value) disables it
-   and never changes the mode. A missing or broken `input` counts as "Send, enabled". */
+   and never changes the mode. `cooldownLeftS` above 0 disables Regenerate only, never Send.
+   A missing or broken `input` counts as "Send, enabled". */
 export function composerActionState(input) {
-  const { busy, hasScript } = input || {};
-  return { mode: hasScript === true ? 'regenerate' : 'send', disabled: !!busy };
+  const { busy, hasScript, cooldownLeftS } = input || {};
+  const cooling = hasScript === true && Number.isFinite(cooldownLeftS) && cooldownLeftS > 0;
+  return { mode: hasScript === true ? 'regenerate' : 'send', disabled: !!busy || cooling };
 }
 
 const DEFAULT_MAX_TURN_WORDS = 2000;

@@ -8,6 +8,7 @@ project (skipped by default; run with `uv run pytest -m integration` after runni
 import hashlib
 import secrets
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
 import pytest
@@ -62,6 +63,32 @@ def test_memory_reset_empties_every_counter():
     assert repo.hit("reset_send", KEY, 1, 60) is True
 
 
+@pytest.mark.parametrize(("at_s", "left_s"), [(0, 600), (75, 525), (599.5, 1), (600, 1)])
+def test_memory_retry_after_counts_down_to_the_window_end(at_s, left_s):
+    now = [0.0]
+    repo = _memory(now)
+    repo.hit("reset_send", KEY, 1, 600)
+    now[0] = at_s
+    assert repo.retry_after_s("reset_send", KEY, 600) == left_s
+
+
+def test_memory_retry_after_of_an_unknown_key_is_the_window_and_writes_nothing():
+    state = MemoryState()
+    repo = MemoryRateLimitRepo(state, clock=lambda: 0.0)
+    assert repo.retry_after_s("reset_send", KEY, 600) == 600
+    assert state.rate_limits == {}
+
+
+def test_memory_refused_hit_does_not_change_the_wait():
+    now = [0.0]
+    repo = _memory(now)
+    repo.hit("reset_send", KEY, 1, 600)
+    now[0] = 75
+    assert repo.hit("reset_send", KEY, 1, 600) is False
+    assert repo.retry_after_s("reset_send", KEY, 600) == 525
+    assert repo.retry_after_s("reset_send", KEY, 600) == 525  # reading counts nothing
+
+
 # ---------- Supabase repository, fake client ----------
 
 
@@ -81,6 +108,69 @@ def test_supabase_hit_without_an_answer_raises(data):
     client.rpc.return_value.execute.return_value.data = data
     with pytest.raises(StorageError):
         SupabaseRateLimitRepo(client).hit("reauth", KEY, 5, 600)
+
+
+NOW = datetime(2026, 11, 26, 10, 0, 0, tzinfo=UTC)
+
+
+def _window_query(client: MagicMock) -> MagicMock:
+    """The last step of select(...).eq(...).eq(...).limit(...) on the fake client."""
+    select = client.table.return_value.select.return_value
+    return select.eq.return_value.eq.return_value.limit.return_value
+
+
+def _retry_after(rows: list) -> int:
+    client = MagicMock()
+    _window_query(client).execute.return_value.data = rows
+    return SupabaseRateLimitRepo(client, now=lambda: NOW).retry_after_s("reauth", KEY, 600)
+
+
+@pytest.mark.parametrize(
+    "window_start",
+    ["2026-11-26T09:58:45Z", "2026-11-26T09:58:45+00:00", "2026-11-26T09:58:45"],
+)
+def test_supabase_retry_after_adds_one_second_margin(window_start):
+    assert _retry_after([{"window_start": window_start}]) == 526  # ceil(600 - 75) + 1
+
+
+@pytest.mark.parametrize(
+    "rows",
+    [[], [{}], [{"window_start": None}], [{"window_start": "yesterday"}]],
+)
+def test_supabase_retry_after_without_a_readable_start_is_the_window(rows):
+    assert _retry_after(rows) == 600
+
+
+@pytest.mark.parametrize(
+    ("window_start", "left_s"),
+    [
+        ("2026-11-26T10:05:00+00:00", 600),  # in the future: capped at the window
+        ("2026-11-26T09:50:00+00:00", 1),  # just ended
+        ("2026-11-25T10:00:00+00:00", 1),  # long ended: never below 1
+    ],
+)
+def test_supabase_retry_after_stays_inside_the_window(window_start, left_s):
+    assert _retry_after([{"window_start": window_start}]) == left_s
+
+
+def test_supabase_retry_after_reads_only_the_row_of_the_bucket_and_key():
+    client = MagicMock()
+    _window_query(client).execute.return_value.data = []
+    SupabaseRateLimitRepo(client).retry_after_s("reauth", KEY, 600)
+    client.table.assert_called_once_with("auth_rate_limits")
+    select = client.table.return_value.select
+    select.assert_called_once_with("window_start")
+    select.return_value.eq.assert_called_once_with("bucket", "reauth")
+    select.return_value.eq.return_value.eq.assert_called_once_with("key", KEY)
+    select.return_value.eq.return_value.eq.return_value.limit.assert_called_once_with(1)
+    client.rpc.assert_not_called()
+
+
+def test_supabase_retry_after_database_error_raises():
+    client = MagicMock()
+    _window_query(client).execute.side_effect = RuntimeError("down")
+    with pytest.raises(StorageError):
+        SupabaseRateLimitRepo(client).retry_after_s("reauth", KEY, 600)
 
 
 # ---------- routes: the counter is down ----------
