@@ -5,7 +5,7 @@ filters by the owner itself (`id` for profiles, `user_id` for other tables).
 All functions are sync; async endpoints call them via run_in_threadpool.
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -19,11 +19,17 @@ from src.app.db.models import (
     BaselineRow,
     ConflictError,
     NewBaseline,
+    NewScheduleEvent,
     NewScript,
     NewSession,
     ProfilePatch,
     ProfileRow,
     ProfileUpsert,
+    ReminderStatus,
+    ScheduleCheckinRow,
+    ScheduleEventPatch,
+    ScheduleEventRow,
+    ScheduleReminderRow,
     ScorePoint,
     ScriptDuplicateBodyError,
     ScriptDuplicateTitleError,
@@ -425,6 +431,206 @@ class SupabaseRateLimitRepo:
         if not isinstance(data, bool):
             raise StorageError("hit_rate_limit returned no answer")
         return data
+
+
+SCHEDULE_PAGE = 1000  # PostgREST returns at most this many rows per call by default
+SCHEDULE_REMINDER_COLUMNS = (
+    "event_id,occ_day,status,attempted_at,sent_at,schedule_events!inner(user_id)"
+)
+
+
+class SupabaseScheduleRepo:
+    """Schedule tables on the core project (db/migration_main/0012_schedule.sql)."""
+
+    def __init__(self, client: Client) -> None:
+        self._client = client
+
+    def _events(self):
+        return self._client.table("schedule_events")
+
+    def _checkins(self):
+        return self._client.table("schedule_checkins")
+
+    def _reminders(self):
+        return self._client.table("schedule_reminders")
+
+    @staticmethod
+    def _event_json(data: NewScheduleEvent) -> dict[str, Any]:
+        values = data.model_dump(mode="json")
+        if values["schedule_set_at"] is None:
+            del values["schedule_set_at"]  # let the column default now() fill it
+        return values
+
+    def list_events(self, user_id: UUID, start_date_to: date) -> list[ScheduleEventRow]:
+        query = (
+            self._events()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .lte("start_date", start_date_to.isoformat())
+        )
+        return [ScheduleEventRow.model_validate(r) for r in _execute(query).data]
+
+    def get_event(self, user_id: UUID, event_id: UUID) -> ScheduleEventRow | None:
+        query = self._events().select("*").eq("user_id", str(user_id)).eq("id", str(event_id))
+        row = _first(_execute(query.limit(1)).data)
+        return ScheduleEventRow.model_validate(row) if row else None
+
+    def count_events(self, user_id: UUID) -> int:
+        query = self._events().select("id", count="exact").eq("user_id", str(user_id)).limit(1)
+        return _execute(query).count or 0
+
+    def create_event(self, user_id: UUID, data: NewScheduleEvent) -> ScheduleEventRow:
+        values = self._event_json(data) | {"user_id": str(user_id)}
+        row = _first(_execute(self._events().insert(values)).data)
+        if row is None:
+            raise StorageError("Insert returned no event")
+        return ScheduleEventRow.model_validate(row)
+
+    def update_event(
+        self, user_id: UUID, event_id: UUID, patch: ScheduleEventPatch
+    ) -> ScheduleEventRow | None:
+        values = patch.model_dump(mode="json", exclude_unset=True)
+        values["updated_at"] = datetime.now(UTC).isoformat()
+        query = self._events().update(values).eq("user_id", str(user_id)).eq("id", str(event_id))
+        row = _first(_execute(query).data)
+        return ScheduleEventRow.model_validate(row) if row else None
+
+    def delete_event(self, user_id: UUID, event_id: UUID) -> bool:
+        query = self._events().delete().eq("user_id", str(user_id)).eq("id", str(event_id))
+        return bool(_execute(query).data)
+
+    def split_event(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        end_until: date,
+        new_event: NewScheduleEvent | None,
+    ) -> list[ScheduleEventRow]:
+        params = {
+            "p_user_id": str(user_id),
+            "p_event_id": str(event_id),
+            "p_end_until": end_until.isoformat(),
+            "p_new_event": self._event_json(new_event) if new_event else None,
+        }
+        rows = _execute(self._client.rpc("split_schedule_event", params)).data or []
+        return [ScheduleEventRow.model_validate(r) for r in rows]
+
+    def list_checkins(
+        self, user_id: UUID, from_day: date, to_day: date
+    ) -> list[ScheduleCheckinRow]:
+        query = (
+            self._checkins()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .gte("occ_day", from_day.isoformat())
+            .lte("occ_day", to_day.isoformat())
+        )
+        return [ScheduleCheckinRow.model_validate(r) for r in _execute(query).data]
+
+    def get_checkin(
+        self, user_id: UUID, event_id: UUID, occ_day: date
+    ) -> ScheduleCheckinRow | None:
+        query = (
+            self._checkins()
+            .select("*")
+            .eq("user_id", str(user_id))
+            .eq("event_id", str(event_id))
+            .eq("occ_day", occ_day.isoformat())
+        )
+        row = _first(_execute(query.limit(1)).data)
+        return ScheduleCheckinRow.model_validate(row) if row else None
+
+    def upsert_checkin(
+        self, user_id: UUID, event_id: UUID, occ_day: date, checkin_at: datetime
+    ) -> ScheduleCheckinRow:
+        values = {
+            "event_id": str(event_id),
+            "occ_day": occ_day.isoformat(),
+            "user_id": str(user_id),
+            "checkin_at": checkin_at.isoformat(),
+        }
+        # on conflict do nothing: a second check-in keeps the first checkin_at
+        _execute(
+            self._checkins().upsert(values, on_conflict="event_id,occ_day", ignore_duplicates=True)
+        )
+        row = self.get_checkin(user_id, event_id, occ_day)
+        if row is None:
+            raise StorageError("Check-in was not stored")
+        return row
+
+    def mark_done(
+        self, user_id: UUID, event_id: UUID, occ_day: date, session_id: UUID, done_at: datetime
+    ) -> ScheduleCheckinRow | None:
+        query = (
+            self._checkins()
+            .update({"done_at": done_at.isoformat(), "session_id": str(session_id)})
+            .eq("user_id", str(user_id))
+            .eq("event_id", str(event_id))
+            .eq("occ_day", occ_day.isoformat())
+            .is_("done_at", "null")  # done once: a second call changes nothing
+        )
+        row = _first(_execute(query).data)
+        if row:
+            return ScheduleCheckinRow.model_validate(row)
+        return self.get_checkin(user_id, event_id, occ_day)
+
+    def list_reminders(
+        self, user_id: UUID, from_day: date, to_day: date
+    ) -> list[ScheduleReminderRow]:
+        # schedule_reminders has no user_id: filter through the event it belongs to
+        query = (
+            self._reminders()
+            .select(SCHEDULE_REMINDER_COLUMNS)
+            .eq("schedule_events.user_id", str(user_id))
+            .gte("occ_day", from_day.isoformat())
+            .lte("occ_day", to_day.isoformat())
+        )
+        return [ScheduleReminderRow.model_validate(r) for r in _execute(query).data]
+
+    def list_reminder_candidates(self, until_day: date) -> list[ScheduleEventRow]:
+        rows: list[dict] = []
+        while True:
+            query = (
+                self._events()
+                .select("*")
+                .lte("start_date", until_day.isoformat())
+                .order("id")
+                .range(len(rows), len(rows) + SCHEDULE_PAGE - 1)
+            )
+            page = _execute(query).data
+            rows.extend(page)
+            if len(page) < SCHEDULE_PAGE:
+                return [ScheduleEventRow.model_validate(r) for r in rows]
+
+    def claim_reminder(
+        self, event_id: UUID, occ_day: date, status: ReminderStatus, attempted_at: datetime
+    ) -> bool:
+        values = {
+            "event_id": str(event_id),
+            "occ_day": occ_day.isoformat(),
+            "status": status,
+            "attempted_at": attempted_at.isoformat(),
+        }
+        # on conflict do nothing returns no row when another run already claimed the session
+        query = self._reminders().upsert(
+            values, on_conflict="event_id,occ_day", ignore_duplicates=True
+        )
+        return bool(_execute(query).data)
+
+    def set_reminder_status(
+        self, event_id: UUID, occ_day: date, status: ReminderStatus, sent_at: datetime | None
+    ) -> None:
+        values = {"status": status, "sent_at": sent_at.isoformat() if sent_at else None}
+        query = (
+            self._reminders()
+            .update(values)
+            .eq("event_id", str(event_id))
+            .eq("occ_day", occ_day.isoformat())
+        )
+        _execute(query)
+
+    def delete_user_schedule(self, user_id: UUID) -> int:
+        return len(_execute(self._events().delete().eq("user_id", str(user_id))).data)
 
 
 class SupabaseAccountRepo:
