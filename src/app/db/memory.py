@@ -1,7 +1,7 @@
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from threading import RLock
 from typing import Any
 from urllib.parse import quote
@@ -12,11 +12,17 @@ from src.app.db.models import (
     BaselineRow,
     ConflictError,
     NewBaseline,
+    NewScheduleEvent,
     NewScript,
     NewSession,
     ProfilePatch,
     ProfileRow,
     ProfileUpsert,
+    ReminderStatus,
+    ScheduleCheckinRow,
+    ScheduleEventPatch,
+    ScheduleEventRow,
+    ScheduleReminderRow,
     ScorePoint,
     ScriptDuplicateBodyError,
     ScriptDuplicateTitleError,
@@ -47,6 +53,11 @@ class MemoryState:
     # (bucket, key) -> (window start, hits), like public.auth_rate_limits
     rate_limits: dict[tuple[str, str], tuple[float, int]] = field(default_factory=dict)
     rate_limits_lock: RLock = field(default_factory=RLock)
+    # Schedule (0012): one lock for the three dicts, so cascade, claim and split stay whole
+    schedule_events: dict[UUID, ScheduleEventRow] = field(default_factory=dict)
+    schedule_checkins: dict[tuple[UUID, date], ScheduleCheckinRow] = field(default_factory=dict)
+    schedule_reminders: dict[tuple[UUID, date], ScheduleReminderRow] = field(default_factory=dict)
+    schedule_lock: RLock = field(default_factory=RLock)
 
 
 def _now() -> datetime:
@@ -418,6 +429,164 @@ class MemoryRateLimitRepo:
     def reset(self) -> None:
         with self._state.rate_limits_lock:
             self._state.rate_limits.clear()
+
+
+class MemoryScheduleRepo:
+    """Schedule tables of 0012 kept in RAM. Every write holds schedule_lock, like one SQL
+    statement or transaction, so two calls at the same moment cannot both win a claim."""
+
+    def __init__(self, state: MemoryState) -> None:
+        self._state = state
+
+    def _owned(self, user_id: UUID, event_id: UUID) -> ScheduleEventRow | None:
+        row = self._state.schedule_events.get(event_id)
+        return row if row is not None and row.user_id == user_id else None
+
+    def _new_row(self, user_id: UUID, data: NewScheduleEvent) -> ScheduleEventRow:
+        now = _now()
+        values = data.model_dump() | {"schedule_set_at": data.schedule_set_at or now}
+        row = ScheduleEventRow(
+            **values, id=uuid4(), user_id=user_id, created_at=now, updated_at=now
+        )
+        self._state.schedule_events[row.id] = row
+        return row
+
+    def _drop_event(self, event_id: UUID) -> None:
+        del self._state.schedule_events[event_id]
+        for table in (self._state.schedule_checkins, self._state.schedule_reminders):
+            for key in [k for k in table if k[0] == event_id]:
+                del table[key]
+
+    def list_events(self, user_id: UUID, start_date_to: date) -> list[ScheduleEventRow]:
+        with self._state.schedule_lock:
+            rows = list(self._state.schedule_events.values())
+        return [r for r in rows if r.user_id == user_id and r.start_date <= start_date_to]
+
+    def get_event(self, user_id: UUID, event_id: UUID) -> ScheduleEventRow | None:
+        return self._owned(user_id, event_id)
+
+    def count_events(self, user_id: UUID) -> int:
+        with self._state.schedule_lock:
+            return sum(r.user_id == user_id for r in self._state.schedule_events.values())
+
+    def create_event(self, user_id: UUID, data: NewScheduleEvent) -> ScheduleEventRow:
+        with self._state.schedule_lock:
+            return self._new_row(user_id, data)
+
+    def update_event(
+        self, user_id: UUID, event_id: UUID, patch: ScheduleEventPatch
+    ) -> ScheduleEventRow | None:
+        with self._state.schedule_lock:
+            row = self._owned(user_id, event_id)
+            if row is None:
+                return None
+            values = row.model_dump() | patch.model_dump(exclude_unset=True)
+            updated = ScheduleEventRow.model_validate(values | {"updated_at": _now()})
+            self._state.schedule_events[event_id] = updated
+            return updated
+
+    def delete_event(self, user_id: UUID, event_id: UUID) -> bool:
+        with self._state.schedule_lock:
+            if self._owned(user_id, event_id) is None:
+                return False
+            self._drop_event(event_id)
+            return True
+
+    def split_event(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        end_until: date,
+        new_event: NewScheduleEvent | None,
+    ) -> list[ScheduleEventRow]:
+        with self._state.schedule_lock:
+            row = self._owned(user_id, event_id)
+            if row is None:
+                return []
+            cut = {"end_kind": "until", "end_until": end_until, "end_count": None}
+            old = ScheduleEventRow.model_validate(row.model_dump() | cut | {"updated_at": _now()})
+            self._state.schedule_events[event_id] = old
+            return [old] if new_event is None else [old, self._new_row(user_id, new_event)]
+
+    def list_checkins(
+        self, user_id: UUID, from_day: date, to_day: date
+    ) -> list[ScheduleCheckinRow]:
+        with self._state.schedule_lock:
+            rows = list(self._state.schedule_checkins.values())
+        return [r for r in rows if r.user_id == user_id and from_day <= r.occ_day <= to_day]
+
+    def get_checkin(
+        self, user_id: UUID, event_id: UUID, occ_day: date
+    ) -> ScheduleCheckinRow | None:
+        row = self._state.schedule_checkins.get((event_id, occ_day))
+        return row if row is not None and row.user_id == user_id else None
+
+    def upsert_checkin(
+        self, user_id: UUID, event_id: UUID, occ_day: date, checkin_at: datetime
+    ) -> ScheduleCheckinRow:
+        with self._state.schedule_lock:
+            if self._owned(user_id, event_id) is None:
+                raise StorageError("Event not found")  # like the foreign key in 0012
+            row = ScheduleCheckinRow(
+                event_id=event_id, occ_day=occ_day, user_id=user_id, checkin_at=checkin_at
+            )
+            # setdefault keeps the first check-in time: the window counts from it
+            return self._state.schedule_checkins.setdefault((event_id, occ_day), row)
+
+    def mark_done(
+        self, user_id: UUID, event_id: UUID, occ_day: date, session_id: UUID, done_at: datetime
+    ) -> ScheduleCheckinRow | None:
+        with self._state.schedule_lock:
+            row = self.get_checkin(user_id, event_id, occ_day)
+            if row is None or row.done_at is not None:
+                return row
+            done = row.model_copy(update={"done_at": done_at, "session_id": session_id})
+            self._state.schedule_checkins[(event_id, occ_day)] = done
+            return done
+
+    def list_reminders(
+        self, user_id: UUID, from_day: date, to_day: date
+    ) -> list[ScheduleReminderRow]:
+        with self._state.schedule_lock:
+            mine = {k for k, r in self._state.schedule_events.items() if r.user_id == user_id}
+            rows = list(self._state.schedule_reminders.values())
+        return [r for r in rows if r.event_id in mine and from_day <= r.occ_day <= to_day]
+
+    def list_reminder_candidates(self, until_day: date) -> list[ScheduleEventRow]:
+        with self._state.schedule_lock:
+            rows = list(self._state.schedule_events.values())
+        return [r for r in rows if r.start_date <= until_day]
+
+    def claim_reminder(
+        self, event_id: UUID, occ_day: date, status: ReminderStatus, attempted_at: datetime
+    ) -> bool:
+        with self._state.schedule_lock:
+            key = (event_id, occ_day)
+            if event_id not in self._state.schedule_events:
+                raise StorageError("Event not found")
+            if key in self._state.schedule_reminders:
+                return False
+            self._state.schedule_reminders[key] = ScheduleReminderRow(
+                event_id=event_id, occ_day=occ_day, status=status, attempted_at=attempted_at
+            )
+            return True
+
+    def set_reminder_status(
+        self, event_id: UUID, occ_day: date, status: ReminderStatus, sent_at: datetime | None
+    ) -> None:
+        with self._state.schedule_lock:
+            row = self._state.schedule_reminders.get((event_id, occ_day))
+            if row is not None:
+                self._state.schedule_reminders[(event_id, occ_day)] = row.model_copy(
+                    update={"status": status, "sent_at": sent_at}
+                )
+
+    def delete_user_schedule(self, user_id: UUID) -> int:
+        with self._state.schedule_lock:
+            ids = [k for k, r in self._state.schedule_events.items() if r.user_id == user_id]
+            for event_id in ids:
+                self._drop_event(event_id)
+            return len(ids)
 
 
 class MemoryAccountRepo:
