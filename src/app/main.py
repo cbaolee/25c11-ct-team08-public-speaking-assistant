@@ -82,6 +82,7 @@ from src.app.deps import (
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
+from src.app.script_guards import reject_gibberish
 from src.app.script_limits import (
     check_generate_limits,
     job_running_block,
@@ -830,6 +831,7 @@ async def generate_script_endpoint(
     # Order matters (ADR-015): bad input and a busy user are refused before anything is counted,
     # and the limits are counted before an upload is written to disk.
     validate_generate_input(clean_topic, duration_min, clean_feedback)
+    reject_gibberish(user_feedback, raw_text, has_file=pdf is not None and bool(pdf.filename))
     if pipeline.has_active_job(user_id):
         return rate_limited_response(job_running_block())
     block = await run_in_threadpool(
@@ -1051,6 +1053,8 @@ async def script_chat_suggest_endpoint(
                 message=exc.message,
                 status_code=422,
             ) from exc
+
+    reject_gibberish(prompt, has_file=bool(file_chunks))
 
     def _run_suggest_sync() -> dict[str, Any]:
         clean_session_id = session_id.strip()
@@ -1431,6 +1435,7 @@ async def _prepare_chat_message_inputs(
                 status_code=422,
             ) from exc
 
+    reject_gibberish(message, has_file=bool(file_chunks))
     clean_msg = sanitize_text(message).strip() if message else ""
     if not clean_msg and not file_chunks:
         raise ScriptGenerationError(

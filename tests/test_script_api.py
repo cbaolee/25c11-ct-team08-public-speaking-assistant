@@ -3,6 +3,7 @@
 import asyncio
 import io
 import json
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -25,7 +26,7 @@ from src.app.config import (
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
-from src.text_processing.chat_session import chat_session_store
+from src.text_processing.chat_session import ChatSessionState, chat_session_store
 from src.text_processing.contracts import (
     GeneratedScript,
     ParagraphCitation,
@@ -1044,3 +1045,213 @@ def test_select_topic_unknown_template_404_preserves_session_state(script_api) -
         stored.topic,
     ) == prev_snapshot
     chat_session_store.clear()
+
+
+# ---------- Contract E: gibberish input is refused before any work ----------
+
+_GIBBERISH_BODY = {
+    "error_code": "gibberish_input",
+    "message": (
+        "Your message looks like random or repeated characters. "
+        "Please enter a clear topic, details, or instructions."
+    ),
+}
+_MESSAGE_ROUTES = ["/api/script-chat/message", "/api/script-chat/message/jobs"]
+_NOTES_FILE = ("notes.txt", b"Coral reefs shelter many fish species.", "text/plain")
+
+
+@pytest.fixture()
+def guard_api(script_api, monkeypatch: pytest.MonkeyPatch):
+    """`script_api` fully offline: no LLM, no search model, script jobs do not run."""
+    client, repos, state = script_api
+    pipeline = app_main.get_script_pipeline()
+    pipeline.template_engine.retriever = None
+    monkeypatch.setattr(app_main, "make_groq_client", lambda: None)
+    monkeypatch.setattr(app_main, "_chat_turn_jobs", {})
+    monkeypatch.setattr(pipeline.moderator, "assert_safe", MagicMock())
+    monkeypatch.setattr(
+        pipeline,
+        "run_job",
+        lambda _job_id, request, _cleanup: Path(request.pdf_path or "no.pdf").unlink(
+            missing_ok=True
+        ),
+    )
+    store = getattr(pipeline, "session_store", chat_session_store)
+    store.clear()
+    yield client, repos, state["user"], pipeline, store
+    store.clear()
+
+
+def _forbid_work(pipeline, repos, monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Spy on every step refused input must not reach; `mock_calls` lists what ran."""
+    work = MagicMock()
+    pipeline.template_engine.retriever = work.retriever
+    pipeline.template_engine.client = work.groq
+    monkeypatch.setattr(pipeline.moderator, "assert_safe", work.moderate)
+    monkeypatch.setattr(pipeline.template_store, "suggest_topics", work.suggest_topics)
+    monkeypatch.setattr(repos.rate_limits, "hit", work.count_attempt)
+    return work
+
+
+def _put_guard_session(store, user: CurrentUser) -> str:
+    store.put(
+        ChatSessionState(
+            session_id="guarded",
+            user_id=str(user.id),
+            category="wildlife",
+            duration_min=5,
+            initial_prompt="Coral reefs",
+        )
+    )
+    return "guarded"
+
+
+def _session_snapshot(store, user: CurrentUser) -> dict[str, Any]:
+    fields = deepcopy(vars(store.get("guarded", user_id=str(user.id))))
+    del fields["last_active_at"]  # reading a session renews its lifetime
+    return fields
+
+
+def test_suggest_refuses_gibberish_without_creating_a_session(guard_api, monkeypatch) -> None:
+    client, repos, _, pipeline, store = guard_api
+    work = _forbid_work(pipeline, repos, monkeypatch)
+
+    response = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": "asdfghjkl"},
+    )
+
+    assert (response.status_code, response.json()) == (422, _GIBBERISH_BODY)
+    assert len(store) == 0
+    assert work.mock_calls == []
+
+
+def test_suggest_refuses_gibberish_without_changing_the_session(guard_api, monkeypatch) -> None:
+    client, repos, user, pipeline, store = guard_api
+    session_id = _put_guard_session(store, user)
+    before = _session_snapshot(store, user)
+    work = _forbid_work(pipeline, repos, monkeypatch)
+
+    response = client.post(
+        "/api/script-chat/suggest",
+        data={"session_id": session_id, "category": "sports", "duration_min": 10, "prompt": "!!!"},
+    )
+
+    assert (response.status_code, response.json()) == (422, _GIBBERISH_BODY)
+    assert _session_snapshot(store, user) == before
+    assert len(store) == 1
+    assert work.mock_calls == []
+
+
+@pytest.mark.parametrize("route", _MESSAGE_ROUTES)
+def test_message_routes_refuse_gibberish_without_side_effects(
+    guard_api, monkeypatch, route
+) -> None:
+    client, repos, user, pipeline, store = guard_api
+    session_id = _put_guard_session(store, user)
+    before = _session_snapshot(store, user)
+    work = _forbid_work(pipeline, repos, monkeypatch)
+
+    response = client.post(route, data={"session_id": session_id, "message": "bla bla bla bla"})
+
+    assert (response.status_code, response.json()) == (422, _GIBBERISH_BODY)
+    assert _session_snapshot(store, user) == before
+    assert app_main._chat_turn_jobs == {}
+    assert work.mock_calls == []
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        {"user_feedback": "asdfghjkl"},
+        {"raw_text": "bla bla bla bla"},
+        {"user_feedback": "???", "raw_text": "A real note about coral reefs."},
+        {"user_feedback": "Make it shorter", "raw_text": "aaaaa"},
+    ],
+)
+def test_generate_script_refuses_gibberish_without_counting_it(
+    guard_api, monkeypatch, form
+) -> None:
+    client, repos, user, pipeline, store = guard_api
+    session_id = _put_guard_session(store, user)
+    before = _session_snapshot(store, user)
+    work = _forbid_work(pipeline, repos, monkeypatch)
+
+    response = client.post(
+        "/api/generate-script",
+        data={"topic": "Coral reefs", "session_id": session_id, **form},
+    )
+
+    assert (response.status_code, response.json()) == (422, _GIBBERISH_BODY)
+    assert _session_snapshot(store, user) == before
+    assert pipeline._jobs == {}
+    assert work.mock_calls == []
+
+
+def test_generate_script_refuses_gibberish_before_the_running_job_check(guard_api) -> None:
+    client, _, user, pipeline, _ = guard_api
+    pipeline.create_job(user_id=str(user.id))
+
+    response = client.post(
+        "/api/generate-script", data={"topic": "Coral reefs", "user_feedback": "zzzzzz"}
+    )
+
+    assert (response.status_code, response.json()) == (422, _GIBBERISH_BODY)
+
+
+@pytest.mark.parametrize(
+    "feedback",
+    [
+        "Write a fresh variation of this speech.",
+        "Write a fresh variation of this speech (variation 2).",
+    ],
+)
+def test_default_regenerate_feedback_passes_the_guard(guard_api, feedback) -> None:
+    client, *_ = guard_api
+
+    response = client.post(
+        "/api/generate-script", data={"topic": "Coral reefs", "user_feedback": feedback}
+    )
+
+    assert response.status_code == 202
+
+
+@pytest.mark.parametrize(
+    ("route", "status_code"),
+    [
+        ("/api/script-chat/suggest", 200),
+        ("/api/script-chat/message", 200),
+        ("/api/script-chat/message/jobs", 202),
+    ],
+)
+def test_chat_routes_accept_gibberish_with_a_file(guard_api, route, status_code) -> None:
+    client, _, user, _, store = guard_api
+    data = {"session_id": _put_guard_session(store, user)}
+    data["prompt" if route.endswith("suggest") else "message"] = "asdfghjkl"
+
+    response = client.post(route, data=data, files={"file": _NOTES_FILE})
+
+    assert response.status_code == status_code
+
+
+def test_generate_script_accepts_gibberish_with_a_pdf(guard_api) -> None:
+    client, *_ = guard_api
+
+    response = client.post(
+        "/api/generate-script",
+        data={"topic": "Coral reefs", "user_feedback": "asdfghjkl"},
+        files={"pdf": ("notes.pdf", b"%PDF-1.4 notes", "application/pdf")},
+    )
+
+    assert response.status_code == 202
+
+
+def test_message_accepts_the_generate_keyword(guard_api) -> None:
+    client, _, user, _, store = guard_api
+
+    response = client.post(
+        "/api/script-chat/message",
+        data={"session_id": _put_guard_session(store, user), "message": "generate"},
+    )
+
+    assert response.status_code == 200
