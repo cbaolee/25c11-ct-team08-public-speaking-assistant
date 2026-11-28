@@ -880,7 +880,7 @@ function topicButton(tpl, title, meta, primary) {
   if (meta) { const m = document.createElement('span'); m.className = 'tc-m'; m.textContent = meta; b.appendChild(m); }
   return b;
 }
-/* One button per suggestion (as many as the server sent) plus Write freely, which is the primary button when recommended */
+/* One button per suggestion (as many as the server sent) plus Write freely, always styled as the primary blue button */
 function renderTopicCards(ai, list, recommendFree, opts = {}) {
   const { animate = true, disabled = false, picked = false, pickedTemplateId = null } = opts;
   stopLoadingTicker(ai);
@@ -888,7 +888,7 @@ function renderTopicCards(ai, list, recommendFree, opts = {}) {
   $('.note', ai).textContent = T(list.length ? 'script.pickTopic' : 'script.noTopics');
   const box = $('.tcards', ai);
   list.forEach(t => box.appendChild(topicButton({ template_id: t.template_id, topic: t.topic }, t.topic, t.duration_min ? t.duration_min + ' ' + T('script.min') : '')));
-  box.appendChild(topicButton({ template_id: null, topic: null }, T('script.writeFreely'), '', recommendFree));
+  box.appendChild(topicButton({ template_id: null, topic: null }, T('script.writeFreely'), '', true));
   if (disabled || picked) {
     $$('[data-a=topic]', box).forEach(b => {
       b.disabled = true;

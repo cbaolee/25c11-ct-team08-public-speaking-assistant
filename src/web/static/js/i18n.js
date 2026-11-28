@@ -131,7 +131,7 @@ export const TEXT = {
     blockedHarm: 'Your request was blocked by our safety check, so no script was written.',
     blockedNext: 'Edit your message or material to remove anything unsafe, then send it again.',
     pickTopic: 'Pick the topic that fits best, or write freely without a template.', noTopics: 'No template matched. You can write freely without a template.',
-    writeFreely: 'No template — Write freely (AI)', generate: 'Generate Script',
+    writeFreely: 'No suitable topic? Write freely', generate: 'Generate Script',
     generateNow: 'Generate now if you do not want to provide more information',
     thinking: 'Working on it...',
     etaRemaining: 'About ~{s}s remaining',
