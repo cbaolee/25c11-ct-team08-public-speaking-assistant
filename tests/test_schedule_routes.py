@@ -24,6 +24,48 @@ def _event(day="2026-12-02", time="22:00"):
     }
 
 
+def test_schedule_reminder_endpoint_requires_config(monkeypatch, caplog):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "")
+    schedule._cron_secret_missing_logged = False
+    client = TestClient(app)
+
+    first = client.post("/internal/schedule/reminders/run")
+    second = client.post("/internal/schedule/reminders/run")
+
+    assert first.status_code == 503
+    assert second.status_code == 503
+    assert first.json()["error_code"] == "cron_not_configured"
+    assert sum("SCHEDULE_CRON_SECRET is not configured" in r.message for r in caplog.records) == 1
+
+
+def test_schedule_reminder_endpoint_rejects_wrong_secret(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    client = TestClient(app)
+
+    missing = client.post("/internal/schedule/reminders/run")
+    wrong = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "wrong-secret"},
+    )
+
+    assert missing.status_code == 401
+    assert wrong.status_code == 401
+    assert missing.json()["error_code"] == "unauthorized"
+
+
+def test_schedule_reminder_endpoint_accepts_correct_secret(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    client = TestClient(app)
+
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
+
+
 def test_create_list_patch_delete_schedule(monkeypatch):
     fixed = datetime(2026, 11, 28, 12, 0, tzinfo=UTC)
     monkeypatch.setattr(schedule, "_now", lambda: fixed)

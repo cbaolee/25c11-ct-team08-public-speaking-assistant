@@ -2,17 +2,19 @@
 
 import datetime as dt
 import hashlib
+import hmac
 import logging
 from datetime import UTC, datetime, time, timedelta
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
+from src.app.config import settings
 from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import NewScheduleEvent, ScheduleEventPatch, ScheduleEventRow, StorageError
@@ -21,6 +23,8 @@ from src.app.schedule import rules
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/schedule")
+cron_router = APIRouter(prefix="/internal/schedule/reminders")
+_cron_secret_missing_logged = False
 
 _schedule_config = CONSTANTS["schedule"]
 SCHEDULE_CONFIG = _schedule_config
@@ -613,3 +617,26 @@ async def complete_checkin(
     if done is None:
         return _error(409, "not_checked_in", "Check in before completing a session.")
     return done.model_dump(mode="json")
+
+
+@cron_router.post("/run")
+async def run_schedule_reminders(
+    x_cron_secret: Annotated[str | None, Header(alias="X-Cron-Secret")] = None,
+):
+    global _cron_secret_missing_logged
+
+    expected = settings.schedule_cron_secret
+    if not expected:
+        if not _cron_secret_missing_logged:
+            logger.error("SCHEDULE_CRON_SECRET is not configured")
+            _cron_secret_missing_logged = True
+        return _error(
+            503,
+            "cron_not_configured",
+            "The schedule reminder job is not configured.",
+        )
+    if x_cron_secret is None or not hmac.compare_digest(x_cron_secret, expected):
+        return _error(401, "unauthorized", "The schedule reminder job was not authorized.")
+
+    # P2-4.2 will replace this placeholder with the reminder claim/send loop.
+    return {"sent": 0, "skipped": 0, "failed": 0}
