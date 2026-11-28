@@ -20,7 +20,8 @@ import numpy as np
 
 from src.app.constants import CONSTANTS
 
-from .contracts import DocumentChunk, ParagraphCitation
+from .contracts import DocumentChunk, ParagraphCitation, SentenceCitation
+from .sanitizer import sanitize_text
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -39,6 +40,10 @@ _MULTIHOP_MIN_RETRIEVAL_SCORE = float(
     CONSTANTS["script"].get("citation_multihop_min_retrieval_score", 0.35)
 )
 _RETRIEVAL_MIN_SCORE = float(CONSTANTS["script"].get("retrieval_min_score", 0.25))
+_MAX_EXCERPT_CHARS = int(CONSTANTS["script"].get("citation_max_excerpt_chars", 180))
+_MAX_SOURCES_PER_SENTENCE = int(
+    CONSTANTS["script"].get("citation_max_sources_per_sentence", 5)
+)
 
 _STOPWORDS = frozenset(
     {
@@ -130,6 +135,10 @@ _STOPWORDS = frozenset(
 )
 
 _SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+_ABBREV_RE = re.compile(
+    r"(?i:\b(?:Dr|Mr|Mrs|Ms|Prof|Sr|Jr|St|Fig|Vol|vs|etc|approx|Inc|Ltd|Co|U\.S|U\.K|e\.g|i\.e|a\.m|p\.m|et\s+al)\.)"
+    r"|\bNo\."
+)
 _CLAUSE_SPLIT_RE = re.compile(
     r"(?:;\s+|,\s+(?:while|whereas|however|although|though|yet|but|and)\s+|\s+(?:while|whereas|and)\s+)",
     re.IGNORECASE,
@@ -211,12 +220,27 @@ def _lexical_overlap_score(query_or_para: str, chunk_text: str) -> float:
 
 
 def _split_paragraph_sentences(paragraph_text: str) -> list[str]:
-    """Split paragraph into substantive sentences (>=3 content tokens)."""
-    parts = [s.strip() for s in _SENTENCE_SPLIT_RE.split(paragraph_text.strip()) if s.strip()]
-    substantive = [s for s in parts if len(_extract_content_tokens(s)) >= 3]
-    if substantive:
-        return substantive
-    return [paragraph_text.strip()] if _extract_content_tokens(paragraph_text) else []
+    """Split paragraph into sentences in order without splitting abbreviations or decimals."""
+    text = (paragraph_text or "").strip()
+    if not text or not re.search(r"[a-zA-Z0-9]", text):
+        return []
+
+    protected_dots: set[int] = {m.end() - 1 for m in _ABBREV_RE.finditer(text)}
+    parts: list[str] = []
+    start = 0
+    for match in _SENTENCE_SPLIT_RE.finditer(text):
+        punct_idx = match.start() - 1
+        if punct_idx in protected_dots:
+            continue
+        segment = text[start : match.start()].strip()
+        if segment:
+            parts.append(segment)
+        start = match.end()
+
+    tail = text[start:].strip()
+    if tail:
+        parts.append(tail)
+    return parts
 
 
 def _split_clauses(sentence: str) -> list[str]:
@@ -227,35 +251,140 @@ def _split_clauses(sentence: str) -> list[str]:
     return [c for c in clauses if len(_extract_content_tokens(c)) >= 3]
 
 
-def _chunk_to_source_entry(chunk: DocumentChunk) -> dict[str, Any]:
+def _excerpt_overlap_score(sentence_text: str, candidate_text: str) -> tuple[int, int, float]:
+    """Score keyword + numeric overlap between *sentence_text* and *candidate_text*."""
+    q_tokens = _extract_content_tokens(sentence_text)
+    c_tokens = _extract_content_tokens(candidate_text)
+    q_nums = set(re.findall(r"\d+(?:\.\d+)?", sentence_text.replace(",", "")))
+    c_nums = set(re.findall(r"\d+(?:\.\d+)?", candidate_text.replace(",", "")))
+    kw_hits = len(q_tokens & c_tokens)
+    num_hits = len(q_nums & c_nums)
+    weighted = kw_hits + 2 * num_hits
+    union_size = len(q_tokens | c_tokens) or 1
+    return (weighted, num_hits, kw_hits / union_size)
+
+
+def _truncate_at_word_boundary(text: str, max_chars: int) -> str:
+    """Truncate normalized plain text at a word boundary within *max_chars*."""
+    if max_chars <= 0:
+        return ""
+    if len(text) <= max_chars:
+        return text
+    if max_chars <= 3:
+        return text[:max_chars]
+
+    budget = max_chars - 3
+    clipped = text[:budget]
+    if not text[budget].isspace():
+        last_space = clipped.rfind(" ")
+        if last_space > 0:
+            clipped = clipped[:last_space]
+    clipped = clipped.rstrip(" ,;:")
+    return f"{clipped}..."
+
+
+def _extract_best_excerpt(
+    sentence_text: str,
+    chunk: DocumentChunk,
+    max_chars: int = _MAX_EXCERPT_CHARS,
+) -> str:
+    """Pick the best-matching sentence from sanitized *chunk.content* within *max_chars*."""
+    cleaned_content = sanitize_text(chunk.content or "")
+    if not cleaned_content:
+        return ""
+    chunk_sentences = _split_paragraph_sentences(cleaned_content)
+    if len(chunk_sentences) <= 1:
+        best = chunk_sentences[0] if chunk_sentences else cleaned_content
+    else:
+        best = max(
+            enumerate(chunk_sentences),
+            key=lambda item: (_excerpt_overlap_score(sentence_text, item[1]), -item[0]),
+        )[1]
+    normalized = " ".join(best.split())
+    return _truncate_at_word_boundary(normalized, max_chars)
+
+
+def _build_source_dict(chunk: DocumentChunk, excerpt: str) -> dict[str, Any]:
+    """Return a normalized Contract-D source dictionary for *chunk* and *excerpt*."""
+    norm_page = chunk.page if (chunk.page is not None and chunk.page > 0) else None
+    raw_kind = getattr(chunk, "source_kind", None)
+    source_file = getattr(chunk, "source_file", None)
+    if chunk.page == 0 and source_file is None:
+        source_kind = "chat"
+    elif raw_kind in ("file", "chat"):
+        source_kind = raw_kind
+    else:
+        source_kind = "chat" if chunk.page == 0 else "file"
     return {
         "chunk_id": chunk.chunk_id,
         "heading": chunk.heading,
-        "page": chunk.page if (chunk.page is not None and chunk.page > 0) else None,
+        "page": norm_page,
+        "excerpt": excerpt,
+        "source_kind": source_kind,
+        "source_msg_id": getattr(chunk, "source_msg_id", None),
+        "source_file": source_file,
     }
 
 
-def _deduplicate_sources(chunks_ordered: list[DocumentChunk]) -> list[dict[str, Any]]:
-    """Convert ordered supporting chunks to unique source dicts, collapsing same-page splits."""
-    seen_ids: set[int] = set()
-    seen_heading_page: set[tuple[str, int | None]] = set()
+def _source_dedup_key(src: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
+    return (src["source_kind"], src["source_msg_id"], src["heading"], src["page"])
+
+
+def _build_sentence_sources(
+    sentence_text: str,
+    scored_chunks: list[tuple[float, int, DocumentChunk]],
+    *,
+    max_sources: int = _MAX_SOURCES_PER_SENTENCE,
+) -> list[dict[str, Any]]:
+    """Sort by score descending, deduplicate by (kind, msg_id, heading, page), and cap."""
+    ranked = sorted(
+        scored_chunks,
+        key=lambda item: (
+            -item[0],
+            -_excerpt_overlap_score(sentence_text, item[2].content)[0],
+            item[1],
+        ),
+    )
+    seen_keys: set[tuple[Any, Any, Any, Any]] = set()
     sources: list[dict[str, Any]] = []
-    for ch in chunks_ordered:
-        if ch.chunk_id in seen_ids:
+    for _, _, ch in ranked:
+        excerpt = _extract_best_excerpt(sentence_text, ch, max_chars=_MAX_EXCERPT_CHARS)
+        src = _build_source_dict(ch, excerpt)
+        key = _source_dedup_key(src)
+        if key in seen_keys:
             continue
-        norm_page = ch.page if (ch.page is not None and ch.page > 0) else None
-        hp_key = (ch.heading, norm_page)
-        if hp_key in seen_heading_page:
-            continue
-        seen_ids.add(ch.chunk_id)
-        seen_heading_page.add(hp_key)
-        sources.append(
-            {
-                "chunk_id": ch.chunk_id,
-                "heading": ch.heading,
-                "page": norm_page,
-            }
+        seen_keys.add(key)
+        sources.append(src)
+        if len(sources) >= max_sources:
+            break
+    return sources
+
+
+def _build_paragraph_sources_from_sentences(
+    sentence_entries: list[tuple[str, list[tuple[float, int, DocumentChunk]]]],
+) -> list[dict[str, Any]]:
+    """Aggregate best-scored deduplicated sources across all cited sentences in a paragraph."""
+    flat_ranked: list[tuple[float, int, str, DocumentChunk]] = []
+    for sent_text, scored_chunks in sentence_entries:
+        for score, order_idx, ch in scored_chunks:
+            flat_ranked.append((score, order_idx, sent_text, ch))
+    flat_ranked.sort(
+        key=lambda item: (
+            -item[0],
+            -_excerpt_overlap_score(item[2], item[3].content)[0],
+            item[1],
         )
+    )
+    seen_keys: set[tuple[Any, Any, Any, Any]] = set()
+    sources: list[dict[str, Any]] = []
+    for _, _, sent_text, ch in flat_ranked:
+        excerpt = _extract_best_excerpt(sent_text, ch, max_chars=_MAX_EXCERPT_CHARS)
+        src = _build_source_dict(ch, excerpt)
+        key = _source_dedup_key(src)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        sources.append(src)
     return sources
 
 
@@ -613,6 +742,10 @@ def _verify_with_nli(
             status="uncited",
             chunk_id=None,
             sources=[],
+            sentences=[
+                SentenceCitation(sentence_index=i, text=s, status="uncited", sources=[])
+                for i, s in enumerate(sentences)
+            ],
         )
     candidates = active_candidates
 
@@ -632,6 +765,7 @@ def _verify_with_nli(
     best_entail_by_cid: dict[int, float] = {c.chunk_id: 0.0 for c in candidates}
     max_contra_by_cid: dict[int, float] = {c.chunk_id: 0.0 for c in candidates}
     sent_supported = [False] * len(sentences)
+    sent_chunk_scores: list[dict[int, float]] = [{} for _ in sentences]
 
     for (c_idx, s_idx), (p_ent, p_con) in zip(r1_index, r1_scores, strict=True):
         cid = candidates[c_idx].chunk_id
@@ -641,6 +775,7 @@ def _verify_with_nli(
             max_contra_by_cid[cid] = p_con
         if p_ent >= entailment_min and p_con < contradiction_max:
             sent_supported[s_idx] = True
+            sent_chunk_scores[s_idx][cid] = max(sent_chunk_scores[s_idx].get(cid, 0.0), p_ent)
 
     accepted_scores: dict[int, float] = {
         c.chunk_id: best_entail_by_cid[c.chunk_id]
@@ -712,12 +847,19 @@ def _verify_with_nli(
                     if not has_conflicting_sibling:
                         accepted_scores[cid] = max(accepted_scores.get(cid, 0.0), p_ent)
                         sent_supported[s_idx] = True
+                        sent_chunk_scores[s_idx][cid] = max(
+                            sent_chunk_scores[s_idx].get(cid, 0.0), p_ent
+                        )
 
     # Round 2B: Combined Top-2 Premise NLI for multi-hop synthesis across two chunks
-    still_unsupported = [i for i, ok in enumerate(sent_supported) if not ok]
+    still_unsupported = [
+        i
+        for i, ok in enumerate(sent_supported)
+        if not ok and len(_extract_content_tokens(sentences[i])) >= 3
+    ]
     if still_unsupported and len(candidates) >= 2:
         multihop_pairs: list[tuple[str, str]] = []
-        multihop_cands: list[tuple[DocumentChunk, DocumentChunk]] = []
+        multihop_cands: list[tuple[int, DocumentChunk, DocumentChunk]] = []
 
         for s_idx in still_unsupported:
             sent = sentences[s_idx]
@@ -757,12 +899,12 @@ def _verify_with_nli(
                     f"{chunk_texts[top1.chunk_id]}\n\n{chunk_texts[top2.chunk_id]}"
                 )
                 multihop_pairs.append((combined_premise, sent))
-                multihop_cands.append((top1, top2))
+                multihop_cands.append((s_idx, top1, top2))
 
         if multihop_pairs:
             mh_scores = nli.score_pairs(multihop_pairs)
             if mh_scores is not None:
-                for (top1, top2), (p_ent, p_con) in zip(
+                for (s_idx, top1, top2), (p_ent, p_con) in zip(
                     multihop_cands, mh_scores, strict=True
                 ):
                     if p_ent >= entailment_min and p_con < contradiction_max:
@@ -775,8 +917,47 @@ def _verify_with_nli(
                         accepted_scores[top2.chunk_id] = max(
                             accepted_scores.get(top2.chunk_id, 0.0), mh_score * 0.99
                         )
+                        sent_supported[s_idx] = True
+                        sent_chunk_scores[s_idx][top1.chunk_id] = max(
+                            sent_chunk_scores[s_idx].get(top1.chunk_id, 0.0), mh_score
+                        )
+                        sent_chunk_scores[s_idx][top2.chunk_id] = max(
+                            sent_chunk_scores[s_idx].get(top2.chunk_id, 0.0), mh_score * 0.99
+                        )
 
-    if not accepted_scores:
+    cand_order = {c.chunk_id: idx for idx, c in enumerate(candidates)}
+    cand_by_id = {c.chunk_id: c for c in candidates}
+    sentence_citations: list[SentenceCitation] = []
+    paragraph_entries: list[tuple[str, list[tuple[float, int, DocumentChunk]]]] = []
+
+    for s_idx, sent_text in enumerate(sentences):
+        scored_for_sent = [
+            (score, cand_order[cid], cand_by_id[cid])
+            for cid, score in sent_chunk_scores[s_idx].items()
+            if max_contra_by_cid.get(cid, 0.0) < contradiction_max
+        ]
+        if scored_for_sent:
+            sent_sources = _build_sentence_sources(sent_text, scored_for_sent)
+            sentence_citations.append(
+                SentenceCitation(
+                    sentence_index=s_idx,
+                    text=sent_text,
+                    status="cited",
+                    sources=sent_sources,
+                )
+            )
+            paragraph_entries.append((sent_text, scored_for_sent))
+        else:
+            sentence_citations.append(
+                SentenceCitation(
+                    sentence_index=s_idx,
+                    text=sent_text,
+                    status="uncited",
+                    sources=[],
+                )
+            )
+
+    if not paragraph_entries or not accepted_scores:
         return ParagraphCitation(
             paragraph=paragraph_index,
             heading=None,
@@ -784,25 +965,20 @@ def _verify_with_nli(
             status="uncited",
             chunk_id=None,
             sources=[],
+            sentences=sentence_citations,
         )
 
-    cand_order = {c.chunk_id: idx for idx, c in enumerate(candidates)}
-    cand_by_id = {c.chunk_id: c for c in candidates}
-    ordered_cids = sorted(
-        accepted_scores,
-        key=lambda cid: (-accepted_scores[cid], cand_order[cid]),
-    )
-    ordered_chunks = [cand_by_id[cid] for cid in ordered_cids]
-    primary = ordered_chunks[0]
-    sources = _deduplicate_sources(ordered_chunks)
+    sources = _build_paragraph_sources_from_sentences(paragraph_entries)
+    primary = sources[0]
 
     return ParagraphCitation(
         paragraph=paragraph_index,
-        heading=primary.heading,
-        page=primary.page if (primary.page is not None and primary.page > 0) else None,
+        heading=primary["heading"],
+        page=primary["page"],
         status="cited",
-        chunk_id=primary.chunk_id,
+        chunk_id=primary["chunk_id"],
         sources=sources,
+        sentences=sentence_citations,
     )
 
 
@@ -834,6 +1010,14 @@ def verify_paragraph_citation(
             candidates.append(by_id[cid])
 
     if not candidates:
+        uncited_sents = (
+            [
+                SentenceCitation(sentence_index=i, text=s, status="uncited", sources=[])
+                for i, s in enumerate(_split_paragraph_sentences(paragraph_text))
+            ]
+            if (paragraph_text and paragraph_text.strip())
+            else []
+        )
         return ParagraphCitation(
             paragraph=paragraph_index,
             heading=None,
@@ -841,18 +1025,21 @@ def verify_paragraph_citation(
             status="uncited",
             chunk_id=None,
             sources=[],
+            sentences=uncited_sents,
         )
 
     # Backward-compatible ID-only check when paragraph_text is not provided
     if paragraph_text is None or not paragraph_text.strip():
         chosen = candidates[0]
+        src = _build_source_dict(chosen, _extract_best_excerpt("", chosen))
         return ParagraphCitation(
             paragraph=paragraph_index,
-            heading=chosen.heading,
-            page=chosen.page if (chosen.page is not None and chosen.page > 0) else None,
+            heading=src["heading"],
+            page=src["page"],
             status="cited",
-            chunk_id=chosen.chunk_id,
-            sources=[_chunk_to_source_entry(chosen)],
+            chunk_id=src["chunk_id"],
+            sources=[src],
+            sentences=[],
         )
 
     clean_para = paragraph_text.strip()
@@ -864,14 +1051,46 @@ def verify_paragraph_citation(
         if _is_verbatim_inline_fact(clean_para, f"{chunk.heading}: {chunk.content}")
     ]
     if inline_matches:
-        primary = inline_matches[0]
+        sentences = _split_paragraph_sentences(clean_para) or [clean_para]
+        sentence_citations: list[SentenceCitation] = []
+        sent_entries: list[tuple[str, list[tuple[float, int, DocumentChunk]]]] = []
+        for s_idx, sent in enumerate(sentences):
+            matched_scored = [
+                (1.0, order_idx, ch)
+                for order_idx, ch in enumerate(candidates)
+                if _is_verbatim_inline_fact(sent, f"{ch.heading}: {ch.content}")
+                or (len(sentences) == 1 and ch in inline_matches)
+            ]
+            if matched_scored:
+                sent_sources = _build_sentence_sources(sent, matched_scored)
+                sentence_citations.append(
+                    SentenceCitation(
+                        sentence_index=s_idx,
+                        text=sent,
+                        status="cited",
+                        sources=sent_sources,
+                    )
+                )
+                sent_entries.append((sent, matched_scored))
+            else:
+                sentence_citations.append(
+                    SentenceCitation(
+                        sentence_index=s_idx,
+                        text=sent,
+                        status="uncited",
+                        sources=[],
+                    )
+                )
+        para_sources = _build_paragraph_sources_from_sentences(sent_entries)
+        primary = para_sources[0]
         return ParagraphCitation(
             paragraph=paragraph_index,
-            heading=primary.heading,
-            page=primary.page if (primary.page is not None and primary.page > 0) else None,
+            heading=primary["heading"],
+            page=primary["page"],
             status="cited",
-            chunk_id=primary.chunk_id,
-            sources=_deduplicate_sources(inline_matches),
+            chunk_id=primary["chunk_id"],
+            sources=para_sources,
+            sentences=sentence_citations,
         )
 
     active_retriever = retriever or SemanticRetriever()
@@ -892,57 +1111,90 @@ def verify_paragraph_citation(
     # Fallback path: sentence-aware Bi-Encoder cosine + lexical overlap
     model = active_retriever.get_model()
     sentences = _split_paragraph_sentences(clean_para)
-    eval_units = [clean_para] + ([s for s in sentences if s != clean_para] if sentences else [])
-
-    unit_vecs: list[NDArray[np.float32]] | None = None
-    if model is not None and eval_units:
-        try:
-            encoded = active_retriever._encode(model, eval_units)
-            unit_vecs = [encoded[i] for i in range(len(eval_units))]
-        except Exception:
-            unit_vecs = None
-
-    min_lexical_support = min(0.25, min_support_score)
-    scored_supported: list[tuple[float, int, DocumentChunk]] = []
-
-    for order_idx, chunk in enumerate(candidates):
-        chunk_full = f"{chunk.heading}: {chunk.content}"
-        best_unit_score = -1.0
-
-        if unit_vecs is not None:
-            c_vec = (chunk_embeddings_by_id or {}).get(chunk.chunk_id)
-            if c_vec is None:
-                try:
-                    c_vec = active_retriever._encode(model, [chunk_full])[0]
-                except Exception:
-                    c_vec = None
-
-            for u_text, u_vec in zip(eval_units, unit_vecs, strict=True):
-                lex_score = _lexical_overlap_score(u_text, chunk_full)
-                sem_score = float(np.dot(c_vec, u_vec)) if c_vec is not None else -1.0
-                score = sem_score if lex_score >= min_lexical_support else -1.0
-                if score > best_unit_score:
-                    best_unit_score = score
-        else:
-            for u_text in eval_units:
-                lex_score = _lexical_overlap_score(u_text, chunk_full)
-                if lex_score > best_unit_score:
-                    best_unit_score = lex_score
-
-        if best_unit_score >= min_support_score:
-            scored_supported.append((best_unit_score, order_idx, chunk))
-
-    if scored_supported:
-        scored_supported.sort(key=lambda item: (-item[0], item[1]))
-        ordered_chunks = [item[2] for item in scored_supported]
-        best_chunk = ordered_chunks[0]
+    if not sentences:
         return ParagraphCitation(
             paragraph=paragraph_index,
-            heading=best_chunk.heading,
-            page=best_chunk.page if (best_chunk.page is not None and best_chunk.page > 0) else None,
+            heading=None,
+            page=None,
+            status="uncited",
+            chunk_id=None,
+            sources=[],
+            sentences=[],
+        )
+
+    sent_vecs: list[NDArray[np.float32]] | None = None
+    chunk_vecs: dict[int, NDArray[np.float32]] = dict(chunk_embeddings_by_id or {})
+    if model is not None:
+        try:
+            encoded = active_retriever._encode(model, sentences)
+            sent_vecs = [encoded[i] for i in range(len(sentences))]
+            for chunk in candidates:
+                if chunk.chunk_id not in chunk_vecs:
+                    chunk_vecs[chunk.chunk_id] = active_retriever._encode(
+                        model, [f"{chunk.heading}: {chunk.content}"]
+                    )[0]
+        except Exception:
+            sent_vecs = None
+
+    min_lexical_support = min(0.25, min_support_score)
+    sentence_citations = []
+    paragraph_entries: list[tuple[str, list[tuple[float, int, DocumentChunk]]]] = []
+
+    for s_idx, sent in enumerate(sentences):
+        # Guard against multi-sentence greetings (e.g., "Good morning, everyone.") matching
+        # a single incidental word in a chunk via verbatim-inline check.
+        sent_tokens = _extract_content_tokens(sent)
+        if not sent_tokens or (len(sentences) > 1 and len(sent_tokens) < 2):
+            sentence_citations.append(
+                SentenceCitation(sentence_index=s_idx, text=sent, status="uncited", sources=[])
+            )
+            continue
+
+        scored_for_sent: list[tuple[float, int, DocumentChunk]] = []
+        for order_idx, chunk in enumerate(candidates):
+            chunk_full = f"{chunk.heading}: {chunk.content}"
+            lex_score = _lexical_overlap_score(sent, chunk_full)
+            if sent_vecs is not None:
+                c_vec = chunk_vecs.get(chunk.chunk_id)
+                sem_score = float(np.dot(c_vec, sent_vecs[s_idx])) if c_vec is not None else -1.0
+                score = sem_score if lex_score >= min_lexical_support else -1.0
+            else:
+                score = lex_score
+            if score >= min_support_score:
+                scored_for_sent.append((score, order_idx, chunk))
+
+        if scored_for_sent:
+            sent_sources = _build_sentence_sources(sent, scored_for_sent)
+            sentence_citations.append(
+                SentenceCitation(
+                    sentence_index=s_idx,
+                    text=sent,
+                    status="cited",
+                    sources=sent_sources,
+                )
+            )
+            paragraph_entries.append((sent, scored_for_sent))
+        else:
+            sentence_citations.append(
+                SentenceCitation(
+                    sentence_index=s_idx,
+                    text=sent,
+                    status="uncited",
+                    sources=[],
+                )
+            )
+
+    if paragraph_entries:
+        para_sources = _build_paragraph_sources_from_sentences(paragraph_entries)
+        primary = para_sources[0]
+        return ParagraphCitation(
+            paragraph=paragraph_index,
+            heading=primary["heading"],
+            page=primary["page"],
             status="cited",
-            chunk_id=best_chunk.chunk_id,
-            sources=_deduplicate_sources(ordered_chunks),
+            chunk_id=primary["chunk_id"],
+            sources=para_sources,
+            sentences=sentence_citations,
         )
 
     return ParagraphCitation(
@@ -952,6 +1204,7 @@ def verify_paragraph_citation(
         status="uncited",
         chunk_id=None,
         sources=[],
+        sentences=sentence_citations,
     )
 
 
@@ -1010,7 +1263,7 @@ def align_script_citations(
         for ch in active_retriever.retrieve_top_k(
             para_text,
             chunks,
-            k=3,
+            k=max(3, _MAX_SOURCES_PER_SENTENCE),
             chunk_embeddings=chunk_embeddings,
             min_score=candidate_min_score,
         ):
@@ -1025,7 +1278,7 @@ def align_script_citations(
                 for ch in active_retriever.retrieve_top_k(
                     sent,
                     chunks,
-                    k=1,
+                    k=_MAX_SOURCES_PER_SENTENCE,
                     chunk_embeddings=chunk_embeddings,
                     min_score=candidate_min_score,
                 ):

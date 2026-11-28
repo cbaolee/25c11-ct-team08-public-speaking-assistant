@@ -32,6 +32,7 @@ from src.app.deps import CurrentUser, get_current_user
 from src.text_processing.chat_session import (
     READY_MESSAGE,
     ChatSessionState,
+    append_to_context_window,
     chat_session_store,
     check_ready_to_generate,
 )
@@ -40,6 +41,7 @@ from src.text_processing.contracts import (
     GeneratedScript,
     ParagraphCitation,
     ScriptGenerationRequest,
+    SentenceCitation,
     TemplateDocument,
     TopicMetadata,
 )
@@ -1071,3 +1073,204 @@ class TestScenario6ContentModeration:
         )
         assert resp.status_code == 200
         assert resp.json()["recommend_free_topic"] is False
+
+
+class TestProvenanceAndSentenceCitationContracts:
+    """Contract A & D: Provenance flow from ChatSessionState -> pipeline -> GeneratedScript."""
+
+    def test_sentence_citation_serialization_and_backward_compat(self) -> None:
+        sc = SentenceCitation(
+            sentence_index=1,
+            text="Coral reefs shelter 25% of marine species.",
+            status="cited",
+            sources=[
+                {
+                    "chunk_id": 1,
+                    "heading": "Reef Ecology",
+                    "page": 2,
+                    "source_kind": "file",
+                    "source_msg_id": "msg-f1",
+                    "source_file": "reefs.pdf",
+                    "excerpt": "Coral reefs shelter 25% of marine species.",
+                }
+            ],
+        )
+        pc = ParagraphCitation(
+            paragraph=1,
+            heading="Reef Ecology",
+            page=2,
+            status="cited",
+            chunk_id=1,
+            sources=list(sc.sources),
+            sentences=[sc],
+        )
+        script = GeneratedScript(
+            script="Welcome everyone. Coral reefs shelter 25% of marine species.",
+            word_count=9,
+            duration_min=5,
+            source="llm",
+            template_id=None,
+            citations=[pc],
+        )
+        payload = script.to_dict()
+        assert payload["citations"][0]["sentences"][0]["sentence_index"] == 1
+        assert payload["citations"][0]["sentences"][0]["status"] == "cited"
+        assert payload["citations"][0]["sentences"][0]["sources"][0]["source_msg_id"] == "msg-f1"
+        assert payload["citations"][0]["sentences"][0]["sources"][0]["source_file"] == "reefs.pdf"
+
+        # Default construction still works without sentences
+        legacy_pc = ParagraphCitation(paragraph=1, heading=None, page=None, status="uncited")
+        assert legacy_pc.sentences == []
+        assert legacy_pc.to_dict()["sentences"] == []
+
+    def test_end_to_end_provenance_from_session_and_feedback_to_generated_script(
+        self, scenario_setup
+    ) -> None:
+        pipeline: ScriptGenerationPipeline = scenario_setup["pipeline"]
+        mock_llm: MagicMock = scenario_setup["mock_llm"]
+        user_id = str(scenario_setup["user"].id)
+
+        file_chunk = DocumentChunk(
+            chunk_id=1,
+            heading="Ocean Survey",
+            page=3,
+            content="Global coral cover declined by 14 percent between 2009 and 2018.",
+            source_kind="file",
+            source_msg_id="msg-file-1",
+            source_file="ocean_survey.pdf",
+        )
+        sid = "provenance-e2e-session"
+        session = ChatSessionState(
+            session_id=sid,
+            user_id=user_id,
+            category="free",
+            duration_min=5,
+            initial_prompt="According to 2024 NOAA studies, coral reefs support 25% of ocean fish.",
+            initial_prompt_msg_id="msg-init-0",
+            chunks=[file_chunk],
+            compacted_summary="- Compacted summary mentioning 99% bogus fact never to be cited.",
+        )
+        # File summary entry (Track 1 only) must never become a citable chunk
+        append_to_context_window(
+            session,
+            "Uploaded reference file: ocean_survey.pdf",
+            turn=1,
+            source="file_summary",
+            msg_id="msg-file-summary-ignored",
+        )
+        # Mixed chat note (casual prefix + citable fact) with client msg_id
+        append_to_context_window(
+            session,
+            "Thanks! Also include that Palau protected 80% of its marine waters in 2020.",
+            turn=2,
+            source="chat",
+            msg_id="msg-chat-2",
+        )
+        chat_session_store.put(session)
+
+        captured_chunks: list[DocumentChunk] = []
+
+        def _capture_and_generate(
+            topic: str,
+            duration_min: int = 5,
+            chunks: list[DocumentChunk] | None = None,
+            **_: object,
+        ) -> GeneratedScript:
+            captured_chunks.extend(chunks or [])
+            citations: list[ParagraphCitation] = []
+            for idx, ch in enumerate(chunks or [], start=1):
+                src = {
+                    "chunk_id": ch.chunk_id,
+                    "heading": ch.heading,
+                    "page": ch.page,
+                    "source_kind": ch.source_kind,
+                    "source_msg_id": ch.source_msg_id,
+                    "source_file": ch.source_file,
+                    "excerpt": ch.content[:120],
+                }
+                citations.append(
+                    ParagraphCitation(
+                        paragraph=idx,
+                        heading=ch.heading,
+                        page=ch.page,
+                        status="cited",
+                        chunk_id=ch.chunk_id,
+                        sources=[src],
+                        sentences=[
+                            SentenceCitation(
+                                sentence_index=0,
+                                text=ch.content,
+                                status="cited",
+                                sources=[src],
+                            )
+                        ],
+                    )
+                )
+            words = " ".join(["coral"] * 620)
+            return GeneratedScript(
+                script=words,
+                word_count=len(words.split()),
+                duration_min=duration_min,
+                source="llm",
+                template_id=None,
+                models_used=["mock-model"],
+                citations=citations,
+                title="Coral Reef Resilience",
+            )
+
+        mock_llm.generate_free_topic_script.side_effect = _capture_and_generate
+
+        feedback_fact = (
+            "According to the 2023 UNEP report, reef restoration costs $400,000 per hectare."
+        )
+        req = ScriptGenerationRequest(
+            topic="Coral Reef Resilience",
+            category="free",
+            duration_min=5,
+            user_id=user_id,
+            session_id=sid,
+            user_feedback=feedback_fact,
+            feedback_msg_id="msg-fb-9",
+        )
+        result = pipeline.run(req)
+
+        # Dual-Track guard: compacted_summary and file_summary never entered chunks
+        all_contents = "\n".join(c.content for c in captured_chunks)
+        assert "bogus fact" not in all_contents
+        assert "Uploaded reference file" not in all_contents
+
+        assert len(captured_chunks) == 4
+        # 1. File chunk provenance
+        assert captured_chunks[0].source_kind == "file"
+        assert captured_chunks[0].source_msg_id == "msg-file-1"
+        assert captured_chunks[0].source_file == "ocean_survey.pdf"
+        # 2. Initial prompt chunk provenance
+        assert captured_chunks[1].page == 0
+        assert captured_chunks[1].source_kind == "chat"
+        assert captured_chunks[1].source_msg_id == "msg-init-0"
+        assert captured_chunks[1].source_file is None
+        # 3. Mixed chat note chunk provenance (strips casual prefix, keeps msg-chat-2)
+        assert captured_chunks[2].page == 0
+        assert captured_chunks[2].source_kind == "chat"
+        assert captured_chunks[2].source_msg_id == "msg-chat-2"
+        assert captured_chunks[2].source_file is None
+        # 4. Feedback note chunk provenance
+        assert captured_chunks[3].page == 0
+        assert captured_chunks[3].source_kind == "chat"
+        assert captured_chunks[3].source_msg_id == "msg-fb-9"
+        assert captured_chunks[3].source_file is None
+
+        # Feedback msg_id persisted on session for subsequent turns
+        updated = chat_session_store.get(sid, user_id=user_id)
+        assert updated is not None
+        assert updated.user_note_msg_ids[feedback_fact.lower()] == "msg-fb-9"
+
+        # GeneratedScript.to_dict() preserves full provenance on sentence sources
+        as_dict = result.to_dict()
+        sent_sources = [c["sentences"][0]["sources"][0] for c in as_dict["citations"]]
+        assert [(s["source_kind"], s["source_msg_id"], s["source_file"]) for s in sent_sources] == [
+            ("file", "msg-file-1", "ocean_survey.pdf"),
+            ("chat", "msg-init-0", None),
+            ("chat", "msg-chat-2", None),
+            ("chat", "msg-fb-9", None),
+        ]

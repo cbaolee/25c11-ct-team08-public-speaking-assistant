@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 import threading
@@ -799,6 +800,7 @@ async def generate_script_endpoint(
     pdf: Annotated[UploadFile | None, File()] = None,
     session_id: Annotated[str, Form()] = "",
     user_feedback: Annotated[str, Form()] = "",
+    client_msg_id: Annotated[str, Form()] = "",
 ) -> dict[str, Any] | JSONResponse:
     """Queue a background script generation job and return `202 {job_id, status}` (Brief §5.5).
 
@@ -815,6 +817,7 @@ async def generate_script_endpoint(
     clean_topic = topic.strip()
     clean_session_id = session_id.strip() or None
     clean_feedback = user_feedback.strip() or None
+    clean_msg_id = _sanitize_client_msg_id(client_msg_id)
 
     store = getattr(pipeline, "session_store", chat_session_store)
     if clean_session_id:
@@ -875,6 +878,7 @@ async def generate_script_endpoint(
         user_id=user_id,
         session_id=clean_session_id,
         user_feedback=clean_feedback,
+        feedback_msg_id=clean_msg_id,
     )
     # Checked again: another request of this user may have created a job during the awaits above.
     # Nothing is awaited between this check and create_job, so two requests cannot both pass.
@@ -909,6 +913,19 @@ def _resolve_groq_client(pipeline: ScriptGenerationPipeline) -> Any | None:
     if isinstance(llm_gen, ScriptGenerator) and llm_gen.client is not None:
         return llm_gen.client
     return make_groq_client()
+
+
+_CLIENT_MSG_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+
+
+def _sanitize_client_msg_id(raw: str | None) -> str | None:
+    """Validate and return a safe client message ID (1-64 alphanumeric/_/- chars), else None."""
+    if not isinstance(raw, str):
+        return None
+    stripped = raw.strip()
+    if not stripped or not _CLIENT_MSG_ID_RE.fullmatch(stripped):
+        return None
+    return stripped
 
 
 def _validate_turn_text(text: str) -> None:
@@ -1026,10 +1043,12 @@ async def script_chat_suggest_endpoint(
     prompt: Annotated[str, Form()] = "",
     file: Annotated[UploadFile | None, File()] = None,
     session_id: Annotated[str, Form()] = "",
+    client_msg_id: Annotated[str, Form()] = "",
 ) -> dict[str, Any]:
     """Suggest 4-5 templates from category, duration, and optional prompt/document."""
     pipeline = get_script_pipeline()
     user_id = str(user.id)
+    clean_msg_id = _sanitize_client_msg_id(client_msg_id)
     store = getattr(pipeline, "session_store", chat_session_store)
     tracker = TurnStepTracker(["validating_input", "moderating", "matching_templates"])
     tracker.start("validating_input")
@@ -1045,6 +1064,10 @@ async def script_chat_suggest_endpoint(
         try:
             raw_chunks = await run_in_threadpool(ingest_upload_file, file_bytes, filename)
             file_chunks = sanitize_chunks(raw_chunks)
+            for chunk in file_chunks:
+                chunk.source_kind = "file"
+                chunk.source_msg_id = clean_msg_id
+                chunk.source_file = filename
         except DocumentParserError as exc:
             raise ScriptGenerationError(
                 error_code=exc.error_code,
@@ -1082,6 +1105,7 @@ async def script_chat_suggest_endpoint(
                 category=category,
                 duration_min=duration_min,
                 initial_prompt=clean_prompt,
+                initial_prompt_msg_id=clean_msg_id if clean_prompt else None,
             )
         else:
             if category:
@@ -1090,6 +1114,7 @@ async def script_chat_suggest_endpoint(
                 session.duration_min = duration_min
             if clean_prompt:
                 session.initial_prompt = clean_prompt
+                session.initial_prompt_msg_id = clean_msg_id
 
         if file_chunks:
             session.files_loaded.append(filename)
@@ -1240,6 +1265,7 @@ def _execute_chat_message(
     filename: str,
     tracker: TurnStepTracker,
     job_id: str | None = None,
+    clean_msg_id: str | None = None,
 ) -> dict[str, Any]:
     store = getattr(pipeline, "session_store", chat_session_store)
     lock_fn = getattr(store, "turn_lock", None)
@@ -1255,6 +1281,7 @@ def _execute_chat_message(
             filename=filename,
             tracker=tracker,
             job_id=job_id,
+            clean_msg_id=clean_msg_id,
         )
 
 
@@ -1269,6 +1296,7 @@ def _execute_chat_message_locked(
     filename: str,
     tracker: TurnStepTracker,
     job_id: str | None = None,
+    clean_msg_id: str | None = None,
 ) -> dict[str, Any]:
     tracker.start("moderating")
     _sync_chat_turn_job(job_id, tracker)
@@ -1309,6 +1337,7 @@ def _execute_chat_message_locked(
             clean_msg,
             turn=session.gather_turns,
             source="chat",
+            msg_id=clean_msg_id,
             client=client,
             limiter=limiter,
             on_compact_start=_on_compact_start,
@@ -1403,7 +1432,9 @@ async def _prepare_chat_message_inputs(
     session_id: str,
     message: str,
     file: UploadFile | None,
-) -> tuple[ChatSessionState, str, list[DocumentChunk], str]:
+    client_msg_id: str = "",
+) -> tuple[ChatSessionState, str, list[DocumentChunk], str, str | None]:
+    clean_msg_id = _sanitize_client_msg_id(client_msg_id)
     store = getattr(pipeline, "session_store", chat_session_store)
     session = store.get(session_id, user_id=user_id)
     if session is None:
@@ -1424,6 +1455,10 @@ async def _prepare_chat_message_inputs(
         try:
             raw_chunks = await run_in_threadpool(ingest_upload_file, file_bytes, filename)
             file_chunks = sanitize_chunks(raw_chunks)
+            for chunk in file_chunks:
+                chunk.source_kind = "file"
+                chunk.source_msg_id = clean_msg_id
+                chunk.source_file = filename
         except DocumentParserError as exc:
             raise ScriptGenerationError(
                 error_code=exc.error_code,
@@ -1438,7 +1473,7 @@ async def _prepare_chat_message_inputs(
             message="Please provide a message or a document.",
             status_code=422,
         )
-    return session, clean_msg, file_chunks, filename
+    return session, clean_msg, file_chunks, filename, clean_msg_id
 
 
 @app.post("/api/script-chat/message")
@@ -1447,6 +1482,7 @@ async def script_chat_message_endpoint(
     session_id: Annotated[str, Form(...)],
     message: Annotated[str, Form()] = "",
     file: Annotated[UploadFile | None, File()] = None,
+    client_msg_id: Annotated[str, Form()] = "",
 ) -> dict[str, Any]:
     """Turn 2+: Bound context, optionally compact, evaluate with Groq, and keep loop open."""
     pipeline = get_script_pipeline()
@@ -1461,12 +1497,13 @@ async def script_chat_message_endpoint(
         ]
     )
     tracker.start("validating_input")
-    session, clean_msg, file_chunks, filename = await _prepare_chat_message_inputs(
+    session, clean_msg, file_chunks, filename, clean_msg_id = await _prepare_chat_message_inputs(
         pipeline=pipeline,
         user_id=user_id,
         session_id=session_id,
         message=message,
         file=file,
+        client_msg_id=client_msg_id,
     )
     return await run_in_threadpool(
         lambda: _execute_chat_message(
@@ -1477,6 +1514,7 @@ async def script_chat_message_endpoint(
             file_chunks=file_chunks,
             filename=filename,
             tracker=tracker,
+            clean_msg_id=clean_msg_id,
         )
     )
 
@@ -1490,6 +1528,7 @@ def _run_chat_message_job(
     file_chunks: list[DocumentChunk],
     filename: str,
     tracker: TurnStepTracker,
+    clean_msg_id: str | None = None,
 ) -> None:
     try:
         _execute_chat_message(
@@ -1501,6 +1540,7 @@ def _run_chat_message_job(
             filename=filename,
             tracker=tracker,
             job_id=job_id,
+            clean_msg_id=clean_msg_id,
         )
     except ScriptGenerationError as exc:
         tracker.fail()
@@ -1529,6 +1569,7 @@ async def create_script_chat_message_job_endpoint(
     session_id: Annotated[str, Form(...)],
     message: Annotated[str, Form()] = "",
     file: Annotated[UploadFile | None, File()] = None,
+    client_msg_id: Annotated[str, Form()] = "",
 ) -> dict[str, Any]:
     """Queue a Turn 2+ message turn and return 202 with live step/ETA polling job_id."""
     pipeline = get_script_pipeline()
@@ -1543,12 +1584,13 @@ async def create_script_chat_message_job_endpoint(
         ]
     )
     tracker.start("validating_input")
-    session, clean_msg, file_chunks, filename = await _prepare_chat_message_inputs(
+    session, clean_msg, file_chunks, filename, clean_msg_id = await _prepare_chat_message_inputs(
         pipeline=pipeline,
         user_id=user_id,
         session_id=session_id,
         message=message,
         file=file,
+        client_msg_id=client_msg_id,
     )
     tracker.done("validating_input")
     job_id = _create_chat_turn_job(user_id, tracker)
@@ -1562,6 +1604,7 @@ async def create_script_chat_message_job_endpoint(
         file_chunks,
         filename,
         tracker,
+        clean_msg_id,
     )
     with _chat_turn_jobs_lock:
         snap = dict(_chat_turn_jobs[job_id])
