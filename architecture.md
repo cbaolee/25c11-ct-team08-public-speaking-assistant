@@ -36,7 +36,7 @@ flowchart LR
 | Backend                      | Python 3.12, FastAPI             | HTTP API, validation, orchestration                     |
 | Evaluate / Baseline Pipeline | FFmpeg, Silero VAD, jiwer        | Score a recording, analyse a voice baseline             |
 | Script Pipeline              | PyMuPDF4LLM, Groq                | Generate an MC script from user content                 |
-| Database                     | Supabase PostgreSQL              | Core: accounts, profiles, preferences, baselines, scripts; user's shard: sessions (see 4.6) |
+| Database                     | Supabase PostgreSQL              | Core: accounts, profiles, preferences, baselines, scripts, Schedule events/check-ins/reminders; user's shard: sessions (see 4.6) |
 | Object storage               | Supabase Storage                 | Core: avatars, baselines; user's shard: recordings, chart series |
 | Accounts                     | Supabase Auth                    | Sign up, log in, token refresh, password change         |
 
@@ -50,7 +50,8 @@ src/app/
 │                           /api/sessions*, /api/generate-script*, /api/script-chat/*, /api/topics,
 │                           static UI (Cache-Control: no-cache)
 ├── routes/                 auth.py (/api/auth/*), profile.py (/api/profile*), baselines.py (/api/baseline*),
-│                           coach.py (/api/sessions/{id}/coach-note), practice.py (/api/practice/retry)
+│                           coach.py (/api/sessions/{id}/coach-note), practice.py (/api/practice/retry),
+│                           schedule.py (/api/schedule*, /internal/schedule/reminders/run)
 ├── auth.py                 AuthProvider: Supabase Auth, or in-memory accounts in dev
 ├── rate_limit.py           In-memory sliding-window limit for Word Coach retries (account limits: 4.3 `hit_rate_limit`)
 ├── uploads.py              Safe upload paths and size-capped upload saving
@@ -163,7 +164,7 @@ Merging uses the SQL function `merge_profile_preferences` (one `update ... set p
 
 ```mermaid
 flowchart TB
-    Routes["Endpoints"] -->|Depends(get_repos)| Repos["Repos<br/>profiles · baselines · scripts · sessions · files · accounts · rate_limits"]
+    Routes["Endpoints"] -->|Depends(get_repos)|     Repos["Repos<br/>profiles · baselines · scripts · sessions · files · accounts · rate_limits · schedule"]
     Repos -.implements.-> Proto["Protocols<br/>repositories.py"]
     Factory["get_repos()"] -->|SUPABASE_URL set| Supa["Supabase*Repo<br/>SupabaseAudioStore"]
     Factory -->|no URL, APP_ENV=dev| Mem["Memory*Repo<br/>MemoryAudioStore"]
@@ -184,12 +185,15 @@ flowchart TB
 
 ### 4.2 Data model
 
-Six tables, all with row level security. Rationale in [ADR-001](docs/adr/ADR-001.md); `accounts` and shards in [ADR-012](docs/adr/ADR-012.md). The diagram shows the core project; in shard projects `sessions` has the same columns without foreign keys.
+Core and shard tables use row level security. Rationale in [ADR-001](docs/adr/ADR-001.md); `accounts` and shards in [ADR-012](docs/adr/ADR-012.md); Schedule in [ADR-016](docs/adr/ADR-016.md). The diagram shows the core project; in shard projects `sessions` has the same columns without foreign keys.
 
 ```mermaid
 erDiagram
     AUTH_USERS ||--|| PROFILES : "id"
     AUTH_USERS ||--o| ACCOUNTS : "user_id"
+    AUTH_USERS ||--o{ SCHEDULE_EVENTS : "user_id"
+    SCHEDULE_EVENTS ||--o{ SCHEDULE_CHECKINS : "event_id"
+    SCHEDULE_EVENTS ||--o{ SCHEDULE_REMINDERS : "event_id"
     PROFILES ||--o{ BASELINES : "user_id"
     PROFILES ||--o{ SCRIPTS : "user_id"
     PROFILES ||--o{ SESSIONS : "user_id"
@@ -205,6 +209,9 @@ erDiagram
 | `sessions`  | Practice results          | Score columns, `result` JSON, `script_snapshot`; `is_compact`, `mistakes` for old sessions; lives in the user's shard |
 | `accounts`  | Shard of each user        | Core only; `shard_ref` (`core` or a shard's project ref) set the first time the user saves a session or session file; no policy (service key only) |
 | `auth_rate_limits` | Attempt counters of the account endpoints | Core only; one row per `(bucket, key)`, key = SHA-256 of the email or user id (never the email); `window_start`, `hits`; rows older than one day deleted every hour by pg_cron; no policy (service key only) |
+| `schedule_events` | Practice events and recurrence settings | Core only; local dates/times follow the event IANA timezone; cascade deletes check-ins and reminders |
+| `schedule_checkins` | One first check-in per event occurrence | Core only; `session_id` is not a foreign key because the session may be in a shard |
+| `schedule_reminders` | Claimed reminder outcome per occurrence | Core only; one row prevents duplicate email and remains `sent`, `failed`, or `skipped` |
 
 ### 4.3 SQL functions
 
@@ -246,6 +253,8 @@ Core project (`db/migration_main/`):
 | `0009_purge_unconfirmed_accounts.sql`  | required, any time | pg_cron job that deletes unconfirmed accounts (ADR-011)              |
 | `0010_accounts.sql`                    | any time           | `accounts` (user to shard); existing users get `core`                |
 | `0011_auth_rate_limits.sql`            | required, any time | `auth_rate_limits`, `hit_rate_limit`, hourly pg_cron cleanup job     |
+| `0012_schedule.sql`                    | required, any time | `schedule_events`, `schedule_checkins`, `schedule_reminders`, `split_schedule_event` |
+| `0013_schedule_reminder_cron.sql`      | required, any time | Five-minute Schedule reminder job via `pg_cron` and `pg_net`         |
 
 Shard projects (`db/migration_shard/`):
 
@@ -304,6 +313,8 @@ Projects in use: core `psc-main` (`SUPABASE_URL`) and shards `psc-shard01` … `
 | 5 | `0005_purge_insufficient_sessions.sql`, `0009_purge_unconfirmed_accounts.sql` | required, any time; need `pg_cron` |
 | 6 | `0010_accounts.sql` | any time |
 | 7 | `0011_auth_rate_limits.sql` | required, any time; needs `pg_cron` |
+| 8 | `0012_schedule.sql` | required, any time; core only |
+| 9 | `0013_schedule_reminder_cron.sql` | required, any time; needs `pg_cron`, `pg_net` and Vault secrets |
 
 `0004` is skipped on a new core: `0008` creates the same function in its current form.
 
@@ -428,6 +439,7 @@ API keys: `DEEPGRAM_API_KEYS`, `GLADIA_API_KEYS`, `GROQ_API_KEYS`, each one or m
 | `SIGNED_URL_TTL_S`                                                   | `600`                                     | Signed URL lifetime, seconds             |
 | `BASELINE_REQUIRED`                                                  | `true`                                    | Reject evaluation without a baseline     |
 | `AUTH_COOKIE_SECURE`                                                 | `true`                                    | `Secure` flag of the `psa_refresh` cookie; browsers accept it on `http://localhost` |
+| `SCHEDULE_CRON_SECRET`                                                | empty                                     | Shared secret checked by the protected Schedule reminder endpoint |
 | `DEV_USER_ID`, `DEV2_USER_ID`                                        | empty                                     | Test users, read only by integration tests |
 
 Account limits in `app_constants.toml` `[auth]`: `otp_length` (6), `resend_cooldown_s` (60), `verify_attempts_per_window` (5) per `verify_window_s` (600), `unconfirmed_ttl_min` (60), `refresh_cookie_days` (30).
