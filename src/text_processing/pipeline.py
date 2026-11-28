@@ -438,18 +438,51 @@ class ScriptGenerationPipeline:
                 ):
                     template_doc = None
 
+        # Reuse precomputed session chunk embeddings (encoding only any newly appended tail chunks)
+        reusable_chunk_embeddings = None
+        if chunks:
+            active_emb_retriever = getattr(self.template_engine, "retriever", None) or getattr(
+                self.llm_generator, "retriever", None
+            )
+            sess_embs = getattr(sess, "chunk_embeddings", None) if sess is not None else None
+            sess_n = len(sess.chunks) if (sess is not None and sess.chunks) else 0
+            if sess_embs is not None and sess_n > 0 and len(sess_embs) == sess_n:
+                if len(chunks) == sess_n:
+                    reusable_chunk_embeddings = sess_embs
+                elif len(chunks) > sess_n and active_emb_retriever is not None:
+                    tail_embs = active_emb_retriever.encode_chunks(chunks[sess_n:])
+                    if tail_embs is not None and len(tail_embs) == len(chunks) - sess_n:
+                        import numpy as np
+
+                        reusable_chunk_embeddings = np.vstack([sess_embs, tail_embs])
+            elif active_emb_retriever is not None:
+                reusable_chunk_embeddings = active_emb_retriever.encode_chunks(chunks)
+
         if template_doc is not None:
-            kwargs: dict[str, str] = {}
+            kwargs: dict[str, object] = {}
             if request.user_feedback:
                 kwargs["user_feedback"] = request.user_feedback
             if effective_chat_context:
                 kwargs["chat_context"] = effective_chat_context
+            template_reported_ids: dict[int, list[int]] = {}
             try:
                 result = self.template_engine.fill_template(
-                    template_doc, chunks=chunks or None, **kwargs
+                    template_doc,
+                    chunks=chunks or None,
+                    verify_citations=False,
+                    chunk_embeddings=reusable_chunk_embeddings,
+                    out_reported_ids=template_reported_ids,
+                    **kwargs,
                 )
             except TypeError:
-                result = self.template_engine.fill_template(template_doc, chunks=chunks or None)
+                try:
+                    result = self.template_engine.fill_template(
+                        template_doc, chunks=chunks or None, **kwargs
+                    )
+                except TypeError:
+                    result = self.template_engine.fill_template(
+                        template_doc, chunks=chunks or None
+                    )
 
             client = getattr(self.template_engine, "client", None)
             if client is None:
@@ -490,7 +523,9 @@ class ScriptGenerationPipeline:
                     result.script,
                     chunks,
                     result.citations,
+                    reported_ids_by_para=template_reported_ids or None,
                     retriever=retriever,
+                    chunk_embeddings=reusable_chunk_embeddings,
                     min_support_score=_CITATION_MIN_SUPPORT_SCORE,
                 )
                 if any(c.status == "uncited" for c in result.citations):
@@ -510,15 +545,25 @@ class ScriptGenerationPipeline:
                     duration_min=request.duration_min,
                     chunks=chunks or None,
                     greeting=request.greeting,
+                    chunk_embeddings=reusable_chunk_embeddings,
                     **kwargs,
                 )
             except TypeError:
-                result = self.llm_generator.generate_free_topic_script(
-                    topic=request.topic,
-                    duration_min=request.duration_min,
-                    chunks=chunks or None,
-                    greeting=request.greeting,
-                )
+                try:
+                    result = self.llm_generator.generate_free_topic_script(
+                        topic=request.topic,
+                        duration_min=request.duration_min,
+                        chunks=chunks or None,
+                        greeting=request.greeting,
+                        **kwargs,
+                    )
+                except TypeError:
+                    result = self.llm_generator.generate_free_topic_script(
+                        topic=request.topic,
+                        duration_min=request.duration_min,
+                        chunks=chunks or None,
+                        greeting=request.greeting,
+                    )
 
         # Stage 7: Post-validation and 20-minute script audio-limit warning
         self._update_job(job_id, "generating", 90, stage="validating_output")

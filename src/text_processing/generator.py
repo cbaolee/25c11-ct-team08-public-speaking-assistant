@@ -23,7 +23,7 @@ from .contracts import (
 )
 from .groq_pool import make_groq_client
 from .moderation import wrap_untrusted_document_context
-from .retrieval import SemanticRetriever, align_script_citations, verify_paragraph_citation
+from .retrieval import SemanticRetriever, align_script_citations
 from .template_engine import TokenBucketLimiter
 
 _RETRIEVAL_MIN_SCORE = float(retrieval_min_score)
@@ -354,6 +354,7 @@ class ScriptGenerator:
         greeting: str | None = None,
         user_feedback: str | None = None,
         chat_context: str | None = None,
+        chunk_embeddings: Any = None,
     ) -> GeneratedScript:
         """Generate a multi-section free-topic speech script for 5, 10, 15, or 20 minutes."""
         clean_topic = topic.strip()
@@ -369,19 +370,18 @@ class ScriptGenerator:
             )
         plan = SECTION_PLANS[duration_min]
         source_chunks = list(chunks or [])
-        chunk_embeddings = (
-            self.retriever.encode_chunks(source_chunks) if source_chunks else None
-        )
-        chunk_embeddings_by_id = (
-            {c.chunk_id: chunk_embeddings[i] for i, c in enumerate(source_chunks)}
-            if (
-                source_chunks
-                and chunk_embeddings is not None
-                and len(chunk_embeddings) == len(source_chunks)
+        if (
+            source_chunks
+            and chunk_embeddings is not None
+            and len(chunk_embeddings) == len(source_chunks)
+        ):
+            resolved_chunk_embeddings = chunk_embeddings
+        else:
+            resolved_chunk_embeddings = (
+                self.retriever.encode_chunks(source_chunks) if source_chunks else None
             )
-            else None
-        )
         all_paragraphs: list[str] = []
+        reported_ids_by_para: dict[int, list[int]] = {}
         citations: list[ParagraphCitation] = []
         models_used: list[str] = []
         prior_titles: list[str] = []
@@ -393,7 +393,7 @@ class ScriptGenerator:
                     f"{clean_topic} - {section_title}",
                     source_chunks,
                     k=self.top_k,
-                    chunk_embeddings=chunk_embeddings,
+                    chunk_embeddings=resolved_chunk_embeddings,
                     min_score=_RETRIEVAL_MIN_SCORE,
                 )
                 if source_chunks
@@ -416,28 +416,22 @@ class ScriptGenerator:
             if model_id not in models_used:
                 models_used.append(model_id)
             prior_titles.append(section_title)
+            section_cids = {c.chunk_id for c in section_chunks}
             for p_text, reported_ids in sec_paragraphs:
                 all_paragraphs.append(p_text)
-                if source_chunks:
-                    citations.append(
-                        verify_paragraph_citation(
-                            len(all_paragraphs),
-                            reported_ids,
-                            section_chunks,
-                            paragraph_text=p_text,
-                            retriever=self.retriever,
-                            chunk_embeddings_by_id=chunk_embeddings_by_id,
-                            min_support_score=_CITATION_MIN_SUPPORT_SCORE,
-                        )
-                    )
+                if source_chunks and reported_ids:
+                    valid_rep = [cid for cid in reported_ids if cid in section_cids]
+                    if valid_rep:
+                        reported_ids_by_para[len(all_paragraphs)] = valid_rep
 
         full_script = "\n\n".join(all_paragraphs)
         if source_chunks and full_script.strip():
             citations = align_script_citations(
                 full_script,
                 source_chunks,
-                citations,
+                reported_ids_by_para=reported_ids_by_para or None,
                 retriever=self.retriever,
+                chunk_embeddings=resolved_chunk_embeddings,
                 min_support_score=_CITATION_MIN_SUPPORT_SCORE,
             )
         word_count = len(full_script.split())

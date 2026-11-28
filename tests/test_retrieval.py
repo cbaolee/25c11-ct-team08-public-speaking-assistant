@@ -996,3 +996,70 @@ def test_sanitize_chunks_preserves_provenance_metadata() -> None:
     assert cleaned[0].source_kind == "file"
     assert cleaned[0].source_msg_id == "msg_file_1"
     assert cleaned[0].source_file == "survey.pdf"
+
+
+def test_per_sentence_nli_scoping_avoids_cross_sentence_pairs_and_honors_reported_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chunks = [
+        DocumentChunk(
+            chunk_id=1,
+            heading="Kelp Survey",
+            page=1,
+            content="Sea otter decline caused kelp forests to collapse by 60 percent.",
+        ),
+        DocumentChunk(
+            chunk_id=2,
+            heading="Solar Report",
+            page=2,
+            content="Community solar microgrids lowered village electricity bills by 40 percent.",
+        ),
+    ]
+    scored_pairs: list[tuple[str, str]] = []
+
+    def _scorer(premise: str, hypothesis: str) -> float:
+        scored_pairs.append((premise, hypothesis))
+        if "Kelp Survey:" in premise and "kelp" in hypothesis.lower():
+            return 0.92
+        if "Solar Report:" in premise and "solar" in hypothesis.lower():
+            return 0.90
+        return 0.05
+
+    fake_nli = NLIVerifier("mock-scoped")
+    monkeypatch.setattr(
+        NLIVerifier,
+        "get_model",
+        classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+    )
+
+    para = (
+        "Good morning everyone. "
+        "Sea otter decline caused kelp forests to collapse by 60 percent. "
+        "Community solar microgrids lowered village electricity bills by 40 percent."
+    )
+    citation = verify_paragraph_citation(
+        paragraph_index=1,
+        reported_chunk_ids=[1, 2],
+        retrieved_chunks=chunks,
+        paragraph_text=para,
+        nli_verifier=fake_nli,
+        sentence_candidate_cids=[set(), {1}, {2}],
+    )
+    assert citation.status == "cited"
+    assert len(citation.sentences) == 3
+    assert citation.sentences[0].status == "uncited"
+    assert [s["chunk_id"] for s in citation.sentences[1].sources] == [1]
+    assert [s["chunk_id"] for s in citation.sentences[2].sources] == [2]
+    # Only the 2 scoped (chunk, sentence) pairs were sent to NLI (zero greeting/cross-topic pairs)
+    assert len(scored_pairs) == 2
+
+    # align_script_citations accepts reported_ids_by_para directly without Pass-1 citations
+    aligned = align_script_citations(
+        para,
+        chunks,
+        reported_ids_by_para={1: [1, 2]},
+        nli_verifier=fake_nli,
+    )
+    assert len(aligned) == 1
+    assert aligned[0].status == "cited"
+    assert {s["chunk_id"] for s in aligned[0].sources} == {1, 2}

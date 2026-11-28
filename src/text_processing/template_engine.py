@@ -456,15 +456,25 @@ class TemplateEngine:
         chat_context: str | None = None,
         max_fill_retries: int = 2,
         client: Any = None,
+        verify_citations: bool = True,
+        chunk_embeddings: Any = None,
+        out_reported_ids: dict[int, list[int]] | None = None,
     ) -> GeneratedScript:
         slots = parse_slots(template)
         topic = template.metadata.topic
         duration_min = template.metadata.duration_min
 
-        chunk_embeddings = self.retriever.encode_chunks(chunks) if chunks else None
+        if chunks and chunk_embeddings is not None and len(chunk_embeddings) == len(chunks):
+            resolved_chunk_embeddings = chunk_embeddings
+        else:
+            resolved_chunk_embeddings = self.retriever.encode_chunks(chunks) if chunks else None
         chunk_embeddings_by_id = (
-            {c.chunk_id: chunk_embeddings[i] for i, c in enumerate(chunks)}
-            if (chunks and chunk_embeddings is not None and len(chunk_embeddings) == len(chunks))
+            {c.chunk_id: resolved_chunk_embeddings[i] for i, c in enumerate(chunks)}
+            if (
+                chunks
+                and resolved_chunk_embeddings is not None
+                and len(resolved_chunk_embeddings) == len(chunks)
+            )
             else None
         )
         entity_slots = [s for s in slots if s.slot_type == "entity"]
@@ -522,7 +532,7 @@ class TemplateEngine:
                                 query,
                                 chunks,
                                 k=3,
-                                chunk_embeddings=chunk_embeddings,
+                                chunk_embeddings=resolved_chunk_embeddings,
                                 min_score=_RETRIEVAL_MIN_SCORE,
                             )
                             if chunks
@@ -589,28 +599,36 @@ class TemplateEngine:
 
                                 if chunks:
                                     real_para = template.body[: slot.start_char].count("\n\n") + 1
-                                    slot_candidates = batch_retrieved.get(slot.name) or list(
-                                        unique_batch_chunks.values()
-                                    )
-                                    citation = verify_paragraph_citation(
-                                        paragraph_index=real_para,
-                                        reported_chunk_ids=[
-                                            int(x)
-                                            for x in source_ids
-                                            if isinstance(x, (int, float))
-                                            or (isinstance(x, str) and x.strip().isdigit())
-                                        ],
-                                        retrieved_chunks=slot_candidates,
-                                        paragraph_text=text,
-                                        retriever=self.retriever,
-                                        chunk_embeddings_by_id=chunk_embeddings_by_id,
-                                        min_support_score=_CITATION_MIN_SUPPORT_SCORE,
-                                    )
-                                    existing = citations_by_para.get(real_para)
-                                    if existing is None or (
-                                        existing.status == "uncited" and citation.status == "cited"
-                                    ):
-                                        citations_by_para[real_para] = citation
+                                    parsed_ids = [
+                                        int(x)
+                                        for x in source_ids
+                                        if isinstance(x, (int, float))
+                                        or (isinstance(x, str) and x.strip().isdigit())
+                                    ]
+                                    if out_reported_ids is not None and parsed_ids:
+                                        existing_ids = out_reported_ids.setdefault(real_para, [])
+                                        for pid in parsed_ids:
+                                            if pid not in existing_ids:
+                                                existing_ids.append(pid)
+                                    if verify_citations:
+                                        slot_candidates = batch_retrieved.get(slot.name) or list(
+                                            unique_batch_chunks.values()
+                                        )
+                                        citation = verify_paragraph_citation(
+                                            paragraph_index=real_para,
+                                            reported_chunk_ids=parsed_ids,
+                                            retrieved_chunks=slot_candidates,
+                                            paragraph_text=text,
+                                            retriever=self.retriever,
+                                            chunk_embeddings_by_id=chunk_embeddings_by_id,
+                                            min_support_score=_CITATION_MIN_SUPPORT_SCORE,
+                                        )
+                                        existing = citations_by_para.get(real_para)
+                                        if existing is None or (
+                                            existing.status == "uncited"
+                                            and citation.status == "cited"
+                                        ):
+                                            citations_by_para[real_para] = citation
                             break
                         except ScriptGenerationError:
                             if retry == max_fill_retries - 1:

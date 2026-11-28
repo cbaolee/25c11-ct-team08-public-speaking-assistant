@@ -693,10 +693,17 @@ def _verify_with_nli(
     chunk_embeddings_by_id: dict[int, NDArray[np.float32]] | None,
     entailment_min: float,
     contradiction_max: float,
+    *,
+    sentence_candidate_cids: list[set[int]] | None = None,
+    sentence_embeddings: NDArray[np.float32] | None = None,
+    round2a_max_chunks_per_sentence: int = 3,
 ) -> ParagraphCitation | None:
     """Run Round 1 (sentence-level) + Round 2 (clause & Top-2 multi-hop) NLI verification.
 
     Returns ``None`` only when the NLI model is unavailable so the caller can fall back.
+    When *sentence_candidate_cids* is provided (by ``align_script_citations``), each sentence
+    is scored only against its own relevant candidate chunks rather than the Cartesian product
+    of every chunk recalled for other sentences in the paragraph.
     """
     sentences = _split_paragraph_sentences(clean_para)
     if not sentences:
@@ -712,20 +719,30 @@ def _verify_with_nli(
     chunk_texts = {c.chunk_id: f"{c.heading}: {c.content}" for c in candidates}
 
     # Pre-filter out completely off-topic chunks (cosine < 0.20) when real embeddings are
-    # available, and cache sentence/chunk vectors for reuse in Round 2B multi-hop ranking.
+    # available, and cache sentence/chunk vectors for reuse across Round 1, 2A, and 2B.
     emb_model = retriever.get_model()
     s_vecs: NDArray[np.float32] | None = None
     local_c_vecs: dict[int, NDArray[np.float32]] = dict(chunk_embeddings_by_id or {})
     eligible_cids: set[int] = {c.chunk_id for c in candidates}
     if emb_model is not None and not type(emb_model).__name__.startswith("Mock"):
         try:
-            s_vecs = retriever._encode(emb_model, sentences)
+            if (
+                sentence_embeddings is not None
+                and len(sentence_embeddings) == len(sentences)
+            ):
+                s_vecs = sentence_embeddings
+            else:
+                s_vecs = retriever._encode(emb_model, sentences)
+            missing_chunks = [ch for ch in candidates if ch.chunk_id not in local_c_vecs]
+            if missing_chunks:
+                missing_vecs = retriever._encode(
+                    emb_model, [chunk_texts[ch.chunk_id] for ch in missing_chunks]
+                )
+                for ch, vec in zip(missing_chunks, missing_vecs, strict=True):
+                    local_c_vecs[ch.chunk_id] = vec
             eligible_cids = set()
             for ch in candidates:
-                c_vec = local_c_vecs.get(ch.chunk_id)
-                if c_vec is None:
-                    c_vec = retriever._encode(emb_model, [chunk_texts[ch.chunk_id]])[0]
-                    local_c_vecs[ch.chunk_id] = c_vec
+                c_vec = local_c_vecs[ch.chunk_id]
                 max_sim = float(np.max(s_vecs @ c_vec))
                 if max_sim >= 0.20:
                     eligible_cids.add(ch.chunk_id)
@@ -749,14 +766,64 @@ def _verify_with_nli(
         )
     candidates = active_candidates
 
-    # Round 1: Batch all (candidate_chunk, sentence) pairs in one predict() call
+    # Precompute sentence x candidate similarity matrix once when real embeddings are available.
+    sim_matrix: NDArray[np.float32] | None = None
+    if s_vecs is not None and all(ch.chunk_id in local_c_vecs for ch in candidates):
+        c_mat = np.stack([local_c_vecs[ch.chunk_id] for ch in candidates], axis=0)
+        sim_matrix = s_vecs @ c_mat.T
+
+    # Determine per-sentence candidate indices to avoid scoring unrelated chunks across sentences.
+    use_per_sent_cids = (
+        sentence_candidate_cids is not None
+        and len(sentence_candidate_cids) == len(sentences)
+    )
+    all_c_indices = list(range(len(candidates)))
+    per_sent_c_indices: list[list[int]] = []
+    for s_idx in range(len(sentences)):
+        if use_per_sent_cids:
+            allowed_ids = sentence_candidate_cids[s_idx]  # type: ignore[index]
+            c_indices = [
+                c_idx for c_idx, ch in enumerate(candidates) if ch.chunk_id in allowed_ids
+            ]
+        elif sim_matrix is not None:
+            # On direct multi-sentence calls, skip chunks unrelated to this sentence (sim < 0.20);
+            # single-sentence calls keep all paragraph-eligible chunks.
+            if len(sentences) > 1:
+                c_indices = [
+                    c_idx
+                    for c_idx in all_c_indices
+                    if float(sim_matrix[s_idx, c_idx]) >= 0.20
+                ]
+            else:
+                c_indices = all_c_indices
+        else:
+            c_indices = all_c_indices
+        per_sent_c_indices.append(c_indices)
+
+    # Round 1: Batch all eligible (candidate_chunk, sentence) pairs in one predict() call
     r1_pairs: list[tuple[str, str]] = []
     r1_index: list[tuple[int, int]] = []  # (cand_idx, sent_idx)
-    for c_idx, chunk in enumerate(candidates):
-        c_full = chunk_texts[chunk.chunk_id]
-        for s_idx, sent in enumerate(sentences):
-            r1_pairs.append((c_full, sent))
+    for s_idx, sent in enumerate(sentences):
+        for c_idx in per_sent_c_indices[s_idx]:
+            r1_pairs.append((chunk_texts[candidates[c_idx].chunk_id], sent))
             r1_index.append((c_idx, s_idx))
+
+    if not r1_pairs:
+        # Ensure NLI model availability check still triggers fallback when NLI is unavailable.
+        if nli.get_model(nli.model_name) is None:
+            return None
+        return ParagraphCitation(
+            paragraph=paragraph_index,
+            heading=None,
+            page=None,
+            status="uncited",
+            chunk_id=None,
+            sources=[],
+            sentences=[
+                SentenceCitation(sentence_index=i, text=s, status="uncited", sources=[])
+                for i, s in enumerate(sentences)
+            ],
+        )
 
     r1_scores = nli.score_pairs(r1_pairs)
     if r1_scores is None:
@@ -785,7 +852,9 @@ def _verify_with_nli(
     }
 
     # Round 2A: Clause splitting for compound sentences that missed Round 1
-    unsupported_indices = [i for i, ok in enumerate(sent_supported) if not ok]
+    unsupported_indices = [
+        i for i, ok in enumerate(sent_supported) if not ok and per_sent_c_indices[i]
+    ]
     if unsupported_indices:
         clauses_by_sent: dict[int, list[str]] = {}
         clause_pairs: list[tuple[str, str]] = []
@@ -795,9 +864,20 @@ def _verify_with_nli(
             if not clauses:
                 continue
             clauses_by_sent[s_idx] = clauses
+            sent_cands = per_sent_c_indices[s_idx]
+            if (
+                sim_matrix is not None
+                and round2a_max_chunks_per_sentence > 0
+                and len(sent_cands) > round2a_max_chunks_per_sentence
+            ):
+                sent_cands = sorted(
+                    sent_cands,
+                    key=lambda ci: float(sim_matrix[s_idx, ci]),
+                    reverse=True,
+                )[:round2a_max_chunks_per_sentence]
             for cl_idx, clause in enumerate(clauses):
-                for c_idx, chunk in enumerate(candidates):
-                    clause_pairs.append((chunk_texts[chunk.chunk_id], clause))
+                for c_idx in sent_cands:
+                    clause_pairs.append((chunk_texts[candidates[c_idx].chunk_id], clause))
                     clause_meta.append((c_idx, s_idx, cl_idx))
 
         if clause_pairs:
@@ -864,7 +944,12 @@ def _verify_with_nli(
         for s_idx in still_unsupported:
             sent = sentences[s_idx]
             ranked: list[tuple[float, DocumentChunk]] = []
-            if emb_model is not None:
+            if sim_matrix is not None:
+                ranked = [
+                    (float(sim_matrix[s_idx, c_idx]), candidates[c_idx])
+                    for c_idx in range(len(candidates))
+                ]
+            elif emb_model is not None:
                 try:
                     s_vec = (
                         s_vecs[s_idx]
@@ -991,6 +1076,8 @@ def verify_paragraph_citation(
     retriever: SemanticRetriever | None = None,
     nli_verifier: NLIVerifier | None = None,
     chunk_embeddings_by_id: dict[int, NDArray[np.float32]] | None = None,
+    sentence_candidate_cids: list[set[int]] | None = None,
+    sentence_embeddings: NDArray[np.float32] | None = None,
     min_support_score: float = 0.52,
     nli_entailment_min: float = _NLI_ENTAILMENT_MIN,
     nli_contradiction_max: float = _NLI_CONTRADICTION_MAX,
@@ -1105,6 +1192,8 @@ def verify_paragraph_citation(
         chunk_embeddings_by_id=chunk_embeddings_by_id,
         entailment_min=nli_entailment_min,
         contradiction_max=nli_contradiction_max,
+        sentence_candidate_cids=sentence_candidate_cids,
+        sentence_embeddings=sentence_embeddings,
     )
     if nli_result is not None:
         return nli_result
@@ -1214,15 +1303,17 @@ def align_script_citations(
     chunks: list[DocumentChunk],
     existing_citations: list[ParagraphCitation] | None = None,
     *,
+    reported_ids_by_para: dict[int, list[int]] | None = None,
     retriever: SemanticRetriever | None = None,
     nli_verifier: NLIVerifier | None = None,
+    chunk_embeddings: NDArray[np.float32] | None = None,
     min_support_score: float = 0.52,
 ) -> list[ParagraphCitation]:
     """Align and verify citations for every paragraph of *script_text* against *chunks*.
 
-    Evaluates both any previously reported chunk(s) and top retrieved candidates across
-    all chunks (including sentence-level retrieval for long multi-source paragraphs) so
-    polished or free-topic paragraphs receive accurate primary + multi-source citations.
+    Evaluates LLM-reported chunk IDs (via *reported_ids_by_para* or *existing_citations*)
+    plus per-sentence top retrieved candidates using a single batched Bi-Encoder pass so
+    every sentence is verified against only its own relevant chunks.
     """
     if not chunks or not script_text or not script_text.strip():
         return list(existing_citations or [])
@@ -1233,10 +1324,13 @@ def align_script_citations(
 
     active_retriever = retriever or SemanticRetriever()
     active_nli = nli_verifier or NLIVerifier()
-    chunk_embeddings = active_retriever.encode_chunks(chunks)
+    if chunk_embeddings is not None and len(chunk_embeddings) == len(chunks):
+        resolved_chunk_embeddings: NDArray[np.float32] | None = chunk_embeddings
+    else:
+        resolved_chunk_embeddings = active_retriever.encode_chunks(chunks)
     chunk_embeddings_by_id = (
-        {c.chunk_id: chunk_embeddings[i] for i, c in enumerate(chunks)}
-        if (chunk_embeddings is not None and len(chunk_embeddings) == len(chunks))
+        {c.chunk_id: resolved_chunk_embeddings[i] for i, c in enumerate(chunks)}
+        if (resolved_chunk_embeddings is not None and len(resolved_chunk_embeddings) == len(chunks))
         else None
     )
     chunks_by_id = {c.chunk_id: c for c in chunks}
@@ -1244,48 +1338,124 @@ def align_script_citations(
         c.paragraph: c for c in (existing_citations or []) if c.status == "cited"
     }
     candidate_min_score = min(_RETRIEVAL_MIN_SCORE, min_support_score)
+    per_sent_min_score = min(0.20, candidate_min_score)
+
+    para_sentences: list[list[str]] = [_split_paragraph_sentences(p) for p in paragraphs]
+
+    # Single batched Bi-Encoder pass for all sentences across the entire script when real
+    # embeddings are available — avoids O(sentences) separate encode() calls and enables
+    # exact per-sentence candidate filtering before Cross-Encoder NLI.
+    emb_model = active_retriever.get_model()
+    use_batched_embs = (
+        resolved_chunk_embeddings is not None
+        and emb_model is not None
+        and not type(emb_model).__name__.startswith("Mock")
+    )
+    para_sent_vecs: list[NDArray[np.float32] | None] = [None] * len(paragraphs)
+    para_sent_sims: list[NDArray[np.float32] | None] = [None] * len(paragraphs)
+    if use_batched_embs:
+        flat_sents = [sent for sents in para_sentences for sent in sents]
+        if flat_sents:
+            try:
+                all_sent_vecs = active_retriever._encode(emb_model, flat_sents)
+                all_sims = all_sent_vecs @ resolved_chunk_embeddings.T  # type: ignore[union-attr]
+                offset = 0
+                for p_i, sents in enumerate(para_sentences):
+                    n_s = len(sents)
+                    if n_s:
+                        para_sent_vecs[p_i] = all_sent_vecs[offset : offset + n_s]
+                        para_sent_sims[p_i] = all_sims[offset : offset + n_s]
+                        offset += n_s
+            except Exception:
+                use_batched_embs = False
 
     aligned: list[ParagraphCitation] = []
-    for idx, para_text in enumerate(paragraphs, start=1):
+    for p_i, para_text in enumerate(paragraphs):
+        idx = p_i + 1
         candidate_chunks: list[DocumentChunk] = []
         seen_cids: set[int] = set()
+        prior_cids: set[int] = set()
 
         prev = existing_by_para.get(idx)
         if prev is not None:
             if prev.chunk_id is not None and prev.chunk_id in chunks_by_id:
                 seen_cids.add(prev.chunk_id)
+                prior_cids.add(prev.chunk_id)
                 candidate_chunks.append(chunks_by_id[prev.chunk_id])
             for src in prev.sources:
                 scid = src.get("chunk_id")
                 if isinstance(scid, int) and scid in chunks_by_id and scid not in seen_cids:
                     seen_cids.add(scid)
+                    prior_cids.add(scid)
                     candidate_chunks.append(chunks_by_id[scid])
 
-        for ch in active_retriever.retrieve_top_k(
-            para_text,
-            chunks,
-            k=max(3, _MAX_SOURCES_PER_SENTENCE),
-            chunk_embeddings=chunk_embeddings,
-            min_score=candidate_min_score,
-        ):
-            if ch.chunk_id not in seen_cids:
-                seen_cids.add(ch.chunk_id)
-                candidate_chunks.append(ch)
+        if reported_ids_by_para:
+            for rcid in reported_ids_by_para.get(idx, ()):
+                if isinstance(rcid, int) and rcid in chunks_by_id:
+                    prior_cids.add(rcid)
+                    if rcid not in seen_cids:
+                        seen_cids.add(rcid)
+                        candidate_chunks.append(chunks_by_id[rcid])
 
-        # Sentence-level candidate recall so multi-topic paragraphs don't miss a 2nd source
-        sentences = _split_paragraph_sentences(para_text)
-        if len(sentences) >= 2 and len(chunks) > len(candidate_chunks):
-            for sent in sentences:
-                for ch in active_retriever.retrieve_top_k(
-                    sent,
-                    chunks,
-                    k=_MAX_SOURCES_PER_SENTENCE,
-                    chunk_embeddings=chunk_embeddings,
-                    min_score=candidate_min_score,
-                ):
+        sentences = para_sentences[p_i]
+        sent_sims = para_sent_sims[p_i]
+        sent_candidate_cids: list[set[int]] | None = None
+
+        if use_batched_embs and sent_sims is not None and sentences:
+            sent_candidate_cids = []
+            top_k = max(3, _MAX_SOURCES_PER_SENTENCE)
+            for s_idx in range(len(sentences)):
+                row = sent_sims[s_idx]
+                ranked_idx = np.argsort(row)[::-1]
+                s_cids: set[int] = set()
+                for c_pos in ranked_idx:
+                    score = float(row[int(c_pos)])
+                    if score < candidate_min_score:
+                        break
+                    ch = chunks[int(c_pos)]
+                    s_cids.add(ch.chunk_id)
                     if ch.chunk_id not in seen_cids:
                         seen_cids.add(ch.chunk_id)
                         candidate_chunks.append(ch)
+                    if len(s_cids) >= top_k:
+                        break
+                # Always include LLM-reported / prior chunks that meet minimum relevance for
+                # this sentence (or all prior chunks on single-sentence paragraphs).
+                for p_cid in prior_cids:
+                    if p_cid in s_cids:
+                        continue
+                    c_pos_match = next(
+                        (i for i, ch in enumerate(chunks) if ch.chunk_id == p_cid), None
+                    )
+                    if c_pos_match is not None and (
+                        len(sentences) == 1 or float(row[c_pos_match]) >= per_sent_min_score
+                    ):
+                        s_cids.add(p_cid)
+                sent_candidate_cids.append(s_cids)
+        else:
+            for ch in active_retriever.retrieve_top_k(
+                para_text,
+                chunks,
+                k=max(3, _MAX_SOURCES_PER_SENTENCE),
+                chunk_embeddings=resolved_chunk_embeddings,
+                min_score=candidate_min_score,
+            ):
+                if ch.chunk_id not in seen_cids:
+                    seen_cids.add(ch.chunk_id)
+                    candidate_chunks.append(ch)
+
+            if len(sentences) >= 2 and len(chunks) > len(candidate_chunks):
+                for sent in sentences:
+                    for ch in active_retriever.retrieve_top_k(
+                        sent,
+                        chunks,
+                        k=_MAX_SOURCES_PER_SENTENCE,
+                        chunk_embeddings=resolved_chunk_embeddings,
+                        min_score=candidate_min_score,
+                    ):
+                        if ch.chunk_id not in seen_cids:
+                            seen_cids.add(ch.chunk_id)
+                            candidate_chunks.append(ch)
 
         citation = verify_paragraph_citation(
             paragraph_index=idx,
@@ -1295,6 +1465,8 @@ def align_script_citations(
             retriever=active_retriever,
             nli_verifier=active_nli,
             chunk_embeddings_by_id=chunk_embeddings_by_id,
+            sentence_candidate_cids=sent_candidate_cids,
+            sentence_embeddings=para_sent_vecs[p_i],
             min_support_score=min_support_score,
         )
         aligned.append(citation)
