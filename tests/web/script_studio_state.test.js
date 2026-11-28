@@ -587,3 +587,16 @@ test('pickCooldownReply rotates across all 15 TEXT.script.regenCooldownReplies w
   assert.match(second.text, /9s/);
   assert.deepEqual(pickCooldownReply([], '5s'), { text: '', index: -1 });
 });
+
+test('every i18n key referenced by script_studio.js and script_reader.js exists in TEXT', async () => {
+  const { TEXT } = await i18n;
+  const resolveKey = key => key.split('.').reduce((acc, part) => (acc && Object.hasOwn(acc, part) ? acc[part] : undefined), TEXT);
+  for (const rel of ['../../src/web/static/js/screens/script_studio.js', '../../src/web/static/js/screens/script_reader.js']) {
+    const src = fs.readFileSync(path.join(__dirname, rel), 'utf8');
+    const keys = [...new Set([...src.matchAll(/T\('([a-zA-Z0-9_.]+)'/g)].map(m => m[1]))];
+    for (const key of keys) {
+      assert.notEqual(resolveKey(key), undefined, `${rel} missing i18n key: ${key}`);
+    }
+  }
+  assert.match(String(TEXT.script.page), /\{n\}/);
+});

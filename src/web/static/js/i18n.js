@@ -124,6 +124,7 @@ export const TEXT = {
     copied: 'Script copied.', copyFail: 'Copy is not available in this browser.', downloadName: 'script.txt',
     citeNone: 'No source document or detailed chat notes attached, so this script has no citations.',
     citeAllOk: 'Citations show the attached document section or chat note supporting each paragraph.',
+    page: 'p. {n}',
     uncited: 'uncited', uncitedHelp: 'Paragraphs marked "uncited" use general knowledge rather than a specific passage from your attached document or chat notes.',
     checking: 'Checking your request against the content rules...',
     blockedTag: 'Blocked by content rules',
