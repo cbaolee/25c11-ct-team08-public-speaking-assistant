@@ -1047,11 +1047,14 @@ FREE_TOPIC_META_WORDS = frozenset(
     """
     a about an and can class could create draft for generate give hello help hi i in like
     make me min mins minute minutes my need of on please prepare presentation presentations
-    script scripts some speech speeches student students talk talks thanks the to want
-    with would write you
-    bài cho giúp làm lớp mình một nói phút sinh thuyết tôi trình tạo về viên viết
+    say script scripts some speech speeches student students talk talks tell thanks the to
+    tomorrow want what with would write you
+    bài bạn cho có được giúp không làm lớp mình một nói phút sinh thể thuyết tôi trình tạo
+    về viên viết
     """.split()
 )
+# "5-minute" and "10min" only state a length.
+_DURATION_WORD_RE = re.compile(r"\d+-?(?:min|mins|minute|minutes)", re.IGNORECASE)
 
 _ANY_TEMPLATE_ID = "selected"
 
@@ -1258,7 +1261,8 @@ def is_free_topic_identifiable(
     if files_loaded or chunks:
         return True
     specific_words = sum(
-        word.lower() not in FREE_TOPIC_META_WORDS for word in content_words(initial_prompt)
+        word.lower() not in FREE_TOPIC_META_WORDS and not _DURATION_WORD_RE.fullmatch(word)
+        for word in content_words(initial_prompt)
     )
     return specific_words >= FREE_TOPIC_MIN_SPECIFIC_WORDS
 

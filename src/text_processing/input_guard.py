@@ -1,7 +1,8 @@
 """Guard against junk chat input such as "aaaaa", "asdfgh" or "?????" (contract E v2).
 
-The web client implements the same rules; `tests/fixtures/gibberish_vectors.json` keeps both
-sides in step. The numbers below are part of the rules, not settings to tune.
+The web client is expected to implement the same rules (not there yet);
+`tests/fixtures/gibberish_vectors.json` is meant to keep both sides in step. The numbers below
+are part of the rules, not settings to tune.
 """
 
 import unicodedata

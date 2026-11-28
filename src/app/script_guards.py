@@ -95,7 +95,7 @@ def _content_key(session: ChatSessionState) -> str:
 
 
 def remember_category_decision(session: ChatSessionState) -> None:
-    """Call after the session was updated with content that passed the category check."""
+    """Call after the session update, only when the guard of that request returned True."""
     slug = normalize_category_slug(session.category)
     if slug is not None:
         category_decisions.remember(session.session_id, slug, _content_key(session))
@@ -113,6 +113,16 @@ def _uses_template_of_category(
     )
 
 
+def _old_content_verified(session: ChatSessionState | None, category: str) -> bool:
+    """Whether the session holds no content yet, or a decision for `category` covers it."""
+    if session is None or not (session.initial_prompt or session.chunks):
+        return True
+    slug = normalize_category_slug(category)
+    return slug is not None and category_decisions.covers(
+        session.session_id, slug, _content_key(session)
+    )
+
+
 def _assert_category(
     pipeline: ScriptGenerationPipeline,
     category: str,
@@ -123,8 +133,11 @@ def _assert_category(
     client: Any | None = None,
     limiter: TokenBucketLimiter | None = None,
     allow_llm: bool = False,
-) -> None:
-    """Raise 422 `category_mismatch` when prompt and chunks clearly belong elsewhere."""
+) -> bool:
+    """Raise 422 `category_mismatch` when prompt and chunks clearly belong elsewhere.
+
+    False when the guard failed open, so the material was not verified.
+    """
     result = check_category_alignment(
         selected_category=category,
         segments=split_segments(prompt, chunks, max_segments=_MAX_SEGMENTS),
@@ -139,6 +152,7 @@ def _assert_category(
     )
     if not result.allowed and result.suggested_category:
         raise CategoryMismatchError(result.selected_category, result.suggested_category)
+    return result.layer != "fail_open"
 
 
 def guard_category_suggest(
@@ -147,21 +161,34 @@ def guard_category_suggest(
     session: ChatSessionState | None,
     category: str,
     prompt: str,
-    chunks: list[DocumentChunk],
+    file_chunks: list[DocumentChunk],
     has_template_match: bool,
     client: Any | None,
     limiter: TokenBucketLimiter | None,
-) -> None:
-    """`/suggest`, before the session changes; `chunks` holds the old and the new ones."""
-    _assert_category(
+) -> bool:
+    """`/suggest`, before the session changes; True when the decision may be remembered.
+
+    With a new file only this request's prompt and that file are scored. Without one the first
+    prompt, the new prompt and the session chunks are scored together.
+    """
+    if file_chunks:
+        text, chunks = prompt, file_chunks
+    else:
+        first_prompt = session.initial_prompt if session else ""
+        text = "\n".join(part for part in dict.fromkeys((first_prompt, prompt)) if part)
+        chunks = session.chunks if session else []
+    verified = _assert_category(
         pipeline,
         category,
-        prompt or (session.initial_prompt if session else ""),
+        text,
         chunks,
         has_template_match=has_template_match,
         client=client,
         limiter=limiter,
         allow_llm=True,
+    )
+    return verified and (
+        has_template_match or not file_chunks or _old_content_verified(session, category)
     )
 
 
@@ -173,18 +200,24 @@ def guard_category_message_file(
     *,
     client: Any | None,
     limiter: TokenBucketLimiter | None,
-) -> None:
-    """A chat turn with a new file: check that message and that file only."""
-    _assert_category(
+) -> bool:
+    """A chat turn with a new file, before the session changes: check message and file only.
+
+    True when the decision may be remembered: the file was really scored (no template pass, no
+    fail-open) and the older content was already verified.
+    """
+    template_pass = _uses_template_of_category(pipeline, session)
+    verified = _assert_category(
         pipeline,
         session.category,
         message,
         file_chunks,
-        has_template_match=_uses_template_of_category(pipeline, session),
+        has_template_match=template_pass,
         client=client,
         limiter=limiter,
         allow_llm=True,
     )
+    return verified and not template_pass and _old_content_verified(session, session.category)
 
 
 def guard_category_generate(

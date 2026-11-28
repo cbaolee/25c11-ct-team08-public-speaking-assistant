@@ -1253,6 +1253,29 @@ def test_generate_script_accepts_gibberish_with_a_pdf(guard_api) -> None:
     assert response.status_code == 202
 
 
+@pytest.mark.parametrize(
+    ("filename", "content", "status_code"),
+    [
+        ("a.txt", b"", 422),
+        ("notes.txt", b"Coral reef notes.", 422),
+        ("empty.pdf", b"", 422),
+        ("NOTES.PDF", b"%PDF-1.4 notes", 202),
+    ],
+)
+def test_generate_script_skips_the_gibberish_guard_only_for_a_pdf_with_content(
+    guard_api, filename, content, status_code
+) -> None:
+    client, *_ = guard_api
+
+    response = client.post(
+        "/api/generate-script",
+        data={"topic": "Coral reefs", "user_feedback": "asdfghjkl"},
+        files={"pdf": (filename, content, "application/pdf")},
+    )
+
+    assert response.status_code == status_code
+
+
 def test_message_accepts_the_generate_keyword(guard_api) -> None:
     client, _, user, _, store = guard_api
 
@@ -1699,6 +1722,165 @@ def test_blocked_material_is_not_remembered(category_api) -> None:
 
     assert _suggest(client, _MARATHON_TEXT).status_code == 422
     assert category_decisions._entries == {}
+
+
+_WILD_TEXT = category_guard._HANDWRITTEN["wildlife"][0]
+# Looks like Sports when scored without the first prompt.
+_INSTRUCTION = "Please make the introduction shorter and finish like a marathon sprint."
+
+
+def _break_embeddings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make layer 1 raise, so the category guard fails open."""
+    monkeypatch.setattr(
+        category_guard, "_prototype_matrices", MagicMock(side_effect=RuntimeError("transient"))
+    )
+
+
+def _upload(client, session_id: str, route: str, file: tuple[str, bytes, str]):
+    """Send a file as the next step of a wildlife session.
+
+    `/suggest` asks for 10 minutes, where no template exists, so no template match skips the check.
+    """
+    data: dict[str, Any] = {"session_id": session_id}
+    if route.endswith("suggest"):
+        data |= {"category": "wildlife", "duration_min": 10}
+    return client.post(route, data=data, files={"file": file})
+
+
+_UPLOAD_ROUTES = ["/api/script-chat/suggest", "/api/script-chat/message"]
+
+
+@pytest.mark.parametrize("prompt", [_INSTRUCTION, _WILD_TEXT, ""])
+def test_suggest_resend_without_a_file_is_scored_with_the_first_prompt(
+    category_api, prompt
+) -> None:
+    client, _, _, _, _, model = category_api
+    session_id = _suggest(client, _WILD_TEXT).json()["session_id"]
+    model.calls.clear()
+
+    response = _suggest(client, prompt, session_id=session_id)
+
+    assert response.status_code == 200
+    scored = list(dict.fromkeys(text for text in (_WILD_TEXT, prompt) if text))
+    assert scored in model.calls
+    assert [_WILD_TEXT, _WILD_TEXT] not in model.calls  # a repeated prompt is scored once
+    model.calls.clear()
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert model.calls == []
+
+
+@pytest.mark.parametrize("prompt", ["", _WILD_TEXT])
+def test_suggest_scores_a_new_file_without_the_older_content(category_api, prompt) -> None:
+    client, _, user, _, store, _ = category_api
+    first = _suggest(client, _WILD_TEXT, files={"file": _REEF_FILE})
+    session = store.get(first.json()["session_id"], user_id=str(user.id))
+
+    response = _suggest(
+        client, prompt, session_id=session.session_id, files={"file": _MARATHON_FILE}
+    )
+
+    # An on-topic prompt sent with the file is scored with it; older content never is.
+    assert response.status_code == (200 if prompt else 422)
+    assert session.files_loaded == (
+        ["reefs.txt", "running.txt"] if prompt else ["reefs.txt"]
+    )
+
+
+@pytest.mark.parametrize("route", _UPLOAD_ROUTES)
+def test_a_fail_open_check_is_not_remembered(category_api, monkeypatch, route) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    store.get(session_id, user_id=str(user.id)).initial_prompt = ""
+    with monkeypatch.context() as broken:
+        _break_embeddings(broken)
+        assert _upload(client, session_id, route, _MARATHON_FILE).status_code == 200
+
+    assert category_decisions._entries == {}
+    response = _generate(client, session_id=session_id)
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+
+
+def test_suggest_without_a_file_does_not_remember_a_fail_open_check(
+    category_api, monkeypatch
+) -> None:
+    client, *_ = category_api
+    with monkeypatch.context() as broken:
+        _break_embeddings(broken)
+        first = _suggest(client, _MARATHON_TEXT)
+
+    assert first.status_code == 200
+    assert category_decisions._entries == {}
+    assert _generate(client, session_id=first.json()["session_id"]).status_code == 422
+
+
+def test_message_file_let_through_by_a_template_is_not_remembered(category_api) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    session = store.get(session_id, user_id=str(user.id))
+    session.selected_template_id = "wildlife/keystone_5m"
+    upload = _upload(client, session_id, "/api/script-chat/message", _MARATHON_FILE)
+    assert upload.status_code == 200
+    session.selected_template_id = None  # the user switches to Write Freely
+
+    response = _generate(client, session_id=session_id)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+
+
+@pytest.mark.parametrize("route", _UPLOAD_ROUTES)
+def test_a_new_file_does_not_vouch_for_unverified_older_content(category_api, route) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    store.get(session_id, user_id=str(user.id)).initial_prompt = _MARATHON_TEXT
+
+    assert _upload(client, session_id, route, _REEF_FILE).status_code == 200
+
+    assert category_decisions._entries == {}
+    response = _generate(client, session_id=session_id)
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+
+
+@pytest.mark.parametrize("route", _UPLOAD_ROUTES)
+@pytest.mark.parametrize("has_older_content", [True, False])
+def test_a_new_file_is_remembered_when_all_content_was_verified(
+    category_api, route, has_older_content
+) -> None:
+    client, _, user, _, store, model = category_api
+    if has_older_content:
+        session_id = _suggest(client, _REEF_TEXT).json()["session_id"]
+    else:
+        session_id = _put_guard_session(store, user)
+        store.get(session_id, user_id=str(user.id)).initial_prompt = ""
+    assert _upload(client, session_id, route, _REEF_FILE).status_code == 200
+    model.calls.clear()
+
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert model.calls == []
+
+
+def test_a_decision_of_another_category_does_not_verify_older_content(category_api) -> None:
+    client, *_ = category_api
+    session_id = _suggest(client, _MARATHON_TEXT, category="sports").json()["session_id"]
+
+    response = _upload(client, session_id, "/api/script-chat/suggest", _REEF_FILE)
+
+    assert response.status_code == 200
+    assert [slug for _, (slug, _) in category_decisions._entries.values()] == ["sports"]
+    assert _generate(client, session_id=session_id).status_code == 422
+
+
+def test_suggest_remembers_a_template_match(category_api) -> None:
+    client, _, user, pipeline, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    strong = MagicMock(recommend_free_topic=False)
+    strong.to_dict.return_value = {"suggestions": [], "recommend_free_topic": False}
+
+    with pytest.MonkeyPatch.context() as patched:
+        patched.setattr(pipeline.template_store, "suggest_topics", lambda **_: strong)
+        response = _upload(client, session_id, "/api/script-chat/suggest", _MARATHON_FILE)
+
+    assert response.status_code == 200
+    assert [slug for _, (slug, _) in category_decisions._entries.values()] == ["wildlife"]
 
 
 def test_category_decisions_follow_the_chat_session_limits() -> None:

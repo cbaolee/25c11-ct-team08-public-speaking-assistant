@@ -840,7 +840,10 @@ async def generate_script_endpoint(
     # Order matters (ADR-015): bad input and a busy user are refused before anything is counted,
     # and the limits are counted before an upload is written to disk.
     validate_generate_input(clean_topic, duration_min, clean_feedback)
-    reject_gibberish(user_feedback, raw_text, has_file=pdf is not None and bool(pdf.filename))
+    has_pdf = (
+        pdf is not None and (pdf.filename or "").lower().endswith(".pdf") and pdf.size != 0
+    )
+    reject_gibberish(user_feedback, raw_text, has_file=has_pdf)
     await run_in_threadpool(
         guard_category_generate,
         pipeline,
@@ -1112,12 +1115,12 @@ async def script_chat_suggest_endpoint(
             query=query,
             retriever=getattr(pipeline.template_engine, "retriever", None),
         )
-        guard_category_suggest(
+        may_remember = guard_category_suggest(
             pipeline,
             session=session,
             category=target_category,
             prompt=clean_prompt,
-            chunks=chunks,
+            file_chunks=file_chunks,
             has_template_match=bool(query.strip()) and not suggestion_res.recommend_free_topic,
             client=_resolve_groq_client(pipeline),
             limiter=getattr(pipeline.template_engine, "limiter", None),
@@ -1150,7 +1153,8 @@ async def script_chat_suggest_endpoint(
                 session.chunk_embeddings = retriever.encode_chunks(session.chunks)
 
         store.put(session)
-        remember_category_decision(session)
+        if may_remember:
+            remember_category_decision(session)
         tracker.finish()
         res = suggestion_res.to_dict()
         res["session_id"] = session.session_id
@@ -1322,8 +1326,9 @@ def _execute_chat_message_locked(
         file_text = "\n".join(c.content for c in file_chunks[:moderation_max_chunks])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
+    may_remember = False
     if file_chunks:
-        guard_category_message_file(
+        may_remember = guard_category_message_file(
             pipeline,
             session,
             clean_msg,
@@ -1429,7 +1434,7 @@ def _execute_chat_message_locked(
 
     tracker.finish()
     store.put(session)
-    if file_chunks:
+    if may_remember:
         remember_category_decision(session)
     result = {
         "session_id": session.session_id,
