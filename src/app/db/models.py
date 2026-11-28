@@ -2,7 +2,7 @@ import base64
 import binascii
 import hashlib
 import json
-from datetime import datetime
+from datetime import date, datetime, time
 from typing import Any, Literal
 from uuid import UUID
 
@@ -214,6 +214,118 @@ class ScorePoint(BaseModel):
     session_id: UUID
     created_at: datetime
     overall: float | None
+
+
+# ---------- Schedule (ADR-016, db/migration_main/0012_schedule.sql) ----------
+
+ScheduleCategory = Literal[
+    "any",
+    "cinematography",
+    "gender_studies",
+    "information_technology",
+    "learning_experiences",
+    "sports",
+    "wildlife",
+]
+ScheduleColor = Literal["lime", "blue", "green", "amber", "brown", "red", "slate", "gray", "sky"]
+ScriptKind = Literal["free", "saved", "ai"]
+RepeatKind = Literal["none", "daily", "weekly", "custom"]
+EndKind = Literal["never", "until", "count"]
+ReminderStatus = Literal["sent", "failed", "skipped"]
+
+
+class NewScheduleEvent(BaseModel):
+    """One event as the table stores it. Dates and times are local to `timezone`."""
+
+    start_date: date
+    all_day: bool
+    start_time: time | None = None
+    timezone: str = Field(min_length=1, max_length=64)
+    duration_min: Literal[5, 10, 15, 20] | None = None
+    category: ScheduleCategory
+    color: ScheduleColor
+    script_kind: ScriptKind
+    script_id: UUID | None = None
+    script_title: str | None = None
+    note: str = Field(default="", max_length=200)
+    repeat_kind: RepeatKind
+    repeat_days: list[int] = Field(default_factory=list)
+    end_kind: EndKind
+    end_until: date | None = None
+    end_count: int | None = Field(default=None, ge=1, le=99)
+    schedule_set_at: datetime | None = None  # None: the database sets now()
+    details_edited_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _same_checks_as_the_table(self) -> "NewScheduleEvent":
+        # Same rules as the checks in 0012, so the memory repo refuses what Postgres refuses.
+        if self.all_day != (self.start_time is None):
+            raise ValueError("start_time is set exactly when the event is not all day")
+        if self.script_kind == "saved" and (self.script_id is None or self.script_title is None):
+            raise ValueError("a saved script needs script_id and script_title")
+        if self.script_kind == "ai" and (self.duration_min is None or self.category == "any"):
+            raise ValueError("an AI script needs a duration and a category")
+        if any(day not in range(1, 8) for day in self.repeat_days):
+            raise ValueError("repeat_days are ISO weekdays 1-7")
+        if (self.repeat_kind == "custom") != bool(self.repeat_days):
+            raise ValueError("repeat_days are set exactly when repeat_kind is custom")
+        if self.repeat_kind == "none" and self.end_kind != "never":
+            raise ValueError("an event that does not repeat never ends")
+        if (self.end_kind == "until") != (self.end_until is not None):
+            raise ValueError("end_until is set exactly when end_kind is until")
+        if (self.end_kind == "count") != (self.end_count is not None):
+            raise ValueError("end_count is set exactly when end_kind is count")
+        if self.end_until is not None and self.end_until < self.start_date:
+            raise ValueError("end_until is before start_date")
+        return self
+
+
+class ScheduleEventPatch(BaseModel):
+    """Only the fields sent change. The route sets schedule_set_at / details_edited_at."""
+
+    start_date: date | None = None
+    all_day: bool | None = None
+    start_time: time | None = None
+    timezone: str | None = Field(default=None, min_length=1, max_length=64)
+    duration_min: Literal[5, 10, 15, 20] | None = None
+    category: ScheduleCategory | None = None
+    color: ScheduleColor | None = None
+    script_kind: ScriptKind | None = None
+    script_id: UUID | None = None
+    script_title: str | None = None
+    note: str | None = Field(default=None, max_length=200)
+    repeat_kind: RepeatKind | None = None
+    repeat_days: list[int] | None = None
+    end_kind: EndKind | None = None
+    end_until: date | None = None
+    end_count: int | None = Field(default=None, ge=1, le=99)
+    schedule_set_at: datetime | None = None
+    details_edited_at: datetime | None = None
+
+
+class ScheduleEventRow(NewScheduleEvent):
+    id: UUID
+    user_id: UUID
+    schedule_set_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class ScheduleCheckinRow(BaseModel):
+    event_id: UUID
+    occ_day: date  # local day of the session
+    user_id: UUID
+    checkin_at: datetime
+    done_at: datetime | None = None
+    session_id: UUID | None = None
+
+
+class ScheduleReminderRow(BaseModel):
+    event_id: UUID
+    occ_day: date
+    status: ReminderStatus
+    attempted_at: datetime
+    sent_at: datetime | None = None
 
 
 def read_session_metric(result: dict | None, name: str) -> float | None:

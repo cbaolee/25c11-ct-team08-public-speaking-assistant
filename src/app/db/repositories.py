@@ -1,14 +1,21 @@
+from datetime import date, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
 from src.app.db.models import (
     BaselineRow,
     NewBaseline,
+    NewScheduleEvent,
     NewScript,
     NewSession,
     ProfilePatch,
     ProfileRow,
     ProfileUpsert,
+    ReminderStatus,
+    ScheduleCheckinRow,
+    ScheduleEventPatch,
+    ScheduleEventRow,
+    ScheduleReminderRow,
     ScorePoint,
     ScriptPatch,
     ScriptRow,
@@ -109,6 +116,78 @@ class RateLimitRepo(Protocol):
     # Count one hit for (bucket, key) and say whether it is allowed: at most max_hits per
     # fixed window of window_s seconds. key is a hash, never an email (0011_auth_rate_limits).
     def hit(self, bucket: str, key: str, max_hits: int, window_s: int) -> bool: ...
+
+
+# Schedule tables on the core project (ADR-016). The repo only stores and reads: the rules
+# (window, reminder time, locks) live in src/app/schedule/rules.py and are applied by the route.
+class ScheduleRepo(Protocol):
+    # Events of the user with start_date <= start_date_to; the route drops ended series.
+    def list_events(self, user_id: UUID, start_date_to: date) -> list[ScheduleEventRow]: ...
+
+    # None when the event is missing or belongs to another user.
+    def get_event(self, user_id: UUID, event_id: UUID) -> ScheduleEventRow | None: ...
+
+    def count_events(self, user_id: UUID) -> int: ...
+
+    def create_event(self, user_id: UUID, data: NewScheduleEvent) -> ScheduleEventRow: ...
+
+    # Changes only the fields sent; None when the user does not own the event.
+    def update_event(
+        self, user_id: UUID, event_id: UUID, patch: ScheduleEventPatch
+    ) -> ScheduleEventRow | None: ...
+
+    # Also deletes its check-ins and reminders (on delete cascade).
+    def delete_event(self, user_id: UUID, event_id: UUID) -> bool: ...
+
+    # "This and following" in one step: end the old event on end_until, then add new_event
+    # (None for delete). Returns [old] or [old, new]; [] when the user does not own the event.
+    def split_event(
+        self,
+        user_id: UUID,
+        event_id: UUID,
+        end_until: date,
+        new_event: NewScheduleEvent | None,
+    ) -> list[ScheduleEventRow]: ...
+
+    # Check-ins of the user with from_day <= occ_day <= to_day.
+    def list_checkins(
+        self, user_id: UUID, from_day: date, to_day: date
+    ) -> list[ScheduleCheckinRow]: ...
+
+    def get_checkin(
+        self, user_id: UUID, event_id: UUID, occ_day: date
+    ) -> ScheduleCheckinRow | None: ...
+
+    # Insert the check-in, or return the one already there with its first checkin_at.
+    def upsert_checkin(
+        self, user_id: UUID, event_id: UUID, occ_day: date, checkin_at: datetime
+    ) -> ScheduleCheckinRow: ...
+
+    # Set done_at and session_id once; a done check-in is returned unchanged. None: no check-in.
+    def mark_done(
+        self, user_id: UUID, event_id: UUID, occ_day: date, session_id: UUID, done_at: datetime
+    ) -> ScheduleCheckinRow | None: ...
+
+    # Reminder rows of the user's events with from_day <= occ_day <= to_day.
+    def list_reminders(
+        self, user_id: UUID, from_day: date, to_day: date
+    ) -> list[ScheduleReminderRow]: ...
+
+    # Events of every user with start_date <= until_day, for the reminder job.
+    def list_reminder_candidates(self, until_day: date) -> list[ScheduleEventRow]: ...
+
+    # Insert the row only if none exists. True only for the call that inserted it, so at
+    # most one run sends the email of a session.
+    def claim_reminder(
+        self, event_id: UUID, occ_day: date, status: ReminderStatus, attempted_at: datetime
+    ) -> bool: ...
+
+    def set_reminder_status(
+        self, event_id: UUID, occ_day: date, status: ReminderStatus, sent_at: datetime | None
+    ) -> None: ...
+
+    # Every event of the user (check-ins and reminders go with them), for deleting an account.
+    def delete_user_schedule(self, user_id: UUID) -> int: ...
 
 
 class AudioStore(Protocol):
