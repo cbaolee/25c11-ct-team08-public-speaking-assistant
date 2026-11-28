@@ -291,3 +291,26 @@ active_job_retry_after_s = 5
 # A job still active this long after it was created is ignored as stuck, in seconds
 # (same as POLL_MAX_MS of the web UI, 5 minutes)
 active_job_stale_s = 300
+
+[script_guard]
+# Provisional, not yet measured.
+# Material with fewer words that contain a letter is not checked, in words
+category_guard_min_words = 8
+# Allowed when the best passage is at least this similar to the selected category (cosine)
+category_guard_safe_selected_min = 0.12
+# Allowed when the best other category is less similar than this (cosine)
+category_guard_safe_other_max = 0.35
+# Allowed when the best other category leads the selected one by less than this (cosine difference)
+category_guard_safe_margin_max = 0.20
+# Blocked without the LLM only below this similarity to the selected category (cosine) ...
+category_guard_block_selected_max = 0.08
+# ... and at least this similarity to the best other category (cosine)
+category_guard_block_other_min = 0.42
+# Characters of the material compared with the other categories and sent to the LLM, in characters
+category_guard_max_chars = 1500
+# Output budget of the LLM check of unclear cases, in tokens
+category_guard_llm_max_tokens = 80
+# Most prompt sentences and document chunks compared with the selected category, in passages
+category_guard_max_segments = 20
+# Most template titles added to the prototypes of one category, in titles
+category_guard_max_titles_per_category = 100
