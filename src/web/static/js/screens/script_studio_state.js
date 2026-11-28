@@ -141,18 +141,18 @@ export function formatReplyMarkup(raw) {
   return safe.replace(/\*{4,}|\*\*([^\s*](?:[^*\r\n]*?[^\s*])?)\*\*/g, (match, inner) => (inner ? '<strong class="key-req">' + inner + '</strong>' : match));
 }
 
-/* Turn 1 (assistant_turn === 1 or can_generate === false) never shows a Generate button;
-   from Turn 2 onward every gathering reply shows the Generate action until the session produces its first script. */
+/* Show Generate when the session has no script yet and the backend allows it (`canGenerate === true`,
+   including Turn 1 when Turn 1 already has enough detail). Legacy data without `canGenerate` falls back to Turn 2+. */
 export function shouldShowGenerateButton(input) {
   const { hasScript, assistantTurn, canGenerate } = input || {};
   if (hasScript === true || canGenerate === false) return false;
+  if (canGenerate === true) return true;
   const turn = Number(assistantTurn);
-  if (turn === 1) return false;
-  return canGenerate === true || (Number.isFinite(turn) && turn >= 2);
+  return Number.isFinite(turn) && turn >= 2;
 }
 
-/* Typing "generate" / "done" / "tạo" / "xong" triggers generation ONLY during gathering from Turn 2 onward
-   (when canGenerateNow === true), without an attached file, and before the first script exists. */
+/* Typing "generate" / "done" / "tạo" / "xong" triggers generation ONLY during gathering when
+   canGenerateNow === true, without an attached file, and before the first script exists. */
 export function canTriggerGenerateKeyword(input) {
   const { stage, hasScript, canGenerateNow, hasFile, text } = input || {};
   if (hasScript === true || stage !== 'gathering' || canGenerateNow !== true || hasFile) return false;
@@ -236,7 +236,7 @@ export function parseRestoredChatSession(raw, nowMs = Date.now(), ttlMs = DEFAUL
   let canGenerateNow = false;
   if (stage === 'gathering') {
     assistantTurn = Number.isInteger(raw.assistantTurn) && raw.assistantTurn >= 1 ? raw.assistantTurn : 1;
-    canGenerateNow = assistantTurn >= 2 && raw.canGenerateNow !== false;
+    canGenerateNow = assistantTurn >= 2 ? raw.canGenerateNow !== false : raw.canGenerateNow === true;
   } else if (stage === 'generated') {
     assistantTurn = Number.isInteger(raw.assistantTurn) && raw.assistantTurn >= 0 ? raw.assistantTurn : 0;
     canGenerateNow = true;
@@ -248,10 +248,13 @@ export function parseRestoredChatSession(raw, nowMs = Date.now(), ttlMs = DEFAUL
       }
     : null;
   const seed = raw.chatSeed && typeof raw.chatSeed === 'object'
-    ? {
-        prompt: typeof raw.chatSeed.prompt === 'string' ? raw.chatSeed.prompt : '',
-        fileName: typeof raw.chatSeed.fileName === 'string' ? raw.chatSeed.fileName : '',
-      }
+    ? Object.assign(
+        {
+          prompt: typeof raw.chatSeed.prompt === 'string' ? raw.chatSeed.prompt : '',
+          fileName: typeof raw.chatSeed.fileName === 'string' ? raw.chatSeed.fileName : '',
+        },
+        raw.chatSeed.needsTopic === true ? { needsTopic: true } : null
+      )
     : null;
   const sessionFiles = Array.isArray(raw.sessionFiles)
     ? raw.sessionFiles.filter(f => typeof f === 'string' && f.trim())
@@ -272,4 +275,179 @@ export function parseRestoredChatSession(raw, nowMs = Date.now(), ttlMs = DEFAUL
     category,
     duration_min,
   };
+}
+
+/* ---------- Contract E v2.1: Gibberish / junk text detector (mirrors src/text_processing/input_guard.py) ----------
+   Verified against the shared 75-case fixture `tests/fixtures/gibberish_vectors.json`. */
+const GIB_KEYBOARD_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+const GIB_RUN_MIN = 5;
+const GIB_RUN_WHOLE_MIN = 4;
+const GIB_REPEAT_CHAR_MIN = 5;
+const GIB_LOW_VARIETY_MIN_LETTERS = 6;
+const GIB_LOW_VARIETY_MAX_DISTINCT = 2;
+const GIB_NO_VOWEL_MIN = 6;
+const GIB_NO_VOWEL_MIN_ALL_CAPS = 8;
+const GIB_REPEAT_TOKEN_MIN = 4;
+const GIB_VOWELS = new Set(['a', 'e', 'i', 'o', 'u', 'y']);
+const GIB_EXEMPT = new Set(['generate', 'done', 'tạo', 'xong', 'yes', 'no', 'ok', 'okay', 'sure']);
+/* Contract E v2.1 whitespace: U+0009-U+000D + Unicode Zs/Zl/Zp (excludes U+001C-U+001F, U+0085, U+FEFF). */
+const GIB_SPACE_RE = /[\t\n\v\f\r\p{Zs}\p{Zl}\p{Zp}]+/u;
+const GIB_LETTER_RE = /^\p{L}$/u;
+const GIB_CONTENT_RE = /^[\p{L}\p{N}]$/u;
+const GIB_ANY_CONTENT_RE = /[\p{L}\p{N}]/u;
+const GIB_ASCII_LETTERS_RE = /^[a-z]+$/;
+const GIB_EXEMPT_END_PUNCT_RE = /[.!?]+$/;
+
+function buildKeyboardRuns(minLen, maxLen) {
+  const out = new Set();
+  for (const row of GIB_KEYBOARD_ROWS) {
+    const rev = Array.from(row).reverse().join('');
+    for (const line of [row, rev]) {
+      const upper = Math.min(maxLen, line.length);
+      for (let len = minLen; len <= upper; len += 1) {
+        for (let start = 0; start <= line.length - len; start += 1) {
+          out.add(line.slice(start, start + len));
+        }
+      }
+    }
+  }
+  return out;
+}
+
+const GIB_WHOLE_TOKEN_RUNS = buildKeyboardRuns(
+  GIB_RUN_WHOLE_MIN,
+  Math.max(...GIB_KEYBOARD_ROWS.map(r => r.length))
+);
+const GIB_INNER_RUNS = buildKeyboardRuns(GIB_RUN_MIN, GIB_RUN_MIN);
+
+function gibCore(word) {
+  const chars = Array.from(word);
+  let start = 0, end = chars.length;
+  while (start < end && !GIB_CONTENT_RE.test(chars[start])) start += 1;
+  while (end > start && !GIB_CONTENT_RE.test(chars[end - 1])) end -= 1;
+  return chars.slice(start, end).join('');
+}
+
+function gibHasRepeatedLetter(lowered) {
+  let run = 0, prev = '';
+  for (const ch of lowered) {
+    if (!GIB_LETTER_RE.test(ch)) {
+      run = 0;
+    } else if (ch === prev) {
+      run += 1;
+    } else {
+      run = 1;
+    }
+    if (run >= GIB_REPEAT_CHAR_MIN) return true;
+    prev = ch;
+  }
+  return false;
+}
+
+function gibHasLowVariety(lettersArr) {
+  return lettersArr.length >= GIB_LOW_VARIETY_MIN_LETTERS && new Set(lettersArr).size <= GIB_LOW_VARIETY_MAX_DISTINCT;
+}
+
+function gibLacksVowels(core, lettersStr) {
+  const folded = lettersStr.normalize('NFD').replace(/\p{Mn}/gu, '');
+  if (!GIB_ASCII_LETTERS_RE.test(folded)) return false;
+  for (const ch of folded) {
+    if (GIB_VOWELS.has(ch)) return false;
+  }
+  const isAllCaps = !Array.from(core).some(ch => GIB_LETTER_RE.test(ch) && ch !== ch.toUpperCase());
+  return folded.length >= (isAllCaps ? GIB_NO_VOWEL_MIN_ALL_CAPS : GIB_NO_VOWEL_MIN);
+}
+
+function gibIsKeyboardRun(lowered, lettersArr, lettersStr) {
+  if (lettersStr === lowered && GIB_WHOLE_TOKEN_RUNS.has(lowered)) return true;
+  // Every longer run contains a 5-char run, so a fixed 5-char window keeps this linear O(n).
+  for (let start = 0; start <= lettersArr.length - GIB_RUN_MIN; start += 1) {
+    const win = lettersArr[start] + lettersArr[start + 1] + lettersArr[start + 2] + lettersArr[start + 3] + lettersArr[start + 4];
+    if (GIB_INNER_RUNS.has(win)) return true;
+  }
+  return false;
+}
+
+function gibIsJunk(core) {
+  const lowered = core.toLowerCase();
+  const lettersArr = [];
+  for (const ch of lowered) {
+    if (GIB_LETTER_RE.test(ch)) lettersArr.push(ch);
+  }
+  const lettersStr = lettersArr.join('');
+  return (
+    gibHasRepeatedLetter(lowered)
+    || gibHasLowVariety(lettersArr)
+    || gibLacksVowels(core, lettersStr)
+    || gibIsKeyboardRun(lowered, lettersArr, lettersStr)
+  );
+}
+
+/* Reject gibberish/junk chat messages consistently with backend `input_guard.is_gibberish`.
+   Empty text or requests with an attached file always pass (other validators handle empty input). */
+export function validateMeaningfulText(text, opts = {}) {
+  const { hasFile = false } = opts || {};
+  if (hasFile || typeof text !== 'string') return { ok: true, reason: null };
+  const words = text.normalize('NFC').split(GIB_SPACE_RE).filter(Boolean);
+  if (!words.length) return { ok: true, reason: null };
+  const normalized = words.join(' ');
+  if (GIB_EXEMPT.has(normalized.toLowerCase().replace(GIB_EXEMPT_END_PUNCT_RE, ''))) {
+    return { ok: true, reason: null };
+  }
+  if (!GIB_ANY_CONTENT_RE.test(normalized)) return { ok: false, reason: 'gibberish' };
+  const cores = words.map(gibCore).filter(Boolean);
+  if (cores.length >= GIB_REPEAT_TOKEN_MIN && new Set(cores.map(c => c.toLowerCase())).size === 1) {
+    return { ok: false, reason: 'gibberish' };
+  }
+  const lettered = cores.filter(core => Array.from(core).some(ch => GIB_LETTER_RE.test(ch)));
+  if (lettered.length && lettered.every(gibIsJunk)) return { ok: false, reason: 'gibberish' };
+  return { ok: true, reason: null };
+}
+
+/* ---------- Contract D: Sentence-level citation pill & deduplication helpers ---------- */
+
+export function dedupeCitationSources(sources) {
+  if (!Array.isArray(sources) || !sources.length) return [];
+  const seen = new Set();
+  const out = [];
+  for (const s of sources) {
+    if (!s || typeof s !== 'object') continue;
+    const pageNum = Number.isInteger(s.page) && s.page > 0 ? s.page : 0;
+    const key = [
+      typeof s.source_kind === 'string' ? s.source_kind : '',
+      typeof s.source_msg_id === 'string' ? s.source_msg_id : '',
+      typeof s.heading === 'string' ? s.heading.trim() : '',
+      pageNum,
+    ].join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
+}
+
+export function formatCitationSourceLabel(source, pageFormatter) {
+  if (!source || typeof source !== 'object') return 'cited';
+  const rawHeading = typeof source.heading === 'string' ? source.heading.trim() : '';
+  const cleanHeading = rawHeading && !/^Page \d+ Overview$/i.test(rawHeading) ? rawHeading : '';
+  const hasPage = Number.isInteger(source.page) && source.page > 0;
+  const pageText = hasPage
+    ? (typeof pageFormatter === 'function' ? pageFormatter(source.page) : 'p. ' + source.page)
+    : '';
+  const fallbackFile = typeof source.source_file === 'string' ? source.source_file.trim() : '';
+  const title = cleanHeading || (hasPage ? '' : fallbackFile);
+  if (title && pageText) return title + ' · ' + pageText;
+  if (title) return title;
+  if (pageText) return pageText;
+  return 'cited';
+}
+
+export function formatCitationPill(sources, pageFormatter, maxLabelChars = 28) {
+  const list = dedupeCitationSources(sources);
+  if (!list.length) return { primaryLabel: '', extraCount: 0, sources: [] };
+  const full = formatCitationSourceLabel(list[0], pageFormatter);
+  const cap = Number.isFinite(maxLabelChars) && maxLabelChars >= 4 ? Math.floor(maxLabelChars) : 28;
+  const chars = Array.from(full);
+  const primaryLabel = chars.length > cap ? chars.slice(0, cap - 1).join('').trimEnd() + '…' : full;
+  return { primaryLabel, extraCount: Math.max(0, list.length - 1), sources: list };
 }

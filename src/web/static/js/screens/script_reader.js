@@ -3,55 +3,287 @@ import { openConfirmDialog } from '../modals/confirm.js';
 import { go } from '../nav.js';
 import { practiceLocked } from '../screens/practice.js';
 import { patchSavedScript } from '../screens/saved_scripts.js';
-import { refreshChatScript, saveChatScript } from '../screens/script_studio.js';
+import { canJumpToChatMessage, jumpToChatMessage, refreshChatScript, saveChatScript } from '../screens/script_studio.js';
+import { formatCitationPill, formatCitationSourceLabel } from '../screens/script_studio_state.js';
 import { CONFIG, S } from '../state.js';
 import { caretToStart, closeModal, editedText, fillParagraphs, guardTitle, openModal, popIn, popOut, setEditable, showSavedTick, toast } from '../ui.js';
-import { $, $$, clearErr, esc, showErr } from '../utils.js';
+import { $, $$, clearErr, showErr } from '../utils.js';
 
 /* ---------- Script Reader: shows a script (from the chat or from Saved Scripts), edits it in place,
+   renders Gemini-style sentence citations with hover/tap popovers & click-to-jump to chat,
    and offers Save / Copy / Download / Practice in a menu that slides out from the right. ----------
    A chat script is edited only in this browser (the chat copy in localStorage); a saved script is edited in the database. */
 
 let draft = null;   // { title, text } while editing; null when not editing
+let citePop = null;
+let citeAnchor = null;
+let citeCloseTimer = null;
+let citeEventsBound = false;
 
-/* Paragraphs with their citation / uncited badge, then the warnings and the citation note. */
+const fmtPage = n => T('script.page', { n });
+
+function cancelCiteClose() {
+  if (citeCloseTimer) { clearTimeout(citeCloseTimer); citeCloseTimer = null; }
+}
+function scheduleCiteClose() {
+  cancelCiteClose();
+  citeCloseTimer = setTimeout(() => closeCitePopover(false), 140);
+}
+function ensureCitePopover() {
+  if (citePop && citePop.isConnected) return citePop;
+  const host = $('#scriptReader') || document.body;
+  citePop = document.createElement('div');
+  citePop.id = 'citePopover';
+  citePop.className = 'cite-pop';
+  citePop.setAttribute('role', 'dialog');
+  citePop.setAttribute('aria-modal', 'false');
+  citePop.hidden = true;
+  citePop.addEventListener('mouseenter', cancelCiteClose);
+  citePop.addEventListener('mouseleave', scheduleCiteClose);
+  citePop.addEventListener('focusin', cancelCiteClose);
+  citePop.addEventListener('focusout', e => {
+    if (!citePop.contains(e.relatedTarget) && e.relatedTarget !== citeAnchor) scheduleCiteClose();
+  });
+  citePop.addEventListener('click', e => {
+    const item = e.target.closest('button.cite-pop-item');
+    if (!item || !item._citeSource) return;
+    const sc = S.readerScript;
+    const body = $('#mrBody');
+    if (sc && body) sc._lastReaderScrollTop = body.scrollTop;
+    const src = item._citeSource;
+    closeCitePopover(false);
+    closeModal('scriptReader', false);
+    jumpToChatMessage(src.source_msg_id, src.source_file);
+  });
+  host.appendChild(citePop);
+  return citePop;
+}
+function closeCitePopover(restoreFocus = false) {
+  cancelCiteClose();
+  const prev = citeAnchor;
+  if (prev) prev.setAttribute('aria-expanded', 'false');
+  citeAnchor = null;
+  if (citePop) {
+    citePop.hidden = true;
+    citePop.replaceChildren();
+  }
+  if (restoreFocus && prev && prev.isConnected) prev.focus();
+}
+function positionCitePopover(anchor, pop) {
+  const rect = anchor.getBoundingClientRect();
+  const margin = 12;
+  const vw = window.innerWidth || 800;
+  const vh = window.innerHeight || 600;
+  pop.style.left = '0px';
+  pop.style.top = '0px';
+  pop.hidden = false;
+  const pw = pop.offsetWidth || 320;
+  const ph = pop.offsetHeight || 120;
+  let left = rect.left;
+  if (left + pw > vw - margin) left = vw - margin - pw;
+  if (left < margin) left = margin;
+  const spaceBelow = vh - rect.bottom - margin;
+  const spaceAbove = rect.top - margin;
+  let top;
+  if (spaceBelow >= ph || spaceBelow >= spaceAbove) {
+    top = Math.min(vh - margin - ph, rect.bottom + 6);
+  } else {
+    top = Math.max(margin, rect.top - ph - 6);
+  }
+  pop.style.left = Math.round(left) + 'px';
+  pop.style.top = Math.round(top) + 'px';
+}
+function openCitePopover(anchor) {
+  const sources = anchor && anchor._citeSources;
+  if (!Array.isArray(sources) || !sources.length) return;
+  cancelCiteClose();
+  if (citeAnchor && citeAnchor !== anchor) citeAnchor.setAttribute('aria-expanded', 'false');
+  citeAnchor = anchor;
+  anchor.setAttribute('aria-expanded', 'true');
+  const pop = ensureCitePopover();
+  const sc = S.readerScript;
+  pop.replaceChildren();
+  sources.forEach(src => {
+    const label = formatCitationSourceLabel(src, fmtPage);
+    const excerpt = typeof src.excerpt === 'string' ? src.excerpt.trim() : '';
+    const canJump = Boolean(sc && !sc.fromList && canJumpToChatMessage(src.source_msg_id, src.source_file));
+    const item = document.createElement(canJump ? 'button' : 'div');
+    item.className = 'cite-pop-item' + (canJump ? '' : ' is-readonly');
+    if (canJump) {
+      item.type = 'button';
+      item.title = T('script.citeJumpHint');
+      item._citeSource = src;
+    }
+    const titleEl = document.createElement('span');
+    titleEl.className = 'cite-pop-title';
+    titleEl.textContent = label;
+    item.appendChild(titleEl);
+    if (excerpt) {
+      const exEl = document.createElement('span');
+      exEl.className = 'cite-pop-excerpt';
+      exEl.textContent = excerpt;
+      item.appendChild(exEl);
+    }
+    if (!canJump) {
+      const noteEl = document.createElement('span');
+      noteEl.className = 'cite-pop-note';
+      noteEl.textContent = T('script.citeNoJump');
+      item.appendChild(noteEl);
+    }
+    pop.appendChild(item);
+  });
+  positionCitePopover(anchor, pop);
+}
+function bindCiteEvents() {
+  if (citeEventsBound) return;
+  citeEventsBound = true;
+  const body = $('#mrBody');
+  if (body) {
+    body.addEventListener('mouseover', e => {
+      const pill = e.target.closest('.cite-pill');
+      if (pill && body.contains(pill)) openCitePopover(pill);
+    });
+    body.addEventListener('mouseout', e => {
+      const pill = e.target.closest('.cite-pill');
+      if (!pill) return;
+      const to = e.relatedTarget;
+      if (to && (pill.contains(to) || (citePop && citePop.contains(to)))) return;
+      scheduleCiteClose();
+    });
+    body.addEventListener('focusin', e => {
+      const pill = e.target.closest('.cite-pill');
+      if (pill && body.contains(pill)) openCitePopover(pill);
+    });
+    body.addEventListener('focusout', e => {
+      const pill = e.target.closest('.cite-pill');
+      if (!pill) return;
+      const to = e.relatedTarget;
+      if (to && citePop && citePop.contains(to)) return;
+      scheduleCiteClose();
+    });
+    body.addEventListener('click', e => {
+      const pill = e.target.closest('.cite-pill');
+      if (!pill || !body.contains(pill)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (citeAnchor === pill && citePop && !citePop.hidden) closeCitePopover(false);
+      else openCitePopover(pill);
+    });
+    body.addEventListener('scroll', () => { if (citePop && !citePop.hidden) closeCitePopover(false); });
+  }
+  document.addEventListener('click', e => {
+    if (!citePop || citePop.hidden) return;
+    if (citePop.contains(e.target) || (citeAnchor && citeAnchor.contains(e.target))) return;
+    closeCitePopover(false);
+  });
+  /* Capture phase so Escape closes an open citation popover first instead of closing the whole Reader modal. */
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && citePop && !citePop.hidden) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeCitePopover(true);
+    }
+  }, true);
+}
+
+function buildCitePillButton(sources) {
+  const pill = formatCitationPill(sources, fmtPage);
+  if (!pill.primaryLabel) return null;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'cite-pill';
+  btn.setAttribute('aria-haspopup', 'dialog');
+  btn.setAttribute('aria-expanded', 'false');
+  const fullAria = pill.primaryLabel + (pill.extraCount > 0 ? ' +' + pill.extraCount : '');
+  btn.setAttribute('aria-label', T('script.citeAria', { label: fullAria }));
+  btn._citeSources = pill.sources;
+  const lbl = document.createElement('span');
+  lbl.className = 'cite-pill-lbl';
+  lbl.textContent = pill.primaryLabel;
+  btn.appendChild(lbl);
+  if (pill.extraCount > 0) {
+    const more = document.createElement('span');
+    more.className = 'cite-pill-more';
+    more.textContent = '+' + pill.extraCount;
+    btn.appendChild(more);
+  }
+  return btn;
+}
+
+/* Paragraphs with sentence-level Gemini citation pills (Contract D), falling back to paragraph-level badges for legacy scripts. */
 function paintBody(sc) {
+  closeCitePopover(false);
   const body = $('#mrBody'), paras = sc.text.split(/\n\n+/).filter(Boolean), cites = sc.citations || [], warns = sc.warnings || [];
-  let h = '';
-  const fmtSource = s => {
-    const cleanHeading = s && s.heading && !/^Page \d+ Overview$/i.test(s.heading) ? s.heading : '';
-    return (cleanHeading ? cleanHeading + (s.page ? ' · ' : '') : '') + (s.page ? T('script.page', { n: s.page }) : (cleanHeading ? '' : 'cited'));
-  };
+  body.replaceChildren();
+  let usedSentenceCites = false;
+  let hasUncited = false;
   paras.forEach((p, i) => {
     const c = cites.find(x => x.paragraph === i + 1 || x.paragraph_index === i);
-    let badge = '';
-    if (c) {
-      if (c.status === 'cited') {
-        const srcList = Array.isArray(c.sources) && c.sources.length ? c.sources : [c];
-        badge = srcList.map(s => '<span class="cite">' + esc(fmtSource(s)) + '</span>').join(' ');
-      } else {
-        badge = '<span class="cite un">' + esc(T('script.uncited')) + '</span>';
+    const div = document.createElement('div');
+    div.className = 'para';
+    if (c && Array.isArray(c.sentences) && c.sentences.length) {
+      usedSentenceCites = true;
+      c.sentences.forEach((sent, idx) => {
+        if (idx > 0) div.appendChild(document.createTextNode(' '));
+        const span = document.createElement('span');
+        span.className = 'sent';
+        span.textContent = typeof sent.text === 'string' ? sent.text : '';
+        div.appendChild(span);
+        if (sent.status === 'cited' && Array.isArray(sent.sources) && sent.sources.length) {
+          const btn = buildCitePillButton(sent.sources);
+          if (btn) div.appendChild(btn);
+        } else {
+          hasUncited = true;
+        }
+      });
+    } else {
+      const ptxt = document.createElement('span');
+      ptxt.className = 'ptxt';
+      ptxt.textContent = p;
+      div.appendChild(ptxt);
+      if (c) {
+        if (c.status === 'cited') {
+          const srcList = Array.isArray(c.sources) && c.sources.length ? c.sources : [c];
+          const btn = buildCitePillButton(srcList);
+          if (btn) div.appendChild(btn);
+        } else {
+          hasUncited = true;
+          const badge = document.createElement('span');
+          badge.className = 'cite un';
+          badge.textContent = T('script.uncited');
+          div.appendChild(badge);
+        }
       }
     }
-    h += '<div class="para"><span class="ptxt"></span>' + badge + '</div>';
+    body.appendChild(div);
   });
-  if (warns.length) h += '<p class="note" style="margin-top:8px;color:var(--warn,#b45309)">' + esc(warns.join(' ')) + '</p>';
-  const hasUncited = cites.some(x => x.status !== 'cited');
+  if (warns.length) {
+    const wp = document.createElement('p');
+    wp.className = 'note';
+    wp.style.marginTop = '8px';
+    wp.style.color = 'var(--warn,#b45309)';
+    wp.textContent = warns.join(' ');
+    body.appendChild(wp);
+  }
+  if (!usedSentenceCites) hasUncited = cites.some(x => x.status !== 'cited');
   const citeNote = !cites.length ? T('script.citeNone') : (hasUncited ? T('script.uncitedHelp') : T('script.citeAllOk'));
-  h += '<p class="note" style="margin-top:10px">' + esc(citeNote) + '</p>';
-  body.innerHTML = h;
-  $$('.ptxt', body).forEach((el, i) => { el.textContent = paras[i]; });
+  const np = document.createElement('p');
+  np.className = 'note';
+  np.style.marginTop = '10px';
+  np.textContent = citeNote;
+  body.appendChild(np);
   $('#mrTitle').textContent = sc.cardName || sc.title;
 }
 
 /* opts.edit: start in edit mode (the pencil in Saved Scripts). */
 export function openReader(sc, opts) {
   opts = opts || {};
+  bindCiteEvents();
   S.readerScript = sc;
   draft = null;                                     // an edit left open last time is dropped
   setEditing(false, false);
   paintBody(sc);
-  $('#mrBody').scrollTop = 0;
+  $('#mrBody').scrollTop = Number.isFinite(sc._lastReaderScrollTop) ? sc._lastReaderScrollTop : 0;
   $('[data-ra=save]', $('#mrMenu')).hidden = !!sc.fromList;   // already in the list
   closeMenu();
   openModal('scriptReader', { focus: '[data-close]' });
@@ -101,6 +333,7 @@ function setEditing(on, animate, after) {
 }
 export function startEdit() {
   const sc = S.readerScript; if (!sc) return;
+  closeCitePopover(false);
   draft = { title: sc.cardName || sc.title, text: sc.text };
   $('#mrTitle').textContent = draft.title;
   fillParagraphs($('#mrBody'), draft.text);          // plain paragraphs, no citation badges while editing
@@ -183,5 +416,6 @@ export function runScriptAction(sc, action) {
 }
 /* Closing the window drops an unsaved edit. */
 export function onReaderClosed() {
+  closeCitePopover(false);
   draft = null;
 }
