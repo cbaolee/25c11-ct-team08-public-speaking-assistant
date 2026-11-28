@@ -1,12 +1,17 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi.testclient import TestClient
 
+from src.app.auth import get_auth
 from src.app.db.factory import get_repos
+from src.app.db.models import ProfileUpsert
 from src.app.main import app
 from src.app.routes import schedule
+from src.app.schedule import mailer
+
+TEST_USER_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 def _event(day="2026-12-02", time="22:00"):
@@ -64,6 +69,154 @@ def test_schedule_reminder_endpoint_accepts_correct_secret(monkeypatch):
 
     assert response.status_code == 200
     assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
+
+
+def test_schedule_reminder_claims_once_and_sends_once(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    sent = []
+    auth = app.dependency_overrides[get_auth]()
+    monkeypatch.setattr(auth, "email_for_user", lambda user_id: "reminder@example.com")
+    monkeypatch.setattr(
+        mailer,
+        "send_reminder",
+        lambda to, occ, name: sent.append((to, occ["day"])),
+    )
+    client = TestClient(app)
+
+    created = client.post("/api/schedule/events", json=_event())
+    assert created.status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 21, 31, tzinfo=UTC),
+    )
+
+    first = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+    second = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert first.status_code == 200
+    assert first.json()["sent"] == 1
+    assert second.json() == {"sent": 0, "skipped": 0, "failed": 0}
+    assert len(sent) == 1
+    assert sent[0][0] == "reminder@example.com"
+    assert sent[0][1].isoformat() == "2026-12-02"
+
+
+def test_schedule_reminder_honors_email_preference(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    repos = app.dependency_overrides[get_repos]()
+    repos.profiles.upsert_profile(
+        TEST_USER_ID,
+        ProfileUpsert(target_accent="american", display_name="Test"),
+    )
+    repos.profiles.merge_preferences(TEST_USER_ID, {"email_reminders": False})
+    sent = []
+    monkeypatch.setattr(mailer, "send_reminder", lambda to, occ, name: sent.append(to))
+    client = TestClient(app)
+
+    assert client.post("/api/schedule/events", json=_event()).status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 21, 31, tzinfo=UTC),
+    )
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
+    assert sent == []
+
+
+def test_schedule_reminder_outside_grace_does_not_send(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    client = TestClient(app)
+    assert client.post("/api/schedule/events", json=_event()).status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 21, 10, tzinfo=UTC),
+    )
+
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
+
+
+def test_schedule_reminder_created_too_close_is_skipped(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    fixed = datetime(2026, 12, 2, 21, 31, tzinfo=UTC)
+    monkeypatch.setattr(schedule, "_now", lambda: fixed)
+    client = TestClient(app)
+    assert client.post("/api/schedule/events", json=_event()).status_code == 201
+
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.json() == {"sent": 0, "skipped": 1, "failed": 0}
+
+
+def test_schedule_reminder_mail_error_is_not_retried(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    auth = app.dependency_overrides[get_auth]()
+    monkeypatch.setattr(auth, "email_for_user", lambda user_id: "reminder@example.com")
+
+    def fail(to, occurrence, display_name):
+        raise mailer.MailError("delivery failed")
+
+    monkeypatch.setattr(mailer, "send_reminder", fail)
+    client = TestClient(app)
+    assert client.post("/api/schedule/events", json=_event()).status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 21, 31, tzinfo=UTC),
+    )
+
+    first = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+    second = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert first.json()["failed"] == 1
+    assert second.json() == {"sent": 0, "skipped": 0, "failed": 0}
 
 
 def test_create_list_patch_delete_schedule(monkeypatch):

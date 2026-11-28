@@ -14,12 +14,13 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict
 
+from src.app.auth import AuthProvider, AuthUnavailableError, get_auth
 from src.app.config import settings
 from src.app.constants import CONSTANTS
 from src.app.db.factory import Repos, get_repos
 from src.app.db.models import NewScheduleEvent, ScheduleEventPatch, ScheduleEventRow, StorageError
 from src.app.deps import CurrentUser, get_current_user
-from src.app.schedule import rules
+from src.app.schedule import mailer, rules
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/schedule")
@@ -621,6 +622,8 @@ async def complete_checkin(
 
 @cron_router.post("/run")
 async def run_schedule_reminders(
+    repos: Annotated[Repos, Depends(get_repos)],
+    auth: Annotated[AuthProvider, Depends(get_auth)],
     x_cron_secret: Annotated[str | None, Header(alias="X-Cron-Secret")] = None,
 ):
     global _cron_secret_missing_logged
@@ -638,5 +641,132 @@ async def run_schedule_reminders(
     if x_cron_secret is None or not hmac.compare_digest(x_cron_secret, expected):
         return _error(401, "unauthorized", "The schedule reminder job was not authorized.")
 
-    # P2-4.2 will replace this placeholder with the reminder claim/send loop.
-    return {"sent": 0, "skipped": 0, "failed": 0}
+    now = _now()
+    grace = timedelta(minutes=SCHEDULE_CONFIG["reminder_grace_min"])
+    yesterday = now.date() - timedelta(days=1)
+    tomorrow = now.date() + timedelta(days=1)
+    sent = 0
+    skipped = 0
+    failed = 0
+    profile_cache: dict[UUID, object | None] = {}
+
+    try:
+        candidates = await run_in_threadpool(
+            repos.schedule.list_reminder_candidates,
+            tomorrow,
+        )
+    except StorageError:
+        logger.warning("Schedule reminder candidates could not be loaded")
+        return _error(503, "storage_unavailable", "The reminder job could not load schedule.")
+
+    for event in candidates:
+        try:
+            until = rules.series_until(event)
+        except (KeyError, TypeError, ValueError, ZoneInfoNotFoundError):
+            continue
+        if until is not None and until < yesterday:
+            continue
+
+        try:
+            zone = ZoneInfo(event.timezone)
+        except (ZoneInfoNotFoundError, ValueError):
+            continue
+        local_today = now.astimezone(zone).date()
+        local_tomorrow = local_today + timedelta(days=1)
+        try:
+            occurrences = rules.expand_occurrences(
+                [event],
+                local_today,
+                local_tomorrow,
+            )
+        except (KeyError, TypeError, ValueError, ZoneInfoNotFoundError):
+            continue
+
+        for occurrence in occurrences:
+            at = rules.reminder_at(occurrence)
+            if not (now - grace < at <= now):
+                continue
+            if now >= occurrence["start"]:
+                continue
+
+            schedule_set_at = event.schedule_set_at
+            if schedule_set_at.tzinfo is None:
+                schedule_set_at = schedule_set_at.replace(tzinfo=UTC)
+            else:
+                schedule_set_at = schedule_set_at.astimezone(UTC)
+            if schedule_set_at > at:
+                try:
+                    claimed = await run_in_threadpool(
+                        repos.schedule.claim_reminder,
+                        event.id,
+                        occurrence["day"],
+                        "skipped",
+                        now,
+                    )
+                except StorageError:
+                    failed += 1
+                    continue
+                if claimed:
+                    skipped += 1
+                continue
+
+            if event.user_id not in profile_cache:
+                try:
+                    profile_cache[event.user_id] = await run_in_threadpool(
+                        repos.profiles.get_profile,
+                        event.user_id,
+                    )
+                except StorageError:
+                    profile_cache[event.user_id] = None
+            profile = profile_cache[event.user_id]
+            if profile is not None and profile.preferences.get("email_reminders") is False:
+                continue
+
+            try:
+                claimed = await run_in_threadpool(
+                    repos.schedule.claim_reminder,
+                    event.id,
+                    occurrence["day"],
+                    "failed",
+                    now,
+                )
+            except StorageError:
+                failed += 1
+                continue
+            if not claimed:
+                continue
+
+            display_name = profile.display_name if profile is not None else None
+            try:
+                email = await run_in_threadpool(auth.email_for_user, event.user_id)
+            except AuthUnavailableError:
+                email = None
+            if email is None:
+                failed += 1
+                continue
+
+            try:
+                await run_in_threadpool(
+                    mailer.send_reminder,
+                    email,
+                    occurrence,
+                    display_name,
+                )
+            except mailer.MailError:
+                failed += 1
+                continue
+
+            try:
+                await run_in_threadpool(
+                    repos.schedule.set_reminder_status,
+                    event.id,
+                    occurrence["day"],
+                    "sent",
+                    now,
+                )
+            except StorageError:
+                logger.warning("Schedule reminder was sent but status could not be updated")
+            sent += 1
+
+    logger.info("Schedule reminder run: sent=%d skipped=%d failed=%d", sent, skipped, failed)
+    return {"sent": sent, "skipped": skipped, "failed": failed}
