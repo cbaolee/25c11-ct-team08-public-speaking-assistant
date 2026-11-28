@@ -14,12 +14,12 @@ from src.app.schedule import mailer
 TEST_USER_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
-def _event(day="2026-12-02", time="22:00"):
+def _event(day="2026-12-02", time="22:00", timezone="UTC"):
     return {
         "date": day,
         "time": time,
         "all_day": False,
-        "timezone": "UTC",
+        "timezone": timezone,
         "duration_min": 10,
         "category": "sports",
         "color": "lime",
@@ -71,7 +71,7 @@ def test_schedule_reminder_endpoint_accepts_correct_secret(monkeypatch):
     assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
 
 
-def test_schedule_reminder_claims_once_and_sends_once(monkeypatch):
+def test_schedule_reminder_claims_once_and_sends_once(monkeypatch, caplog):
     monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
     monkeypatch.setattr(
         schedule,
@@ -111,6 +111,7 @@ def test_schedule_reminder_claims_once_and_sends_once(monkeypatch):
     assert len(sent) == 1
     assert sent[0][0] == "reminder@example.com"
     assert sent[0][1].isoformat() == "2026-12-02"
+    assert all("reminder@example.com" not in record.message for record in caplog.records)
 
 
 def test_schedule_reminder_honors_email_preference(monkeypatch):
@@ -144,6 +145,34 @@ def test_schedule_reminder_honors_email_preference(monkeypatch):
     assert response.status_code == 200
     assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
     assert sent == []
+
+
+def test_schedule_reminder_missing_preference_still_sends(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    sent = []
+    auth = app.dependency_overrides[get_auth]()
+    monkeypatch.setattr(auth, "email_for_user", lambda user_id: "reminder@example.com")
+    monkeypatch.setattr(mailer, "send_reminder", lambda to, occ, name: sent.append(to))
+    client = TestClient(app)
+    assert client.post("/api/schedule/events", json=_event()).status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 21, 31, tzinfo=UTC),
+    )
+
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.json()["sent"] == 1
+    assert sent == ["reminder@example.com"]
 
 
 def test_schedule_reminder_outside_grace_does_not_send(monkeypatch):
@@ -182,6 +211,60 @@ def test_schedule_reminder_created_too_close_is_skipped(monkeypatch):
     )
 
     assert response.json() == {"sent": 0, "skipped": 1, "failed": 0}
+
+
+def test_schedule_reminder_does_not_send_at_or_after_start(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    client = TestClient(app)
+    assert client.post("/api/schedule/events", json=_event()).status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 22, 0, tzinfo=UTC),
+    )
+
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.json() == {"sent": 0, "skipped": 0, "failed": 0}
+
+
+def test_schedule_reminder_uses_event_timezone(monkeypatch):
+    monkeypatch.setattr(schedule.settings, "schedule_cron_secret", "correct-secret")
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 12, 0, tzinfo=UTC),
+    )
+    sent = []
+    auth = app.dependency_overrides[get_auth]()
+    monkeypatch.setattr(auth, "email_for_user", lambda user_id: "reminder@example.com")
+    monkeypatch.setattr(mailer, "send_reminder", lambda to, occ, name: sent.append(occ))
+    client = TestClient(app)
+    assert client.post(
+        "/api/schedule/events",
+        json=_event(time="22:00", timezone="Asia/Ho_Chi_Minh"),
+    ).status_code == 201
+    monkeypatch.setattr(
+        schedule,
+        "_now",
+        lambda: datetime(2026, 12, 2, 14, 31, tzinfo=UTC),
+    )
+
+    response = client.post(
+        "/internal/schedule/reminders/run",
+        headers={"X-Cron-Secret": "correct-secret"},
+    )
+
+    assert response.json()["sent"] == 1
+    assert len(sent) == 1
 
 
 def test_schedule_reminder_mail_error_is_not_retried(monkeypatch):
