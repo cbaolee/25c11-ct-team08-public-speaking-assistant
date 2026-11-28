@@ -116,6 +116,11 @@ export const TEXT = {
     errFileNoText: 'That PDF has no readable text. Use a PDF with selectable text.',
     errLong: 'The text is longer than {max} words. Shorten it and send again.',
     errLongChars: 'The text is longer than {max} characters. Shorten it and send again.',
+    errGibberish: 'Your message looks like random or repeated characters. Please enter a clear topic, details, or instructions.',
+    errCategoryMismatch: 'Your topic and material appear to be about **{suggested}** rather than **{selected}**. Start a **New chat** and choose the matching category.',
+    errCategoryMismatchGeneric: 'Your topic and material appear to belong to a different category. Start a **New chat** and choose the matching category.',
+    startNewChatCat: 'Start New chat with {suggested}',
+    startNewChatPlain: 'Start New chat',
     extracting: 'Reading your material and checking it is safe to use...',
     generating: 'Writing your script...', regenerating: 'Writing another version...',
     scriptHeader: 'Script · {title}',
@@ -123,9 +128,12 @@ export const TEXT = {
     practice: 'Practise with this script', copy: 'Copy text', download: 'Download', regenerate: 'Regenerate',
     copied: 'Script copied.', copyFail: 'Copy is not available in this browser.', downloadName: 'script.txt',
     citeNone: 'No source document or detailed chat notes attached, so this script has no citations.',
-    citeAllOk: 'Citations show the attached document section or chat note supporting each paragraph.',
+    citeAllOk: 'Citations show the attached document section or chat note supporting each sentence.',
+    citeAria: 'View citation sources ({label})',
+    citeJumpHint: 'Click to jump to this message in chat',
+    citeNoJump: 'Original chat message is not in this feed.',
     page: 'p. {n}',
-    uncited: 'uncited', uncitedHelp: 'Paragraphs marked "uncited" use general knowledge rather than a specific passage from your attached document or chat notes.',
+    uncited: 'uncited', uncitedHelp: 'Sentences without a citation pill use general knowledge or transitions rather than a specific passage from your attached document or chat notes.',
     checking: 'Checking your request against the content rules...',
     blockedTag: 'Blocked by content rules',
     blockedTitle: 'Cannot generate script based on regulations.',
@@ -464,7 +472,6 @@ export const TEXT = {
   chart: { table: 'View as table', time: 'Time', value: 'Value', type: 'Type', minutes: 'Minutes' }
 };
 TEXT.wc = { title: 'Practice', heardAs: 'Heard as: {x}', hearIt: 'Hear it', hearYourself: 'Hear yourself', tryAgain: 'Try again', stop: 'Stop', checking: 'Checking...', recognised: 'Recognised as {x}', close: 'Close, listen again', heard: 'Heard {y}', notHeard: "We couldn't hear that, try again", sampleVoice: 'Sample voice from your browser', practiceOnly: 'Practice only: your score does not change', noVoice: 'No English voice is available', practiceSentence: 'Practice this sentence', stillWrong: 'Still to practise: {x}', errMic: 'Microphone unavailable. Check your permissions and device.', errRate: 'Too many attempts. Please try again later.', errStt: 'Speech recognition is unavailable. Try again later.', errNet: 'Could not check the recording. Try again.', closeLabel: 'Close practice', timer: '{elapsed} / {max}' };
-TEXT.script.page = 'p. {n}';
 TEXT.report.playFrom = 'Play from {t}';
 export const TOPICS = TEXT.topics;
 

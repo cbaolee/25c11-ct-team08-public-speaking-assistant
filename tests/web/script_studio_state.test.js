@@ -356,13 +356,15 @@ test('formatReplyMarkup leaves unmatched, empty, whitespace-only, or multi-line 
   }
 });
 
-test('shouldShowGenerateButton hides button on Turn 1 and after a script exists, shows from Turn 2 onward', async () => {
+test('shouldShowGenerateButton follows Contract C (allows Turn 1 when canGenerate is true, hides when false or after script)', async () => {
   const { shouldShowGenerateButton } = await mod;
   assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 1, canGenerate: false }), false);
-  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 1, canGenerate: true }), false);
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 1, canGenerate: true }), true);
+  assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 1 }), false);
   assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 2, canGenerate: false }), false);
   assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 2, canGenerate: true }), true);
   assert.equal(shouldShowGenerateButton({ hasScript: false, assistantTurn: 4 }), true);
+  assert.equal(shouldShowGenerateButton({ hasScript: true, assistantTurn: 1, canGenerate: true }), false);
   assert.equal(shouldShowGenerateButton({ hasScript: true, assistantTurn: 3, canGenerate: true }), false);
   assert.equal(shouldShowGenerateButton(), false);
 });
@@ -503,9 +505,9 @@ test('parseRestoredChatSession restores picking_topic, gathering (Turn 1 / Turn 
     }
   );
 
-  // gathering Turn 1 always enforces canGenerateNow = false (Turn 1 hard rule)
-  const turn1 = parseRestoredChatSession({
-    chatSessionId: 'sess-g1',
+  // gathering Turn 1 respects backend canGenerateNow (Contract C) and preserves chatSeed.needsTopic
+  const turn1Ready = parseRestoredChatSession({
+    chatSessionId: 'sess-g1-ready',
     chatStage: 'gathering',
     assistantTurn: 1,
     canGenerateNow: true,
@@ -514,10 +516,35 @@ test('parseRestoredChatSession restores picking_topic, gathering (Turn 1 / Turn 
     duration_min: 15,
     savedAt: now - 60_000,
   }, now);
-  assert.equal(turn1.chatStage, 'gathering');
-  assert.equal(turn1.chatHasScript, false);
-  assert.equal(turn1.assistantTurn, 1);
-  assert.equal(turn1.canGenerateNow, false);
+  assert.equal(turn1Ready.chatStage, 'gathering');
+  assert.equal(turn1Ready.chatHasScript, false);
+  assert.equal(turn1Ready.assistantTurn, 1);
+  assert.equal(turn1Ready.canGenerateNow, true);
+
+  const turn1Wait = parseRestoredChatSession({
+    chatSessionId: 'sess-g1-wait',
+    chatStage: 'gathering',
+    assistantTurn: 1,
+    canGenerateNow: false,
+    chatSeed: { prompt: 'help me write a speech', fileName: '', needsTopic: true },
+    selectedTemplate: { template_id: null, topic: null },
+    category: 'technology',
+    duration_min: 15,
+    savedAt: now - 60_000,
+  }, now);
+  assert.equal(turn1Wait.assistantTurn, 1);
+  assert.equal(turn1Wait.canGenerateNow, false);
+  assert.deepEqual(turn1Wait.chatSeed, { prompt: 'help me write a speech', fileName: '', needsTopic: true });
+
+  const turn1Legacy = parseRestoredChatSession({
+    chatSessionId: 'sess-g1-legacy',
+    chatStage: 'gathering',
+    assistantTurn: 1,
+    category: 'technology',
+    duration_min: 15,
+    savedAt: now - 60_000,
+  }, now);
+  assert.equal(turn1Legacy.canGenerateNow, false);
 
   // gathering Turn 2+ restores canGenerateNow = true
   const turn2 = parseRestoredChatSession({
@@ -599,4 +626,79 @@ test('every i18n key referenced by script_studio.js and script_reader.js exists 
     }
   }
   assert.match(String(TEXT.script.page), /\{n\}/);
+});
+
+const gibberishVectors = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '../fixtures/gibberish_vectors.json'), 'utf8')
+);
+
+test(`validateMeaningfulText matches all ${gibberishVectors.length} shared Contract E v2.1 vectors`, async () => {
+  const { validateMeaningfulText } = await mod;
+  assert.ok(gibberishVectors.length >= 75, 'expected at least 75 shared vectors');
+  for (const v of gibberishVectors) {
+    const res = validateMeaningfulText(v.input, { hasFile: v.has_file === true });
+    assert.equal(
+      res.ok ? 'ALLOW' : 'REJECT',
+      v.expected,
+      `vector ${JSON.stringify(v.input)} (has_file=${Boolean(v.has_file)}, rule=${v.rule})`
+    );
+    assert.equal(res.reason, res.ok ? null : 'gibberish');
+  }
+});
+
+test('validateMeaningfulText stays linear on 18,000-char input (T4 5-char window)', async () => {
+  const { validateMeaningfulText } = await mod;
+  const longToken = 'abecidofug'.repeat(1800); // 18,000 chars, no 5-char keyboard run, has vowels, >2 distinct letters
+  const started = Date.now();
+  const res = validateMeaningfulText(longToken);
+  const elapsedMs = Date.now() - started;
+  assert.equal(res.ok, true);
+  assert.ok(elapsedMs < 500, `took too long: ${elapsedMs}ms`);
+});
+
+test('dedupeCitationSources, formatCitationSourceLabel, and formatCitationPill handle Contract D sources', async () => {
+  const { dedupeCitationSources, formatCitationSourceLabel, formatCitationPill } = await mod;
+  const fmtPage = n => `p. ${n}`;
+
+  // Chat note has page: null (from Dev 2 retrieval.py) -> shows heading without page number
+  assert.equal(
+    formatCitationSourceLabel({ heading: 'Chat note #1 · Field notes', page: null, source_kind: 'chat' }, fmtPage),
+    'Chat note #1 · Field notes'
+  );
+  // PDF page with generic "Page 2 Overview" heading -> shows "p. 2"
+  assert.equal(
+    formatCitationSourceLabel({ heading: 'Page 2 Overview', page: 2, source_kind: 'file' }, fmtPage),
+    'p. 2'
+  );
+  // PDF page with real heading -> "<heading> · p. <n>"
+  assert.equal(
+    formatCitationSourceLabel({ heading: 'Keystone Survey', page: 2, source_kind: 'file' }, fmtPage),
+    'Keystone Survey · p. 2'
+  );
+
+  const duped = [
+    { chunk_id: 3, heading: 'Keystone Survey', page: 2, source_kind: 'file', source_msg_id: 'msg_1', excerpt: 'A' },
+    { chunk_id: 4, heading: 'Keystone Survey', page: 2, source_kind: 'file', source_msg_id: 'msg_1', excerpt: 'B' },
+    { chunk_id: 7, heading: 'Chat note #1', page: null, source_kind: 'chat', source_msg_id: 'msg_2', excerpt: 'C' },
+    { chunk_id: 9, heading: 'Chat note #2', page: null, source_kind: 'chat', source_msg_id: 'msg_3', excerpt: 'D' },
+  ];
+  assert.equal(dedupeCitationSources(duped).length, 3);
+
+  const single = formatCitationPill([duped[2]], fmtPage);
+  assert.equal(single.primaryLabel, 'Chat note #1');
+  assert.equal(single.extraCount, 0);
+  assert.equal(single.sources.length, 1);
+
+  const multi = formatCitationPill(duped, fmtPage);
+  assert.equal(multi.primaryLabel, 'Keystone Survey · p. 2');
+  assert.equal(multi.extraCount, 2);
+  assert.equal(multi.sources.length, 3);
+
+  const longTitle = formatCitationPill(
+    [{ heading: 'Very Long Environmental Marine Biodiversity Report', page: 12, source_kind: 'file' }],
+    fmtPage,
+    28
+  );
+  assert.ok(Array.from(longTitle.primaryLabel).length <= 28);
+  assert.ok(longTitle.primaryLabel.endsWith('…'));
 });
