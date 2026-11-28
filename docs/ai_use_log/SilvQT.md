@@ -7,3 +7,4 @@
 | 2026-11-14 | #43 / #16 | Copilot | Guidance with Supabase connection, save-failure handling|
 | 2026-11-20 | #64 / #55 | Copilot | Guidance with script backend, saving history|
 | 2026-11-22 | #104 / #102 | Copilot | Guidance with SQL Migration and helped updted script models|
+| 2026-11-28 | #141/#135 | Copilot | Implemented Schedule constants,API routes|
