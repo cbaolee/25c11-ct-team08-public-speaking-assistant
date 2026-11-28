@@ -313,6 +313,8 @@ category_guard_block_other_min = 0.42
 category_guard_max_chars = 1500
 # Output budget of the LLM check of unclear cases, in tokens
 category_guard_llm_max_tokens = 80
+# HTTP timeout of that LLM check, sent without SDK retries, in seconds (provisional, not yet measured)
+category_guard_llm_timeout_s = 5
 # Most prompt sentences and document chunks compared with the selected category, in passages
 category_guard_max_segments = 20
 # Write Freely may Generate at turn 1 when its first prompt has at least this many words that
