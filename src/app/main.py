@@ -71,6 +71,7 @@ from src.app.deps import (
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
+from src.app.routes import schedule as schedule_routes
 from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_upload_limited
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
@@ -170,6 +171,7 @@ app.mount("/static", RevalidatedStaticFiles(directory=WEB_DIR / "static"), name=
 templates = Jinja2Templates(directory=WEB_DIR / "templates")
 app.include_router(auth_routes.router)
 app.include_router(profile_routes.router)
+app.include_router(schedule_routes.router)
 app.include_router(baselines.router)
 app.include_router(practice.router)
 app.include_router(coach.router)
