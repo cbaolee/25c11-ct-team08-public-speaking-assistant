@@ -15,6 +15,7 @@ from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
+from src.app import script_guards
 from src.app.config import (
     chat_session_store_capacity,
     chat_session_ttl_s,
@@ -1770,8 +1771,9 @@ def test_suggest_resend_without_a_file_is_scored_with_the_first_prompt(
 @pytest.mark.parametrize("prompt", ["", _WILD_TEXT])
 def test_suggest_scores_a_new_file_without_the_older_content(category_api, prompt) -> None:
     client, _, user, _, store, _ = category_api
-    first = _suggest(client, _WILD_TEXT, files={"file": _REEF_FILE})
-    session = store.get(first.json()["session_id"], user_id=str(user.id))
+    session = store.get(_put_guard_session(store, user), user_id=str(user.id))
+    session.initial_prompt, session.files_loaded = _WILD_TEXT, ["reefs.txt"]
+    session.chunks = [DocumentChunk(1, "Notes", 1, _REEF_TEXT)]
 
     response = _suggest(
         client, prompt, session_id=session.session_id, files={"file": _MARATHON_FILE}
@@ -1863,7 +1865,7 @@ def test_a_decision_of_another_category_does_not_verify_older_content(category_a
     response = _upload(client, session_id, "/api/script-chat/suggest", _REEF_FILE)
 
     assert response.status_code == 200
-    assert [slug for _, (slug, _) in category_decisions._entries.values()] == ["sports"]
+    assert [entry[1][0] for entry in category_decisions._entries.values()] == ["sports"]
     assert _generate(client, session_id=session_id).status_code == 422
 
 
@@ -1878,7 +1880,190 @@ def test_suggest_remembers_a_template_match(category_api) -> None:
         response = _upload(client, session_id, "/api/script-chat/suggest", _MARATHON_FILE)
 
     assert response.status_code == 200
-    assert [slug for _, (slug, _) in category_decisions._entries.values()] == ["wildlife"]
+    assert [entry[1][0] for entry in category_decisions._entries.values()] == ["wildlife"]
+
+
+# A supporting document that looks like Sports, such as a grading rubric.
+_RUBRIC = "Grading rubric: marathon delivery, clear structure, steady pace and eye contact."
+_RUBRIC_FILE = ("rubric.txt", _RUBRIC.encode(), "text/plain")
+_ALL_UPLOAD_ROUTES = ["/api/script-chat/suggest", *_MESSAGE_ROUTES]
+
+
+def _spy_on_guard(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    spy = MagicMock(wraps=category_guard.check_category_alignment)
+    monkeypatch.setattr(script_guards, "check_category_alignment", spy)
+    return spy
+
+
+_NOTE_WITH_FILE = "Use these notes for my speech."
+
+
+def _send_note_with_rubric(client, session_id: str, route: str):
+    """The same note and off-category file; `/suggest` calls the note `prompt`."""
+    suggest = route.endswith("suggest")
+    data: dict[str, Any] = {"session_id": session_id}
+    data["prompt" if suggest else "message"] = _NOTE_WITH_FILE
+    if suggest:
+        data |= {"category": "wildlife", "duration_min": 10}
+    return client.post(route, data=data, files={"file": _RUBRIC_FILE})
+
+
+@pytest.mark.parametrize("route", _ALL_UPLOAD_ROUTES)
+def test_without_verified_content_the_note_and_new_file_are_scored_alone(
+    category_api, monkeypatch, route
+) -> None:
+    """Condition: the session has NO verified content.
+
+    The guard scores exactly the note sent with the file plus the new file chunks, never the
+    first prompt, so an off-category file is refused with 422.
+    """
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    store.get(session_id, user_id=str(user.id)).initial_prompt = _WILD_TEXT  # never checked
+    guard = _spy_on_guard(monkeypatch)
+
+    response = _send_note_with_rubric(client, session_id, route)
+
+    if route.endswith("jobs"):
+        job = client.get(f"/api/script-chat/jobs/{response.json()['job_id']}").json()
+        assert {key: job[key] for key in _MISMATCH_BODY} == _MISMATCH_BODY
+    else:
+        assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert [call.kwargs["whole_text"] for call in guard.call_args_list] == [
+        "\n".join((_NOTE_WITH_FILE, _RUBRIC))
+    ]
+
+
+@pytest.mark.parametrize("route", _ALL_UPLOAD_ROUTES)
+def test_with_verified_content_the_same_new_file_passes_unscored(
+    category_api, monkeypatch, route
+) -> None:
+    """Condition: the session HAS verified content.
+
+    The same note and off-category file pass, and the guard never receives (so never encodes)
+    the file. The chat routes call no guard at all; `/suggest` still scores the new note with
+    the older content.
+    """
+    client, _, user, _, store, _ = category_api
+    session_id = _suggest(client, _WILD_TEXT).json()["session_id"]  # checked and passed
+    guard = _spy_on_guard(monkeypatch)
+
+    response = _send_note_with_rubric(client, session_id, route)
+
+    if route.endswith("jobs"):
+        job = client.get(f"/api/script-chat/jobs/{response.json()['job_id']}").json()
+        assert job["status"] == "completed"
+    else:
+        assert response.status_code == 200
+    assert store.get(session_id, user_id=str(user.id)).files_loaded == ["rubric.txt"]
+    scored = [call.kwargs["whole_text"] for call in guard.call_args_list]
+    suggest = route.endswith("suggest")
+    assert scored == (["\n".join((_WILD_TEXT, _NOTE_WITH_FILE))] if suggest else [])
+
+
+@pytest.mark.parametrize("route", _ALL_UPLOAD_ROUTES)
+@pytest.mark.parametrize("verified_by", ["embedding", "template_match", "llm"])
+def test_a_verified_session_takes_further_files_unchecked(
+    category_api, monkeypatch, route, verified_by
+) -> None:
+    client, _, user, pipeline, store, _ = category_api
+    if verified_by == "llm":
+        _judging_client(pipeline, fits=True)
+    first_prompt = {
+        "embedding": _WILD_TEXT,
+        "template_match": "Coral reefs",
+        "llm": _STADIUM_TEXT,
+    }[verified_by]
+    session_id = _suggest(client, first_prompt).json()["session_id"]
+    pipeline.template_engine.client = None
+    guard = _spy_on_guard(monkeypatch)
+
+    for _ in range(2):  # the first upload keeps the session verified for the second one
+        response = _upload(client, session_id, route, _RUBRIC_FILE)
+        if route.endswith("jobs"):
+            job = client.get(f"/api/script-chat/jobs/{response.json()['job_id']}").json()
+            assert job["status"] == "completed"
+        else:
+            assert response.status_code == 200
+
+    session = store.get(session_id, user_id=str(user.id))
+    assert session.files_loaded == ["rubric.txt", "rubric.txt"]
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert guard.mock_calls == []
+
+
+@pytest.mark.parametrize("route", _UPLOAD_ROUTES)
+@pytest.mark.parametrize("first_check", ["too_short", "fail_open"])
+def test_an_unverified_session_still_checks_a_further_file(
+    category_api, monkeypatch, route, first_check
+) -> None:
+    client, *_ = category_api
+    with monkeypatch.context() as patched:
+        if first_check == "fail_open":
+            _break_embeddings(patched)
+        prompt = _WILD_TEXT if first_check == "fail_open" else "Coral reefs"
+        session_id = _suggest(client, prompt, duration_min=10).json()["session_id"]
+    # The wildlife sentence would mask the file if the two were scored together.
+    response = _upload(client, session_id, route, _RUBRIC_FILE)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+
+
+def test_a_changed_category_checks_a_further_file(category_api) -> None:
+    client, *_ = category_api
+    session_id = _suggest(client, _WILD_TEXT).json()["session_id"]
+
+    response = _suggest(
+        client,
+        session_id=session_id,
+        category="information_technology",
+        files={"file": _RUBRIC_FILE},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["selected_category"] == "information_technology"
+
+
+def test_a_skipped_recheck_keeps_the_session_verified(category_api) -> None:
+    client, *_ = category_api
+    session_id = _suggest(client, "Coral reefs").json()["session_id"]  # matches the template
+    assert _suggest(client, session_id=session_id).status_code == 200  # same content, too short
+
+    response = _upload(client, session_id, "/api/script-chat/message", _RUBRIC_FILE)
+
+    assert response.status_code == 200
+
+
+@pytest.mark.parametrize("prompt", [_INSTRUCTION, _WILD_TEXT])
+def test_a_verified_session_scores_only_a_new_prompt_sent_with_a_file(
+    category_api, monkeypatch, prompt
+) -> None:
+    client, *_ = category_api
+    session_id = _suggest(client, _WILD_TEXT).json()["session_id"]
+    guard = _spy_on_guard(monkeypatch)
+
+    response = _suggest(
+        client, prompt, session_id=session_id, duration_min=10, files={"file": _RUBRIC_FILE}
+    )
+
+    assert response.status_code == 200
+    scored = [call.kwargs["whole_text"] for call in guard.call_args_list]
+    assert scored == ([] if prompt == _WILD_TEXT else [f"{_WILD_TEXT}\n{prompt}"])
+    guard.reset_mock()
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert guard.mock_calls == []
+
+
+def test_category_decisions_tell_verified_content_from_skipped_content() -> None:
+    decisions = CategoryDecisionStore()
+    decisions.remember("a", "wildlife", "k1")
+    assert decisions.covers("a", "wildlife", "k1")
+    assert not decisions.covers("a", "wildlife", "k1", verified_only=True)
+    decisions.remember("a", "wildlife", "k1", verified=True)
+    decisions.remember("a", "wildlife", "k1")  # the same content stays verified
+    assert decisions.covers("a", "wildlife", "k1", verified_only=True)
+    decisions.remember("a", "wildlife", "k2")
+    assert not decisions.covers("a", "wildlife", "k2", verified_only=True)
 
 
 def test_category_decisions_follow_the_chat_session_limits() -> None:

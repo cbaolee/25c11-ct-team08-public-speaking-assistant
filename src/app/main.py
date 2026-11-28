@@ -1115,7 +1115,7 @@ async def script_chat_suggest_endpoint(
             query=query,
             retriever=getattr(pipeline.template_engine, "retriever", None),
         )
-        may_remember = guard_category_suggest(
+        category_record = guard_category_suggest(
             pipeline,
             session=session,
             category=target_category,
@@ -1153,8 +1153,7 @@ async def script_chat_suggest_endpoint(
                 session.chunk_embeddings = retriever.encode_chunks(session.chunks)
 
         store.put(session)
-        if may_remember:
-            remember_category_decision(session)
+        remember_category_decision(session, category_record)
         tracker.finish()
         res = suggestion_res.to_dict()
         res["session_id"] = session.session_id
@@ -1326,9 +1325,9 @@ def _execute_chat_message_locked(
         file_text = "\n".join(c.content for c in file_chunks[:moderation_max_chunks])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
-    may_remember = False
+    category_record = None
     if file_chunks:
-        may_remember = guard_category_message_file(
+        category_record = guard_category_message_file(
             pipeline,
             session,
             clean_msg,
@@ -1434,8 +1433,7 @@ def _execute_chat_message_locked(
 
     tracker.finish()
     store.put(session)
-    if may_remember:
-        remember_category_decision(session)
+    remember_category_decision(session, category_record)
     result = {
         "session_id": session.session_id,
         "reply_message": decision.reply_message,
