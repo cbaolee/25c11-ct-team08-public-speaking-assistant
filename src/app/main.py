@@ -82,7 +82,13 @@ from src.app.deps import (
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
-from src.app.script_guards import reject_gibberish
+from src.app.script_guards import (
+    guard_category_generate,
+    guard_category_message_file,
+    guard_category_suggest,
+    reject_gibberish,
+    remember_category_decision,
+)
 from src.app.script_limits import (
     check_generate_limits,
     job_running_block,
@@ -93,6 +99,7 @@ from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_uplo
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
 from src.audio_processing.pipeline import evaluate_session
+from src.text_processing.category_guard import warm_category_prototypes
 from src.text_processing.chat_session import (
     CHAT_TURN_STEP_DURATIONS,
     ChatSessionState,
@@ -134,6 +141,7 @@ def _warmup_script_pipeline() -> None:
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:
             retriever.get_model()
+            warm_category_prototypes(retriever, pipeline.template_store)
     except Exception:
         logger.debug("Background script pipeline warm-up skipped.", exc_info=True)
 
@@ -818,6 +826,7 @@ async def generate_script_endpoint(
     clean_feedback = user_feedback.strip() or None
 
     store = getattr(pipeline, "session_store", chat_session_store)
+    sess = None
     if clean_session_id:
         sess = store.get(clean_session_id, user_id=user_id)
         if sess:
@@ -832,6 +841,14 @@ async def generate_script_endpoint(
     # and the limits are counted before an upload is written to disk.
     validate_generate_input(clean_topic, duration_min, clean_feedback)
     reject_gibberish(user_feedback, raw_text, has_file=pdf is not None and bool(pdf.filename))
+    await run_in_threadpool(
+        guard_category_generate,
+        pipeline,
+        session=sess,
+        category=category,
+        topic=clean_topic,
+        raw_text=raw_text,
+    )
     if pipeline.has_active_job(user_id):
         return rate_limited_response(job_running_block())
     block = await run_in_threadpool(
@@ -1006,6 +1023,7 @@ def _sync_chat_turn_job(
     result: dict[str, Any] | None = None,
     error_code: str | None = None,
     message: str | None = None,
+    extra: dict[str, str] | None = None,
 ) -> None:
     if not job_id:
         return
@@ -1018,6 +1036,7 @@ def _sync_chat_turn_job(
         job["result"] = result
         job["error_code"] = error_code
         job["message"] = message
+        job.update(extra or {})
 
 
 @app.post("/api/script-chat/suggest")
@@ -1079,6 +1098,31 @@ async def script_chat_suggest_endpoint(
                 pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
         tracker.start("matching_templates")
+        # Ranked and checked before the session is created or changed.
+        target_category = category or (session.category if session else "")
+        chunks = [*(session.chunks if session else []), *file_chunks]
+
+        query = clean_prompt
+        if not query and chunks:
+            query = " ".join(c.content for c in chunks[:suggest_query_max_chunks])
+
+        suggestion_res = pipeline.template_store.suggest_topics(
+            category_slug=target_category,
+            duration_min=duration_min or (session.duration_min if session else duration_min),
+            query=query,
+            retriever=getattr(pipeline.template_engine, "retriever", None),
+        )
+        guard_category_suggest(
+            pipeline,
+            session=session,
+            category=target_category,
+            prompt=clean_prompt,
+            chunks=chunks,
+            has_template_match=bool(query.strip()) and not suggestion_res.recommend_free_topic,
+            client=_resolve_groq_client(pipeline),
+            limiter=getattr(pipeline.template_engine, "limiter", None),
+        )
+
         if session is None:
             session = ChatSessionState(
                 session_id=str(uuid4()),
@@ -1106,17 +1150,7 @@ async def script_chat_suggest_endpoint(
                 session.chunk_embeddings = retriever.encode_chunks(session.chunks)
 
         store.put(session)
-
-        query = clean_prompt
-        if not query and session.chunks:
-            query = " ".join(c.content for c in session.chunks[:suggest_query_max_chunks])
-
-        suggestion_res = pipeline.template_store.suggest_topics(
-            category_slug=session.category,
-            duration_min=session.duration_min,
-            query=query,
-            retriever=getattr(pipeline.template_engine, "retriever", None),
-        )
+        remember_category_decision(session)
         tracker.finish()
         res = suggestion_res.to_dict()
         res["session_id"] = session.session_id
@@ -1282,6 +1316,15 @@ def _execute_chat_message_locked(
         file_text = "\n".join(c.content for c in file_chunks[:moderation_max_chunks])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
+    if file_chunks:
+        guard_category_message_file(
+            pipeline,
+            session,
+            clean_msg,
+            file_chunks,
+            client=_resolve_groq_client(pipeline),
+            limiter=getattr(pipeline.template_engine, "limiter", None),
+        )
 
     tracker.start("updating_context")
     _sync_chat_turn_job(job_id, tracker)
@@ -1380,6 +1423,8 @@ def _execute_chat_message_locked(
 
     tracker.finish()
     store.put(session)
+    if file_chunks:
+        remember_category_decision(session)
     result = {
         "session_id": session.session_id,
         "reply_message": decision.reply_message,
@@ -1515,6 +1560,7 @@ def _run_chat_message_job(
             status="failed",
             error_code=exc.error_code,
             message=exc.message,
+            extra=getattr(exc, "extra", None),
         )
     except Exception as exc:
         tracker.fail()

@@ -9,12 +9,15 @@ from typing import Any
 from unittest.mock import MagicMock
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
 
+import numpy as np
 import pytest
 from fastapi import BackgroundTasks, UploadFile
 from fastapi.testclient import TestClient
 
 from src.app import main as app_main
 from src.app.config import (
+    chat_session_store_capacity,
+    chat_session_ttl_s,
     composer_max_words,
     max_pdf_size_bytes,
     max_saved_scripts,
@@ -26,6 +29,8 @@ from src.app.config import (
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import NewScript, NewSession, StorageError, build_content_hash
 from src.app.deps import CurrentUser, get_current_user
+from src.app.script_guards import CategoryDecisionStore, category_decisions
+from src.text_processing import category_guard
 from src.text_processing.chat_session import ChatSessionState, chat_session_store
 from src.text_processing.contracts import (
     GeneratedScript,
@@ -33,7 +38,9 @@ from src.text_processing.contracts import (
     TemplateDocument,
     TopicMetadata,
 )
+from src.text_processing.parser import DocumentChunk
 from src.text_processing.pipeline import ScriptGenerationPipeline
+from src.text_processing.retrieval import SemanticRetriever
 from src.text_processing.template_engine import TemplateEngine
 from src.text_processing.template_store import TemplateStore
 
@@ -1255,3 +1262,473 @@ def test_message_accepts_the_generate_keyword(guard_api) -> None:
     )
 
     assert response.status_code == 200
+
+
+# ---------- Category guard: material of another category is refused ----------
+
+_REEF_TEXT = "Coral reefs shelter many fish species and protect the coast from storms."
+_MARATHON_TEXT = "Marathon runners train every week to build endurance and a steady pace."
+_STADIUM_TEXT = "Stadium crowds gather near the river where herons nest every spring."
+_MARATHON_FILE = ("running.txt", _MARATHON_TEXT.encode(), "text/plain")
+_REEF_FILE = ("reefs.txt", _REEF_TEXT.encode(), "text/plain")
+_MISMATCH_BODY = {
+    "error_code": "category_mismatch",
+    "message": (
+        "Your topic and material appear to be about Sports rather than Wildlife. "
+        "Please start a New chat and choose the matching category."
+    ),
+    "selected_category": "wildlife",
+    "selected_category_label": "Wildlife",
+    "suggested_category": "sports",
+    "suggested_category_label": "Sports",
+}
+
+
+class _KeywordModel:
+    """Fake embeddings over the six category axes and one unrelated axis.
+
+    Prototypes sit on their category's axis, "marathon" texts are clearly sports, "stadium"
+    texts are in the gray zone for wildlife, and every other text is unrelated.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[list[str]] = []
+        self.ran_on_event_loop = False
+
+    def encode(self, texts: list[str], **_: Any) -> np.ndarray:
+        try:
+            asyncio.get_running_loop()
+            self.ran_on_event_loop = True
+        except RuntimeError:
+            pass
+        self.calls.append(list(texts))
+        return np.array([self._vector(text) for text in texts])
+
+    @staticmethod
+    def _vector(text: str) -> np.ndarray:
+        slugs = list(category_guard.CATEGORY_SLUG_MAP)
+        vector = np.zeros(len(slugs) + 1)
+        prototypes = dict(category_guard._HANDWRITTEN)
+        prototypes["wildlife"] += ("Keystone Species Conservation",)  # the one template title
+        for slug, sentences in prototypes.items():
+            if text in sentences:
+                vector[slugs.index(slug)] = 1.0
+                return vector
+        if "marathon" in text.lower():
+            vector[slugs.index("sports")] = 1.0
+        elif "stadium" in text.lower():
+            vector[slugs.index("sports")] = 0.6
+            vector[slugs.index("wildlife")] = 0.1
+        else:
+            vector[-1] = 1.0
+        return vector
+
+
+class _KeywordRetriever(SemanticRetriever):
+    def __init__(self) -> None:
+        self.model = _KeywordModel()
+
+    def get_model(self) -> _KeywordModel:
+        return self.model
+
+
+@pytest.fixture()
+def category_api(guard_api, monkeypatch: pytest.MonkeyPatch):
+    """`guard_api` with a hand-made search model, so the category guard really scores."""
+    client, repos, user, pipeline, store = guard_api
+    retriever = _KeywordRetriever()
+    pipeline.template_engine.retriever = retriever
+    monkeypatch.setattr(category_guard, "_proto_cache", None)
+    category_decisions.clear()
+    yield client, repos, user, pipeline, store, retriever.model
+    category_decisions.clear()
+    assert retriever.model.ran_on_event_loop is False
+
+
+def _judging_client(pipeline, *, fits: bool) -> MagicMock:
+    groq = MagicMock()
+    answer = json.dumps({"fits_selected": fits, "better_category": "sports"})
+    groq.chat.completions.create.return_value.choices = [
+        MagicMock(message=MagicMock(content=answer))
+    ]
+    pipeline.template_engine.client = groq
+    return groq
+
+
+def _suggest(client, prompt: str = "", **extra: Any):
+    data = {"category": "wildlife", "duration_min": 5, "prompt": prompt}
+    files = extra.pop("files", None)
+    return client.post("/api/script-chat/suggest", data={**data, **extra}, files=files)
+
+
+def _generate(client, **form: Any):
+    return client.post("/api/generate-script", data={"topic": "Coral reefs", **form})
+
+
+@pytest.mark.parametrize(
+    ("prompt", "files"), [(_MARATHON_TEXT, None), ("", {"file": _MARATHON_FILE})]
+)
+def test_suggest_refuses_another_category_without_creating_a_session(
+    category_api, prompt, files
+) -> None:
+    client, _, _, _, store, _ = category_api
+
+    response = _suggest(client, prompt, files=files)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert len(store) == 0
+
+
+@pytest.mark.parametrize(
+    ("form", "files"),
+    [({"prompt": _MARATHON_TEXT}, None), ({}, {"file": _MARATHON_FILE})],
+)
+def test_suggest_refuses_another_category_without_changing_the_session(
+    category_api, form, files
+) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    before = _session_snapshot(store, user)
+
+    response = _suggest(client, session_id=session_id, duration_min=10, files=files, **form)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert _session_snapshot(store, user) == before
+    assert len(store) == 1
+
+
+def test_suggest_checks_a_category_change_without_new_material(category_api) -> None:
+    client, _, user, _, store, _ = category_api
+    first = _suggest(client, _MARATHON_TEXT, category="sports")
+    session_id = first.json()["session_id"]
+    session = store.get(session_id, user_id=str(user.id))
+    decisions = {key: value[1] for key, value in category_decisions._entries.items()}
+
+    response = _suggest(client, session_id=session_id, category="wildlife")
+
+    assert first.status_code == 200
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert (session.category, session.initial_prompt) == ("sports", _MARATHON_TEXT)
+    assert (session.files_loaded, session.chunks) == ([], [])
+    assert {key: value[1] for key, value in category_decisions._entries.items()} == decisions
+    assert [slug for slug, _ in decisions.values()] == ["sports"]
+
+
+def test_suggest_checks_the_category_after_moderation(category_api, monkeypatch) -> None:
+    client, _, _, pipeline, _, model = category_api
+    encoded_at_moderation: list[int] = []
+    monkeypatch.setattr(
+        pipeline.moderator,
+        "assert_safe",
+        lambda *_, **__: encoded_at_moderation.append(len(model.calls)),
+    )
+
+    assert _suggest(client, _MARATHON_TEXT).status_code == 422
+    assert encoded_at_moderation == [0]
+
+
+def test_suggest_keeps_its_result_for_matching_material(category_api) -> None:
+    client, _, _, _, store, _ = category_api
+
+    first = _suggest(client, _REEF_TEXT, files={"file": _REEF_FILE})
+    again = _suggest(client, session_id=first.json()["session_id"], duration_min=0)
+
+    assert (first.status_code, again.status_code) == (200, 200)
+    assert [item["template_id"] for item in again.json()["suggestions"]] == [
+        "wildlife/keystone_5m"
+    ]
+    assert again.json()["files_loaded"] == ["reefs.txt"]
+    assert len(store) == 1
+
+
+@pytest.mark.parametrize("message", ["", "Use these notes for my speech."])
+def test_message_refuses_an_off_category_file_before_any_change(
+    category_api, monkeypatch, message
+) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    before = _session_snapshot(store, user)
+    compaction = MagicMock()
+    monkeypatch.setattr(app_main, "append_to_context_window", compaction)
+
+    response = client.post(
+        "/api/script-chat/message",
+        data={"session_id": session_id, "message": message},
+        files={"file": _MARATHON_FILE},
+    )
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    after = _session_snapshot(store, user)
+    assert (after["gather_turns"], after["context_window"], after["chunks"]) == (0, [], [])
+    assert after == before
+    assert compaction.mock_calls == []
+
+
+def test_message_job_reports_the_mismatch_with_both_categories(category_api) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    before = _session_snapshot(store, user)
+
+    queued = client.post(
+        "/api/script-chat/message/jobs",
+        data={"session_id": session_id},
+        files={"file": _MARATHON_FILE},
+    )
+    job = client.get(f"/api/script-chat/jobs/{queued.json()['job_id']}").json()
+
+    assert queued.status_code == 202
+    assert (job["status"], job["result"]) == ("failed", None)
+    assert {key: job[key] for key in _MISMATCH_BODY} == _MISMATCH_BODY
+    assert _session_snapshot(store, user) == before
+
+
+def test_message_with_text_only_is_not_checked(category_api) -> None:
+    client, _, user, _, store, model = category_api
+
+    response = client.post(
+        "/api/script-chat/message",
+        data={"session_id": _put_guard_session(store, user), "message": _MARATHON_TEXT},
+    )
+
+    assert response.status_code == 200
+    assert not any(_MARATHON_TEXT in call for call in model.calls)
+    assert category_guard._proto_cache is None
+
+
+@pytest.mark.parametrize("route", _MESSAGE_ROUTES)
+def test_selected_template_of_the_category_lets_a_file_pass(category_api, route) -> None:
+    client, _, user, _, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    store.get(session_id, user_id=str(user.id)).selected_template_id = "wildlife/keystone_5m"
+
+    response = client.post(route, data={"session_id": session_id}, files={"file": _MARATHON_FILE})
+
+    assert response.status_code in (200, 202)
+    assert store.get(session_id, user_id=str(user.id)).files_loaded == ["running.txt"]
+    assert category_guard._proto_cache is None
+
+
+def test_template_of_another_category_does_not_let_a_file_pass(category_api) -> None:
+    client, _, user, pipeline, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    session = store.get(session_id, user_id=str(user.id))
+    session.category, session.selected_template_id = "gender_studies", "wildlife/keystone_5m"
+
+    response = client.post(
+        "/api/script-chat/message",
+        data={"session_id": session_id},
+        files={"file": _MARATHON_FILE},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["selected_category"] == "gender_studies"
+
+
+@pytest.mark.parametrize(("fits", "status_code"), [(False, 422), (True, 200)])
+def test_message_asks_the_compaction_model_about_unclear_files(
+    category_api, fits, status_code
+) -> None:
+    client, _, user, pipeline, store, _ = category_api
+    groq = _judging_client(pipeline, fits=fits)
+
+    response = client.post(
+        "/api/script-chat/message",
+        data={"session_id": _put_guard_session(store, user)},
+        files={"file": ("herons.txt", _STADIUM_TEXT.encode(), "text/plain")},
+    )
+
+    assert response.status_code == status_code
+    first_request = groq.chat.completions.create.call_args_list[0].kwargs
+    assert first_request["model"] == settings.groq_compaction_model
+
+
+def test_suggest_asks_the_model_about_unclear_material(category_api) -> None:
+    client, _, _, pipeline, store, _ = category_api
+    groq = _judging_client(pipeline, fits=False)
+
+    response = _suggest(client, _STADIUM_TEXT, duration_min=10)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert groq.chat.completions.create.call_count == 1
+    assert len(store) == 0
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        {"topic": _MARATHON_TEXT, "category": "wildlife"},
+        {"topic": "Coral reefs", "category": "Wildlife", "raw_text": _MARATHON_TEXT},
+    ],
+)
+def test_generate_without_session_refuses_another_category(
+    category_api, monkeypatch, form
+) -> None:
+    client, repos, _, pipeline, _, _ = category_api
+    groq = _judging_client(pipeline, fits=False)
+    count_attempt = MagicMock()
+    monkeypatch.setattr(repos.rate_limits, "hit", count_attempt)
+
+    response = client.post("/api/generate-script", data=form)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert groq.mock_calls == []
+    assert count_attempt.mock_calls == []
+    assert pipeline._jobs == {}
+
+
+@pytest.mark.parametrize(
+    ("prompt", "chunk_text", "raw_text"),
+    [
+        (_MARATHON_TEXT, "", ""),
+        ("Coral reefs", _MARATHON_TEXT, ""),
+        ("Coral reefs", "", _MARATHON_TEXT),
+    ],
+)
+def test_generate_checks_the_session_category_not_the_form(
+    category_api, monkeypatch, prompt, chunk_text, raw_text
+) -> None:
+    client, repos, user, pipeline, store, _ = category_api
+    session_id = _put_guard_session(store, user)
+    session = store.get(session_id, user_id=str(user.id))
+    session.initial_prompt = prompt
+    if chunk_text:
+        session.chunks = [DocumentChunk(1, "Notes", 1, chunk_text)]
+    pipeline.create_job(user_id=str(user.id))  # a running job is only reported afterwards
+    count_attempt = MagicMock()
+    monkeypatch.setattr(repos.rate_limits, "hit", count_attempt)
+
+    response = _generate(client, session_id=session_id, category="free", raw_text=raw_text)
+
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert count_attempt.mock_calls == []
+    assert len(pipeline._jobs) == 1
+
+
+def test_generate_refuses_before_writing_the_pdf(category_api, monkeypatch) -> None:
+    client, *_ = category_api
+    save = MagicMock()
+    monkeypatch.setattr(app_main, "save_upload_limited", save)
+
+    response = client.post(
+        "/api/generate-script",
+        data={"topic": _MARATHON_TEXT, "category": "wildlife"},
+        files={"pdf": ("notes.pdf", b"%PDF-1.4 notes", "application/pdf")},
+    )
+
+    assert response.status_code == 422
+    assert save.mock_calls == []
+
+
+@pytest.mark.parametrize(
+    "form",
+    [
+        {"topic": _STADIUM_TEXT, "category": "wildlife"},  # gray zone
+        {"topic": _MARATHON_TEXT, "category": "free"},
+        {"category": "wildlife", "user_feedback": _MARATHON_TEXT},
+    ],
+)
+def test_generate_never_asks_the_llm_and_skips_unchecked_input(
+    category_api, monkeypatch, form
+) -> None:
+    client, _, _, pipeline, _, _ = category_api
+    groq = _judging_client(pipeline, fits=False)
+    make_client = MagicMock()
+    monkeypatch.setattr(app_main, "make_groq_client", make_client)
+
+    response = _generate(client, **form)
+
+    assert response.status_code == 202
+    assert groq.mock_calls == []
+    assert make_client.mock_calls == []
+
+
+@pytest.mark.parametrize("template_id", ["wildlife/keystone_5m", None])
+def test_generate_passes_a_session_with_a_template_of_its_category(
+    category_api, template_id
+) -> None:
+    client, _, user, _, store, model = category_api
+    session_id = _put_guard_session(store, user)
+    session = store.get(session_id, user_id=str(user.id))
+    session.initial_prompt, session.selected_template_id = _MARATHON_TEXT, template_id
+
+    response = _generate(client, session_id=session_id, raw_text=_MARATHON_TEXT)
+
+    assert response.status_code == (202 if template_id else 422)
+    assert bool(model.calls) is (template_id is None)
+
+
+def test_generate_reuses_the_decision_until_the_session_content_changes(
+    category_api, monkeypatch
+) -> None:
+    client, _, user, pipeline, store, model = category_api
+    monkeypatch.setattr(
+        pipeline,
+        "run_job",
+        lambda job_id, *_: setattr(pipeline.get_job(job_id), "status", "completed"),
+    )
+    session_id = _suggest(client, _REEF_TEXT).json()["session_id"]
+    model.calls.clear()
+
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert model.calls == []
+
+    # A text message changes no checked content; a passing file stores a new decision.
+    message = {"session_id": session_id, "message": "The audience is biology teachers."}
+    assert client.post("/api/script-chat/message", data=message).status_code == 200
+    model.calls.clear()
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert model.calls == []
+
+    upload = client.post(
+        "/api/script-chat/message", data={"session_id": session_id}, files={"file": _REEF_FILE}
+    )
+    assert upload.status_code == 200
+    model.calls.clear()
+    assert _generate(client, session_id=session_id).status_code == 202
+    assert model.calls == []
+
+    # Content the guard never saw is checked again.
+    store.get(session_id, user_id=str(user.id)).initial_prompt = _MARATHON_TEXT
+    response = _generate(client, session_id=session_id)
+    assert (response.status_code, response.json()) == (422, _MISMATCH_BODY)
+    assert model.calls
+
+
+def test_blocked_material_is_not_remembered(category_api) -> None:
+    client, *_ = category_api
+
+    assert _suggest(client, _MARATHON_TEXT).status_code == 422
+    assert category_decisions._entries == {}
+
+
+def test_category_decisions_follow_the_chat_session_limits() -> None:
+    now = [0.0]
+    decisions = CategoryDecisionStore(capacity=2, ttl_s=10, clock=lambda: now[0])
+    assert (category_decisions._capacity, category_decisions._ttl_s) == (
+        chat_session_store_capacity,
+        chat_session_ttl_s,
+    )
+
+    decisions.remember("a", "wildlife", "k1")
+    assert decisions.covers("a", "wildlife", "k1")
+    assert not decisions.covers("a", "sports", "k1")
+    assert not decisions.covers("a", "wildlife", "k2")
+    decisions.remember("b", "wildlife", "k1")
+    assert decisions.covers("a", "wildlife", "k1")  # now "b" is the least recently used
+    decisions.remember("c", "wildlife", "k1")
+    assert not decisions.covers("b", "wildlife", "k1")
+
+    now[0] = 10.0
+    assert decisions.covers("a", "wildlife", "k1")  # renewed until 20
+    now[0] = 20.5
+    assert not decisions.covers("a", "wildlife", "k1")
+    assert not decisions.covers("c", "wildlife", "k1")
+
+
+def test_warmup_encodes_the_category_prototypes(category_api) -> None:
+    *_, model = category_api
+
+    app_main._warmup_script_pipeline()
+
+    assert len(model.calls) == len(category_guard.CATEGORY_SLUG_MAP)
+    assert category_guard._proto_cache is not None
