@@ -1,5 +1,6 @@
 """DELETE /api/auth/account (ADR-011): password first, files in all 4 buckets, then the account."""
 
+from datetime import UTC, date, datetime, time
 from uuid import UUID, uuid4
 
 import pytest
@@ -11,6 +12,7 @@ from src.app.auth import AuthUnavailableError, get_auth
 from src.app.config import settings
 from src.app.db.factory import build_memory_repos, get_repos
 from src.app.db.models import (
+    NewScheduleEvent,
     NewSession,
     ProfileUpsert,
     StorageError,
@@ -111,6 +113,47 @@ def test_delete_account_removes_files_rows_and_login(client):
         == 401
     )
     assert client.get("/api/profile", headers=headers).status_code == 401  # tokens are gone
+
+
+def test_delete_account_removes_only_its_schedule_data(client):
+    user_id, headers = _account(client)
+    repos = _repos()
+    other_user = uuid4()
+    day = date(2026, 12, 2)
+    now = datetime(2026, 11, 28, 12, 0, tzinfo=UTC)
+
+    def event(owner):
+        return repos.schedule.create_event(
+            owner,
+            NewScheduleEvent(
+                start_date=day,
+                all_day=False,
+                start_time=time(22, 0),
+                timezone="UTC",
+                duration_min=10,
+                category="sports",
+                color="lime",
+                script_kind="free",
+                repeat_kind="none",
+                end_kind="never",
+                schedule_set_at=now,
+            ),
+        )
+
+    own_event = event(user_id)
+    other_event = event(other_user)
+    repos.schedule.upsert_checkin(user_id, own_event.id, day, now)
+    repos.schedule.claim_reminder(own_event.id, day, "failed", now)
+    repos.schedule.upsert_checkin(other_user, other_event.id, day, now)
+    repos.schedule.claim_reminder(other_event.id, day, "failed", now)
+
+    assert _delete(client, headers).status_code == 200
+    assert repos.schedule.list_events(user_id, day) == []
+    assert repos.schedule.list_checkins(user_id, day, day) == []
+    assert repos.schedule.list_reminders(user_id, day, day) == []
+    assert repos.schedule.get_event(other_user, other_event.id) is not None
+    assert repos.schedule.list_checkins(other_user, day, day)
+    assert repos.schedule.list_reminders(other_user, day, day)
 
 
 def _record_calls(monkeypatch, *, fail_bucket=None, fail_auth=False, fail_sessions=False):

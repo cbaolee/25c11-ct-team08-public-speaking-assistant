@@ -90,6 +90,7 @@ Database and storage variables:
 | `APP_ENV`              | Yes                 | `dev` locally. Any other value disables the temporary dev user.                                                                                                                                                 |
 | `SUPABASE_URL`         | No                  | Project URL `https://<ref>.supabase.co` from _Project Settings → API_, **without** `/rest/v1/` (the server refuses to start with it). Empty in `dev` = in-memory storage and accounts, data is lost on restart. |
 | `SUPABASE_SERVICE_KEY` | With `SUPABASE_URL` | Server-side key (`service_role` / `secret`). Full database access: keep it private.                                                                                                                             |
+| `SCHEDULE_CRON_SECRET` | Schedule cron | Shared secret for `X-Cron-Secret` on `POST /internal/schedule/reminders/run`; keep it empty locally unless testing the reminder job. |
 | `DEV_USER_ID`          | Integration tests   | UUID of a first test user, only read by integration tests. The app itself uses real log in (`/api/auth/*`).                                                                                                     |
 | `DEV2_USER_ID`         | Integration tests   | UUID of a second test user, only read by integration tests.                                                                                                                                                     |
 
@@ -117,8 +118,17 @@ Only needed when `SUPABASE_URL` is set.
    | `0009_purge_unconfirmed_accounts.sql` | required, any time | pg_cron job (every 15 min) that deletes accounts whose email is still unconfirmed 60 minutes after the last code (must match `app_constants.toml` `[auth] unconfirmed_ttl_min`); accounts with files in Storage are skipped. Enable `pg_cron` first. Until it has run, unconfirmed accounts stay even though the "Check your email" step says they are deleted (ADR-011). |
    | `0010_accounts.sql` | any time | Table `accounts` (which shard holds each user's sessions); existing users get `core` |
    | `0011_auth_rate_limits.sql` | required, any time | Table `auth_rate_limits`, function `hit_rate_limit` and an hourly pg_cron cleanup job: attempt limits of sign-up codes, password reset and re-auth, shared by every server worker. Enable `pg_cron` first. Until it has run, the backend lets every attempt through and logs a warning, so only Supabase Auth's own limits apply. |
+   | `0012_schedule.sql` | required, any time | Schedule events, check-ins and reminder claims on `psc-main`, with RLS and no policies. `session_id` has no foreign key because sessions may live in a shard. **Not yet run on Supabase.** |
+   | `0013_schedule_reminder_cron.sql` | required, any time | Runs `POST /internal/schedule/reminders/run` every five minutes with `pg_cron` and `pg_net`. URL and secret come from Vault. **Not yet run on Supabase.** |
 
    On every **shard project** (ADR-012) run `db/migration_shard/0001_sessions.sql` (once), then `migration_shard/0002_purge_insufficient_sessions.sql` (enable pg_cron first), then list the shards in `SUPABASE_SHARDS`.
+
+   For Schedule reminders, enable `pg_cron` and `pg_net` on `psc-main`, then create two Vault secrets:
+
+   - `schedule_app_url`: deployed app origin, without a trailing slash.
+   - `schedule_cron_secret`: the same value as `SCHEDULE_CRON_SECRET` on the app.
+
+   Run `0012_schedule.sql`, deploy the reminder endpoint, and then run `0013_schedule_reminder_cron.sql`. Check the job with `select * from cron.job where jobname = 'schedule_reminders';` and its runs with `select * from cron.job_run_details order by start_time desc limit 20;`. The `Applied:` line must remain `not yet run on Supabase` until a team member actually applies the migration.
 
    Deploy a backend version only after the migrations it needs have run.
 2. **Create test users** on `psc-main` only: _Authentication → Users → Add user_. Put the first UUID in `DEV_USER_ID` and the second in `DEV2_USER_ID`.

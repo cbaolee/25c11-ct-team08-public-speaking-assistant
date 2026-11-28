@@ -58,6 +58,19 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 | `origin_mismatch`       | Request refresh/logout đến từ site khác |
 | `wrong_password`        | Sai mật khẩu hiện tại (đổi mật khẩu, xoá tài khoản) |
 
+## 3.1. Mã lỗi Schedule
+
+| Mã lỗi                  | Khi nào |
+| ----------------------- | ------- |
+| `schedule_limit`        | 409: quá số event tối đa của user |
+| `schedule_locked`       | 403: sửa ngày, giờ, all-day hoặc recurrence sau thời điểm nhắc |
+| `details_locked`        | 403: sửa chi tiết hoặc xoá sau giờ bắt đầu |
+| `window_closed`         | 409: check-in sau cửa sổ cho phép |
+| `not_started`           | 409: check-in trước giờ bắt đầu |
+| `not_checked_in`        | 409: complete session chưa có check-in |
+| `session_not_scorable`  | 422: session không `ok`, không có `overall`, hoặc được tạo trước check-in |
+| `session_not_found`     | 404: session không tồn tại hoặc không thuộc user |
+
 ## 4. Trang và phần sẽ thêm (dự kiến)
 
 | Tên gọi             | Mô tả                                                    |

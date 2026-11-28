@@ -625,6 +625,8 @@ async def delete_account(
     4. delete the auth user, always last; `on delete cascade` removes accounts, profiles,
        baselines, scripts (and sessions in the core project). If this fails after the data
        is gone, the account still works without history and the user can try again.
+    5. after the auth deletion, remove schedule events in memory repositories. Supabase uses
+       the auth-user cascade; cleanup is best-effort and must not undo a successful deletion.
     Running evaluate jobs are not cancelled: the job store has no per-user cancel (see ADR-011).
     """
     denied = await _check_current_password(auth, repos, user, payload.password)
@@ -652,6 +654,12 @@ async def delete_account(
     except AuthProviderError:
         logger.warning("Delete account: files deleted but the account could not be deleted")
         return _auth_unavailable()
+    try:
+        # Supabase: auth.users deletion cascades through schedule_events. Memory repos need
+        # explicit cleanup because auth and repository storage are separate in dev/tests.
+        await run_in_threadpool(repos.schedule.delete_user_schedule, user.id)
+    except StorageError:
+        logger.warning("Delete account: account deleted, schedule cleanup failed")
     try:
         # Supabase: the cascade already removed the rows, so this is a no-op. In-memory
         # accounts and repositories are not linked, so the rows are removed here.

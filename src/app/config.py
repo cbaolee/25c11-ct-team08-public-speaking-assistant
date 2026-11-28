@@ -144,6 +144,7 @@ class Settings(BaseSettings):
     groq_llm_fallback_model_1: str = ""
     groq_llm_fallback_model_2: str = ""
     app_env: str = "dev"
+    schedule_cron_secret: str = ""
 
     # Moderation Layer 2 (Ollama / OpenAI-compatible Llama-Guard endpoint)
     ollama_host: str = ""
