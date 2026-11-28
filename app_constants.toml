@@ -143,6 +143,20 @@ unconfirmed_ttl_min = 60
 # so this is how long a browser stays logged in without opening the app.
 refresh_cookie_days = 30
 
+[schedule]
+# Fixed schedule rules; values also exist in src/web/static/js/schedule/schedule_model.js.
+checkin_window_h = 6
+reminder_lead_min = 30
+all_day_reminder_hour = 8
+note_max_chars = 200
+count_max = 99
+# Provisional values, not measured yet.
+max_events_per_user = 20
+range_max_days = 62
+reminder_grace_min = 15
+writes_per_window = 30
+window_s = 60
+
 [retry]
 # Provisional values, not yet measured (voice_evaluate_tasks.md 11.2). Calibrate in M7.
 sentence_min_error_ratio = 0.30
