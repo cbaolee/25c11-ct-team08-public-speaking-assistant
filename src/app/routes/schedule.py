@@ -524,3 +524,38 @@ async def delete_occurrence(
     return JSONResponse(status_code=204, content=None)
 
 
+@router.post("/checkins")
+async def checkin(
+    payload: CheckinPayload,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    if not await _allowed(repos, user.id):
+        return _error(429, "rate_limited", "Too many schedule changes.")
+    try:
+        event = await run_in_threadpool(repos.schedule.get_event, user.id, payload.event_id)
+    except StorageError:
+        return _error(503, "storage_unavailable", "The schedule could not be loaded.")
+    if event is None:
+        return _error(404, "event_not_found", "The schedule event was not found.")
+    occ = _occurrence(event, payload.day)
+    if occ is None:
+        return _error(404, "event_not_found", "The schedule event was not found.")
+    now = _now()
+    if now < occ["start"]:
+        return _error(409, "not_started", "The check-in has not started.")
+    if now >= rules.window_closes_at(occ):
+        return _error(409, "window_closed", "The check-in window is closed.")
+    try:
+        row = await run_in_threadpool(
+            repos.schedule.upsert_checkin,
+            user.id,
+            payload.event_id,
+            payload.day,
+            now,
+        )
+    except StorageError:
+        return _error(503, "storage_unavailable", "The check-in could not be saved.")
+    return row.model_dump(mode="json")
+
+
