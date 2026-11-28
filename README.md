@@ -32,6 +32,7 @@ Public Speaking Coach is a web app that helps English learners prepare and pract
 | **Saved Scripts**     | Up to 10 named scripts per user, editable, shared by Practice and Script Studio. Practising a script does not save it.                                                                                        |
 | **Follow-along**      | While recording, the current sentence is highlighted at a chosen speed. Tapping a sentence moves the highlight there; with Auto speed on, the taps also set the speed. Range and Auto speed are in Settings. |
 | **Profile**           | Display name, accent, recording consent, profile picture and reading-speed preferences, stored per account. Recording consent is required to sign up; while it is off in Settings, practice and recording are locked and past reports stay readable. |
+| **Schedule (demo)**   | Plan practice sessions on a month or week calendar (time or all day, length, category, script: free choice, a saved script or one generated at check-in, colour, repeat with an end). A session can be checked in from its start until 6 hours later (never past midnight); it counts as done when the practice started from Check in is evaluated with a score. Home shows today's sessions and a weekly streak. **Demo only:** everything is kept in this browser (localStorage), and the reminder email 30 minutes before is only a preview; nothing is sent. |
 | **Account**           | Email + password with email verification. _Forgot password?_ sends a code by email; the new password ends every session. Changing the password or deleting the account asks for the current password; deleting removes recordings, baseline, scripts and history. The login lasts in an HttpOnly cookie that page scripts cannot read. Settings > Audio picks the microphone (kept in this browser). |
 
 ## Tech Stack
@@ -173,6 +174,7 @@ microphone on `localhost` or HTTPS.
 4. **Practice**: choose a saved script, your own text or a sample, then record (pause and resume allowed) or upload your voice.
 5. **Report**: scores for accuracy, fluency, pronunciation and meaning, with every marked word. An evaluation longer than 5 seconds continues in the background and the report is offered when ready.
    Home and History keep your sessions; the 10 newest keep their audio and charts.
+6. **Schedule** (demo): add a practice session from a day on the calendar; when it opens, use **Check in** (on Home or in the day panel) to practise it.
 
 A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase project must not be paused.
 
@@ -207,10 +209,10 @@ A demo needs Internet access (Supabase, speech-to-text, Groq) and the Supabase p
 │   │   └── main.py                # FastAPI app: evaluate, scripts, session history, config
 │   ├── audio_processing/          # Evaluate and Baseline Pipeline
 │   ├── text_processing/           # Script Pipeline
-│   └── web/                       # index.html, CSS, ES modules
+│   └── web/                       # index.html, CSS, ES modules (static/js/schedule/: Schedule demo)
 ├── tests/
 │   ├── db/                        # Repository and session helper tests
-│   └── web/                       # Node tests for evaluate_client.js
+│   └── web/                       # Node tests for the browser modules (evaluate client, schedule, ...)
 ├── .env.example
 ├── .gitattributes
 ├── .gitignore
