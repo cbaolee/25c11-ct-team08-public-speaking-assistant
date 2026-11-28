@@ -83,6 +83,13 @@ from src.app.deps import (
 from src.app.routes import auth as auth_routes
 from src.app.routes import baselines, coach, practice
 from src.app.routes import profile as profile_routes
+from src.app.script_guards import (
+    guard_category_generate,
+    guard_category_message_file,
+    guard_category_suggest,
+    reject_gibberish,
+    remember_category_decision,
+)
 from src.app.script_limits import (
     check_generate_limits,
     job_running_block,
@@ -93,13 +100,14 @@ from src.app.uploads import BodySizeLimitMiddleware, safe_upload_path, save_uplo
 from src.audio_processing.contracts import AudioRejected, SttUnavailable, VadParams
 from src.audio_processing.evaluate_jobs import EvaluateJobStore, RateLimited, run_evaluate_job
 from src.audio_processing.pipeline import evaluate_session
+from src.text_processing.category_guard import warm_category_prototypes
 from src.text_processing.chat_session import (
     CHAT_TURN_STEP_DURATIONS,
     ChatSessionState,
     TurnStepTracker,
     analyze_slot_coverage,
     append_to_context_window,
-    build_turn1_question,
+    build_turn1_decision,
     chat_session_store,
     evaluate_and_build_followup,
     ingest_upload_file,
@@ -134,6 +142,7 @@ def _warmup_script_pipeline() -> None:
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:
             retriever.get_model()
+            warm_category_prototypes(retriever)
     except Exception:
         logger.debug("Background script pipeline warm-up skipped.", exc_info=True)
 
@@ -820,6 +829,7 @@ async def generate_script_endpoint(
     clean_msg_id = _sanitize_client_msg_id(client_msg_id)
 
     store = getattr(pipeline, "session_store", chat_session_store)
+    sess = None
     if clean_session_id:
         sess = store.get(clean_session_id, user_id=user_id)
         if sess:
@@ -833,6 +843,18 @@ async def generate_script_endpoint(
     # Order matters (ADR-015): bad input and a busy user are refused before anything is counted,
     # and the limits are counted before an upload is written to disk.
     validate_generate_input(clean_topic, duration_min, clean_feedback)
+    has_pdf = (
+        pdf is not None and (pdf.filename or "").lower().endswith(".pdf") and pdf.size != 0
+    )
+    reject_gibberish(user_feedback, raw_text, has_file=has_pdf)
+    await run_in_threadpool(
+        guard_category_generate,
+        pipeline,
+        session=sess,
+        category=category,
+        topic=clean_topic,
+        raw_text=raw_text,
+    )
     if pipeline.has_active_job(user_id):
         return rate_limited_response(job_running_block())
     block = await run_in_threadpool(
@@ -1021,6 +1043,7 @@ def _sync_chat_turn_job(
     result: dict[str, Any] | None = None,
     error_code: str | None = None,
     message: str | None = None,
+    extra: dict[str, str] | None = None,
 ) -> None:
     if not job_id:
         return
@@ -1033,6 +1056,7 @@ def _sync_chat_turn_job(
         job["result"] = result
         job["error_code"] = error_code
         job["message"] = message
+        job.update(extra or {})
 
 
 @app.post("/api/script-chat/suggest")
@@ -1075,6 +1099,8 @@ async def script_chat_suggest_endpoint(
                 status_code=422,
             ) from exc
 
+    reject_gibberish(prompt, has_file=bool(file_chunks))
+
     def _run_suggest_sync() -> dict[str, Any]:
         clean_session_id = session_id.strip()
         session = None
@@ -1098,6 +1124,31 @@ async def script_chat_suggest_endpoint(
                 pipeline.moderator.assert_safe(file_text, user_id=user_id)
 
         tracker.start("matching_templates")
+        # Ranked and checked before the session is created or changed.
+        target_category = category or (session.category if session else "")
+        chunks = [*(session.chunks if session else []), *file_chunks]
+
+        query = clean_prompt
+        if not query and chunks:
+            query = " ".join(c.content for c in chunks[:suggest_query_max_chunks])
+
+        suggestion_res = pipeline.template_store.suggest_topics(
+            category_slug=target_category,
+            duration_min=duration_min or (session.duration_min if session else duration_min),
+            query=query,
+            retriever=getattr(pipeline.template_engine, "retriever", None),
+        )
+        category_record = guard_category_suggest(
+            pipeline,
+            session=session,
+            category=target_category,
+            prompt=clean_prompt,
+            file_chunks=file_chunks,
+            has_template_match=bool(query.strip()) and not suggestion_res.recommend_free_topic,
+            client=_resolve_groq_client(pipeline),
+            limiter=getattr(pipeline.template_engine, "limiter", None),
+        )
+
         if session is None:
             session = ChatSessionState(
                 session_id=str(uuid4()),
@@ -1127,17 +1178,7 @@ async def script_chat_suggest_endpoint(
                 session.chunk_embeddings = retriever.encode_chunks(session.chunks)
 
         store.put(session)
-
-        query = clean_prompt
-        if not query and session.chunks:
-            query = " ".join(c.content for c in session.chunks[:suggest_query_max_chunks])
-
-        suggestion_res = pipeline.template_store.suggest_topics(
-            category_slug=session.category,
-            duration_min=session.duration_min,
-            query=query,
-            retriever=getattr(pipeline.template_engine, "retriever", None),
-        )
+        remember_category_decision(session, category_record)
         tracker.finish()
         res = suggestion_res.to_dict()
         res["session_id"] = session.session_id
@@ -1154,7 +1195,10 @@ async def script_chat_select_topic_endpoint(
     payload: SelectTopicPayload,
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> dict[str, Any]:
-    """Turn 1: Lock topic/mode and always return an opening context question (no Generate)."""
+    """Turn 1: lock the topic/mode, reply, and allow Generate if the context is sufficient.
+
+    `topic_clear` is false only for a Write Freely prompt that names no topic yet.
+    """
     pipeline = get_script_pipeline()
     user_id = str(user.id)
     store = getattr(pipeline, "session_store", chat_session_store)
@@ -1217,22 +1261,24 @@ async def script_chat_select_topic_endpoint(
             client = _resolve_groq_client(pipeline)
             limiter = getattr(pipeline.template_engine, "limiter", None)
             model_chain = getattr(pipeline.template_engine, "model_chain", None)
-            reply, missing_items = build_turn1_question(
+            decision = build_turn1_decision(
                 topic=session.topic or session.category or "your speech",
                 category=session.category,
                 duration_min=session.duration_min,
                 is_free_topic=is_free_topic,
                 initial_prompt=session.initial_prompt,
                 files_loaded=session.files_loaded,
+                chunks=session.chunks,
+                coverage_ratio=session.coverage_ratio,
                 missing_entities=session.missing_entities,
                 missing_groups=session.missing_groups,
                 client=client,
                 model_chain=model_chain,
                 limiter=limiter,
             )
-            session.last_question = reply
-            session.missing_items = list(missing_items)
-            session.ready_to_generate = False
+            session.last_question = decision.reply_message
+            session.missing_items = list(decision.missing_items)
+            session.ready_to_generate = decision.can_generate
 
             tracker.finish()
             store.put(session)
@@ -1240,15 +1286,16 @@ async def script_chat_select_topic_endpoint(
                 "session_id": session.session_id,
                 "template_id": session.selected_template_id,
                 "selected_template_id": session.selected_template_id,
-                "ready_to_generate": False,
-                "can_generate": False,
+                "ready_to_generate": decision.can_generate,
+                "can_generate": decision.can_generate,
+                "topic_clear": decision.topic_clear,
                 "assistant_turn": 1,
                 "coverage_ratio": session.coverage_ratio,
                 "missing_entities": session.missing_entities,
                 "missing_groups": session.missing_groups,
-                "missing_items": list(missing_items),
+                "missing_items": list(decision.missing_items),
                 "context_compacted": False,
-                "reply_message": reply,
+                "reply_message": decision.reply_message,
                 **tracker.to_telemetry(),
             }
 
@@ -1306,6 +1353,16 @@ def _execute_chat_message_locked(
         file_text = "\n".join(c.content for c in file_chunks[:moderation_max_chunks])
         if file_text:
             pipeline.moderator.assert_safe(file_text, user_id=user_id)
+    category_record = None
+    if file_chunks:
+        category_record = guard_category_message_file(
+            pipeline,
+            session,
+            clean_msg,
+            file_chunks,
+            client=_resolve_groq_client(pipeline),
+            limiter=getattr(pipeline.template_engine, "limiter", None),
+        )
 
     tracker.start("updating_context")
     _sync_chat_turn_job(job_id, tracker)
@@ -1405,6 +1462,7 @@ def _execute_chat_message_locked(
 
     tracker.finish()
     store.put(session)
+    remember_category_decision(session, category_record)
     result = {
         "session_id": session.session_id,
         "reply_message": decision.reply_message,
@@ -1466,6 +1524,7 @@ async def _prepare_chat_message_inputs(
                 status_code=422,
             ) from exc
 
+    reject_gibberish(message, has_file=bool(file_chunks))
     clean_msg = sanitize_text(message).strip() if message else ""
     if not clean_msg and not file_chunks:
         raise ScriptGenerationError(
@@ -1550,6 +1609,7 @@ def _run_chat_message_job(
             status="failed",
             error_code=exc.error_code,
             message=exc.message,
+            extra=getattr(exc, "extra", None),
         )
     except Exception as exc:
         tracker.fail()

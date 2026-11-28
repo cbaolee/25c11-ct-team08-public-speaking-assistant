@@ -1,0 +1,379 @@
+[
+ {
+  "input": "aaaaa",
+  "expected": "REJECT",
+  "rule": "T1"
+ },
+ {
+  "input": "zzzzzz",
+  "expected": "REJECT",
+  "rule": "T1"
+ },
+ {
+  "input": "hmmmmm",
+  "expected": "REJECT",
+  "rule": "T1"
+ },
+ {
+  "input": ".......",
+  "expected": "REJECT",
+  "rule": "R1"
+ },
+ {
+  "input": "???",
+  "expected": "REJECT",
+  "rule": "R1"
+ },
+ {
+  "input": "!!!",
+  "expected": "REJECT",
+  "rule": "R1"
+ },
+ {
+  "input": "---",
+  "expected": "REJECT",
+  "rule": "R1"
+ },
+ {
+  "input": "😀😀😀",
+  "expected": "REJECT",
+  "rule": "R1"
+ },
+ {
+  "input": "!!! ???",
+  "expected": "REJECT",
+  "rule": "R1"
+ },
+ {
+  "input": "asdfghjkl",
+  "expected": "REJECT",
+  "rule": "T4"
+ },
+ {
+  "input": "qwertyuiop",
+  "expected": "REJECT",
+  "rule": "T4"
+ },
+ {
+  "input": "qwertyui",
+  "expected": "REJECT",
+  "rule": "T4"
+ },
+ {
+  "input": "zxcvbnm",
+  "expected": "REJECT",
+  "rule": "T4"
+ },
+ {
+  "input": "lkjhg",
+  "expected": "REJECT",
+  "rule": "T4"
+ },
+ {
+  "input": "asdf",
+  "expected": "REJECT",
+  "rule": "T4 (whole token is a run of 4)"
+ },
+ {
+  "input": "asdf qwerty",
+  "expected": "REJECT",
+  "rule": "every content token junk"
+ },
+ {
+  "input": "ababababab",
+  "expected": "REJECT",
+  "rule": "T2"
+ },
+ {
+  "input": "lalalalala",
+  "expected": "REJECT",
+  "rule": "T2"
+ },
+ {
+  "input": "hahahaha",
+  "expected": "REJECT",
+  "rule": "T2"
+ },
+ {
+  "input": "bcdfghjklmn",
+  "expected": "REJECT",
+  "rule": "T3"
+ },
+ {
+  "input": "xkcdvbtrw",
+  "expected": "REJECT",
+  "rule": "T3"
+ },
+ {
+  "input": "bla bla bla bla",
+  "expected": "REJECT",
+  "rule": "R4"
+ },
+ {
+  "input": "test test test test",
+  "expected": "REJECT",
+  "rule": "R4"
+ },
+ {
+  "input": "Test test TEST test.",
+  "expected": "REJECT",
+  "rule": "R4 (case and edge punctuation ignored)"
+ },
+ {
+  "input": "AI",
+  "expected": "ALLOW",
+  "rule": "acronym"
+ },
+ {
+  "input": "LLM",
+  "expected": "ALLOW",
+  "rule": "acronym"
+ },
+ {
+  "input": "NLP",
+  "expected": "ALLOW",
+  "rule": "acronym"
+ },
+ {
+  "input": "SQL",
+  "expected": "ALLOW",
+  "rule": "acronym"
+ },
+ {
+  "input": "DNA",
+  "expected": "ALLOW",
+  "rule": "acronym"
+ },
+ {
+  "input": "STEM",
+  "expected": "ALLOW",
+  "rule": "acronym"
+ },
+ {
+  "input": "COVID-19",
+  "expected": "ALLOW",
+  "rule": "acronym with digits"
+ },
+ {
+  "input": "HTTPS",
+  "expected": "ALLOW",
+  "rule": "all-caps, 5 letters"
+ },
+ {
+  "input": "TP.HCM",
+  "expected": "ALLOW",
+  "rule": "from the old contract"
+ },
+ {
+  "input": "Việt Nam",
+  "expected": "ALLOW",
+  "rule": "from the old contract"
+ },
+ {
+  "input": "Ngắn hơn 30 giây",
+  "expected": "ALLOW",
+  "rule": "from the old contract"
+ },
+ {
+  "input": "你好世界你好",
+  "expected": "ALLOW",
+  "rule": "non-Latin: not this guard's job"
+ },
+ {
+  "input": "yes",
+  "expected": "ALLOW",
+  "rule": "exempt"
+ },
+ {
+  "input": "ok",
+  "expected": "ALLOW",
+  "rule": "exempt"
+ },
+ {
+  "input": "Done!",
+  "expected": "ALLOW",
+  "rule": "exempt keyword"
+ },
+ {
+  "input": "generate",
+  "expected": "ALLOW",
+  "rule": "exempt keyword"
+ },
+ {
+  "input": "xong",
+  "expected": "ALLOW",
+  "rule": "exempt keyword"
+ },
+ {
+  "input": "5",
+  "expected": "ALLOW",
+  "rule": "number only"
+ },
+ {
+  "input": "5 min",
+  "expected": "ALLOW",
+  "rule": "short answer"
+ },
+ {
+  "input": "100000",
+  "expected": "ALLOW",
+  "rule": "number only"
+ },
+ {
+  "input": "12121212",
+  "expected": "ALLOW",
+  "rule": "number only (old contract text said reject)"
+ },
+ {
+  "input": "students",
+  "expected": "ALLOW",
+  "rule": "word"
+ },
+ {
+  "input": "Climate change in the Mekong Delta",
+  "expected": "ALLOW",
+  "rule": "normal prompt"
+ },
+ {
+  "input": "typewriter",
+  "expected": "ALLOW",
+  "rule": "all top-row letters but not a keyboard run"
+ },
+ {
+  "input": "pretty property report",
+  "expected": "ALLOW",
+  "rule": "top-row words"
+ },
+ {
+  "input": "rhythm",
+  "expected": "ALLOW",
+  "rule": "y is a vowel"
+ },
+ {
+  "input": "rhythms",
+  "expected": "ALLOW",
+  "rule": "y is a vowel"
+ },
+ {
+  "input": "strengths",
+  "expected": "ALLOW",
+  "rule": "has e"
+ },
+ {
+  "input": "aaaa hãy giúp tôi viết bài về môi trường",
+  "expected": "ALLOW",
+  "rule": "has meaningful tokens"
+ },
+ {
+  "input": "aaaaa please write about wildlife",
+  "expected": "ALLOW",
+  "rule": "one junk token among real words"
+ },
+ {
+  "input": "sooooo good",
+  "expected": "ALLOW",
+  "rule": "one junk token among real words"
+ },
+ {
+  "input": "very very very good",
+  "expected": "ALLOW",
+  "rule": "not all tokens identical"
+ },
+ {
+  "input": "ha ha",
+  "expected": "ALLOW",
+  "rule": "too short to judge"
+ },
+ {
+  "input": "😀 great talk",
+  "expected": "ALLOW",
+  "rule": "emoji plus words"
+ },
+ {
+  "input": "https://example.com/report",
+  "expected": "ALLOW",
+  "rule": "URL"
+ },
+ {
+  "input": "booboo",
+  "expected": "REJECT",
+  "rule": "T2, known trade-off"
+ },
+ {
+  "input": "",
+  "expected": "ALLOW",
+  "rule": "empty is handled by other validation"
+ },
+ {
+  "input": "",
+  "has_file": true,
+  "expected": "ALLOW",
+  "rule": "file attached"
+ },
+ {
+  "input": "aaaaa",
+  "has_file": true,
+  "expected": "ALLOW",
+  "rule": "file attached skips the guard"
+ },
+ {
+  "input": "﻿",
+  "expected": "REJECT",
+  "rule": "U+FEFF is not whitespace; R1"
+ },
+ {
+  "input": "aaaaa\u0085hello",
+  "expected": "REJECT",
+  "rule": "U+0085 is not whitespace; one token, T1"
+ },
+ {
+  "input": "aaaaa﻿ok",
+  "expected": "REJECT",
+  "rule": "U+FEFF is not whitespace; one token, T1"
+ },
+ {
+  "input": "aaaaa\u001cok",
+  "expected": "REJECT",
+  "rule": "U+001C is not whitespace; one token, T1"
+ },
+ {
+  "input": "aaaaa ok",
+  "expected": "ALLOW",
+  "rule": "U+00A0 is Zs; one junk token beside a real word"
+ },
+ {
+  "input": "aaaaa ok",
+  "expected": "ALLOW",
+  "rule": "U+2028 is Zl"
+ },
+ {
+  "input": "tạo",
+  "expected": "ALLOW",
+  "rule": "NFC, then matches EXEMPT"
+ },
+ {
+  "input": "哈哈哈哈哈",
+  "expected": "REJECT",
+  "rule": "T1 applies to every script"
+ },
+ {
+  "input": "ааааа",
+  "expected": "REJECT",
+  "rule": "T1 applies to every script"
+ },
+ {
+  "input": "tp.hcmc",
+  "expected": "REJECT",
+  "rule": "T3, known trade-off"
+ },
+ {
+  "input": "Write a fresh variation of this speech.",
+  "expected": "ALLOW",
+  "rule": "default Regenerate feedback"
+ },
+ {
+  "input": "Write a fresh variation of this speech (variation 2).",
+  "expected": "ALLOW",
+  "rule": "default Regenerate feedback"
+ }
+]

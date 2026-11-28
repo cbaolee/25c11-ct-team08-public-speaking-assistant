@@ -71,6 +71,9 @@ Mục đích: chỉ Tường Vi và AI của Tường Vi gọi đúng một tên
 | **Script Pipeline**   | Sinh script: parser → sanitizer → generator. Sắp thêm **Template Matcher** và **Guard** |
 | **Template Matcher**  | Dò kho template, chọn bài phù hợp trước khi phải gọi LLM (sắp làm)                      |
 | **Guard**             | Chặn prompt injection và nội dung độc hại (sắp làm)                                     |
+| **Gibberish Guard**   | Chặn tin nhắn rác (lặp chữ, gõ loạn phím, chỉ dấu câu) ở script chat và sinh script; mã lỗi `gibberish_input`; module `input_guard.py` |
+| **Category Guard**    | Chặn prompt hoặc file lệch rõ so với category đã chọn (embedding, Groq cho vùng xám, lỗi thì cho qua); mã lỗi `category_mismatch`; module `category_guard.py` |
+| **Turn 1 Generate**   | Cho tạo script ngay ở lượt đầu khi ngữ cảnh đã đủ (`can_generate`); backend ở `/api/script-chat/select-topic`; nút trên web chưa làm (PR web riêng) |
 | **Template Corpus**   | Kho bài mẫu: 6 chủ đề, mỗi chủ đề khoảng 100 bài                                        |
 
 ---

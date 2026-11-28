@@ -1,0 +1,513 @@
+{
+  "description": "Labelled cases for the offline evaluation of layer 1 of the category guard. AI-drafted by Claude Code, not yet reviewed by a human. Not user data and not a measured result. kind: on_topic and interdisciplinary must not be blocked; mismatch has a selected category that clearly differs from expected_category.",
+  "cases": [
+    {
+      "id": "on-cine-01",
+      "selected": "cinematography",
+      "kind": "on_topic",
+      "prompt": "I want to explain why long takes make an audience feel trapped inside a thriller.",
+      "chunks": []
+    },
+    {
+      "id": "on-cine-02",
+      "selected": "cinematography",
+      "kind": "on_topic",
+      "prompt": "Write a speech about how film composers use recurring themes. I want examples from famous movie scores. My classmates know very little about music.",
+      "chunks": []
+    },
+    {
+      "id": "on-cine-03",
+      "selected": "cinematography",
+      "kind": "on_topic",
+      "prompt": "The rise of independent horror films made on very small budgets.",
+      "chunks": []
+    },
+    {
+      "id": "on-cine-04",
+      "selected": "cinematography",
+      "kind": "on_topic",
+      "prompt": "Please turn my attached notes into a five minute talk for film club.",
+      "chunks": [
+        "Silent comedies relied on physical performance because there was no recorded dialogue. Title cards carried only the lines that the picture could not show.",
+        "When synchronised sound arrived, studios rebuilt their stages and many actors had to change how they performed in front of the camera."
+      ]
+    },
+    {
+      "id": "on-cine-05",
+      "selected": "cinematography",
+      "kind": "on_topic",
+      "prompt": "Why storyboards save time and money before shooting a short movie with friends.",
+      "chunks": []
+    },
+    {
+      "id": "on-gend-01",
+      "selected": "gender_studies",
+      "kind": "on_topic",
+      "prompt": "I want to talk about why fathers rarely take the full parental leave they are offered.",
+      "chunks": []
+    },
+    {
+      "id": "on-gend-02",
+      "selected": "gender_studies",
+      "kind": "on_topic",
+      "prompt": "My speech is about toys marketed separately to boys and girls. Shops sort them by colour. Children quickly learn which ones they are supposed to want.",
+      "chunks": []
+    },
+    {
+      "id": "on-gend-03",
+      "selected": "gender_studies",
+      "kind": "on_topic",
+      "prompt": "The history of the movement that won women the right to vote.",
+      "chunks": []
+    },
+    {
+      "id": "on-gend-04",
+      "selected": "gender_studies",
+      "kind": "on_topic",
+      "prompt": "Use the passages below to write a persuasive speech about care work.",
+      "chunks": [
+        "In many households women still do most of the cooking, cleaning and looking after elderly relatives, even when both partners have full time jobs.",
+        "Because this work is unpaid it is missing from salary figures, and it limits the hours that many women can spend on promotion or further study."
+      ]
+    },
+    {
+      "id": "on-gend-05",
+      "selected": "gender_studies",
+      "kind": "on_topic",
+      "prompt": "How using inclusive pronouns at work can help nonbinary colleagues feel respected.",
+      "chunks": []
+    },
+    {
+      "id": "on-itec-01",
+      "selected": "information_technology",
+      "kind": "on_topic",
+      "prompt": "I want to explain to my grandparents how to spot phishing emails and protect their passwords.",
+      "chunks": []
+    },
+    {
+      "id": "on-itec-02",
+      "selected": "information_technology",
+      "kind": "on_topic",
+      "prompt": "Our team is moving from one big server application to small services. I need a short talk for managers. It should cover cost, risk and the time needed.",
+      "chunks": []
+    },
+    {
+      "id": "on-itec-03",
+      "selected": "information_technology",
+      "kind": "on_topic",
+      "prompt": "Why version control is essential when several programmers edit the same code.",
+      "chunks": []
+    },
+    {
+      "id": "on-itec-04",
+      "selected": "information_technology",
+      "kind": "on_topic",
+      "prompt": "Summarise these notes into a clear talk about database indexing for beginners.",
+      "chunks": [
+        "An index is a separate data structure that lets the database find matching rows without reading the whole table.",
+        "Every index speeds up some queries but slows down inserts and updates, because the index must be changed as well."
+      ]
+    },
+    {
+      "id": "on-itec-05",
+      "selected": "information_technology",
+      "kind": "on_topic",
+      "prompt": "The pros and cons of open source software for a small startup company.",
+      "chunks": []
+    },
+    {
+      "id": "on-lear-01",
+      "selected": "learning_experiences",
+      "kind": "on_topic",
+      "prompt": "I want to share how I stopped cramming the night before exams and started revising weekly.",
+      "chunks": []
+    },
+    {
+      "id": "on-lear-02",
+      "selected": "learning_experiences",
+      "kind": "on_topic",
+      "prompt": "My first year away from home was difficult. I had to cook, budget and make new friends. By the end I felt much more independent.",
+      "chunks": []
+    },
+    {
+      "id": "on-lear-03",
+      "selected": "learning_experiences",
+      "kind": "on_topic",
+      "prompt": "What a strict but fair teacher taught me about asking good questions.",
+      "chunks": []
+    },
+    {
+      "id": "on-lear-04",
+      "selected": "learning_experiences",
+      "kind": "on_topic",
+      "prompt": "Here is my diary from the semester, please make it into a speech.",
+      "chunks": [
+        "I joined the debate society in October and was so nervous that I could barely finish my first two minute speech.",
+        "Practising every week with older members helped me accept criticism, and by spring I was helping new students prepare."
+      ]
+    },
+    {
+      "id": "on-lear-05",
+      "selected": "learning_experiences",
+      "kind": "on_topic",
+      "prompt": "How learning a second language changed the way I deal with making mistakes.",
+      "chunks": []
+    },
+    {
+      "id": "on-spor-01",
+      "selected": "sports",
+      "kind": "on_topic",
+      "prompt": "I want to talk about why marathon runners slow down sharply in the final ten kilometres.",
+      "chunks": []
+    },
+    {
+      "id": "on-spor-02",
+      "selected": "sports",
+      "kind": "on_topic",
+      "prompt": "My speech is about penalty shootouts. Goalkeepers have less than a second to react. Many of them study where each striker usually shoots.",
+      "chunks": []
+    },
+    {
+      "id": "on-spor-03",
+      "selected": "sports",
+      "kind": "on_topic",
+      "prompt": "Should professional tennis tournaments allow coaching from the stands during matches?",
+      "chunks": []
+    },
+    {
+      "id": "on-spor-04",
+      "selected": "sports",
+      "kind": "on_topic",
+      "prompt": "Make a short talk about injury prevention based on these coaching notes.",
+      "chunks": [
+        "A proper warm up raises muscle temperature and rehearses the movements used in the game, which lowers the chance of hamstring strains.",
+        "Players who increase their weekly training load too quickly are more likely to be hurt than those who build up gradually."
+      ]
+    },
+    {
+      "id": "on-spor-05",
+      "selected": "sports",
+      "kind": "on_topic",
+      "prompt": "Why hosting a big championship can leave a city with expensive empty stadiums.",
+      "chunks": []
+    },
+    {
+      "id": "on-wild-01",
+      "selected": "wildlife",
+      "kind": "on_topic",
+      "prompt": "I want to explain how sea turtles find their way back to the beach where they hatched.",
+      "chunks": []
+    },
+    {
+      "id": "on-wild-02",
+      "selected": "wildlife",
+      "kind": "on_topic",
+      "prompt": "Wolves were returned to a large national park. Elk numbers fell and young trees recovered along the rivers. I want to tell that story.",
+      "chunks": []
+    },
+    {
+      "id": "on-wild-03",
+      "selected": "wildlife",
+      "kind": "on_topic",
+      "prompt": "Why bees and other pollinators are disappearing and what gardeners can do.",
+      "chunks": []
+    },
+    {
+      "id": "on-wild-04",
+      "selected": "wildlife",
+      "kind": "on_topic",
+      "prompt": "Please write a speech from the field notes that I have attached here.",
+      "chunks": [
+        "The frogs in the wetland begin calling after the first heavy rain, and males gather at shallow pools to attract females.",
+        "A fungal disease and the draining of marshland have reduced the number of breeding pairs recorded over the survey period."
+      ]
+    },
+    {
+      "id": "on-wild-05",
+      "selected": "wildlife",
+      "kind": "on_topic",
+      "prompt": "How octopuses change colour and shape to escape from their predators.",
+      "chunks": []
+    },
+    {
+      "id": "inter-wild-short",
+      "selected": "wildlife",
+      "kind": "interdisciplinary",
+      "prompt": "AI drones protecting endangered elephants",
+      "chunks": []
+    },
+    {
+      "id": "inter-wild-long",
+      "selected": "wildlife",
+      "kind": "interdisciplinary",
+      "prompt": "I want to talk about how AI drones are protecting endangered elephants from poachers at night.",
+      "chunks": []
+    },
+    {
+      "id": "inter-spor-itec",
+      "selected": "sports",
+      "kind": "interdisciplinary",
+      "prompt": "How machine learning models and cloud databases process wearable sensor data for football coaches.",
+      "chunks": []
+    },
+    {
+      "id": "inter-itec-spor",
+      "selected": "information_technology",
+      "kind": "interdisciplinary",
+      "prompt": "Football referees now depend on video review. Cameras feed a computer vision system that tracks the ball and every player. I want to discuss whether we can trust that software.",
+      "chunks": []
+    },
+    {
+      "id": "inter-cine-gend",
+      "selected": "cinematography",
+      "kind": "interdisciplinary",
+      "prompt": "How the roles written for women in action movies reveal changing ideas about gender.",
+      "chunks": []
+    },
+    {
+      "id": "inter-gend-spor",
+      "selected": "gender_studies",
+      "kind": "interdisciplinary",
+      "prompt": "Why women's football receives less television coverage and much lower prize money than the men's game.",
+      "chunks": []
+    },
+    {
+      "id": "inter-spor-gend",
+      "selected": "sports",
+      "kind": "interdisciplinary",
+      "prompt": "Equal rights for women have been argued about for a century. Sexism, stereotypes and unequal pay still shape who is allowed to compete and lead athletic clubs.",
+      "chunks": []
+    },
+    {
+      "id": "inter-gend-itec",
+      "selected": "gender_studies",
+      "kind": "interdisciplinary",
+      "prompt": "Hiring algorithms can reject female applicants when software engineers train the models on biased historical data.",
+      "chunks": []
+    },
+    {
+      "id": "inter-lear-itec",
+      "selected": "learning_experiences",
+      "kind": "interdisciplinary",
+      "prompt": "What I learned in my first semester of programming, when I spent every night debugging Python code and reading server error messages.",
+      "chunks": []
+    },
+    {
+      "id": "inter-lear-spor",
+      "selected": "learning_experiences",
+      "kind": "interdisciplinary",
+      "prompt": "Joining the university rowing team meant training before sunrise. The races were exhausting, but that routine taught me discipline.",
+      "chunks": []
+    },
+    {
+      "id": "inter-cine-wild",
+      "selected": "cinematography",
+      "kind": "interdisciplinary",
+      "prompt": "Snow leopards hunt blue sheep on steep mountain slopes, and a documentary crew waited months to film one chase.",
+      "chunks": []
+    },
+    {
+      "id": "inter-wild-cine",
+      "selected": "wildlife",
+      "kind": "interdisciplinary",
+      "prompt": "Use my notes to talk about filming hummingbirds.",
+      "chunks": [
+        "High speed cameras, macro lenses and careful lighting let the crew replay each wing beat in slow motion.",
+        "In the editing room the director chooses shots and music that build suspense around the bird's search for nectar."
+      ]
+    },
+    {
+      "id": "inter-cine-itec",
+      "selected": "cinematography",
+      "kind": "interdisciplinary",
+      "prompt": "Graphics software, huge render servers and teams of programmers now create the digital creatures seen in blockbusters.",
+      "chunks": []
+    },
+    {
+      "id": "inter-itec-lear",
+      "selected": "information_technology",
+      "kind": "interdisciplinary",
+      "prompt": "Students study differently now that learning apps on their phones recommend what to review before every exam.",
+      "chunks": []
+    },
+    {
+      "id": "inter-lear-wild",
+      "selected": "learning_experiences",
+      "kind": "interdisciplinary",
+      "prompt": "Our biology class spent a week on an island counting turtle nests, protecting hatchlings from crabs and seabirds.",
+      "chunks": []
+    },
+    {
+      "id": "inter-wild-spor",
+      "selected": "wildlife",
+      "kind": "interdisciplinary",
+      "prompt": "Fishing competitions attract hundreds of anglers every summer, and I want to examine what catch and release does to fish populations.",
+      "chunks": []
+    },
+    {
+      "id": "mis-wild-lear",
+      "selected": "wildlife",
+      "kind": "mismatch",
+      "prompt": "I want to share how I overcame procrastination at university by planning my study schedule and asking my teachers for feedback.",
+      "chunks": [],
+      "expected_category": "learning_experiences"
+    },
+    {
+      "id": "mis-wild-itec",
+      "selected": "wildlife",
+      "kind": "mismatch",
+      "prompt": "Explain how a company should back up its databases. Cover cloud storage, encryption keys and what to do after a ransomware attack.",
+      "chunks": [],
+      "expected_category": "information_technology"
+    },
+    {
+      "id": "mis-wild-spor",
+      "selected": "wildlife",
+      "kind": "mismatch",
+      "prompt": "The basketball tactics that helped our team win the league final in the last quarter.",
+      "chunks": [],
+      "expected_category": "sports"
+    },
+    {
+      "id": "mis-spor-itec",
+      "selected": "sports",
+      "kind": "mismatch",
+      "prompt": "I need a talk about writing unit tests, reviewing pull requests and deploying a web application without downtime.",
+      "chunks": [],
+      "expected_category": "information_technology"
+    },
+    {
+      "id": "mis-spor-gend",
+      "selected": "sports",
+      "kind": "mismatch",
+      "prompt": "Feminist theory argues that patriarchy shapes family life. I want to explain unpaid care work and the gender pay gap.",
+      "chunks": [],
+      "expected_category": "gender_studies"
+    },
+    {
+      "id": "mis-spor-wild",
+      "selected": "sports",
+      "kind": "mismatch",
+      "prompt": "Please write a speech from the attached report for my class presentation.",
+      "chunks": [
+        "Orangutans are losing their rainforest habitat as land is cleared for plantations, and isolated populations struggle to find mates.",
+        "Conservation groups are restoring forest corridors and rescuing orphaned young apes before returning them to protected reserves."
+      ],
+      "expected_category": "wildlife"
+    },
+    {
+      "id": "mis-cine-gend",
+      "selected": "cinematography",
+      "kind": "mismatch",
+      "prompt": "Why transgender people face discrimination in healthcare and housing, and which laws could protect their rights.",
+      "chunks": [],
+      "expected_category": "gender_studies"
+    },
+    {
+      "id": "mis-cine-spor",
+      "selected": "cinematography",
+      "kind": "mismatch",
+      "prompt": "How swimmers improve their freestyle stroke and build endurance during the winter training season.",
+      "chunks": [],
+      "expected_category": "sports"
+    },
+    {
+      "id": "mis-cine-lear",
+      "selected": "cinematography",
+      "kind": "mismatch",
+      "prompt": "Taking good lecture notes helped me remember more. I now review them every weekend and my exam grades have improved.",
+      "chunks": [],
+      "expected_category": "learning_experiences"
+    },
+    {
+      "id": "mis-gend-itec",
+      "selected": "gender_studies",
+      "kind": "mismatch",
+      "prompt": "How containers and load balancers keep an online shop running when thousands of requests arrive at once.",
+      "chunks": [],
+      "expected_category": "information_technology"
+    },
+    {
+      "id": "mis-gend-wild",
+      "selected": "gender_studies",
+      "kind": "mismatch",
+      "prompt": "Coral reefs are bleaching as the ocean warms, and the fish that shelter among them are disappearing.",
+      "chunks": [],
+      "expected_category": "wildlife"
+    },
+    {
+      "id": "mis-gend-spor",
+      "selected": "gender_studies",
+      "kind": "mismatch",
+      "prompt": "Turn these match notes into a speech for our club dinner.",
+      "chunks": [
+        "The striker scored twice in the second half after the coach switched to a high pressing formation.",
+        "Our defenders recovered well from earlier injuries and the goalkeeper saved a late penalty to secure the trophy."
+      ],
+      "expected_category": "sports"
+    },
+    {
+      "id": "mis-itec-lear",
+      "selected": "information_technology",
+      "kind": "mismatch",
+      "prompt": "Living with a host family on a student exchange taught me patience, confidence and how to cope with homesickness.",
+      "chunks": [],
+      "expected_category": "learning_experiences"
+    },
+    {
+      "id": "mis-itec-cine",
+      "selected": "information_technology",
+      "kind": "mismatch",
+      "prompt": "I want to analyse how shadows, camera angles and slow editing create fear in classic horror films.",
+      "chunks": [],
+      "expected_category": "cinematography"
+    },
+    {
+      "id": "mis-itec-wild",
+      "selected": "information_technology",
+      "kind": "mismatch",
+      "prompt": "Every year millions of wildebeest migrate across the plains. Lions and crocodiles wait for the weak at river crossings.",
+      "chunks": [],
+      "expected_category": "wildlife"
+    },
+    {
+      "id": "mis-lear-cine",
+      "selected": "learning_experiences",
+      "kind": "mismatch",
+      "prompt": "The way a famous director frames characters through doorways and uses colour to show loneliness on screen.",
+      "chunks": [],
+      "expected_category": "cinematography"
+    },
+    {
+      "id": "mis-lear-spor",
+      "selected": "learning_experiences",
+      "kind": "mismatch",
+      "prompt": "Why the offside rule confuses football fans and how referees apply it during tournament matches.",
+      "chunks": [],
+      "expected_category": "sports"
+    },
+    {
+      "id": "mis-lear-gend",
+      "selected": "learning_experiences",
+      "kind": "mismatch",
+      "prompt": "Masculinity norms discourage many men from seeking help. This speech examines how gender expectations harm mental health.",
+      "chunks": [],
+      "expected_category": "gender_studies"
+    }
+  ],
+  "no_topic": {
+    "description": "Prompts without any topic (kind no_topic). AI-drafted, not yet reviewed by a human; nt-01 and nt-02 were found by a reviewer. Each prompt is scored under every category and must not be blocked.",
+    "prompts": [
+      {"id": "nt-01", "prompt": "Please help me prepare a presentation for my teacher and my classmates."},
+      {"id": "nt-02", "prompt": "Write a speech that I can give in front of students tomorrow morning."},
+      {"id": "nt-03", "prompt": "Can you help me write something to present at my class next week?"},
+      {"id": "nt-04", "prompt": "I need a five minute talk and I do not know where to start yet."},
+      {"id": "nt-05", "prompt": "Please write a short speech for me to read at our meeting on Friday."},
+      {"id": "nt-06", "prompt": "Help me make a good presentation that sounds confident and natural please."},
+      {"id": "nt-07", "prompt": "Make the introduction shorter and add a question for the audience."},
+      {"id": "nt-08", "prompt": "Use simple words and a friendly tone because my listeners are beginners."},
+      {"id": "nt-09", "prompt": "I would like a speech with a strong opening and a clear conclusion."},
+      {"id": "nt-10", "prompt": "My professor asked us to speak for ten minutes in front of everyone."}
+    ]
+  }
+}
