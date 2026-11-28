@@ -559,3 +559,57 @@ async def checkin(
     return row.model_dump(mode="json")
 
 
+@router.post("/checkins/{event_id}/{day}/complete")
+async def complete_checkin(
+    event_id: UUID,
+    day: dt.date,
+    payload: CompletePayload,
+    user: Annotated[CurrentUser, Depends(get_current_user)],
+    repos: Annotated[Repos, Depends(get_repos)],
+):
+    if not await _allowed(repos, user.id):
+        return _error(429, "rate_limited", "Too many schedule changes.")
+    try:
+        checkin_row = await run_in_threadpool(
+            repos.schedule.get_checkin, user.id, event_id, day
+        )
+    except StorageError:
+        return _error(503, "storage_unavailable", "The check-in could not be loaded.")
+    if checkin_row is None:
+        return _error(409, "not_checked_in", "Check in before completing a session.")
+    if checkin_row.done_at is not None:
+        return checkin_row.model_dump(mode="json")
+    try:
+        session = await run_in_threadpool(
+            repos.sessions.get_session, user.id, payload.session_id
+        )
+    except StorageError:
+        return _error(503, "storage_unavailable", "The session could not be loaded.")
+    if session is None:
+        return _error(404, "session_not_found", "The session was not found.")
+    if session.status != "ok" or session.overall is None:
+        return _error(
+            422,
+            "session_not_scorable",
+            "The session is not a scorable completed practice.",
+        )
+    if session.created_at <= checkin_row.checkin_at:
+        return _error(
+            422,
+            "session_not_scorable",
+            "The session was not created after the check-in.",
+        )
+    try:
+        done = await run_in_threadpool(
+            repos.schedule.mark_done,
+            user.id,
+            event_id,
+            day,
+            payload.session_id,
+            _now(),
+        )
+    except StorageError:
+        return _error(503, "storage_unavailable", "The completion could not be saved.")
+    if done is None:
+        return _error(409, "not_checked_in", "Check in before completing a session.")
+    return done.model_dump(mode="json")
