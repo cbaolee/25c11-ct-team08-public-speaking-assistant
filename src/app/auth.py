@@ -134,6 +134,9 @@ class AuthProvider(Protocol):
     # Check the recovery code, set the new password, then end every session of the account.
     def reset_password_with_otp(self, email: str, token: str, new_password: str) -> UUID: ...
 
+    # Address for the Schedule reminder email (ADR-016). None when the account is gone.
+    def email_for_user(self, user_id: UUID) -> str | None: ...
+
 
 # ---------- in-memory provider (dev without Supabase, tests) ----------
 
@@ -366,6 +369,11 @@ class MemoryAuthProvider:
             account = self._account_by_id(user_id)
             if account is not None:
                 account.display_name = display_name
+
+    def email_for_user(self, user_id: UUID) -> str | None:
+        with self._lock:
+            account = self._account_by_id(user_id)
+            return account.email if account is not None else None
 
     def verify_password(self, email: str, password: str) -> bool:
         """Check a password without creating a session (re-auth before a sensitive action)."""
@@ -636,6 +644,18 @@ class SupabaseAuthProvider:
             )
         except Exception as err:
             raise AuthUnavailableError("Could not save the display name") from err
+
+    def email_for_user(self, user_id: UUID) -> str | None:
+        try:
+            resp = self._admin_client.admin.get_user_by_id(str(user_id))
+        except AuthApiError as err:
+            if getattr(err, "status", None) == 404:
+                return None  # the account was deleted
+            raise AuthUnavailableError("Could not read the account email") from err
+        except Exception as err:
+            raise AuthUnavailableError("Could not read the account email") from err
+        user = getattr(resp, "user", None)
+        return getattr(user, "email", None) or None
 
     def verify_password(self, email: str, password: str) -> bool:
         """Re-auth: sign in on a throwaway client, then revoke the session it created at once.
