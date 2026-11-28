@@ -106,7 +106,7 @@ from src.text_processing.chat_session import (
     TurnStepTracker,
     analyze_slot_coverage,
     append_to_context_window,
-    build_turn1_question,
+    build_turn1_decision,
     chat_session_store,
     evaluate_and_build_followup,
     ingest_upload_file,
@@ -1167,7 +1167,10 @@ async def script_chat_select_topic_endpoint(
     payload: SelectTopicPayload,
     user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> dict[str, Any]:
-    """Turn 1: Lock topic/mode and always return an opening context question (no Generate)."""
+    """Turn 1: lock the topic/mode, reply, and allow Generate if the context is sufficient.
+
+    `topic_clear` is false only for a Write Freely prompt that names no topic yet.
+    """
     pipeline = get_script_pipeline()
     user_id = str(user.id)
     store = getattr(pipeline, "session_store", chat_session_store)
@@ -1230,22 +1233,24 @@ async def script_chat_select_topic_endpoint(
             client = _resolve_groq_client(pipeline)
             limiter = getattr(pipeline.template_engine, "limiter", None)
             model_chain = getattr(pipeline.template_engine, "model_chain", None)
-            reply, missing_items = build_turn1_question(
+            decision = build_turn1_decision(
                 topic=session.topic or session.category or "your speech",
                 category=session.category,
                 duration_min=session.duration_min,
                 is_free_topic=is_free_topic,
                 initial_prompt=session.initial_prompt,
                 files_loaded=session.files_loaded,
+                chunks=session.chunks,
+                coverage_ratio=session.coverage_ratio,
                 missing_entities=session.missing_entities,
                 missing_groups=session.missing_groups,
                 client=client,
                 model_chain=model_chain,
                 limiter=limiter,
             )
-            session.last_question = reply
-            session.missing_items = list(missing_items)
-            session.ready_to_generate = False
+            session.last_question = decision.reply_message
+            session.missing_items = list(decision.missing_items)
+            session.ready_to_generate = decision.can_generate
 
             tracker.finish()
             store.put(session)
@@ -1253,15 +1258,16 @@ async def script_chat_select_topic_endpoint(
                 "session_id": session.session_id,
                 "template_id": session.selected_template_id,
                 "selected_template_id": session.selected_template_id,
-                "ready_to_generate": False,
-                "can_generate": False,
+                "ready_to_generate": decision.can_generate,
+                "can_generate": decision.can_generate,
+                "topic_clear": decision.topic_clear,
                 "assistant_turn": 1,
                 "coverage_ratio": session.coverage_ratio,
                 "missing_entities": session.missing_entities,
                 "missing_groups": session.missing_groups,
-                "missing_items": list(missing_items),
+                "missing_items": list(decision.missing_items),
                 "context_compacted": False,
-                "reply_message": reply,
+                "reply_message": decision.reply_message,
                 **tracker.to_telemetry(),
             }
 

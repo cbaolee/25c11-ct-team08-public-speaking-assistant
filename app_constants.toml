@@ -314,3 +314,7 @@ category_guard_llm_max_tokens = 80
 category_guard_max_segments = 20
 # Most template titles added to the prototypes of one category, in titles
 category_guard_max_titles_per_category = 100
+# Write Freely may Generate at turn 1 when its first prompt has at least this many words that
+# contain a letter (provisional, not yet measured). Not [script] free_topic_min_words, which is
+# the rule-based fallback from turn 2.
+free_topic_turn1_ready_words = 40

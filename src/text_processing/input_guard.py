@@ -138,9 +138,14 @@ def _is_junk(core: str) -> bool:
     )
 
 
+def content_words(text: str) -> list[str]:
+    """The word cores of `text` that contain at least one letter, case kept."""
+    return list(filter(_has_letter, _cores(_split_words(text))))
+
+
 def content_word_count(text: str) -> int:
     """How many words of `text` contain at least one letter."""
-    return sum(map(_has_letter, _cores(_split_words(text))))
+    return len(content_words(text))
 
 
 def is_gibberish(text: str, *, has_file: bool = False) -> bool:

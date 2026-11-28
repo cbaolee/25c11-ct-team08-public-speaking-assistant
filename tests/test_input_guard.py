@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.text_processing.input_guard import content_word_count, is_gibberish
+from src.text_processing.input_guard import content_word_count, content_words, is_gibberish
 
 VECTORS_PATH = Path(__file__).parent / "fixtures" / "gibberish_vectors.json"
 VECTORS = json.loads(VECTORS_PATH.read_text(encoding="utf-8"))
@@ -57,6 +57,10 @@ def test_rule_edges(text, refused):
 )
 def test_content_word_count(text, count):
     assert content_word_count(text) == count
+
+
+def test_content_words_keep_case_and_drop_edges_and_numbers():
+    assert content_words("COVID-19 (AI), 2024 !!! TP.HCM.") == ["COVID-19", "AI", "TP.HCM"]
 
 
 @pytest.mark.parametrize(("tail", "refused"), [("speaking", False), ("asdfgabc", True)])

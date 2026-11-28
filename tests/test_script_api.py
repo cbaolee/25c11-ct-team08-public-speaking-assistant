@@ -1732,3 +1732,136 @@ def test_warmup_encodes_the_category_prototypes(category_api) -> None:
 
     assert len(model.calls) == len(category_guard.CATEGORY_SLUG_MAP)
     assert category_guard._proto_cache is not None
+
+
+# ---------- Contract C: Turn 1 may already allow Generate ----------
+
+_TURN1_FIELDS = {
+    "session_id",
+    "template_id",
+    "selected_template_id",
+    "ready_to_generate",
+    "can_generate",
+    "topic_clear",
+    "assistant_turn",
+    "coverage_ratio",
+    "missing_entities",
+    "missing_groups",
+    "missing_items",
+    "context_compacted",
+    "reply_message",
+    "stage",
+    "progress",
+    "steps",
+    "eta_buffer_s",
+    "estimated_total_s",
+    "estimated_remaining_s",
+}
+
+
+@pytest.mark.parametrize(
+    ("prompt", "template_id", "topic_clear", "can_generate"),
+    [
+        ("help me write a speech", None, False, False),
+        ("Coral reefs", None, True, False),
+        (" ".join(["coral"] * 20 + ["reef"] * 20), None, True, True),
+        ("Coral reefs", "wildlife/keystone_5m", True, False),
+        ("Opening thought argument intro", "wildlife/keystone_5m", True, True),
+    ],
+)
+def test_select_topic_returns_the_turn1_decision(
+    guard_api, prompt, template_id, topic_clear, can_generate
+) -> None:
+    client, _, user, _, store = guard_api
+    session_id = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": prompt},
+    ).json()["session_id"]
+
+    response = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": session_id, "template_id": template_id},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == _TURN1_FIELDS
+    assert body["topic_clear"] is topic_clear
+    assert body["can_generate"] is can_generate
+    assert body["ready_to_generate"] is can_generate
+    assert body["assistant_turn"] == 1
+    assert "**" in body["reply_message"]
+    assert [step["key"] for step in body["steps"]] == [
+        "validating_input",
+        "analyzing_slots",
+        "analyzing_with_llm",
+    ]
+    session = store.get(session_id, user_id=str(user.id))
+    assert session.ready_to_generate is can_generate
+    assert session.last_question == body["reply_message"]
+    assert session.missing_items == body["missing_items"]
+
+
+@pytest.mark.parametrize(
+    ("prompt", "template_id"),
+    [
+        (" ".join(["coral"] * 20 + ["reef"] * 20), None),
+        ("Opening thought argument intro", "wildlife/keystone_5m"),
+    ],
+)
+def test_generate_is_accepted_right_after_a_ready_turn1(guard_api, prompt, template_id) -> None:
+    client, _, user, pipeline, _ = guard_api
+    session_id = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5, "prompt": prompt},
+    ).json()["session_id"]
+    turn1 = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": session_id, "template_id": template_id},
+    ).json()
+    assert turn1["can_generate"] is True
+
+    response = client.post(
+        "/api/generate-script", data={"session_id": session_id, "duration_min": 5}
+    )
+
+    assert response.status_code == 202
+    assert pipeline.has_active_job(str(user.id))
+
+
+def test_select_topic_with_a_file_allows_generate_when_the_llm_asks_more(guard_api) -> None:
+    client, _, _, pipeline, _ = guard_api
+    groq = MagicMock()
+    answer = MagicMock()
+    answer.usage = MagicMock(total_tokens=90)
+    answer.choices = [
+        MagicMock(
+            message=MagicMock(
+                content=json.dumps(
+                    {
+                        "sufficient": False,
+                        "missing_items": ["target audience"],
+                        "reply_message": "Who is your **target audience**?",
+                    }
+                )
+            )
+        )
+    ]
+    groq.chat.completions.create.return_value = answer
+    session_id = client.post(
+        "/api/script-chat/suggest",
+        data={"category": "wildlife", "duration_min": 5},
+        files={"file": _NOTES_FILE},
+    ).json()["session_id"]
+    pipeline.template_engine.client = groq
+
+    body = client.post(
+        "/api/script-chat/select-topic",
+        json={"session_id": session_id, "template_id": None},
+    ).json()
+
+    assert (body["topic_clear"], body["can_generate"]) == (True, True)
+    assert body["reply_message"] == (
+        "Who is your **target audience**? You can also generate the script right now."
+    )
+    assert groq.chat.completions.create.call_count == 1

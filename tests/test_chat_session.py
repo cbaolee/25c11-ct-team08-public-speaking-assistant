@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import threading
 import time
 import types
+import unicodedata
 import zlib
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -14,7 +16,9 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
+from src.app.constants import CONSTANTS
 from src.text_processing.chat_session import (
+    FREE_TOPIC_TURN1_READY_WORDS,
     GROUP_COUNTER,
     GROUP_EVIDENCE,
     GROUP_MAIN,
@@ -26,6 +30,7 @@ from src.text_processing.chat_session import (
     analyze_slot_coverage,
     append_to_context_window,
     build_followup_reply,
+    build_turn1_decision,
     build_turn1_question,
     check_ready_to_generate,
     classify_argument_slot,
@@ -34,6 +39,7 @@ from src.text_processing.chat_session import (
     evaluate_and_build_followup,
     group_uncovered_slots,
     ingest_upload_file,
+    is_free_topic_identifiable,
     normalize_turn_entry,
 )
 from src.text_processing.contracts import (
@@ -1257,3 +1263,271 @@ class TestStepAndEtaTelemetry:
             "generating",
             "validating_output",
         ]
+
+
+# ---------- Turn 1 Smart Generate (Contract C) ----------
+
+_READY_HINT = "You can also generate the script right now."
+
+
+def _turn1_client(payload: object) -> MagicMock:
+    """A Groq mock answering every call with `payload` (a dict, or raw text)."""
+    client = MagicMock()
+    response = MagicMock()
+    content = payload if isinstance(payload, str) else json.dumps(payload)
+    response.choices = [MagicMock(message=MagicMock(content=content))]
+    response.usage = MagicMock(total_tokens=90)
+    client.chat.completions.create.return_value = response
+    return client
+
+
+def _asking_payload(**extra: object) -> dict[str, object]:
+    return {
+        "reply_message": "Who is your **target audience**?",
+        "missing_items": ["target audience"],
+        **extra,
+    }
+
+
+def _free_decision(prompt: str, **kwargs: object):
+    kwargs.setdefault("limiter", TokenBucketLimiter())
+    return build_turn1_decision(
+        topic=prompt or "Custom Speech", is_free_topic=True, initial_prompt=prompt, **kwargs
+    )
+
+
+def _template_decision(**kwargs: object):
+    kwargs.setdefault("limiter", TokenBucketLimiter())
+    return build_turn1_decision(topic="Keystone Species", **kwargs)
+
+
+def _sent_prompts(client: MagicMock) -> tuple[str, str]:
+    messages = client.chat.completions.create.call_args.kwargs["messages"]
+    return messages[0]["content"], messages[1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected"),
+    [
+        ("help me write a speech", False),
+        ("write a 5 minute presentation", False),
+        ("for my class", False),
+        ("tạo bài thuyết trình giúp tôi", False),
+        (unicodedata.normalize("NFD", "viết bài nói giúp tôi"), False),
+        ("viết bài nói giúp tôi", False),
+        ("5 phút cho sinh viên", False),
+        ("HELP ME, write a SPEECH!", False),
+        ("Football", False),
+        ("", False),
+        ("Coral reefs", True),
+        ("Climate change in the Mekong Delta", True),
+        ("help me write a speech about ocean plastic pollution", True),
+        ("Biến đổi khí hậu ở đồng bằng sông Cửu Long", True),
+    ],
+)
+def test_free_topic_is_identifiable_from_the_prompt(prompt: str, expected: bool) -> None:
+    assert is_free_topic_identifiable(prompt, [], []) is expected
+
+
+def test_free_topic_is_identifiable_from_a_file_or_chunks() -> None:
+    chunk = DocumentChunk(chunk_id=1, heading="Notes", page=1, content="Reef survey.")
+
+    assert is_free_topic_identifiable("", ["notes.txt"], []) is True
+    assert is_free_topic_identifiable("help me", [], [chunk]) is True
+
+
+def test_turn1_ready_words_come_from_the_script_guard_section() -> None:
+    configured = CONSTANTS["script_guard"]["free_topic_turn1_ready_words"]
+
+    assert FREE_TOPIC_TURN1_READY_WORDS == configured == 40
+
+
+def test_turn1_ready_template_replies_without_calling_the_llm() -> None:
+    client = _turn1_client(_asking_payload())
+
+    decision = _template_decision(coverage_ratio=0.7, missing_entities=[], client=client)
+
+    assert decision.can_generate is True
+    assert decision.topic_clear is True
+    assert decision.used_llm is False
+    assert decision.missing_items == []
+    assert decision.reply_message == (
+        "You already shared enough detail on **Keystone Species** to draft the speech. "
+        "You can generate right now, or add any **extra examples** or "
+        "**tone preferences** first."
+    )
+    assert client.mock_calls == []
+
+
+@pytest.mark.parametrize(
+    ("coverage_ratio", "missing_entities"),
+    [(0.69, []), (1.0, ["entity_audience_type"])],
+)
+def test_turn1_incomplete_template_never_allows_generate(
+    coverage_ratio: float, missing_entities: list[str]
+) -> None:
+    client = _turn1_client(_asking_payload(sufficient=True))
+
+    decision = _template_decision(
+        coverage_ratio=coverage_ratio, missing_entities=missing_entities, client=client
+    )
+
+    assert decision.can_generate is False
+    assert decision.topic_clear is True
+    assert decision.used_llm is True
+    assert decision.reply_message == "Who is your **target audience**?"
+    assert client.chat.completions.create.call_count == 1
+    system_prompt, user_prompt = _sent_prompts(client)
+    assert "Never tell the user to click Generate yet." in system_prompt
+    assert "Mode: Template-guided speech" in user_prompt
+
+
+def test_turn1_template_without_argument_slots_is_ready() -> None:
+    document = TemplateDocument(
+        metadata=TopicMetadata(
+            template_id="sports/no_slots",
+            category_slug="sports",
+            category="Sports",
+            topic="Fair Play",
+            topic_slug="no_slots",
+            duration_min=5,
+        ),
+        body="Welcome everyone. Thank you.",
+        file_path="data/templates/sports/no_slots.md",
+    )
+    coverage_ratio, missing_entities, missing_groups = analyze_slot_coverage(
+        template_document=document, chunks=[], chunk_embeddings=None, retriever=None
+    )
+
+    decision = _template_decision(
+        coverage_ratio=coverage_ratio,
+        missing_entities=missing_entities,
+        missing_groups=missing_groups,
+    )
+
+    assert decision.can_generate is True
+
+
+def test_turn1_unclear_free_topic_asks_for_the_topic_without_the_llm() -> None:
+    client = _turn1_client(_asking_payload(sufficient=True))
+
+    decision = _free_decision("help me write a speech", client=client)
+
+    assert decision.topic_clear is False
+    assert decision.can_generate is False
+    assert decision.missing_items == ["speech topic"]
+    assert "**specific topic**" in decision.reply_message
+    assert "generate" not in decision.reply_message.lower()
+    assert client.mock_calls == []
+
+
+def test_turn1_clear_short_free_topic_keeps_asking() -> None:
+    client = _turn1_client(_asking_payload(sufficient=False, topic_clear=False))
+
+    decision = _free_decision("Coral reefs", client=client)
+
+    assert decision.topic_clear is True
+    assert decision.can_generate is False
+    assert decision.used_llm is True
+    assert decision.missing_items == ["target audience"]
+    assert decision.reply_message == "Who is your **target audience**?"
+    assert client.chat.completions.create.call_count == 1
+    system_prompt, user_prompt = _sent_prompts(client)
+    assert '"sufficient": bool' in system_prompt
+    assert "otherwise never tell the user to click Generate" in system_prompt
+    assert "Mode: Free-topic speech" in user_prompt
+
+
+@pytest.mark.parametrize(
+    ("words", "expected"),
+    [(FREE_TOPIC_TURN1_READY_WORDS - 1, False), (FREE_TOPIC_TURN1_READY_WORDS, True)],
+)
+def test_turn1_free_topic_word_threshold_counts_words_with_a_letter(
+    words: int, expected: bool
+) -> None:
+    prompt = " ".join(["coral"] * words) + " 2024 - 35"
+    client = _turn1_client(_asking_payload(sufficient=False))
+
+    decision = _free_decision(prompt, client=client)
+
+    assert decision.can_generate is expected
+    assert decision.reply_message.endswith(_READY_HINT) is expected
+
+
+@pytest.mark.parametrize(
+    "material",
+    [
+        {"files_loaded": ["notes.txt"]},
+        {"chunks": [DocumentChunk(chunk_id=1, heading="Notes", page=1, content="Reefs.")]},
+    ],
+)
+def test_turn1_free_topic_with_material_may_generate_and_says_so(
+    material: dict[str, object],
+) -> None:
+    client = _turn1_client(_asking_payload(sufficient=False))
+
+    decision = _free_decision("", client=client, **material)
+
+    assert decision.can_generate is True
+    assert decision.reply_message == f"Who is your **target audience**? {_READY_HINT}"
+    system_prompt, _ = _sent_prompts(client)
+    assert "never tell the user" not in system_prompt.lower()
+
+
+def test_turn1_llm_sufficient_true_allows_generate_without_repeating_the_hint() -> None:
+    reply = "We are set on **coral reefs**. Generate when ready."
+    client = _turn1_client({"sufficient": True, "missing_items": [], "reply_message": reply})
+
+    decision = _free_decision("Coral reefs", client=client)
+
+    assert decision.can_generate is True
+    assert decision.missing_items == []
+    assert decision.reply_message == reply
+
+
+@pytest.mark.parametrize("flag", ["true", 1, None])
+def test_turn1_only_a_boolean_sufficient_flag_counts(flag: object) -> None:
+    client = _turn1_client(_asking_payload(sufficient=flag))
+
+    assert _free_decision("Coral reefs", client=client).can_generate is False
+
+
+def _failing_clients() -> list[MagicMock | None]:
+    raising = MagicMock()
+    raising.chat.completions.create.side_effect = RuntimeError("groq down")
+    return [
+        None,
+        raising,
+        _turn1_client("{broken json"),
+        _turn1_client("[]"),
+        _turn1_client({"sufficient": True, "reply_message": "  "}),
+    ]
+
+
+@pytest.mark.parametrize("client", _failing_clients())
+def test_turn1_llm_failure_falls_back_to_the_deterministic_rule(
+    client: MagicMock | None,
+) -> None:
+    short = _free_decision("Coral reefs", client=client)
+    with_file = _free_decision("", files_loaded=["notes.txt"], client=client)
+    template = _template_decision(missing_entities=["entity_audience_type"], client=client)
+
+    assert (short.can_generate, short.used_llm) == (False, False)
+    assert "**" in short.reply_message
+    assert "generate" not in short.reply_message.lower()
+    assert (with_file.can_generate, with_file.used_llm) == (True, False)
+    assert with_file.missing_items == []
+    assert "generate it right now" in with_file.reply_message
+    assert (template.can_generate, template.used_llm) == (False, False)
+    assert "**audience type**" in template.reply_message
+
+
+def test_turn1_exhausted_llm_budget_falls_back_without_a_call() -> None:
+    limiter = MagicMock()
+    limiter.wait_time_s.return_value = 3600.0
+    client = _turn1_client(_asking_payload(sufficient=True))
+
+    decision = _free_decision("Coral reefs", client=client, limiter=limiter)
+
+    assert (decision.can_generate, decision.used_llm) == (False, False)
+    assert client.mock_calls == []

@@ -56,6 +56,7 @@ from src.app.config import (
     turn1_max_tokens,
     turn1_temperature,
 )
+from src.app.constants import CONSTANTS
 
 from .contracts import (
     DocumentChunk,
@@ -63,6 +64,7 @@ from .contracts import (
     TemplateSlot,
     TopicMetadata,
 )
+from .input_guard import content_word_count, content_words
 from .limiter import TokenBucketLimiter
 from .parser import (
     MAX_PDF_SIZE_BYTES,
@@ -85,6 +87,7 @@ COSINE_SIMILARITY_THRESHOLD = float(slot_coverage_min_score)
 SLOT_COVERAGE_READY_THRESHOLD = float(slot_coverage_ready_threshold)
 FREE_TOPIC_MIN_WORDS = int(free_topic_min_words)
 FREE_TOPIC_THESIS_MIN_WORDS = int(free_topic_thesis_min_words)
+FREE_TOPIC_TURN1_READY_WORDS = int(CONSTANTS["script_guard"]["free_topic_turn1_ready_words"])
 TURN1_MAX_TOKENS = int(turn1_max_tokens)
 FOLLOWUP_MAX_TOKENS = int(followup_max_tokens)
 COMPACTION_MAX_TOKENS = int(compaction_max_tokens)
@@ -1036,6 +1039,70 @@ def _derive_missing_items(
     return missing or ["tone or extra examples"]
 
 
+# A Write Freely prompt names a topic when this many of its words are not meta words.
+# Both constants define the rule; they are not settings to tune.
+FREE_TOPIC_MIN_SPECIFIC_WORDS = 2
+# Words of a generic request ("help me write a speech") that say nothing about the topic.
+FREE_TOPIC_META_WORDS = frozenset(
+    """
+    a about an and can class could create draft for generate give hello help hi i in like
+    make me min mins minute minutes my need of on please prepare presentation presentations
+    script scripts some speech speeches student students talk talks thanks the to want
+    with would write you
+    bài cho giúp làm lớp mình một nói phút sinh thuyết tôi trình tạo về viên viết
+    """.split()
+)
+
+_ANY_TEMPLATE_ID = "selected"
+
+_TURN1_COACH_PROMPT = (
+    "You are a warm, natural public-speaking coach starting a short conversation "
+    "before writing a speech. Briefly acknowledge the topic (and any notes/files "
+    "already shared), then ask 1 natural, topic-specific opening question covering "
+    "at most 1-2 helpful details (such as angle, audience, or tone). "
+    "Wrap 1-2 key concepts in **bold** markdown (e.g. **target audience**). "
+    "Never recite a generic checklist (do not list 'main thesis, key points, examples, "
+    "counter-arguments' together). Keep under 60 words. "
+)
+_TURN1_QUESTION_RULES = (
+    "Never tell the user to click Generate yet. "
+    'Return strict JSON: {"reply_message": "...", "missing_items": ["..."]}.'
+)
+_TURN1_DECISION_SCHEMA = (
+    'Return strict JSON: {"sufficient": bool, "missing_items": ["..."], "reply_message": "..."}.'
+)
+_TURN1_JUDGE_RULES = (
+    "Set sufficient to true only if the topic, an angle and the audience or goal are clear "
+    "enough to draft the speech. Only when sufficient is true may you say they can generate "
+    "the script now; otherwise never tell the user to click Generate. "
+) + _TURN1_DECISION_SCHEMA
+_TURN1_READY_RULES = (
+    "There is already enough material to draft the speech, so you may say they can generate "
+    "the script now; your question is optional. "
+) + _TURN1_DECISION_SCHEMA
+
+_TOPIC_QUESTION = (
+    "Happy to help! What **specific topic** would you like to speak about? "
+    "Name the **subject** or issue, and the angle you care about if you have one."
+)
+_FREE_READY_REPLY = (
+    "I have enough to draft your speech. You can generate it right now, or add any "
+    "**extra examples** or **tone preferences** first."
+)
+_GENERATE_HINT = "You can also generate the script right now."
+
+
+@dataclass(frozen=True)
+class Turn1Decision:
+    """Turn 1 reply and readiness; at Turn 1 `can_generate` is also `ready_to_generate`."""
+
+    reply_message: str
+    missing_items: list[str]
+    topic_clear: bool
+    can_generate: bool
+    used_llm: bool = False
+
+
 def build_turn1_question(
     *,
     topic: str,
@@ -1058,37 +1125,87 @@ def build_turn1_question(
         context_text=initial_prompt,
         files_loaded=files_loaded,
     )
+    reply, items, _ = _turn1_question(
+        topic=topic,
+        is_free_topic=is_free_topic,
+        user_prompt=_turn1_user_prompt(
+            topic=topic,
+            category=category,
+            duration_min=duration_min,
+            is_free_topic=is_free_topic,
+            initial_prompt=initial_prompt,
+            files_loaded=files_loaded,
+            missing_items=missing_items,
+        ),
+        missing_items=missing_items,
+        client=client,
+        model_chain=model_chain,
+        limiter=limiter,
+    )
+    return reply, items
 
-    if client is None:
-        return (
-            _turn1_fallback_question(topic, missing_items, is_free_topic=is_free_topic),
-            missing_items,
-        )
 
-    active_limiter = limiter or _QA_LIMITER
-    chain = _get_qa_model_chain(model_chain)
+def _turn1_question(
+    *,
+    topic: str,
+    is_free_topic: bool,
+    user_prompt: str,
+    missing_items: list[str],
+    client: Any | None,
+    model_chain: tuple[str, ...] | None,
+    limiter: TokenBucketLimiter | None,
+) -> tuple[str, list[str], bool]:
+    """Opening question as (reply, missing items, whether the LLM wrote it)."""
+    data = _request_turn1_json(
+        _TURN1_COACH_PROMPT + _TURN1_QUESTION_RULES,
+        user_prompt,
+        client=client,
+        model_chain=model_chain,
+        limiter=limiter,
+    )
+    if data is None:
+        fallback = _turn1_fallback_question(topic, missing_items, is_free_topic=is_free_topic)
+        return fallback, missing_items, False
+    items = _turn1_missing_items(data, missing_items)
+    return _ensure_bold_keys(str(data["reply_message"]).strip(), items), items, True
+
+
+def _turn1_user_prompt(
+    *,
+    topic: str,
+    category: str,
+    duration_min: int,
+    is_free_topic: bool,
+    initial_prompt: str,
+    files_loaded: list[str] | None,
+    missing_items: list[str],
+) -> str:
     mode_label = "Free-topic speech" if is_free_topic else "Template-guided speech"
     files_note = ", ".join(files_loaded) if files_loaded else "None"
-
-    system_prompt = (
-        "You are a warm, natural public-speaking coach starting a short conversation "
-        "before writing a speech. Briefly acknowledge the topic (and any notes/files "
-        "already shared), then ask 1 natural, topic-specific opening question covering "
-        "at most 1-2 helpful details (such as angle, audience, or tone). "
-        "Wrap 1-2 key concepts in **bold** markdown (e.g. **target audience**). "
-        "Never recite a generic checklist (do not list 'main thesis, key points, examples, "
-        "counter-arguments' together). Keep under 60 words. Never tell the user to click "
-        "Generate yet. "
-        'Return strict JSON: {"reply_message": "...", "missing_items": ["..."]}.'
-    )
     focus_hints = ", ".join(missing_items[:2]) or "target audience, main angle"
-    user_prompt = (
+    return (
         f"Mode: {mode_label} | Category: {category or 'General'} | Duration: {duration_min} min\n"
         f"Topic: {topic}\n"
         f"Initial prompt: {initial_prompt.strip() or 'None'}\n"
         f"Uploaded files: {files_note}\n"
         f"Optional coaching focus: {focus_hints}"
     )
+
+
+def _request_turn1_json(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    client: Any | None,
+    model_chain: tuple[str, ...] | None,
+    limiter: TokenBucketLimiter | None,
+) -> dict[str, Any] | None:
+    """First JSON object with a `reply_message` from the model chain, or None."""
+    if client is None:
+        return None
+
+    active_limiter = limiter or _QA_LIMITER
+    chain = _get_qa_model_chain(model_chain)
     est_tokens = max(90, int(len(user_prompt) / 3.5) + TURN1_MAX_TOKENS)
 
     for model_id in chain:
@@ -1112,28 +1229,142 @@ def build_turn1_question(
             tokens_used = raw_tokens if isinstance(raw_tokens, int) else est_tokens
             active_limiter.consume(model_id, tokens_used)
 
-            reply = ""
-            parsed_items = list(missing_items)
             if raw:
                 try:
                     data = json.loads(raw)
-                    if isinstance(data, dict):
-                        reply = str(data.get("reply_message", "")).strip()
-                        raw_items = data.get("missing_items")
-                        if isinstance(raw_items, list) and raw_items:
-                            parsed_items = [str(x).strip() for x in raw_items if str(x).strip()]
+                    if isinstance(data, dict) and str(data.get("reply_message", "")).strip():
+                        return data
                 except json.JSONDecodeError as exc:
                     logger.warning(
                         "Groq Turn 1 returned invalid JSON on %s (%s)", model_id, exc
                     )
-            if reply:
-                return _ensure_bold_keys(reply, parsed_items), parsed_items
         except Exception as exc:
             logger.warning("Groq Turn 1 question failed on %s (%s)", model_id, exc)
 
-    return (
-        _turn1_fallback_question(topic, missing_items, is_free_topic=is_free_topic),
-        missing_items,
+    return None
+
+
+def _turn1_missing_items(data: dict[str, Any], fallback: list[str]) -> list[str]:
+    raw_items = data.get("missing_items")
+    if isinstance(raw_items, list) and raw_items:
+        return [str(x).strip() for x in raw_items if str(x).strip()]
+    return list(fallback)
+
+
+def is_free_topic_identifiable(
+    initial_prompt: str, files_loaded: list[str], chunks: list[DocumentChunk]
+) -> bool:
+    """Whether a Write Freely session names what the speech is about (no LLM involved)."""
+    if files_loaded or chunks:
+        return True
+    specific_words = sum(
+        word.lower() not in FREE_TOPIC_META_WORDS for word in content_words(initial_prompt)
+    )
+    return specific_words >= FREE_TOPIC_MIN_SPECIFIC_WORDS
+
+
+def build_turn1_decision(
+    *,
+    topic: str,
+    category: str = "",
+    duration_min: int = 5,
+    is_free_topic: bool = False,
+    initial_prompt: str = "",
+    files_loaded: list[str] | None = None,
+    chunks: list[DocumentChunk] | None = None,
+    coverage_ratio: float = 0.0,
+    missing_entities: list[str] | None = None,
+    missing_groups: list[str] | None = None,
+    client: Any | None = None,
+    model_chain: tuple[str, ...] | None = None,
+    limiter: TokenBucketLimiter | None = None,
+) -> Turn1Decision:
+    """Turn 1: reply and decide whether Generate is already allowed, with at most 1 LLM call.
+
+    A template is judged by its slot coverage. Write Freely needs a named topic, then a file,
+    enough words, or the LLM saying the context is sufficient.
+    """
+    files = files_loaded or []
+    if not is_free_topic and check_ready_to_generate(
+        selected_template_id=_ANY_TEMPLATE_ID,
+        missing_entities=missing_entities or [],
+        coverage_ratio=coverage_ratio,
+    ):
+        return Turn1Decision(
+            reply_message=(
+                f"You already shared enough detail on **{topic}** to draft the speech. "
+                "You can generate right now, or add any **extra examples** or "
+                "**tone preferences** first."
+            ),
+            missing_items=[],
+            topic_clear=True,
+            can_generate=True,
+        )
+    if is_free_topic and not is_free_topic_identifiable(initial_prompt, files, chunks or []):
+        return Turn1Decision(
+            reply_message=_TOPIC_QUESTION,
+            missing_items=["speech topic"],
+            topic_clear=False,
+            can_generate=False,
+        )
+
+    missing_items = _derive_missing_items(
+        is_free_topic=is_free_topic,
+        missing_entities=missing_entities,
+        missing_groups=missing_groups,
+        context_text=initial_prompt,
+        files_loaded=files,
+    )
+    user_prompt = _turn1_user_prompt(
+        topic=topic,
+        category=category,
+        duration_min=duration_min,
+        is_free_topic=is_free_topic,
+        initial_prompt=initial_prompt,
+        files_loaded=files,
+        missing_items=missing_items,
+    )
+    if not is_free_topic:
+        reply, items, used_llm = _turn1_question(
+            topic=topic,
+            is_free_topic=False,
+            user_prompt=user_prompt,
+            missing_items=missing_items,
+            client=client,
+            model_chain=model_chain,
+            limiter=limiter,
+        )
+        return Turn1Decision(reply, items, topic_clear=True, can_generate=False, used_llm=used_llm)
+
+    has_material = bool(files or chunks) or (
+        content_word_count(initial_prompt) >= FREE_TOPIC_TURN1_READY_WORDS
+    )
+    data = _request_turn1_json(
+        _TURN1_COACH_PROMPT + (_TURN1_READY_RULES if has_material else _TURN1_JUDGE_RULES),
+        user_prompt,
+        client=client,
+        model_chain=model_chain,
+        limiter=limiter,
+    )
+    if data is None:
+        if has_material:
+            return Turn1Decision(_FREE_READY_REPLY, [], topic_clear=True, can_generate=True)
+        return Turn1Decision(
+            _turn1_fallback_question(topic, missing_items, is_free_topic=True),
+            missing_items,
+            topic_clear=True,
+            can_generate=False,
+        )
+
+    sufficient = data.get("sufficient") is True
+    can_generate = sufficient or has_material
+    nothing_missing = sufficient and data.get("missing_items") == []
+    items = [] if nothing_missing else _turn1_missing_items(data, missing_items)
+    reply = _ensure_bold_keys(str(data["reply_message"]).strip(), items)
+    if can_generate and "generate" not in reply.lower():
+        reply = f"{reply} {_GENERATE_HINT}"
+    return Turn1Decision(
+        reply, items, topic_clear=True, can_generate=can_generate, used_llm=True
     )
 
 
