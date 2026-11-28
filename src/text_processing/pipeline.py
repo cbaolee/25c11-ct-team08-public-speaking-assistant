@@ -63,12 +63,19 @@ _MODERATION_MAX_CHUNKS = int(moderation_max_chunks)
 _AUTO_REGEN_FEEDBACK_PREFIX = "write a fresh variation of this speech"
 
 
+def _normalize_note_key(text: str) -> str:
+    """Normalize a chat note for msg_id lookup and deduplication."""
+    return re.sub(r"\s+", " ", text).strip().lower()
+
+
 def _build_chat_note_chunks(
     notes: list[str],
     start_chunk_id: int = 1,
     min_words: int = 4,
     *,
     retriever: SemanticRetriever | None = None,
+    note_msg_ids: dict[str, str] | None = None,
+    initial_prompt_msg_id: str | None = None,
 ) -> list[DocumentChunk]:
     """Turn citable ``source_material`` user notes into in-memory chunks (``page=0``).
 
@@ -79,17 +86,23 @@ def _build_chat_note_chunks(
     note_chunks: list[DocumentChunk] = []
     seen_notes: set[str] = set()
     note_num = 0
-    for raw_note in notes:
+    for idx, raw_note in enumerate(notes):
         cleaned = sanitize_text(raw_note).strip()
         if not cleaned:
             continue
         source_only = extract_citable_source_text(cleaned, retriever=retriever)
         if not source_only or len(source_only.split()) < min_words:
             continue
-        dedup_key = re.sub(r"\s+", " ", source_only).strip().lower()
+        dedup_key = _normalize_note_key(source_only)
         if dedup_key in seen_notes:
             continue
         seen_notes.add(dedup_key)
+        norm_cleaned = _normalize_note_key(cleaned)
+        matched_msg_id: str | None = None
+        if note_msg_ids:
+            matched_msg_id = note_msg_ids.get(norm_cleaned) or note_msg_ids.get(dedup_key)
+        if matched_msg_id is None and idx == 0 and initial_prompt_msg_id:
+            matched_msg_id = initial_prompt_msg_id
         note_num += 1
         lines = [ln.strip() for ln in source_only.splitlines() if ln.strip()]
         label = f"Chat note #{note_num}"
@@ -104,6 +117,9 @@ def _build_chat_note_chunks(
                     heading=label,
                     page=0,
                     content=part,
+                    source_kind="chat",
+                    source_msg_id=matched_msg_id,
+                    source_file=None,
                 )
             )
     return note_chunks
@@ -223,7 +239,11 @@ class ScriptGenerationPipeline:
         chunks: list[DocumentChunk],
         chat_context: str | None = None,
     ) -> str:
-        chunk_text = "\n".join(f"{c.page}:{c.heading}:{c.content}" for c in chunks)
+        chunk_text = "\n".join(
+            f"{c.page}:{c.heading}:{c.source_kind}:"
+            f"{c.source_msg_id or ''}:{c.source_file or ''}:{c.content}"
+            for c in chunks
+        )
         effective_chat = (
             chat_context if chat_context is not None else (request.chat_context or "")
         ).strip()
@@ -254,6 +274,8 @@ class ScriptGenerationPipeline:
         chunks: list[DocumentChunk] = []
         chat_parts: list[str] = []
         citable_notes: list[str] = []
+        note_msg_ids: dict[str, str] = {}
+        prompt_msg_id_for_chunks: str | None = None
         force_free_topic = False
         sess = None
         pending_feedback_note: str | None = None
@@ -268,6 +290,15 @@ class ScriptGenerationPipeline:
                     if cleaned_prompt:
                         chat_parts.append(cleaned_prompt)
                         citable_notes.append(cleaned_prompt)
+                        sess_prompt_msg_id = getattr(sess, "initial_prompt_msg_id", None)
+                        if sess_prompt_msg_id:
+                            prompt_msg_id_for_chunks = sess_prompt_msg_id
+                            note_msg_ids[_normalize_note_key(cleaned_prompt)] = sess_prompt_msg_id
+                raw_note_msg_ids = getattr(sess, "user_note_msg_ids", None)
+                if isinstance(raw_note_msg_ids, dict):
+                    for norm_k, msg_id_val in raw_note_msg_ids.items():
+                        if norm_k and msg_id_val:
+                            note_msg_ids[norm_k] = msg_id_val
                 # Dual-Track storage separation:
                 # Track 1 (chat_parts -> effective_chat_context): bounded context_window +
                 # compacted_summary for LLM prompting within token limits.
@@ -306,6 +337,8 @@ class ScriptGenerationPipeline:
                 if not chat_parts or chat_parts[-1] != cleaned_fb:
                     chat_parts.append(cleaned_fb)
                     citable_notes.append(cleaned_fb)
+                    if request.feedback_msg_id:
+                        note_msg_ids[_normalize_note_key(cleaned_fb)] = request.feedback_msg_id
                     if sess is not None:
                         pending_feedback_note = cleaned_fb
         if request.chat_context and request.chat_context.strip():
@@ -351,6 +384,8 @@ class ScriptGenerationPipeline:
                 citable_notes,
                 start_chunk_id=len(chunks) + 1,
                 retriever=active_retriever,
+                note_msg_ids=note_msg_ids or None,
+                initial_prompt_msg_id=prompt_msg_id_for_chunks,
             )
             chunks.extend(note_chunks)
 
@@ -373,6 +408,7 @@ class ScriptGenerationPipeline:
                 pending_feedback_note,
                 turn=sess.gather_turns + 1,
                 source="feedback",
+                msg_id=request.feedback_msg_id,
                 client=self._resolve_compaction_client(),
                 limiter=getattr(self.template_engine, "limiter", None),
             )

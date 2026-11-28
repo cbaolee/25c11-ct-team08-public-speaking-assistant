@@ -83,6 +83,9 @@ citation_nli_model = "MoritzLaurer/DeBERTa-v3-xsmall-mnli-fever-anli-ling-binary
 citation_nli_entailment_min = 0.65
 citation_nli_contradiction_max = 0.35
 citation_multihop_min_retrieval_score = 0.35
+# Sentence-level citation excerpt & dedup limits
+citation_max_excerpt_chars = 180
+citation_max_sources_per_sentence = 5
 # Per-turn chat text limit in characters (NFC code points), paired with [web] composer_max_words
 max_turn_text_chars = 18_000
 # Bounded pre-generation chat context window & compaction policy

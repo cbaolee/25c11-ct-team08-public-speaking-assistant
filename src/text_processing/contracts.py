@@ -168,6 +168,19 @@ class ModerationDecision:
 
 
 @dataclass(frozen=True)
+class SentenceCitation:
+    """Verified citation attached to a single sentence inside a script paragraph."""
+
+    sentence_index: int
+    text: str
+    status: CitationStatus
+    sources: list[dict[str, Any]] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ParagraphCitation:
     """Verified citation attached to a script paragraph or filled slot (Brief §5.6)."""
 
@@ -177,6 +190,7 @@ class ParagraphCitation:
     status: CitationStatus
     chunk_id: int | None = None
     sources: list[dict[str, Any]] = field(default_factory=list)
+    sentences: list[SentenceCitation] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -226,6 +240,7 @@ class ScriptGenerationRequest:
     session_id: str | None = None
     user_feedback: str | None = None
     chat_context: str | None = None
+    feedback_msg_id: str | None = None
 
 
 @dataclass
@@ -279,6 +294,7 @@ __all__ = [
     "ScriptGenerationRequest",
     "ScriptJobState",
     "ScriptSource",
+    "SentenceCitation",
     "TARGET_WORD_COUNT_RANGES",
     "TemplateDocument",
     "TemplateSlot",

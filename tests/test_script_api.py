@@ -1044,3 +1044,144 @@ def test_select_topic_unknown_template_404_preserves_session_state(script_api) -
         stored.topic,
     ) == prev_snapshot
     chat_session_store.clear()
+
+
+def test_sanitize_client_msg_id_validation() -> None:
+    assert app_main._sanitize_client_msg_id("msg_1-ABC") == "msg_1-ABC"
+    assert app_main._sanitize_client_msg_id("a" * 64) == "a" * 64
+    assert app_main._sanitize_client_msg_id("") is None
+    assert app_main._sanitize_client_msg_id("   ") is None
+    assert app_main._sanitize_client_msg_id("a" * 65) is None
+    assert app_main._sanitize_client_msg_id("bad msg id") is None
+    assert app_main._sanitize_client_msg_id("../etc/passwd") is None
+    assert app_main._sanitize_client_msg_id("<script>") is None
+
+
+def test_client_msg_id_passthrough_across_all_four_routes(
+    setup_pipeline: tuple[ScriptGenerationPipeline, MagicMock],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pipeline, _ = setup_pipeline
+    pipeline.template_engine.retriever = None
+    monkeypatch.setattr(app_main, "make_groq_client", lambda: None)
+    chat_session_store.clear()
+
+    caller = _user("client-msg-id-user")
+    user_id = str(caller.id)
+    repos = build_memory_repos()
+
+    # 1. POST /api/script-chat/suggest (prompt + file + valid client_msg_id)
+    s_body = _run_coro(
+        app_main.script_chat_suggest_endpoint(
+            user=caller,
+            category="wildlife",
+            duration_min=5,
+            prompt="Coral reefs shelter 25% of marine fish.",
+            file=UploadFile(
+                filename="reef_facts.txt",
+                file=io.BytesIO(b"Coral bleaching increased sharply in 2024."),
+            ),
+            client_msg_id="msg_suggest-1",
+        )
+    )
+    sid = s_body["session_id"]
+    sess = chat_session_store.get(sid, user_id=user_id)
+    assert sess is not None
+    assert sess.initial_prompt_msg_id == "msg_suggest-1"
+    assert len(sess.chunks) == 1
+    assert sess.chunks[0].source_kind == "file"
+    assert sess.chunks[0].source_msg_id == "msg_suggest-1"
+    assert sess.chunks[0].source_file == "reef_facts.txt"
+
+    # 2. POST /api/script-chat/message (message + file + valid client_msg_id)
+    msg_text = "According to NOAA, sea temperatures rose 1.2 degrees Celsius."
+    _run_coro(
+        app_main.script_chat_message_endpoint(
+            user=caller,
+            session_id=sid,
+            message=msg_text,
+            file=UploadFile(
+                filename="noaa_summary.md",
+                file=io.BytesIO(b"Thermal stress events doubled since 2010."),
+            ),
+            client_msg_id="msg_turn-2",
+        )
+    )
+    assert sess.user_note_msg_ids[msg_text.lower()] == "msg_turn-2"
+    assert sess.chunks[1].source_kind == "file"
+    assert sess.chunks[1].source_msg_id == "msg_turn-2"
+    assert sess.chunks[1].source_file == "noaa_summary.md"
+
+    # 3. POST /api/script-chat/message/jobs (invalid client_msg_id -> sanitized to None)
+    job_msg_text = "Palau established marine sanctuaries covering 80% of its waters."
+    bg1 = BackgroundTasks()
+    j_body1 = _run_coro(
+        app_main.create_script_chat_message_job_endpoint(
+            user=caller,
+            background_tasks=bg1,
+            session_id=sid,
+            message=job_msg_text,
+            file=UploadFile(
+                filename="palau.txt",
+                file=io.BytesIO(b"Marine reserves aid reef fish biomass recovery."),
+            ),
+            client_msg_id="invalid/id with spaces!",
+        )
+    )
+    assert j_body1["status"] == "queued"
+    for task in bg1.tasks:
+        task.func(*task.args, **task.kwargs)
+    assert sess.chunks[2].source_kind == "file"
+    assert sess.chunks[2].source_msg_id is None
+    assert sess.chunks[2].source_file == "palau.txt"
+    assert job_msg_text.lower() not in sess.user_note_msg_ids
+
+    # Now with a valid client_msg_id on /message/jobs
+    job_msg_valid = "GBR surveys recorded 36% coral cover in northern sectors."
+    bg2 = BackgroundTasks()
+    j_body2 = _run_coro(
+        app_main.create_script_chat_message_job_endpoint(
+            user=caller,
+            background_tasks=bg2,
+            session_id=sid,
+            message=job_msg_valid,
+            client_msg_id="msg_job-3",
+        )
+    )
+    assert j_body2["status"] == "queued"
+    for task in bg2.tasks:
+        task.func(*task.args, **task.kwargs)
+    assert sess.user_note_msg_ids[job_msg_valid.lower()] == "msg_job-3"
+
+    # 4. POST /api/generate-script passes feedback_msg_id into ScriptGenerationRequest -> pipeline
+    captured_reqs: list[Any] = []
+    orig_run = pipeline.run
+
+    def _spy_run(req: Any, job_id: str | None = None) -> GeneratedScript:
+        captured_reqs.append(req)
+        return orig_run(req, job_id=job_id)
+
+    monkeypatch.setattr(pipeline, "run", _spy_run)
+
+    fb_text = "According to 2025 surveys, artificial reefs boosted fish counts by 40%."
+    bg3 = BackgroundTasks()
+    g_body = _run_coro(
+        app_main.generate_script_endpoint(
+            user=caller,
+            background_tasks=bg3,
+            repos=repos,
+            topic="Coral Reef Resilience",
+            category="free",
+            duration_min=5,
+            session_id=sid,
+            user_feedback=fb_text,
+            client_msg_id="msg_gen-4",
+        )
+    )
+    assert g_body["status"] == "queued"
+    for task in bg3.tasks:
+        task.func(*task.args, **task.kwargs)
+    assert len(captured_reqs) == 1
+    assert captured_reqs[0].feedback_msg_id == "msg_gen-4"
+    assert sess.user_note_msg_ids[fb_text.lower()] == "msg_gen-4"
+    chat_session_store.clear()

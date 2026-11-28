@@ -10,12 +10,15 @@ import zlib
 import numpy as np
 import pytest
 
-from src.text_processing.contracts import DocumentChunk
+from src.text_processing.contracts import DocumentChunk, SentenceCitation
 from src.text_processing.parser import parse_input_to_chunks
 from src.text_processing.retrieval import (
     NLIVerifier,
     SemanticRetriever,
+    _build_source_dict,
+    _extract_best_excerpt,
     _is_verbatim_inline_fact,
+    _split_paragraph_sentences,
     align_script_citations,
     verify_paragraph_citation,
 )
@@ -433,7 +436,24 @@ class TestNLICitationAndMultiHop:
         assert paraphrased.status == "cited"
         assert paraphrased.chunk_id == 2
         assert paraphrased.page == 3
-        assert paraphrased.sources == [{"chunk_id": 2, "heading": "Results", "page": 3}]
+        assert paraphrased.sources == [
+            {
+                "chunk_id": 2,
+                "heading": "Results",
+                "page": 3,
+                "excerpt": (
+                    "Severe decline observed in amphibian populations across tropical regions."
+                ),
+                "source_kind": "file",
+                "source_msg_id": None,
+                "source_file": None,
+            }
+        ]
+        assert len(paraphrased.sentences) == 2
+        assert paraphrased.sentences[0].status == "uncited"
+        assert paraphrased.sentences[0].sources == []
+        assert paraphrased.sentences[1].status == "cited"
+        assert paraphrased.sentences[1].sources == paraphrased.sources
 
         # Contradiction sharing exact lexical words is rejected by NLI
         contradicted = verify_paragraph_citation(
@@ -625,3 +645,322 @@ class TestNLICitationAndMultiHop:
             nli_verifier=fake_nli,
         )
         assert citation.status == "uncited"
+
+
+class TestSentenceLevelCitationsAndExcerpts:
+    """Tests for Contract D: sentence splitting, excerpts, dedup, source caps, and alignment."""
+
+    def test_abbreviation_and_decimal_safe_sentence_splitting(self) -> None:
+        para = (
+            "Good morning, everyone. "
+            "Dr. Smith, Mr. Lee, Mrs. Park, Ms. Tran, and Prof. Wu met in the U.S. "
+            "and U.K. to compare Fig. 2 and No. 5, e.g. 3.5 solar grids vs. 4.2% wind "
+            "gains, i.e. clean power cited by Chen et al. in 2024. "
+            "Thank you for listening!"
+        )
+        sentences = _split_paragraph_sentences(para)
+        assert len(sentences) == 3
+        assert sentences[0] == "Good morning, everyone."
+        assert sentences[1].startswith("Dr. Smith")
+        assert "et al. in 2024." in sentences[1]
+        assert sentences[2] == "Thank you for listening!"
+
+    def test_extract_best_excerpt_overlap_and_word_boundary_truncation(self) -> None:
+        long_second_sentence = (
+            "In 2023 the coastal coral reef survey documented 42 percent bleaching recovery "
+            "across northern marine sanctuaries after strict thermal runoff protections were "
+            "enforced by regional fisheries boards throughout the archipelago."
+        )
+        chunk = DocumentChunk(
+            chunk_id=10,
+            heading="Marine Survey",
+            page=4,
+            content=(
+                "Introduction covers unrelated terrestrial pine forests.\n"
+                f"{long_second_sentence} "
+                "Finally, budget appendices list equipment costs."
+            ),
+            source_kind="file",
+            source_file="marine_report.pdf",
+        )
+        excerpt = _extract_best_excerpt(
+            "The 2023 survey recorded 42 percent coral bleaching recovery.",
+            chunk,
+            max_chars=180,
+        )
+        assert len(excerpt) <= 180
+        assert excerpt.endswith("...")
+        assert excerpt.startswith("In 2023 the coastal coral reef survey documented 42 percent")
+        # Truncated cleanly at a word boundary (no partial word before "...")
+        stem = excerpt[:-3]
+        assert long_second_sentence.startswith(stem)
+        next_char = long_second_sentence[len(stem)]
+        assert next_char.isspace() or next_char in ",.;:"
+
+        src = _build_source_dict(chunk, excerpt)
+        assert src == {
+            "chunk_id": 10,
+            "heading": "Marine Survey",
+            "page": 4,
+            "excerpt": excerpt,
+            "source_kind": "file",
+            "source_msg_id": None,
+            "source_file": "marine_report.pdf",
+        }
+
+    def test_three_sentence_paragraph_per_sentence_sources_sorted_nli(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Report Alpha",
+                page=2,
+                content=(
+                    "Solar capacity expanded rapidly. "
+                    "Solar microgrids cut rural outages by 45% in 2023."
+                ),
+                source_kind="file",
+                source_file="energy.pdf",
+            ),
+            DocumentChunk(
+                chunk_id=2,
+                heading="Chat note #1",
+                page=0,
+                content="Solar microgrids reduced rural outages by 45% in 2023 field trials.",
+                source_kind="chat",
+                source_msg_id="msg-101",
+            ),
+            DocumentChunk(
+                chunk_id=3,
+                heading="Storage Appendix",
+                page=6,
+                content="Lithium-iron batteries store excess solar energy for 12 hours.",
+                source_kind="file",
+                source_file="storage.pdf",
+            ),
+        ]
+
+        def _scorer(premise: str, hypothesis: str) -> float:
+            if "Good morning" in hypothesis:
+                return 0.02
+            if "outages by 45%" in hypothesis:
+                if "Chat note #1" in premise:
+                    return 0.95  # Higher score -> must sort first
+                if "Report Alpha" in premise:
+                    return 0.82
+            if "12 hours" in hypothesis and "Storage Appendix" in premise:
+                return 0.90
+            return 0.04
+
+        fake_nli = NLIVerifier("mock-3sent")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        para = (
+            "Good morning, everyone. "
+            "Solar microgrids cut rural outages by 45% in 2023. "
+            "Lithium-iron batteries store excess solar energy for 12 hours."
+        )
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1, 2, 3],
+            retrieved_chunks=chunks,
+            paragraph_text=para,
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "cited"
+        assert len(citation.sentences) == 3
+
+        s0, s1, s2 = citation.sentences
+        assert isinstance(s0, SentenceCitation)
+        assert s0.sentence_index == 0
+        assert s0.text == "Good morning, everyone."
+        assert s0.status == "uncited"
+        assert s0.sources == []
+
+        assert s1.sentence_index == 1
+        assert s1.status == "cited"
+        assert len(s1.sources) == 2
+        # Sorted by score descending: chunk 2 (0.95) before chunk 1 (0.82)
+        assert [s["chunk_id"] for s in s1.sources] == [2, 1]
+        assert s1.sources[0]["source_kind"] == "chat"
+        assert s1.sources[0]["source_msg_id"] == "msg-101"
+        assert s1.sources[0]["page"] is None
+        assert s1.sources[1]["source_file"] == "energy.pdf"
+        assert all(len(s["excerpt"]) <= 180 and s["excerpt"] for s in s1.sources)
+        assert "45%" in s1.sources[1]["excerpt"]
+
+        assert s2.sentence_index == 2
+        assert s2.status == "cited"
+        assert [s["chunk_id"] for s in s2.sources] == [3]
+        assert s2.sources[0]["source_file"] == "storage.pdf"
+
+        # align_script_citations also preserves sentence-level citations and excerpts
+        aligned = align_script_citations(para, chunks, [citation], nli_verifier=fake_nli)
+        assert len(aligned) == 1
+        assert len(aligned[0].sentences) == 3
+        assert aligned[0].sentences[0].status == "uncited"
+        assert [s["chunk_id"] for s in aligned[0].sentences[1].sources] == [2, 1]
+        assert [s["chunk_id"] for s in aligned[0].sentences[2].sources] == [3]
+
+    def test_three_sentence_paragraph_fallback_mode(self) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=1,
+                heading="Survey A",
+                page=1,
+                content="Solar microgrids cut rural outages by 45 percent across island villages.",
+                source_kind="file",
+                source_file="a.pdf",
+            ),
+            DocumentChunk(
+                chunk_id=2,
+                heading="Survey B",
+                page=2,
+                content="Solar microgrids reduced rural outages in island villages during 2023.",
+                source_kind="file",
+                source_file="b.pdf",
+            ),
+            DocumentChunk(
+                chunk_id=3,
+                heading="Battery C",
+                page=3,
+                content="Lithium iron phosphate batteries store surplus solar power overnight.",
+                source_kind="file",
+                source_file="c.pdf",
+            ),
+        ]
+        para = (
+            "Good morning, everyone. "
+            "Solar microgrids cut rural outages by 45 percent across island villages. "
+            "Lithium iron phosphate batteries store surplus solar power overnight."
+        )
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1, 2, 3],
+            retrieved_chunks=chunks,
+            paragraph_text=para,
+            min_support_score=0.52,
+        )
+        assert citation.status == "cited"
+        assert len(citation.sentences) == 3
+        assert citation.sentences[0].status == "uncited"
+        assert citation.sentences[0].sources == []
+        assert citation.sentences[1].status == "cited"
+        assert {s["chunk_id"] for s in citation.sentences[1].sources} == {1, 2}
+        assert citation.sentences[2].status == "cited"
+        assert [s["chunk_id"] for s in citation.sentences[2].sources] == [3]
+
+    def test_deduplicates_subchunks_with_same_provenance_key(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=10,
+                heading="Energy Policy",
+                page=3,
+                content="Sub-chunk one mentions solar targets in general terms.",
+                source_kind="file",
+                source_file="policy.pdf",
+            ),
+            DocumentChunk(
+                chunk_id=11,
+                heading="Energy Policy",
+                page=3,
+                content="Sub-chunk two specifies solar targets reached 60 gigawatts in 2024.",
+                source_kind="file",
+                source_file="policy.pdf",
+            ),
+            # Distinct chat message ID must NOT be collapsed with chunk 12
+            DocumentChunk(
+                chunk_id=12,
+                heading="Chat note",
+                page=0,
+                content="Solar targets reached 60 gigawatts in 2024 according to grid data.",
+                source_kind="chat",
+                source_msg_id="msg-a",
+            ),
+            DocumentChunk(
+                chunk_id=13,
+                heading="Chat note",
+                page=0,
+                content="Grid data confirmed solar targets reached 60 gigawatts in 2024.",
+                source_kind="chat",
+                source_msg_id="msg-b",
+            ),
+        ]
+
+        def _scorer(premise: str, _hypothesis: str) -> float:
+            if "Sub-chunk two" in premise:
+                return 0.93
+            if "Sub-chunk one" in premise:
+                return 0.78
+            if "Grid data confirmed" in premise:
+                return 0.85
+            if "according to grid data" in premise:
+                return 0.80
+            return 0.1
+
+        fake_nli = NLIVerifier("mock-dedup")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[10, 11, 12, 13],
+            retrieved_chunks=chunks,
+            paragraph_text="Solar targets reached 60 gigawatts in 2024.",
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "cited"
+        assert len(citation.sentences) == 1
+        sent_sources = citation.sentences[0].sources
+        # Sub-chunks 10 and 11 share (file, None, "Energy Policy", 3) -> keep higher-scoring 11 only
+        assert [s["chunk_id"] for s in sent_sources] == [11, 13, 12]
+        assert "60 gigawatts" in sent_sources[0]["excerpt"]
+
+    def test_caps_sources_per_sentence_at_five(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        chunks = [
+            DocumentChunk(
+                chunk_id=i,
+                heading=f"Section {i}",
+                page=i,
+                content=f"Ocean temperatures rose 1.2 degrees in decade {i}.",
+                source_kind="file",
+                source_file=f"doc_{i}.pdf",
+            )
+            for i in range(1, 8)
+        ]
+
+        def _scorer(premise: str, _hypothesis: str) -> float:
+            for i in range(1, 8):
+                if f"Section {i}:" in premise:
+                    return 0.70 + 0.03 * i
+            return 0.05
+
+        fake_nli = NLIVerifier("mock-cap5")
+        monkeypatch.setattr(
+            NLIVerifier,
+            "get_model",
+            classmethod(lambda cls, name=None: _FakeBinaryNLIModel(_scorer)),
+        )
+
+        citation = verify_paragraph_citation(
+            paragraph_index=1,
+            reported_chunk_ids=[1, 2, 3, 4, 5, 6, 7],
+            retrieved_chunks=chunks,
+            paragraph_text="Ocean temperatures rose 1.2 degrees across recorded decades.",
+            nli_verifier=fake_nli,
+        )
+        assert citation.status == "cited"
+        assert len(citation.sentences) == 1
+        sent_sources = citation.sentences[0].sources
+        assert len(sent_sources) == 5
+        assert [s["chunk_id"] for s in sent_sources] == [7, 6, 5, 4, 3]

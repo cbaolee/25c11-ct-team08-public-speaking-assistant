@@ -7,7 +7,7 @@ import warnings
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from src.app.config import (
     composer_max_words,
@@ -75,6 +75,9 @@ class DocumentChunk:
     heading: str
     page: int
     content: str
+    source_kind: Literal["file", "chat"] = "file"
+    source_msg_id: str | None = None
+    source_file: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

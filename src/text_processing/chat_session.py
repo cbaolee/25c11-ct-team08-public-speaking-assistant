@@ -342,6 +342,8 @@ class ChatSessionState:
     missing_groups: list[str] = field(default_factory=list)
     ready_to_generate: bool = False
     last_active_at: float = field(default_factory=time.time)
+    initial_prompt_msg_id: str | None = None
+    user_note_msg_ids: dict[str, str] = field(default_factory=dict)
 
     def touch(self) -> None:
         """Update last active timestamp for sliding TTL."""
@@ -692,6 +694,7 @@ def append_to_context_window(
     *,
     turn: int,
     source: Literal["prompt", "chat", "feedback", "file_summary"] = "chat",
+    msg_id: str | None = None,
     moderator: Any | None = None,
     client: Any | None = None,
     compaction_model: str | None = None,
@@ -738,6 +741,10 @@ def append_to_context_window(
     if source in ("chat", "feedback"):
         if not session.user_notes or session.user_notes[-1] != cleaned:
             session.user_notes.append(cleaned)
+        if msg_id:
+            norm_key = re.sub(r"\s+", " ", cleaned).strip().lower()
+            if norm_key:
+                session.user_note_msg_ids[norm_key] = msg_id
 
     session.context_window.append(entry)
 
