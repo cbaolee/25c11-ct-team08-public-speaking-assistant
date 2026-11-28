@@ -1082,16 +1082,17 @@ def verify_paragraph_citation(
                     )
                 )
         para_sources = _build_paragraph_sources_from_sentences(sent_entries)
-        primary = para_sources[0]
-        return ParagraphCitation(
-            paragraph=paragraph_index,
-            heading=primary["heading"],
-            page=primary["page"],
-            status="cited",
-            chunk_id=primary["chunk_id"],
-            sources=para_sources,
-            sentences=sentence_citations,
-        )
+        if para_sources:
+            primary = para_sources[0]
+            return ParagraphCitation(
+                paragraph=paragraph_index,
+                heading=primary["heading"],
+                page=primary["page"],
+                status="cited",
+                chunk_id=primary["chunk_id"],
+                sources=para_sources,
+                sentences=sentence_citations,
+            )
 
     active_retriever = retriever or SemanticRetriever()
     active_nli = nli_verifier or NLIVerifier()

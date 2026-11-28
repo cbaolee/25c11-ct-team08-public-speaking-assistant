@@ -30,9 +30,21 @@ def sanitize_text(raw_text: str) -> str:
 
 
 def sanitize_chunks(chunks: list[DocumentChunk]) -> list[DocumentChunk]:
-    """Sanitize all chunks and drop empty ones."""
-    return [
-        DocumentChunk(c.chunk_id, sanitize_text(c.heading), c.page, sanitize_text(c.content))
-        for c in chunks
-        if sanitize_text(c.content)
-    ]
+    """Sanitize all chunks, preserving provenance metadata and dropping empty ones."""
+    result: list[DocumentChunk] = []
+    for c in chunks:
+        cleaned_content = sanitize_text(c.content)
+        if not cleaned_content:
+            continue
+        result.append(
+            DocumentChunk(
+                chunk_id=c.chunk_id,
+                heading=sanitize_text(c.heading),
+                page=c.page,
+                content=cleaned_content,
+                source_kind=getattr(c, "source_kind", "file"),
+                source_msg_id=getattr(c, "source_msg_id", None),
+                source_file=getattr(c, "source_file", None),
+            )
+        )
+    return result

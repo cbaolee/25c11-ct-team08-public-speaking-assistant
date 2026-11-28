@@ -964,3 +964,35 @@ class TestSentenceLevelCitationsAndExcerpts:
         sent_sources = citation.sentences[0].sources
         assert len(sent_sources) == 5
         assert [s["chunk_id"] for s in sent_sources] == [7, 6, 5, 4, 3]
+
+
+def test_sanitize_chunks_preserves_provenance_metadata() -> None:
+    from src.text_processing.sanitizer import sanitize_chunks
+
+    chunks = [
+        DocumentChunk(
+            chunk_id=1,
+            heading="Survey\u200b Notes",
+            page=2,
+            content="Coral cover rose\xa042 percent.",
+            source_kind="file",
+            source_msg_id="msg_file_1",
+            source_file="survey.pdf",
+        ),
+        DocumentChunk(
+            chunk_id=2,
+            heading="Chat note #1",
+            page=0,
+            content="   ",
+            source_kind="chat",
+            source_msg_id="msg_empty",
+            source_file=None,
+        ),
+    ]
+    cleaned = sanitize_chunks(chunks)
+    assert len(cleaned) == 1
+    assert cleaned[0].heading == "Survey Notes"
+    assert cleaned[0].content == "Coral cover rose 42 percent."
+    assert cleaned[0].source_kind == "file"
+    assert cleaned[0].source_msg_id == "msg_file_1"
+    assert cleaned[0].source_file == "survey.pdf"
