@@ -26,6 +26,8 @@ SLUGS = list(CATEGORY_SLUG_MAP)
 DIM = len(SLUGS) + 1  # one axis per category and one unrelated axis
 MODEL = "test/compaction-model"
 SECRET = "zebrafish confidential notes about eight different private things today"
+# Gray zone for `wildlife`: low selected score, other category too weak to block, wide margin
+GRAY = {"wildlife": 0.10, "sports": 0.40}
 
 
 def _vector(**weights: float) -> np.ndarray:
@@ -113,8 +115,7 @@ def _groq(content: str) -> MagicMock:
 
 def _gray(client: Any, **kwargs: Any):
     """Wildlife selected, sports closer, but not clearly enough for layer 1 to block."""
-    vector = _vector(wildlife=0.10, sports=0.60)
-    return _check("wildlife", vector=vector, client=client, model=MODEL, **kwargs)
+    return _check("wildlife", vector=_vector(**GRAY), client=client, model=MODEL, **kwargs)
 
 
 # ---------- constants, prototypes, slugs ----------
@@ -349,14 +350,16 @@ def test_interdisciplinary_material_passes_on_its_best_passage(selected, other) 
 @pytest.mark.parametrize(
     ("selected", "other", "allowed", "reason"),
     [
-        (0.12, 0.90, True, "safe"),  # selected at the safe floor
-        (0.119, 0.90, True, "gray_allowed"),
+        (0.20, 0.90, True, "safe"),  # selected at the safe floor
+        (0.199, 0.90, False, "mismatch"),  # just below the safe floor and the block ceiling
         (0.0, 0.349, True, "safe"),  # other below the safe ceiling
         (0.0, 0.35, True, "gray_allowed"),
-        (0.20, 0.90, True, "safe"),  # selected above the safe floor whatever the margin
-        (0.079, 0.42, False, "mismatch"),
-        (0.08, 0.42, True, "gray_allowed"),  # selected at the block ceiling
-        (0.079, 0.419, True, "gray_allowed"),  # other below the block floor
+        (0.30, 0.90, True, "safe"),  # selected above the safe floor whatever the margin
+        (0.199, 0.42, False, "mismatch"),  # other at the block floor
+        (0.199, 0.419, True, "gray_allowed"),  # other below the block floor
+        (0.20, 0.42, True, "safe"),  # selected at the block ceiling
+        (0.18, 0.379, True, "safe"),  # margin just below its limit, no other safe rule applies
+        (0.18, 0.381, True, "gray_allowed"),  # margin just above its limit
     ],
 )
 def test_zone_borders(selected: float, other: float, allowed: bool, reason: str) -> None:
@@ -371,7 +374,7 @@ def test_zone_borders(selected: float, other: float, allowed: bool, reason: str)
 
 @pytest.mark.parametrize(("margin", "safe"), [(0.199, True), (0.20, False)])
 def test_margin_border(monkeypatch, margin: float, safe: bool) -> None:
-    # With the shipped values the margin rule never decides alone, so lower another threshold.
+    # A zero selected score makes the margin exact in floating point, so lower the other ceiling.
     monkeypatch.setattr(category_guard, "_SAFE_OTHER_MAX", 0.0)
     result = _check(
         "wildlife",
@@ -380,6 +383,19 @@ def test_margin_border(monkeypatch, margin: float, safe: bool) -> None:
         allow_llm=False,
     )
     assert result.reason == ("safe" if safe else "gray_allowed")
+
+
+@pytest.mark.parametrize(("selected", "reason"), [(0.199, "mismatch"), (0.20, "gray_allowed")])
+def test_block_ceiling_border(monkeypatch, selected: float, reason: str) -> None:
+    # With the shipped values the safe floor equals the block ceiling and hides it, so raise it.
+    monkeypatch.setattr(category_guard, "_SAFE_SELECTED_MIN", 1.0)
+    result = _check(
+        "wildlife",
+        vector=_vector(wildlife=selected, sports=0.90),
+        segments={SECRET[:20]: _vector(wildlife=selected)},
+        allow_llm=False,
+    )
+    assert result.reason == reason
 
 
 def test_only_the_start_of_the_text_is_compared_with_other_categories() -> None:
@@ -468,8 +484,8 @@ def test_llm_text_is_cut_and_cannot_close_the_wrapper() -> None:
     _check(
         "wildlife",
         text,
-        vector=_vector(wildlife=0.10, sports=0.60),
-        segments={"x": _vector(wildlife=0.10)},
+        vector=_vector(**GRAY),
+        segments={"x": _vector(wildlife=GRAY["wildlife"])},
         client=client,
         model=MODEL,
     )
@@ -538,9 +554,7 @@ def test_llm_call_uses_the_shared_budget() -> None:
 
 @pytest.mark.parametrize(("client", "model"), [(None, MODEL), (MagicMock(), None)])
 def test_missing_llm_setup_fails_open(client, model) -> None:
-    result = _check(
-        "wildlife", vector=_vector(wildlife=0.10, sports=0.60), client=client, model=model
-    )
+    result = _check("wildlife", vector=_vector(**GRAY), client=client, model=model)
     assert (result.allowed, result.layer) == (True, "fail_open")
 
 
@@ -566,7 +580,7 @@ def test_logs_never_carry_user_text_or_llm_output(content: str, caplog) -> None:
     caplog.set_level(logging.DEBUG, logger=category_guard.__name__)
     _gray(_groq(content))
     assert "selected=wildlife" in caplog.text
-    assert "selected_score=0.1 other=sports other_score=0.6" in caplog.text
+    assert "selected_score=0.1 other=sports other_score=0.4" in caplog.text
     assert "zebrafish" not in caplog.text
 
 

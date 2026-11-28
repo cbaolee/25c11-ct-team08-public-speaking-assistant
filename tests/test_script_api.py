@@ -1317,7 +1317,7 @@ class _KeywordModel:
         if "marathon" in text.lower():
             vector[slugs.index("sports")] = 1.0
         elif "stadium" in text.lower():
-            vector[slugs.index("sports")] = 0.6
+            vector[slugs.index("sports")] = 0.4
             vector[slugs.index("wildlife")] = 0.1
         else:
             vector[-1] = 1.0
