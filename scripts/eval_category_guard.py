@@ -1,8 +1,9 @@
 """Evaluate layer 1 of the category guard offline, with the real embedding model.
 
 Runs ``check_category_alignment`` with ``allow_llm=False`` and no client on the labelled cases of
-``tests/fixtures/category_guard_eval_set.json`` and prints the measured scores. The cases are
-AI-drafted and not yet reviewed by a human. Thresholds are only read, never changed.
+``tests/fixtures/category_guard_eval_set.json``, and on its ``no_topic`` prompts under every
+category, then prints the measured scores. The cases are AI-drafted and not yet reviewed by a
+human. Thresholds are only read, never changed.
 
 Usage:
     HF_HUB_OFFLINE=1 uv run python scripts/eval_category_guard.py [--json PATH]
@@ -34,7 +35,6 @@ from src.text_processing.category_guard import (  # noqa: E402
 from src.text_processing.contracts import CATEGORY_SLUG_MAP  # noqa: E402
 from src.text_processing.parser import DocumentChunk  # noqa: E402
 from src.text_processing.retrieval import SemanticRetriever  # noqa: E402
-from src.text_processing.template_store import TemplateStore  # noqa: E402
 
 EVAL_FILE = REPO_ROOT / "tests" / "fixtures" / "category_guard_eval_set.json"
 
@@ -46,6 +46,7 @@ BLOCK_OTHER_MIN = float(_CONFIG["category_guard_block_other_min"])
 ZONES = ("block", "gray", "safe", "skipped")
 KINDS = ("on_topic", "interdisciplinary", "mismatch")
 MUST_PASS_KINDS = ("on_topic", "interdisciplinary")
+NO_TOPIC_KIND = "no_topic"
 _ZONE_BY_REASON = {"safe": "safe", "mismatch": "block", "gray_allowed": "gray"}
 _CLOSEST_SHOWN = 5
 
@@ -73,10 +74,9 @@ class CaseResult:
 
 @dataclass(frozen=True)
 class Report:
-    """All case results plus the prototype sizes and the first prototype encode time."""
+    """All case results plus the prototype counts and the first prototype encode time."""
 
     results: list[CaseResult]
-    prototype_titles: dict[str, int]
     prototype_texts: dict[str, int]
     prototype_encode_s: float
 
@@ -84,6 +84,22 @@ class Report:
 def load_cases(path: Path = EVAL_FILE) -> list[dict[str, Any]]:
     """The labelled cases of the evaluation set."""
     return json.loads(path.read_text(encoding="utf-8"))["cases"]
+
+
+def load_no_topic_cases(path: Path = EVAL_FILE) -> list[dict[str, Any]]:
+    """Every prompt without a topic, once under each category; none of them may be blocked."""
+    prompts = json.loads(path.read_text(encoding="utf-8"))["no_topic"]["prompts"]
+    return [
+        {
+            "id": f"{item['id']}-{slug[:4]}",
+            "selected": slug,
+            "kind": NO_TOPIC_KIND,
+            "prompt": item["prompt"],
+            "chunks": [],
+        }
+        for item in prompts
+        for slug in CATEGORY_SLUG_MAP
+    ]
 
 
 def build_guard_inputs(prompt: str, chunk_texts: Sequence[str]) -> tuple[list[str], str]:
@@ -113,9 +129,7 @@ def zone_of(result: CategoryCheckResult) -> str:
     )
 
 
-def evaluate_case(
-    case: dict[str, Any], retriever: SemanticRetriever, store: TemplateStore
-) -> CaseResult:
+def evaluate_case(case: dict[str, Any], retriever: SemanticRetriever) -> CaseResult:
     """Run the guard on one case without any LLM."""
     segments, whole_text = build_guard_inputs(case["prompt"], case["chunks"])
     result = check_category_alignment(
@@ -123,7 +137,6 @@ def evaluate_case(
         segments=segments,
         whole_text=whole_text,
         retriever=retriever,
-        template_store=store,
         client=None,
         allow_llm=False,
     )
@@ -145,27 +158,20 @@ def evaluate_case(
 
 
 def run_evaluation(cases: list[dict[str, Any]]) -> Report:
-    """Load the real model and templates, time the prototype encoding, then score every case."""
+    """Load the real model, time the prototype encoding, then score every case."""
     retriever = SemanticRetriever()
     model = category_guard._usable_model(retriever)
     if model is None:
         raise ModelUnavailableError("model not available")
-    store = TemplateStore()
-    store.load()
-    texts = {slug: category_guard._prototype_texts(slug, store) for slug in CATEGORY_SLUG_MAP}
-    titles = {
-        slug: len(items) - len(category_guard._HANDWRITTEN[slug]) for slug, items in texts.items()
-    }
     try:
         started = time.perf_counter()
-        category_guard._prototype_matrices(retriever, model, store)
+        matrices = category_guard._prototype_matrices(retriever, model)
         encode_s = time.perf_counter() - started
     except Exception as exc:
         raise ModelUnavailableError(f"model not available: {type(exc).__name__}") from exc
     return Report(
-        results=[evaluate_case(case, retriever, store) for case in cases],
-        prototype_titles=titles,
-        prototype_texts={slug: len(items) for slug, items in texts.items()},
+        results=[evaluate_case(case, retriever) for case in cases],
+        prototype_texts={slug: len(matrix) for slug, matrix in matrices.items()},
         prototype_encode_s=encode_s,
     )
 
@@ -194,6 +200,12 @@ def _zone_counts(results: list[CaseResult]) -> str:
     return " | ".join(f"{zone}={counts[zone]}" for zone in ZONES)
 
 
+def _no_topic_summary(results: list[CaseResult]) -> str:
+    group = [r for r in results if r.kind == NO_TOPIC_KIND]
+    blocked = sum(1 for r in group if r.zone == "block")
+    return f"no_topic: blocked {blocked}/{len(group)} ({_zone_counts(group)})"
+
+
 def _summary(results: list[CaseResult]) -> list[str]:
     mismatches = [r for r in results if r.kind == "mismatch"]
     blocked = [r for r in mismatches if r.zone == "block"]
@@ -220,13 +232,14 @@ def _summary(results: list[CaseResult]) -> list[str]:
             f"best_other={r.best_other_category}:{r.best_other_score:.4f} zone={r.zone}"
             for r in closest[:_CLOSEST_SHOWN]
         )
+    lines.append(_no_topic_summary(results))
     return lines
 
 
 def format_report(report: Report) -> str:
-    """Per-case table, zone summary, prototype sizes and the measured encode time."""
+    """Per-case table, zone summary, prototype counts and the measured encode time."""
     lines = [
-        f"Category guard layer 1, N={len(report.results)} cases, allow_llm=False",
+        f"Category guard layer 1, N={len(report.results)} scored rows, allow_llm=False",
         "Cases: AI-drafted, not yet reviewed by a human.",
         f"Block thresholds: selected_score < {BLOCK_SELECTED_MAX} and "
         f"best_other_score >= {BLOCK_OTHER_MIN}",
@@ -235,11 +248,8 @@ def format_report(report: Report) -> str:
         "",
         *_summary(report.results),
         "",
-        "Prototypes per category (template titles / all prototype texts):",
-        *(
-            f"  {slug:<22} {report.prototype_titles[slug]:>3} / {report.prototype_texts[slug]}"
-            for slug in report.prototype_titles
-        ),
+        "Prototype sentences per category:",
+        *(f"  {slug:<22} {count:>3}" for slug, count in report.prototype_texts.items()),
         f"First prototype encode time: {report.prototype_encode_s:.3f} s",
     ]
     return "\n".join(lines)
@@ -251,7 +261,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--json", type=Path, help="also write the results to this file")
     args = parser.parse_args(argv)
     try:
-        report = run_evaluation(load_cases())
+        report = run_evaluation(load_cases() + load_no_topic_cases())
     except ModelUnavailableError as exc:
         print(exc, file=sys.stderr)
         return 2

@@ -141,7 +141,7 @@ def _warmup_script_pipeline() -> None:
         retriever = getattr(pipeline.template_engine, "retriever", None)
         if retriever is not None:
             retriever.get_model()
-            warm_category_prototypes(retriever, pipeline.template_store)
+            warm_category_prototypes(retriever)
     except Exception:
         logger.debug("Background script pipeline warm-up skipped.", exc_info=True)
 

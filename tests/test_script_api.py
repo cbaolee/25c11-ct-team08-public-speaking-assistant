@@ -1331,9 +1331,7 @@ class _KeywordModel:
     def _vector(text: str) -> np.ndarray:
         slugs = list(category_guard.CATEGORY_SLUG_MAP)
         vector = np.zeros(len(slugs) + 1)
-        prototypes = dict(category_guard._HANDWRITTEN)
-        prototypes["wildlife"] += ("Keystone Species Conservation",)  # the one template title
-        for slug, sentences in prototypes.items():
+        for slug, sentences in category_guard._HANDWRITTEN.items():
             if text in sentences:
                 vector[slugs.index(slug)] = 1.0
                 return vector

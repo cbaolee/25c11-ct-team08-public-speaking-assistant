@@ -144,7 +144,6 @@ def _assert_category(
         whole_text="\n".join(text for text in (prompt, *(c.content for c in chunks)) if text),
         has_template_match=has_template_match,
         retriever=getattr(pipeline.template_engine, "retriever", None),
-        template_store=pipeline.template_store,
         client=client,
         model=settings.groq_compaction_model,
         limiter=limiter,

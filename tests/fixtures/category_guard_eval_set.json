@@ -494,5 +494,20 @@
       "chunks": [],
       "expected_category": "gender_studies"
     }
-  ]
+  ],
+  "no_topic": {
+    "description": "Prompts without any topic (kind no_topic). AI-drafted, not yet reviewed by a human; nt-01 and nt-02 were found by a reviewer. Each prompt is scored under every category and must not be blocked.",
+    "prompts": [
+      {"id": "nt-01", "prompt": "Please help me prepare a presentation for my teacher and my classmates."},
+      {"id": "nt-02", "prompt": "Write a speech that I can give in front of students tomorrow morning."},
+      {"id": "nt-03", "prompt": "Can you help me write something to present at my class next week?"},
+      {"id": "nt-04", "prompt": "I need a five minute talk and I do not know where to start yet."},
+      {"id": "nt-05", "prompt": "Please write a short speech for me to read at our meeting on Friday."},
+      {"id": "nt-06", "prompt": "Help me make a good presentation that sounds confident and natural please."},
+      {"id": "nt-07", "prompt": "Make the introduction shorter and add a question for the audience."},
+      {"id": "nt-08", "prompt": "Use simple words and a friendly tone because my listeners are beginners."},
+      {"id": "nt-09", "prompt": "I would like a speech with a strong opening and a clear conclusion."},
+      {"id": "nt-10", "prompt": "My professor asked us to speak for ten minutes in front of everyone."}
+    ]
+  }
 }

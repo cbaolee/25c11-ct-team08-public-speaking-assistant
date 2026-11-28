@@ -23,6 +23,7 @@ SHORT_CASE_IDS = {"inter-wild-short"}
 SHORT_PROMPT = "AI drones protecting endangered elephants"
 
 CASES = evaluator.load_cases()
+NO_TOPIC_CASES = evaluator.load_no_topic_cases()
 
 
 def _of_kind(kind: str) -> list[dict[str, Any]]:
@@ -95,6 +96,19 @@ def test_some_cases_carry_file_chunks() -> None:
     assert {case["kind"] for case in CASES if case["chunks"]} == set(evaluator.KINDS)
 
 
+def test_each_no_topic_prompt_is_scored_under_every_category() -> None:
+    prompts = Counter(case["prompt"] for case in NO_TOPIC_CASES)
+    assert len(NO_TOPIC_CASES) == 60
+    assert len({case["id"] for case in NO_TOPIC_CASES}) == 60
+    assert len(prompts) == 10 and set(prompts.values()) == {len(CATEGORY_SLUG_MAP)}
+    assert {(case["prompt"], case["selected"]) for case in NO_TOPIC_CASES} == {
+        (prompt, slug) for prompt in prompts for slug in CATEGORY_SLUG_MAP
+    }
+    for case in NO_TOPIC_CASES:
+        assert (case["kind"], case["chunks"]) == (evaluator.NO_TOPIC_KIND, [])
+        assert content_word_count(case["prompt"]) >= MIN_WORDS, case["id"]
+
+
 # ---------- the script itself (no model) ----------
 
 
@@ -109,7 +123,7 @@ def test_guard_inputs_match_the_route_guard(monkeypatch: pytest.MonkeyPatch) -> 
     prompt = "First sentence. Second one!\r\nThird line"
     texts = [f"Chunk {index}. With two sentences." for index in range(30)]
     chunks = [DocumentChunk(index, "Notes", 1, text) for index, text in enumerate(texts, 1)]
-    pipeline = type("Pipeline", (), {"template_engine": None, "template_store": None})()
+    pipeline = type("Pipeline", (), {"template_engine": None})()
 
     script_guards._assert_category(pipeline, "sports", prompt, chunks)
 
@@ -122,6 +136,26 @@ def test_distance_to_block_is_zero_only_when_both_thresholds_are_reached() -> No
     assert evaluator.distance_to_block(low + 0.10, high + 0.01) == pytest.approx(0.10)
     assert evaluator.distance_to_block(low - 0.01, high - 0.20) == pytest.approx(0.20)
     assert evaluator.distance_to_block(low + 0.10, high - 0.20) == pytest.approx(0.20)
+
+
+def test_summary_counts_the_blocked_no_topic_rows() -> None:
+    def row(zone: str) -> evaluator.CaseResult:
+        scores = {"selected_score": 0.1, "best_other_score": 0.5, "margin": 0.4, "distance": 0.0}
+        return evaluator.CaseResult(
+            id=zone,
+            kind=evaluator.NO_TOPIC_KIND,
+            selected="sports",
+            expected_category=None,
+            best_other_category="wildlife",
+            zone=zone,
+            suggested_category=None,
+            **scores,
+        )
+
+    lines = evaluator._summary([row("block"), row("safe")])
+
+    assert lines[-1] == "no_topic: blocked 1/2 (block=1 | gray=0 | safe=1 | skipped=0)"
+    assert not any("smallest d" in line for line in lines)
 
 
 def test_a_fail_open_result_has_no_zone() -> None:
@@ -152,7 +186,7 @@ def test_main_prints_no_numbers_without_a_model(
 @pytest.fixture(scope="module")
 def real_report() -> evaluator.Report:
     try:
-        return evaluator.run_evaluation(CASES)
+        return evaluator.run_evaluation(CASES + NO_TOPIC_CASES)
     except evaluator.ModelUnavailableError as exc:
         pytest.skip(str(exc))
 
@@ -172,6 +206,14 @@ def test_no_legitimate_case_is_blocked(real_report: evaluator.Report) -> None:
         for r in real_report.results
         if r.kind in evaluator.MUST_PASS_KINDS and r.zone == "block"
     ]
+    assert not blocked, "\n".join(_describe(blocked))
+
+
+@pytest.mark.integration
+def test_no_prompt_without_a_topic_is_blocked(real_report: evaluator.Report) -> None:
+    rows = [r for r in real_report.results if r.kind == evaluator.NO_TOPIC_KIND]
+    assert len(rows) == len(NO_TOPIC_CASES)
+    blocked = [r for r in rows if r.zone == "block"]
     assert not blocked, "\n".join(_describe(blocked))
 
 

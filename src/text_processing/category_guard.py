@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
     from .parser import DocumentChunk
     from .retrieval import SemanticRetriever
-    from .template_store import TemplateStore
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,6 @@ _BLOCK_SELECTED_MAX = float(_CONFIG["category_guard_block_selected_max"])
 _BLOCK_OTHER_MIN = float(_CONFIG["category_guard_block_other_min"])
 _MAX_CHARS = int(_CONFIG["category_guard_max_chars"])
 _LLM_MAX_TOKENS = int(_CONFIG["category_guard_llm_max_tokens"])
-_MAX_TITLES = int(_CONFIG["category_guard_max_titles_per_category"])
 
 _CHARS_PER_TOKEN = 3.5  # same token estimate as the pre-generation Q&A calls
 _SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
@@ -197,20 +195,9 @@ def split_segments(prompt: str, chunks: list[DocumentChunk], *, max_segments: in
     return _spread(sentences, prompt_places) + _spread(contents, max_segments - prompt_places)
 
 
-def _prototype_texts(slug: str, template_store: TemplateStore) -> list[str]:
-    """Hand-written sentences plus an even, deterministic sample of the template titles."""
-    titles = sorted(topic.topic.strip() for topic in template_store.list_topics(slug))
-    unique: dict[str, str] = {}
-    for title in titles:
-        if title:
-            unique.setdefault(title.casefold(), title)
-    ordered = [unique[key] for key in sorted(unique)]
-    return [*_HANDWRITTEN[slug], *_spread(ordered, _MAX_TITLES)]
-
-
 _proto_lock = threading.Lock()
-# (model, template store, prototype matrix per slug); holding both objects keeps their ids unique
-_proto_cache: tuple[Any, Any, dict[str, NDArray[np.float32]]] | None = None
+# (model, prototype matrix per slug)
+_proto_cache: tuple[Any, dict[str, NDArray[np.float32]]] | None = None
 
 
 def _usable_model(retriever: SemanticRetriever | None) -> Any | None:
@@ -221,31 +208,27 @@ def _usable_model(retriever: SemanticRetriever | None) -> Any | None:
     return model
 
 
-def _prototype_matrices(
-    retriever: SemanticRetriever, model: Any, template_store: TemplateStore
-) -> dict[str, NDArray[np.float32]]:
-    """Encode the prototypes once per (model, template store) pair of this process."""
+def _prototype_matrices(retriever: SemanticRetriever, model: Any) -> dict[str, NDArray[np.float32]]:
+    """Encode the hand-written prototypes once per model of this process."""
     global _proto_cache
     with _proto_lock:
         cached = _proto_cache
-        if cached is None or cached[0] is not model or cached[1] is not template_store:
+        if cached is None or cached[0] is not model:
             matrices = {
-                slug: retriever._encode(model, _prototype_texts(slug, template_store))
+                slug: retriever._encode(model, list(_HANDWRITTEN[slug]))
                 for slug in CATEGORY_SLUG_MAP
             }
-            cached = (model, template_store, matrices)
+            cached = (model, matrices)
             _proto_cache = cached
-        return cached[2]
+        return cached[1]
 
 
-def warm_category_prototypes(
-    retriever: SemanticRetriever | None, template_store: TemplateStore | None
-) -> None:
+def warm_category_prototypes(retriever: SemanticRetriever | None) -> None:
     """Encode the prototypes ahead of the first request; failures are only logged."""
     try:
         model = _usable_model(retriever)
-        if model is not None and template_store is not None:
-            _prototype_matrices(retriever, model, template_store)
+        if model is not None:
+            _prototype_matrices(retriever, model)
     except Exception as exc:
         logger.warning("category guard warm-up skipped: error=%s", type(exc).__name__)
 
@@ -366,7 +349,6 @@ def check_category_alignment(
     whole_text: str,
     has_template_match: bool = False,
     retriever: SemanticRetriever | None = None,
-    template_store: TemplateStore | None = None,
     client: Any | None = None,
     model: str | None = None,
     limiter: TokenBucketLimiter | None = None,
@@ -382,9 +364,9 @@ def check_category_alignment(
         return _decide(slug, "skipped", "too_short")
     try:
         model_in_use = _usable_model(retriever)
-        if model_in_use is None or template_store is None:
+        if model_in_use is None:
             return _log(_decide(slug, "fail_open", "no_local_model"))
-        matrices = _prototype_matrices(retriever, model_in_use, template_store)
+        matrices = _prototype_matrices(retriever, model_in_use)
         scores = _layer1_scores(retriever, model_in_use, matrices, slug, segments, whole_text)
     except Exception as exc:
         return _log(_decide(slug, "fail_open", "embedding_error"), exc)

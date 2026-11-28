@@ -2,7 +2,6 @@
 
 import json
 import logging
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -41,10 +40,10 @@ def _vector(**weights: float) -> np.ndarray:
 class FakeModel:
     """Prototype texts sit on their category's axis; other texts are looked up by hand."""
 
-    def __init__(self, store: "FakeStore", vectors: dict[str, np.ndarray]) -> None:
+    def __init__(self, vectors: dict[str, np.ndarray]) -> None:
         self.vectors = dict(vectors)
         for slug in SLUGS:
-            for text in category_guard._prototype_texts(slug, store):
+            for text in category_guard._HANDWRITTEN[slug]:
                 self.vectors[text] = _vector(**{slug: 1.0})
         self.calls: list[list[str]] = []
 
@@ -66,14 +65,6 @@ class FakeRetriever:
         return model.encode(texts)
 
 
-class FakeStore:
-    def __init__(self, titles: dict[str, list[str]] | None = None) -> None:
-        self.titles = titles or {}
-
-    def list_topics(self, category_slug: str | None = None) -> list[SimpleNamespace]:
-        return [SimpleNamespace(topic=title) for title in self.titles.get(category_slug, [])]
-
-
 @pytest.fixture(autouse=True)
 def fresh_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(category_guard, "_proto_cache", None)
@@ -89,17 +80,15 @@ def _check(
     **kwargs: Any,
 ):
     """Run the guard with `vector` for the whole text and one vector per extra segment."""
-    store = FakeStore()
     vectors = dict(segments or {})
     if vector is not None:
         vectors[text[: category_guard._MAX_CHARS]] = vector
-    model = FakeModel(store, vectors)
+    model = FakeModel(vectors)
     return check_category_alignment(
         selected_category=selected,
         segments=list(segments) if segments else [text],
         whole_text=text,
         retriever=FakeRetriever(model),
-        template_store=store,
         **kwargs,
     )
 
@@ -131,7 +120,6 @@ def test_constants_come_from_the_toml_section() -> None:
     assert category_guard._BLOCK_OTHER_MIN == section["category_guard_block_other_min"]
     assert category_guard._MAX_CHARS == section["category_guard_max_chars"]
     assert category_guard._LLM_MAX_TOKENS == section["category_guard_llm_max_tokens"]
-    assert category_guard._MAX_TITLES == section["category_guard_max_titles_per_category"]
 
 
 def test_handwritten_prototypes_cover_exactly_the_six_categories() -> None:
@@ -139,19 +127,10 @@ def test_handwritten_prototypes_cover_exactly_the_six_categories() -> None:
     assert all(6 <= len(texts) <= 8 for texts in category_guard._HANDWRITTEN.values())
 
 
-def test_titles_are_deduplicated_sorted_and_sampled_evenly() -> None:
-    titles = [f"Title {index:03d}" for index in range(397)]
-    store = FakeStore({"sports": [*reversed(titles), "TITLE 000", "title 396", "  "]})
-    texts = category_guard._prototype_texts("sports", store)
-    added = texts[len(category_guard._HANDWRITTEN["sports"]) :]
-
-    assert len(added) == category_guard._MAX_TITLES == 100
-    assert [title.casefold() for title in added] == [
-        titles[round(index * 396 / 99)].casefold() for index in range(100)
-    ]
-    assert category_guard._prototype_texts("sports", FakeStore({"sports": titles[::-1]}))[-1] == (
-        "Title 396"
-    )
+def test_prototypes_are_exactly_the_handwritten_sentences() -> None:
+    model = FakeModel({})
+    warm_category_prototypes(FakeRetriever(model))
+    assert model.calls == [list(category_guard._HANDWRITTEN[slug]) for slug in SLUGS]
 
 
 @pytest.mark.parametrize(("slug", "label"), CATEGORY_SLUG_MAP.items())
@@ -229,7 +208,6 @@ def test_early_passes_do_not_encode(selected, text, extra, layer) -> None:
         segments=[text],
         whole_text=text,
         retriever=retriever,
-        template_store=FakeStore(),
         **extra,
     )
     assert (result.allowed, result.layer) == (True, layer)
@@ -259,33 +237,24 @@ def _broken_encoder() -> FakeRetriever:
     return FakeRetriever(model)
 
 
-def _broken_store() -> MagicMock:
-    store = MagicMock()
-    store.list_topics.side_effect = RuntimeError(SECRET)
-    return store
-
-
 @pytest.mark.parametrize(
-    ("retriever", "store"),
+    "retriever",
     [
-        (None, FakeStore()),
-        (FakeRetriever(None), FakeStore()),
-        (FakeRetriever(MockEmbedder()), FakeStore()),
-        (_broken_retriever(), FakeStore()),
-        (_broken_encoder(), FakeStore()),
-        (FakeRetriever(FakeModel(FakeStore(), {})), None),
-        (FakeRetriever(FakeModel(FakeStore(), {})), _broken_store()),
-        (FakeRetriever(FakeModel(FakeStore(), {SECRET: np.full(DIM, np.nan)})), FakeStore()),
+        None,
+        FakeRetriever(None),
+        FakeRetriever(MockEmbedder()),
+        _broken_retriever(),
+        _broken_encoder(),
+        FakeRetriever(FakeModel({SECRET: np.full(DIM, np.nan)})),
     ],
 )
-def test_embedding_trouble_fails_open_with_a_warning(retriever, store, caplog) -> None:
+def test_embedding_trouble_fails_open_with_a_warning(retriever, caplog) -> None:
     client = _groq("{}")
     result = check_category_alignment(
         selected_category="wildlife",
         segments=[SECRET],
         whole_text=SECRET,
         retriever=retriever,
-        template_store=store,
         client=client,
         model=MODEL,
     )
@@ -350,16 +319,16 @@ def test_interdisciplinary_material_passes_on_its_best_passage(selected, other) 
 @pytest.mark.parametrize(
     ("selected", "other", "allowed", "reason"),
     [
-        (0.20, 0.90, True, "safe"),  # selected at the safe floor
-        (0.199, 0.90, False, "mismatch"),  # just below the safe floor and the block ceiling
+        (0.16, 0.90, True, "safe"),  # selected at the safe floor
+        (0.159, 0.90, False, "mismatch"),  # just below the safe floor and the block ceiling
         (0.0, 0.349, True, "safe"),  # other below the safe ceiling
         (0.0, 0.35, True, "gray_allowed"),
         (0.30, 0.90, True, "safe"),  # selected above the safe floor whatever the margin
-        (0.199, 0.42, False, "mismatch"),  # other at the block floor
-        (0.199, 0.419, True, "gray_allowed"),  # other below the block floor
-        (0.20, 0.42, True, "safe"),  # selected at the block ceiling
-        (0.18, 0.379, True, "safe"),  # margin just below its limit, no other safe rule applies
-        (0.18, 0.381, True, "gray_allowed"),  # margin just above its limit
+        (0.159, 0.42, False, "mismatch"),  # other at the block floor
+        (0.159, 0.419, True, "gray_allowed"),  # other below the block floor
+        (0.16, 0.42, True, "safe"),  # selected at the block ceiling
+        (0.155, 0.354, True, "safe"),  # margin just below its limit, no other safe rule applies
+        (0.155, 0.356, True, "gray_allowed"),  # margin just above its limit
     ],
 )
 def test_zone_borders(selected: float, other: float, allowed: bool, reason: str) -> None:
@@ -385,7 +354,7 @@ def test_margin_border(monkeypatch, margin: float, safe: bool) -> None:
     assert result.reason == ("safe" if safe else "gray_allowed")
 
 
-@pytest.mark.parametrize(("selected", "reason"), [(0.199, "mismatch"), (0.20, "gray_allowed")])
+@pytest.mark.parametrize(("selected", "reason"), [(0.159, "mismatch"), (0.16, "gray_allowed")])
 def test_block_ceiling_border(monkeypatch, selected: float, reason: str) -> None:
     # With the shipped values the safe floor equals the block ceiling and hides it, so raise it.
     monkeypatch.setattr(category_guard, "_SAFE_SELECTED_MIN", 1.0)
@@ -405,24 +374,21 @@ def test_only_the_start_of_the_text_is_compared_with_other_categories() -> None:
 
 
 def test_without_segments_the_whole_text_is_scored() -> None:
-    store = FakeStore()
-    model = FakeModel(store, {SECRET: _vector(wildlife=0.7)})
+    model = FakeModel({SECRET: _vector(wildlife=0.7)})
     result = check_category_alignment(
         selected_category="Wildlife",
         segments=[" "],
         whole_text=SECRET,
         retriever=FakeRetriever(model),
-        template_store=store,
     )
     assert (result.selected_category, result.selected_score) == ("wildlife", 0.7)
 
 
-def test_prototypes_are_encoded_once_per_model_and_store() -> None:
-    store = FakeStore({"sports": ["Marathon pacing"]})
-    model = FakeModel(store, {})
+def test_prototypes_are_encoded_once_per_model() -> None:
+    model = FakeModel({})
     retriever = FakeRetriever(model)
 
-    warm_category_prototypes(retriever, store)
+    warm_category_prototypes(retriever)
     assert len(model.calls) == len(SLUGS)
     for _ in range(2):
         check_category_alignment(
@@ -430,27 +396,22 @@ def test_prototypes_are_encoded_once_per_model_and_store() -> None:
             segments=[SECRET],
             whole_text=SECRET,
             retriever=retriever,
-            template_store=store,
             allow_llm=False,
         )
-    warm_category_prototypes(retriever, store)
+    warm_category_prototypes(FakeRetriever(model))
     assert len(model.calls) == len(SLUGS) + 4  # two passages encodes per check
 
-    warm_category_prototypes(retriever, FakeStore())
-    assert len(model.calls) == 2 * len(SLUGS) + 4
+    other = FakeModel({})
+    warm_category_prototypes(FakeRetriever(other))
+    assert len(other.calls) == len(SLUGS)
 
 
 @pytest.mark.parametrize(
-    ("retriever", "store"),
-    [
-        (None, FakeStore()),
-        (FakeRetriever(MockEmbedder()), FakeStore()),
-        (_broken_retriever(), FakeStore()),
-        (FakeRetriever(FakeModel(FakeStore(), {})), None),
-    ],
+    "retriever",
+    [None, FakeRetriever(MockEmbedder()), _broken_retriever(), _broken_encoder()],
 )
-def test_warm_up_never_raises(retriever, store) -> None:
-    warm_category_prototypes(retriever, store)
+def test_warm_up_never_raises(retriever) -> None:
+    warm_category_prototypes(retriever)
     assert category_guard._proto_cache is None
 
 
